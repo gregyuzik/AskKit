@@ -37,8 +37,8 @@ private final class Written {
         #expect(style.accessory == nil)
     }
 
-    /// The screen's spectrum reaches the face, which glows and fills its
-    /// circle with it, and taking it away is a write the face hears too.
+    /// The screen's spectrum reaches the face, which fills its circle with
+    /// it, and taking it away is a write the face hears too.
     @Test func aChangedSpectrumReachesTheFaceAfterTheScreenAppeared() {
         let style = AskComposerFaceStyle()
         style.update(accent: .blue, spectrum: nil, accessory: nil)

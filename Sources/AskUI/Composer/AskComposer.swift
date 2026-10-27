@@ -32,12 +32,6 @@ public struct AskComposer: View {
     /// What the send circle wears in place of the accent: `AskScreen`'s
     /// spectrum, which a host sets on the screen (`AskSpectrum`).
     private let spectrum: AskSpectrum?
-    /// The clock the spectrum's glass rod drifts by: the store's, which the
-    /// face in a host's slot reads too (`AskGlassRodClock`).
-    private let rodClock: AskGlassRodClock
-    /// How far over the capsule the rod's glow may reach: as far as the photo
-    /// chip waiting over the composer, or nil where none waits.
-    private let rodHeadroom: CGFloat?
     private let isThinking: Bool
     private let acceptsAttachments: Bool
     private let onSend: () -> Void
@@ -106,7 +100,7 @@ public struct AskComposer: View {
     ) {
         self.init(
             draft: draft, isFocused: isFocused, placeholder: placeholder,
-            accent: accent, spectrum: nil, rodClock: .resting, rodHeadroom: nil, isThinking: isThinking,
+            accent: accent, spectrum: nil, isThinking: isThinking,
             acceptsAttachments: acceptsAttachments, onSend: onSend, onStop: onStop,
             onAttach: onAttach, accessory: accessory
         )
@@ -120,8 +114,6 @@ public struct AskComposer: View {
         placeholder: String,
         accent: Color,
         spectrum: AskSpectrum?,
-        rodClock: AskGlassRodClock,
-        rodHeadroom: CGFloat?,
         isThinking: Bool,
         acceptsAttachments: Bool,
         onSend: @escaping () -> Void,
@@ -134,8 +126,6 @@ public struct AskComposer: View {
         self.placeholder = placeholder
         self.accent = accent
         self.spectrum = spectrum
-        self.rodClock = rodClock
-        self.rodHeadroom = rodHeadroom
         self.isThinking = isThinking
         self.acceptsAttachments = acceptsAttachments
         self.onSend = onSend
@@ -185,16 +175,6 @@ public struct AskComposer: View {
         .padding(.leading, leadingAccessory == nil ? 18 : AskComposerMetrics.edge)
         .padding(.trailing, AskComposerMetrics.edge)
         .padding(.vertical, AskComposerMetrics.edge)
-        // The host's spectrum as a glass rod round the capsule's rim, there
-        // whenever the composer is in sight and drifting while a turn is in
-        // flight (`AskGlassRod`). Here, between the content and the glass, so
-        // it draws over the glass and under the field and the circles. Out
-        // while the composer rests in a host's slot, where the face carries
-        // it instead.
-        .askGlassRod(
-            spectrum, clock: rodClock, facing: .outward, corner: corner, headroom: rodHeadroom,
-            covered: rests
-        )
         // A capsule at one line, and as the field grows, a rectangle whose
         // corners keep that radius, concentric with the circles at the
         // bottom corners (`AskComposerMetrics.corner`).
@@ -622,8 +602,7 @@ nonisolated enum AskComposerMetrics {
     /// and the same as the field grows, so the circles, which sit at the
     /// bottom of the row, stay centred on the corners' centres, as far inside
     /// the edge at four lines as at one. A capsule four lines tall has ends
-    /// 57 pt round, and its circles ran out over its rim, with the glass
-    /// rod's light behind them.
+    /// 57 pt round, and its circles ran out over its rim.
     static func corner(widestGlyph scaled: CGFloat) -> CGFloat {
         edge + target(widestGlyph: scaled) / 2
     }

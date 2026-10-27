@@ -44,5 +44,3 @@ Don't "tidy" it into either list.
 - `AskHostFocus` is ungated and imports Foundation alone.
 - `AskWindowHeight` is `#if os(iOS)`.
 - `AskCommands` is `#if os(macOS)`.
-- `AskGlassRod.metal` takes no gate. SwiftPM and Xcode compile it into AskUI's bundle for all five
-  platforms, watchOS included, and only `AskGlassRod`, inside the view gate, loads it.

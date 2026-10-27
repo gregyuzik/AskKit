@@ -319,9 +319,8 @@ struct ContentView: View {
             AskScreen(
                 store: ask.store,
                 accent: .accentColor,
-                // The icon's colors: a glass rod round the composer, and the
-                // send circle and the caret in a gradient
-                // (`AskSpectrum.aurora`).
+                // The icon's colors: the send circle and the caret in a
+                // gradient of them (`AskSpectrum.aurora`).
                 spectrum: .aurora,
                 // `DemoLaunchArgument.emptyLibrary` with `button`: where a
                 // host would take the reader to add a first item. The demo

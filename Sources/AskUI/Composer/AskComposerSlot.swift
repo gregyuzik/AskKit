@@ -268,7 +268,7 @@ private struct AskComposerSlot<Domain: AskDomain, Accessory: View>: ViewModifier
 ///
 /// **A wash, not glass.** The slot draws its own glass capsule, so the accent
 /// is painted inside it, at 35%; a second glass layer would be glass on
-/// glass. A spectrum's glass rod is drawn inside it too, over the wash.
+/// glass.
 ///
 /// **Fixed metrics where the composer's scale.** The slot is 48 pt tall at
 /// every text size, and a circle scaled past it would be cut off, so the
@@ -314,13 +314,6 @@ struct AskComposerFace<Domain: AskDomain>: View {
         .padding(.leading, accessory == nil ? 18 : 2)
         .padding(.trailing, 2)
         .frame(maxHeight: .infinity)
-        // The host's spectrum as a glass rod, as round the composer: this is
-        // the composer's face, so it carries the rod wherever it rests.
-        // Inside the slot's glass, so just inside the face's edge, over the
-        // wash and under the line and the circles, with its glow falling
-        // inward. Out while the screen's own composer is up over the face,
-        // which then carries it itself.
-        .askGlassRod(style.spectrum, clock: store.rodClock, facing: .inward, covered: isUnderRaisedComposer)
         .background(accent.opacity(Self.wash), in: .capsule)
         .disabled(store.composerIsDisabled)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)

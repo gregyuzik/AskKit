@@ -36,12 +36,10 @@ in [ARCHITECTURE.md](ARCHITECTURE.md).
   and the two meet where a search finds nothing, with an offer to ask instead
   (`AskConversationStore.prefill(_:scope:send:)`).
 - **Apple Intelligence's visual grammar.** The multicolor shimmer border is the system's signature, Siri's
-  and Writing Tools', and a third-party surface doesn't imitate it. The spectrum look's glass rod round
-  the composer is the host's own colors, opt-in, and is the field's edge rather than a sign of the
-  system at work: it stands still at rest, marking where to type, and while a turn is in flight its
-  colors only drift slowly round it. With no spectrum there is none. The `apple.intelligence` symbol
-  belongs on the first screen's disclosure and the settings card, **not on every message**. The host's
-  own mark is the identity.
+  and Writing Tools', and a third-party surface doesn't imitate it. AskKit draws no colored border at
+  all: the spectrum look is the host's own colors, opt-in, on the send circle and the streaming caret
+  alone, and the composer is plain glass. The `apple.intelligence` symbol belongs on the first screen's
+  disclosure and the settings card, **not on every message**. The host's own mark is the identity.
 
 ## 2. Research on chat UX (NN/g, 2025–2026)
 
@@ -100,8 +98,8 @@ Not taken from the research: an assistant bubble or avatar beside every answer (
 finding); a visible "thinking" transcript for Private Cloud Compute's reasoning, which Apple keeps in
 intermediate segments the app never receives as prose, so a collapsible box would show nothing honest;
 a model picker (one policy, one tier caption); per-message disclaimers; and any imitation of the Apple
-Intelligence shimmer, which the spectrum look's glass rod, still at rest and in the host's colors, is
-not (§1).
+Intelligence shimmer: no colored border, and the spectrum look's colors stay on the send circle and the
+caret (§1).
 
 ## Sources
 

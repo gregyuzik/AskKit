@@ -1755,11 +1755,6 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 placeholder: store.brand.help,
                 accent: accent,
                 spectrum: spectrum,
-                rodClock: store.rodClock,
-                // The rod's glow stops short of a photo waiting over the
-                // composer, rather than wash the chip in color the whole time
-                // it waits.
-                rodHeadroom: store.pendingPhoto == nil ? nil : Self.photoChipGap,
                 isThinking: store.isThinking,
                 acceptsAttachments: store.domain.acceptsPhotoAttachments,
                 onSend: { store.ask(store.draft) },
@@ -2195,11 +2190,10 @@ where Mark == AskDefaultMark, Tiles == AskDefaultTiles<Domain.Row>, Disclosure =
     ///     proposal's card, and the face in a host's slot. The app's accent
     ///     color by default.
     ///   - spectrum: A run of colors for the spectrum look (`AskSpectrum`),
-    ///     such as `.aurora`: a glass rod of its colors round the composer's
-    ///     rim, there at rest and drifting while a turn is in flight, and the
-    ///     send circle and the reveal's caret in a gradient in place of the
-    ///     accent, on the face in a host's slot too. Everything else keeps the
-    ///     accent. Nil by default, for none.
+    ///     such as `.aurora`: the send circle and the reveal's caret in a
+    ///     gradient of it in place of the accent, the send circle on the face
+    ///     in a host's slot too. Everything else keeps the accent, and so do
+    ///     those two under Increase Contrast. Nil by default, for none.
     ///   - onNothingAction: What the button on the nothing-to-ask first screen
     ///     does, such as opening the host's sheet for adding something. The
     ///     button shows only when this is set and the brand has a
@@ -2408,9 +2402,8 @@ extension AskScreen {
 struct AskScreenConfiguration {
     /// The color the screen tints its own surfaces with.
     var accent: Color
-    /// What lights the glass rod round the composer, and what its send
-    /// circle and the reveal's caret wear in place of the accent, or nil for
-    /// the accent alone (`AskSpectrum`).
+    /// What the composer's send circle and the reveal's caret wear in place
+    /// of the accent, or nil for the accent alone (`AskSpectrum`).
     var spectrum: AskSpectrum?
     /// What the button on the nothing-to-ask first screen does, or nil for no
     /// button. Only the host knows where adding something goes.
