@@ -1,0 +1,3 @@
+# Xcode 27.2's JSON project: JSON5 (comments, trailing commas). LF only, and no union merge, which would write
+# duplicate keys or broken commas that the push gate's formatter check then rejects.
+*.xcproj text eol=lf linguist-language=JSON5

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # The only ecosystem Dependabot can update here. The package has no remote
+  # dependencies, and Dependabot's Swift toolchain predates `swift-tools-version: 6.4`.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      all:
+        patterns:
+          - "*"

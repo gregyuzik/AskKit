@@ -1,0 +1,74 @@
+name: Bug report
+description: AskKit doesn't do what its documentation says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A security problem, such as text the host didn't write steering the model, goes through the private form linked from the issue chooser instead.
+  - type: input
+    id: version
+    attributes:
+      label: AskKit version
+      description: The tag or commit your package resolves to.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms
+      multiple: true
+      options:
+        - iOS
+        - iPadOS
+        - macOS
+        - visionOS
+        - tvOS
+        - watchOS
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: OS and Xcode versions
+      placeholder: iOS 27.2, Xcode 27.2
+    validations:
+      required: true
+  - type: dropdown
+    id: tier
+    attributes:
+      label: The model that answered
+      description: The tier caption says which. A Debug, simulator or development-signed build stays on the device unless it's launched with `ASK_LIVE_PCC=1`.
+      options:
+        - Private Cloud Compute
+        - On device
+        - Neither, because the turn failed
+        - It isn't about a turn
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The fewest steps that show it. If the demo app shows it, start there.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: AskKit logs under your `AskBrand.logSubsystem`. A question or an answer can hold personal details, so remove them first.
+      render: text

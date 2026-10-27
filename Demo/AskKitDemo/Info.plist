@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  The twenty-five locales AskCore and AskUI carry, claimed by the HOST.
+
+	  iOS runs an app in the intersection of the reader's preferred languages and
+	  the app's own supported localizations, and a bundle with nothing to declare
+	  supports exactly one. The demo carries no catalog of its own, so without
+	  this list it runs in English whatever the system says: under
+	  `-AppleLanguages (he)` Apple Intelligence reports itself unavailable, which
+	  is the honest Hebrew answer, while every AskUI string stays in English and
+	  every layout left-to-right, and the screen can't be checked right-to-left.
+
+	  Declaring them here costs nothing. A host with catalogs of its own gets
+	  this for free.
+	-->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ar</string>
+		<string>cs</string>
+		<string>da</string>
+		<string>de</string>
+		<string>es</string>
+		<string>es-MX</string>
+		<string>fr</string>
+		<string>he</string>
+		<string>id</string>
+		<string>it</string>
+		<string>ja</string>
+		<string>ko</string>
+		<string>nb</string>
+		<string>nl</string>
+		<string>pl</string>
+		<string>pt-BR</string>
+		<string>ru</string>
+		<string>sv</string>
+		<string>th</string>
+		<string>tr</string>
+		<string>uk</string>
+		<string>vi</string>
+		<string>zh-Hans</string>
+		<string>zh-Hant</string>
+	</array>
+	<!--
+	  askkitdemo://ask?q=… — the Ask link shape AskLink reads, so the demo can
+	  show a link landing in the composer and sending nothing.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.example.askkitdemo.ask</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>askkitdemo</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

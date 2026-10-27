@@ -1,0 +1,32 @@
+# SwiftLint configuration. Goal: `swiftlint lint` exits clean on the current
+# tree so any new violation stands out. Size/judgment rules the codebase
+# deliberately violates are disabled; mechanical rules stay on.
+# `--strict` as a property of the config, not of one invocation, so a bare
+# `swiftlint lint` — which is what anyone runs by hand — fails wherever the
+# pre-push gate does, instead of only warning.
+strict: true
+
+excluded:
+  - .build
+  - .swiftpm
+  - tmp
+  # `.claude/` holds notes and scratch for coding agents, not this package's
+  # code.
+  - .claude
+
+disabled_rules:
+  # Persisted enums spell out rawValues that equal the case name on purpose —
+  # the explicit string is the storage contract, so a future case-rename can't
+  # silently change what's on disk.
+  - redundant_string_enum_value
+  # `@Guide("…")` prose on a `@Generable` property is one literal and cannot be
+  # wrapped without changing what the model reads.
+  - line_length
+  - identifier_name
+  - file_length
+  - type_body_length
+  - function_body_length
+  - function_parameter_count
+  - cyclomatic_complexity
+  - large_tuple
+  - nesting

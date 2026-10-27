@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+<linearGradient id="field" x1="1" y1="0" x2="0" y2="1"><stop offset="0.0" stop-color="#fcebd8" stop-opacity="1.0"/><stop offset="0.5" stop-color="#f7dfdf" stop-opacity="1.0"/><stop offset="1.0" stop-color="#a8d9e2" stop-opacity="1.0"/></linearGradient>
+<linearGradient id="beam" gradientUnits="userSpaceOnUse" x1="0" y1="512.5" x2="0" y2="819.5"><stop offset="0" stop-color="color(display-p3 1.00 0.50 0.44)" stop-opacity="0"/><stop offset="0.5" stop-color="color(display-p3 1.00 0.50 0.44)" stop-opacity="0.24"/><stop offset="1" stop-color="color(display-p3 1.00 0.50 0.44)" stop-opacity="0"/></linearGradient>
+</defs>
+<rect width="1024" height="1024" fill="url(#field)"/>
+<rect x="-1024" y="512.5" width="3072" height="307" fill="url(#beam)" transform="rotate(21.8 512 512)"/>
+</svg>

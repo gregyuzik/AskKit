@@ -1,0 +1,28 @@
+// Signing for every demo target: the project's Debug and Release configurations
+// are based on this file.
+//
+// A simulator build and the Mac app are unsigned and need nothing here. An
+// iPhone, an iPad or an Apple Vision Pro installs only a signed app, so a device
+// build signs with the team in Local.xcconfig: a file beside this one that git
+// ignores. To run the demo on a device, create it with your team's ID:
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// With a team set, the bundle id takes it as a suffix, com.example.askkitdemoABCDE12345
+// instead of com.example.askkitdemo. An App ID can be registered to one team
+// only, so a fixed id would register for the first developer to run the demo on
+// a device and fail for everyone after.
+//
+// Anything else a local build needs can go in Local.xcconfig too, since it is
+// read last: `CODE_SIGNING_ALLOWED = YES` signs the Mac app with the same team.
+// Signed, the Mac app runs in the App Sandbox under the hardened runtime, which
+// the project asks for and an unsigned build can't carry.
+
+DEVELOPMENT_TEAM =
+DEMO_BUNDLE_ID_SUFFIX = $(DEVELOPMENT_TEAM)
+
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGNING_ALLOWED[sdk=iphoneos*] = YES
+CODE_SIGNING_ALLOWED[sdk=xros*] = YES
+
+#include? "Local.xcconfig"

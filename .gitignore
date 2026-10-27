@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+/DerivedData/
+Demo/Local.xcconfig
+/tmp/
+__pycache__/
+*.log
+.DS_Store
+*.xcresult
+xcuserdata/
+.vscode/
+.idea/

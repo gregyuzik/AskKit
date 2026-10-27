@@ -1,0 +1,2299 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Apple Intelligence doesn't support this language yet." : {
+      "comment" : "Shown when Apple Intelligence works but does not support the app's language, so no question can be answered. Hebrew is one such language.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يدعم Apple Intelligence هذه اللغة بعد."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence zatím tento jazyk nepodporuje."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence understøtter ikke dette sprog endnu."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence unterstützt diese Sprache noch nicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence doesn’t support this language yet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence aún no admite este idioma."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence aún no admite este idioma."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ne prend pas encore en charge cette langue."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "השפה הזו עדיין אינה נתמכת ב‑Apple Intelligence."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence belum mendukung bahasa ini."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence non supporta ancora questa lingua."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligenceはこの言語にまだ対応していません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence가 아직 이 언어를 지원하지 않습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence støtter ikke dette språket ennå."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ondersteunt deze taal nog niet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence jeszcze nie obsługuje tego języka."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence ainda não é compatível com este idioma."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence пока не поддерживает этот язык."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence stöder inte det här språket ännu."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ยังไม่รองรับภาษานี้"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence bu dili henüz desteklemiyor."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ще не підтримує цю мову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence chưa hỗ trợ ngôn ngữ này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence 尚不支持此语言。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence尚未支援此語言。"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is still downloading. Ask again once it has finished." : {
+      "comment" : "Shown when the Apple Intelligence model assets are still downloading.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‏Apple Intelligence ما زال قيد التنزيل. يمكنك طرح السؤال مرة أخرى بعد اكتمال التنزيل."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence se ještě stahuje. Zeptejte se znovu, až to bude hotové."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence hentes stadig. Spørg igen, når overførslen er færdig."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence wird noch geladen. Frag erneut, sobald der Vorgang abgeschlossen ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence aún se está descargando. Vuelve a preguntar cuando termine."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence aún se está descargando. Vuelve a preguntar cuando termine."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence est encore en cours de téléchargement. Reposez votre question une fois le téléchargement terminé."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ההורדה של Apple Intelligence עדיין נמשכת. ניתן לשאול שוב כשהיא תסתיים."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence masih diunduh. Ajukan pertanyaan lagi setelah pengunduhan selesai."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence è ancora in download. Riprova a chiedere quando avrà finito."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligenceをダウンロード中です。完了してからもう一度質問してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence를 아직 다운로드하고 있습니다. 완료된 후 다시 질문해 주세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence lastes fortsatt ned. Spør igjen når nedlastingen er ferdig."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence wordt nog gedownload. Vraag het opnieuw zodra dat klaar is."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence wciąż się pobiera. Zapytaj ponownie, gdy pobieranie się zakończy."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Apple Intelligence ainda está sendo baixado. Pergunte de novo quando terminar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ещё загружается. Спросите снова, когда загрузка завершится."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence hämtas fortfarande. Fråga igen när hämtningen är klar."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence กำลังดาวน์โหลดอยู่ ลองถามอีกครั้งเมื่อดาวน์โหลดเสร็จ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence hâlâ indiriliyor. İndirme bittiğinde tekrar sorun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ще завантажується. Запитайте знову, коли завантаження завершиться."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence vẫn đang tải xuống. Hãy hỏi lại khi tải xong."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence 仍在下载。下载完成后再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence仍在下載。下載完成後再問一次。"
+          }
+        }
+      }
+    },
+    "Apple Intelligence is turned off. Turn it on in Settings." : {
+      "comment" : "Shown when no model can answer because the reader has not turned Apple Intelligence on. The Mac variation names the Mac's app, System Settings, where the other says Settings.",
+      "localizations" : {
+        "ar" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "‏Apple Intelligence متوقف. يمكنك تشغيله في إعدادات النظام."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "‏Apple Intelligence متوقف. يمكنك تشغيله في الإعدادات."
+                }
+              }
+            }
+          }
+        },
+        "cs" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Funkce Apple Intelligence je vypnutá. Zapněte ji v Nastavení systému."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Funkce Apple Intelligence je vypnutá. Zapněte ji v Nastavení."
+                }
+              }
+            }
+          }
+        },
+        "da" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence er slået fra. Slå det til i Systemindstillinger."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence er slået fra. Slå det til i Indstillinger."
+                }
+              }
+            }
+          }
+        },
+        "de" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence ist deaktiviert. Aktiviere es in den Systemeinstellungen."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence ist deaktiviert. Aktiviere es in den Einstellungen."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence is turned off. Turn it on in System Settings."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence is turned off. Turn it on in Settings."
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence está desactivado. Actívalo en Ajustes del Sistema."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence está desactivado. Actívalo en Ajustes."
+                }
+              }
+            }
+          }
+        },
+        "es-MX" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence está desactivado. Actívalo en Configuración del Sistema."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence está desactivado. Actívalo en Configuración."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence est désactivé. Activez-le dans Réglages Système."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence est désactivé. Activez-le dans Réglages."
+                }
+              }
+            }
+          }
+        },
+        "he" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "‏Apple Intelligence כבוי. יש להפעיל אותו ב״הגדרות המערכת״."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "‏Apple Intelligence כבוי. יש להפעיל אותו ב״הגדרות״."
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence nonaktif. Aktifkan di Pengaturan Sistem."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence nonaktif. Aktifkan di Pengaturan."
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence è disattivato. Attivalo in Impostazioni di Sistema."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence è disattivato. Attivalo in Impostazioni."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligenceがオフになっています。“システム設定”でオンにしてください。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligenceがオフになっています。“設定”でオンにしてください。"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence가 꺼져 있습니다. 시스템 설정에서 켜세요."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence가 꺼져 있습니다. 설정에서 켜세요."
+                }
+              }
+            }
+          }
+        },
+        "nb" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence er slått av. Slå det på i Systeminnstillinger."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence er slått av. Slå det på i Innstillinger."
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence is uitgeschakeld. Schakel het in bij Systeeminstellingen."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence is uitgeschakeld. Schakel het in bij Instellingen."
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence jest wyłączone. Włącz je w Ustawieniach systemowych."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence jest wyłączone. Włącz je w Ustawieniach."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "O Apple Intelligence está desativado. Ative-o nos Ajustes do Sistema."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "O Apple Intelligence está desativado. Ative-o nos Ajustes."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence выключен. Включите его в Системных настройках."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence выключен. Включите его в Настройках."
+                }
+              }
+            }
+          }
+        },
+        "sv" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence är avstängt. Slå på det i Systeminställningar."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence är avstängt. Slå på det i Inställningar."
+                }
+              }
+            }
+          }
+        },
+        "th" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence ปิดอยู่ เปิดได้ที่การตั้งค่าระบบ"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence ปิดอยู่ เปิดได้ที่การตั้งค่า"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence kapalı. Sistem Ayarları’ndan açın."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence kapalı. Ayarlar’dan açın."
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence вимкнено. Увімкніть його в Системних параметрах."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence вимкнено. Увімкніть його в Параметрах."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence đang tắt. Hãy bật trong Cài đặt hệ thống."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence đang tắt. Hãy bật trong Cài đặt."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence 已关闭。请在“系统设置”中开启。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence 已关闭。请在“设置”中开启。"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence已關閉。請在「系統設定」中開啟。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Apple Intelligence已關閉。請在「設定」中開啟。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Couldn't answer that just now. Please try again." : {
+      "comment" : "Shown when a model was available but the Ask turn timed out, failed, or produced no answer. Retryable, so Try Again is offered.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر الرد على ذلك الآن. يرجى المحاولة مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na tuto otázku se teď nepodařilo odpovědět. Zkuste to znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare lige nu. Prøv igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das konnte gerade nicht beantwortet werden. Versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t answer that just now. Please try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido responder en este momento. Inténtalo de nuevo."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo responder en este momento. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de répondre pour le moment. Réessayez."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן היה לענות כרגע. ניתן לנסות שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menjawab saat ini. Silakan coba lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile rispondere in questo momento. Riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は回答できませんでした。やり直してみてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 답할 수 없었습니다. 다시 시도하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare akkurat nå. Prøv igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kon nu geen antwoord geven. Probeer het opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się teraz odpowiedzieć. Spróbuj ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível responder agora. Tente novamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось ответить. Попробуйте ещё раз."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte svara just nu. Försök igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบคำถามไม่ได้ในขณะนี้ ลองอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şu anda yanıt verilemedi. Lütfen tekrar deneyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зараз не вдалося відповісти. Спробуйте ще раз."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể trả lời lúc này. Vui lòng thử lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现在无法回答。请重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在無法回答。請再試一次。"
+          }
+        }
+      }
+    },
+    "Couldn't answer that question. Try asking it another way." : {
+      "comment" : "Shown when the model refused an Ask question, or answered without reading the reader's own data so the answer was discarded.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر الرد على هذا السؤال. يمكنك طرحه بصياغة مختلفة."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na tuto otázku nelze odpovědět. Zkuste ji položit jinak."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare på det spørgsmål. Prøv at stille det på en anden måde."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Frage konnte nicht beantwortet werden. Formuliere sie anders."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t answer that question. Try asking it another way."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido responder esa pregunta. Prueba a formularla de otra manera."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo responder esa pregunta. Intenta formularla de otra manera."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de répondre à cette question. Essayez de la formuler autrement."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן היה לענות על השאלה הזו. ניתן לנסות לנסח אותה אחרת."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menjawab pertanyaan itu. Coba ajukan dengan cara lain."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile rispondere a questa domanda. Prova a formularla in un altro modo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その質問には回答できませんでした。別の言い方で聞いてみてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그 질문에는 답할 수 없습니다. 다르게 물어보세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare på det spørsmålet. Prøv å stille det på en annen måte."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kon die vraag niet beantwoorden. Probeer het anders te formuleren."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się odpowiedzieć na to pytanie. Spróbuj zadać je inaczej."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível responder a essa pergunta. Tente perguntar de outro jeito."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось ответить на этот вопрос. Попробуйте сформулировать его иначе."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte svara på den frågan. Prova att formulera om den."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบคำถามนั้นไม่ได้ ลองถามด้วยวิธีอื่น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu soru yanıtlanamadı. Başka bir şekilde sormayı deneyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося відповісти на це запитання. Спробуйте сформулювати його інакше."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể trả lời câu hỏi đó. Hãy thử hỏi theo cách khác."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法回答该问题。换个说法再问问看。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法回答該問題。換個說法再問問看。"
+          }
+        }
+      }
+    },
+    "Couldn't reach Apple Intelligence right now. Try again later." : {
+      "comment" : "Shown when no model can answer for a reason the app cannot name — a tier that is not ready, no network behind Private Cloud Compute, or a reason newer than this build.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر الوصول إلى Apple Intelligence الآن. يرجى المحاولة لاحقًا."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teď se nepodařilo připojit k Apple Intelligence. Zkuste to později."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke nå Apple Intelligence lige nu. Prøv igen senere."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence ist gerade nicht erreichbar. Versuche es später erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t reach Apple Intelligence right now. Try again later."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido acceder a Apple Intelligence ahora mismo. Inténtalo más tarde."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo acceder a Apple Intelligence en este momento. Inténtalo más tarde."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’accéder à Apple Intelligence pour le moment. Réessayez plus tard."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן להגיע אל Apple Intelligence כרגע. ניתן לנסות שוב מאוחר יותר."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat terhubung ke Apple Intelligence saat ini. Silakan coba lagi nanti."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile raggiungere Apple Intelligence in questo momento. Riprova più tardi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在Apple Intelligenceに接続できません。あとでやり直してみてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 Apple Intelligence에 연결할 수 없습니다. 나중에 다시 시도해 주세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fikk ikke kontakt med Apple Intelligence akkurat nå. Prøv igjen senere."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is nu niet bereikbaar. Probeer het later opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się teraz połączyć z Apple Intelligence. Spróbuj ponownie później."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível acessar o Apple Intelligence agora. Tente novamente mais tarde."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сейчас не удалось обратиться к Apple Intelligence. Повторите попытку позже."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte nå Apple Intelligence just nu. Försök igen senare."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถเชื่อมต่อกับ Apple Intelligence ได้ในขณะนี้ ลองอีกครั้งในภายหลัง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Şu anda Apple Intelligence’a ulaşılamıyor. Lütfen daha sonra tekrar deneyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Наразі не вдалося звернутися до Apple Intelligence. Спробуйте ще раз пізніше."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện không kết nối được với Apple Intelligence. Vui lòng thử lại sau."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前无法连接 Apple Intelligence。请稍后重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前無法連接Apple Intelligence。請稍後再試。"
+          }
+        }
+      }
+    },
+    "Couldn't reach Private Cloud Compute. Try again." : {
+      "comment" : "Shown when an Ask turn failed because Private Cloud Compute could not be reached. Retryable.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر الوصول إلى Private Cloud Compute. يرجى المحاولة مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nepodařilo se připojit k Private Cloud Compute. Zkuste to znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke nå Private Cloud Compute. Prøv igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute war nicht erreichbar. Versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t reach Private Cloud Compute. Try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido conectar con Private Cloud Compute. Inténtalo de nuevo."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo conectar con Private Cloud Compute. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de joindre Private Cloud Compute. Réessayez."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן היה להתחבר ל‑Private Cloud Compute. ניתן לנסות שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat terhubung ke Private Cloud Compute. Coba lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile raggiungere Private Cloud Compute. Riprova."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Computeに接続できませんでした。やり直してみてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute에 연결할 수 없었습니다. 다시 시도하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fikk ikke kontakt med Private Cloud Compute. Prøv igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute was niet bereikbaar. Probeer het opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się połączyć z Private Cloud Compute. Spróbuj ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível acessar o Private Cloud Compute. Tente novamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось связаться с Private Cloud Compute. Попробуйте ещё раз."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte nå Private Cloud Compute. Försök igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ไม่สามารถเชื่อมต่อกับ Private Cloud Compute ได้ ลองอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute’a ulaşılamadı. Lütfen tekrar deneyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося підключитися до Private Cloud Compute. Спробуйте ще раз."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể kết nối với Private Cloud Compute. Vui lòng thử lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接 Private Cloud Compute。请重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連接Private Cloud Compute。請再試一次。"
+          }
+        }
+      }
+    },
+    "Couldn't read the photo. Ask again without it." : {
+      "comment" : "Shown when a question was asked with a photo and the model answering it can't take photos. Not retryable: asking again with the photo fails the same way, so the reader is told to ask without it.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر قراءة الصورة. يمكنك طرح السؤال مرة أخرى بدونها."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotografii se nepodařilo přečíst. Zeptejte se znovu bez ní."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke læse billedet. Spørg igen uden det."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Foto konnte nicht gelesen werden. Frag erneut ohne das Foto."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t read the photo. Ask again without it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido leer la foto. Vuelve a preguntar sin ella."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo leer la foto. Vuelve a preguntar sin ella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de lire la photo. Reposez votre question sans la photo."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן היה לקרוא את התמונה. יש לשאול שוב ללא התמונה."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto tidak dapat dibaca. Ajukan lagi pertanyaan tanpa foto."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile leggere la foto. Riprova a chiedere senza la foto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を読み取れませんでした。写真なしでもう一度質問してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진을 읽을 수 없습니다. 사진 없이 다시 질문하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke lese bildet. Spør igjen uten det."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kon de foto niet lezen. Vraag het opnieuw zonder de foto."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się odczytać zdjęcia. Zapytaj ponownie bez niego."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível ler a foto. Pergunte de novo sem ela."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось прочитать фото. Спросите снова без фото."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte läsa fotot. Fråga igen utan det."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "อ่านรูปภาพไม่ได้ ลองถามอีกครั้งโดยไม่ใช้รูปภาพ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğraf okunamadı. Fotoğraf olmadan tekrar sorun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося прочитати фото. Запитайте знову без нього."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể đọc ảnh. Hãy hỏi lại mà không kèm ảnh."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取照片。请不带照片再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法讀取照片。請不帶照片再問一次。"
+          }
+        }
+      }
+    },
+    "Private Cloud Compute has reached today's limit." : {
+      "comment" : "Shown when the daily per-user Private Cloud Compute quota is spent. The reset time is shown separately by the quota banner.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وصلت Private Cloud Compute إلى الحد اليومي."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dnešní limit pro Private Cloud Compute je vyčerpán."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute har nået dagens grænse."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute hat das Tageslimit erreicht."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute has reached today’s limit."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute ha alcanzado el límite de hoy."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute alcanzó el límite de hoy."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute a atteint la limite du jour."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‏Private Cloud Compute הגיע למגבלה היומית."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute telah mencapai batas hari ini."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute ha raggiunto il limite di oggi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Computeは本日の上限に達しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute가 오늘 한도에 도달했습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute har nådd dagens grense."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute heeft de limiet van vandaag bereikt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dzisiejszy limit Private Cloud Compute został wyczerpany."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Private Cloud Compute atingiu o limite de hoje."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute достиг дневного лимита."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute har nått dagens gräns."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ถึงขีดจำกัดของวันนี้สำหรับ Private Cloud Compute แล้ว"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute bugünkü sınıra ulaştı."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Денний ліміт Private Cloud Compute вичерпано."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute đã đạt giới hạn hôm nay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute 已达到今日上限。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private Cloud Compute已達到今日上限。"
+          }
+        }
+      }
+    },
+    "This conversation got too long to carry on. Start a new chat and ask again." : {
+      "comment" : "Shown when an Ask conversation overflowed the model's context window. New Chat is the toolbar button that starts over.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذه المحادثة طويلة جدًا ولا يمكن متابعتها. يمكنك بدء دردشة جديدة وطرح السؤال مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tato konverzace je příliš dlouhá, aby mohla pokračovat. Začněte nový chat a zeptejte se znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denne samtale blev for lang til at fortsætte. Start en ny chat, og spørg igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Unterhaltung ist zu lang geworden. Starte einen neuen Chat und frag erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta conversación se ha hecho demasiado larga para continuar. Empieza un nuevo chat y vuelve a preguntar."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta conversación se hizo demasiado larga para continuar. Empieza un nuevo chat y vuelve a preguntar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette conversation est devenue trop longue pour continuer. Démarrez une nouvelle discussion et posez à nouveau votre question."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "השיחה הזו נעשתה ארוכה מדי כדי להמשיך. יש להתחיל צ׳אט חדש ולשאול שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Percakapan ini terlalu panjang untuk dilanjutkan. Mulai obrolan baru dan ajukan pertanyaan lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa conversazione è diventata troppo lunga per proseguire. Inizia una nuova chat e riprova a chiedere."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この会話は長くなりすぎて続けられません。新規チャットを開始して、もう一度質問してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 대화가 너무 길어져 이어갈 수 없습니다. 새로운 채팅을 시작해 다시 질문하세요."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denne samtalen ble for lang til å fortsette. Start en ny chat, og spør igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit gesprek is te lang geworden om voort te zetten. Begin een nieuwe chat en vraag het opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta rozmowa jest zbyt długa, by ją kontynuować. Rozpocznij nowy czat i zapytaj ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta conversa ficou longa demais para continuar. Inicie uma nova conversa e pergunte de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот разговор стал слишком длинным. Начните новый чат и спросите снова."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den här konversationen blev för lång för att fortsätta. Starta en ny chatt och fråga igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "การสนทนานี้ยาวเกินไปจนไม่สามารถดำเนินต่อได้ เริ่มแชทใหม่แล้วถามอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sohbet devam edemeyecek kadar uzadı. Yeni bir sohbet başlatıp tekrar sorun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ця розмова стала занадто довгою, щоб продовжувати. Почніть новий чат і запитайте знову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuộc trò chuyện này đã quá dài để tiếp tục. Hãy bắt đầu cuộc trò chuyện mới và hỏi lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这段对话太长，无法继续。请开始新聊天再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這段對話太長，無法繼續。請開始新聊天再問一次。"
+          }
+        }
+      }
+    },
+    "This device can't run Apple Intelligence." : {
+      "comment" : "Shown when the hardware is not eligible for Apple Intelligence — there is nothing the reader can turn on. The Mac variation says \"this Mac\" where the other says \"this device\".",
+      "localizations" : {
+        "ar" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "هذا الـ Mac لا يدعم Apple Intelligence.‏"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "هذا الجهاز لا يدعم Apple Intelligence.‏"
+                }
+              }
+            }
+          }
+        },
+        "cs" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tento Mac nemůže Apple Intelligence spustit."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Toto zařízení nemůže Apple Intelligence spustit."
+                }
+              }
+            }
+          }
+        },
+        "da" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Denne Mac kan ikke køre Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Denne enhed kan ikke køre Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "de" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dieser Mac kann Apple Intelligence nicht ausführen."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dieses Gerät kann Apple Intelligence nicht ausführen."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This Mac can’t run Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "This device can’t run Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este Mac no puede ejecutar Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este dispositivo no puede ejecutar Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "es-MX" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este Mac no puede ejecutar Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este dispositivo no puede ejecutar Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ce Mac ne peut pas exécuter Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Cet appareil ne peut pas exécuter Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "he" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "‏Mac זה אינו יכול להפעיל את Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "מכשיר זה אינו יכול להפעיל את Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "id" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mac ini tidak dapat menjalankan Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Perangkat ini tidak dapat menjalankan Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Questo Mac non può eseguire Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Questo dispositivo non può eseguire Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "このMacではApple Intelligenceを実行できません。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "このデバイスではApple Intelligenceを実行できません。"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "이 Mac에서는 Apple Intelligence를 실행할 수 없습니다."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "이 기기에서는 Apple Intelligence를 실행할 수 없습니다."
+                }
+              }
+            }
+          }
+        },
+        "nb" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Denne Macen kan ikke kjøre Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Denne enheten kan ikke kjøre Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deze Mac kan Apple Intelligence niet uitvoeren."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dit apparaat kan Apple Intelligence niet uitvoeren."
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ten Mac nie obsługuje Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "To urządzenie nie obsługuje Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este Mac não pode executar o Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Este dispositivo não pode executar o Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Этот Mac не поддерживает Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Это устройство не поддерживает Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "sv" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Denna Mac kan inte köra Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Den här enheten kan inte köra Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "th" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mac เครื่องนี้ใช้ Apple Intelligence ไม่ได้"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "อุปกรณ์นี้ใช้ Apple Intelligence ไม่ได้"
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Bu Mac Apple Intelligence’ı çalıştıramıyor."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Bu aygıt Apple Intelligence’ı çalıştıramıyor."
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Цей Mac не може працювати з Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Цей пристрій не може працювати з Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Máy Mac này không chạy được Apple Intelligence."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thiết bị này không chạy được Apple Intelligence."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "这台Mac无法运行 Apple Intelligence。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "此设备无法运行 Apple Intelligence。"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "device" : {
+              "mac" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "這部Mac無法執行Apple Intelligence。"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "此裝置無法執行Apple Intelligence。"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}

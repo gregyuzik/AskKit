@@ -1,0 +1,148 @@
+name: Set up
+description: Selects the image's newest Xcode release or release candidate, 27.2 or later (a beta only when neither exists), downloads that Xcode's Metal Toolchain if the image lacks it, and installs the pinned tools a job names.
+
+# Xcode isn't pinned. A job takes the image's newest Xcode release or release
+# candidate, by version, when that is 27.2 or later; a beta only when neither
+# exists, the newest that is 27.2 or later, with a warning. So CI moves off a
+# beta on its own once the image has a 27.2 release candidate or release. With
+# nothing 27.2 or later the job fails: the demo's project is Xcode 27.2's JSON
+# format, and `scripts/ci.sh checks` reads it with `xcrun xcprojformatter` and
+# `xcrun xcodeproj`.
+# The image's aliases (Xcode.app, Xcode_27.2.app, Xcode_27.2.0.app) are symlinks,
+# and one named like a release can point at a beta, so each app is judged by the
+# name of the folder it resolves to and the version in its Info.plist.
+#
+# A tool is bumped by changing its URL and digest together. The digests come from the release:
+#   gh api repos/OWNER/REPO/releases/tags/TAG --jq '.assets[] | .name + " " + .digest'
+
+inputs:
+  tools:
+    description: Either or both of swiftlint and shellcheck, separated by a space.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Select the newest Xcode
+      shell: bash
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        tab=$(printf '\t')
+        # One line per alias: version, release or beta, the folder, the alias. A
+        # release candidate is a release here; only a beta folder is a beta.
+        installed=$(
+          for alias in /Applications/Xcode*.app; do
+            app=$(realpath "$alias") || continue
+            version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+              "$app/Contents/Info.plist" 2>/dev/null) || version=unknown
+            # Not a case: bash 3.2, the image's /bin/bash, ends the command
+            # substitution at a pattern's closing parenthesis.
+            kind=release
+            if [[ ${app##*/} == *[Bb]eta* ]]; then kind=beta; fi
+            printf '%s\t%s\t%s\t%s\n' "$version" "$kind" "$app" "$alias"
+          done
+        )
+        echo "Xcodes on this image:"
+        printf '%s\n' "$installed" | awk -F "$tab" 'NF { print "  " $4 " -> " $3 ": " $1 ", " $2 }'
+        # newest KIND: the newest folder of that kind, by version, numerically
+        # (27.10 is after 27.9), as major, minor, patch, version and folder.
+        newest() {
+          printf '%s\n' "$installed" |
+            awk -F "$tab" -v OFS="$tab" -v kind="$1" '$2 == kind && $1 ~ /^[0-9]+(\.[0-9]+)*$/ {
+              split($1, v, "."); print v[1] + 0, v[2] + 0, v[3] + 0, $1, $3 }' |
+            sort -u | sort -t "$tab" -k1,1n -k2,2n -k3,3n | tail -n 1
+        }
+        # The newest release or release candidate, 27.2 or later; a beta only
+        # when neither exists.
+        selected="" version="" app=""
+        for kind in release beta; do
+          line=$(newest "$kind")
+          [ -n "$line" ] || continue
+          IFS=$tab read -r major minor _ version app <<< "$line"
+          if [ "$major" -gt 27 ] || { [ "$major" -eq 27 ] && [ "$minor" -ge 2 ]; }; then
+            selected=$kind
+            break
+          fi
+        done
+        if [ -z "$selected" ]; then
+          summary=$(printf '%s\n' "$installed" | awk -F "$tab" 'NF { print $1 " " $2 " at " $3 }' |
+            sort -u | paste -s -d ';' - | sed 's/;/; /g')
+          echo "::error::Nothing on this image is Xcode 27.2 or later, release, release candidate or beta, and AskKit needs 27.2: the demo's project is Xcode 27.2's JSON format. The image has: ${summary:-no Xcode}."
+          exit 1
+        fi
+        if [ "$selected" = beta ]; then
+          echo "::warning::No Xcode release or release candidate of 27.2 or later is on this image, so this job runs on the Xcode $version beta at $app."
+        fi
+        developer=$app/Contents/Developer
+        echo "DEVELOPER_DIR=$developer" >> "$GITHUB_ENV"
+        echo "Selected Xcode $version ($selected) at $app"
+        DEVELOPER_DIR=$developer xcodebuild -version
+
+    # AskUI compiles a Metal shader, the spectrum's glass rod (AskGlassRod.metal),
+    # under `swift build` and xcodebuild alike, with the Metal Toolchain: a
+    # component Xcode installs apart from itself, so an image can carry an Xcode
+    # without it. Checked for the Xcode selected above, whose DEVELOPER_DIR this
+    # step inherits, and downloaded only when missing. A download that fails, or
+    # leaves `xcrun metal` still failing, stops the job here with that said,
+    # rather than at the shader in every build.
+    - name: Install the Metal Toolchain if missing
+      shell: bash
+      run: |
+        set -euo pipefail
+        # `xcrun metal` is what the build runs, and without the component it
+        # fails, naming the download.
+        if version=$(xcrun metal --version 2>&1); then
+          echo "The Metal Toolchain is installed: $(head -n 1 <<< "$version")"
+          exit 0
+        fi
+        echo "No Metal Toolchain for this Xcode ($(head -n 1 <<< "$version")); downloading it."
+        if ! xcodebuild -downloadComponent MetalToolchain; then
+          echo "::error::xcodebuild -downloadComponent MetalToolchain failed (above), and AskUI's Metal shader can't compile without the Metal Toolchain."
+          exit 1
+        fi
+        # A path xcrun cached before the download would hide the new toolchain.
+        xcrun --kill-cache
+        if ! version=$(xcrun metal --version 2>&1); then
+          echo "::error::The Metal Toolchain downloaded, but xcrun metal still fails: $(head -n 1 <<< "$version")"
+          exit 1
+        fi
+        echo "Downloaded the Metal Toolchain: $(head -n 1 <<< "$version")"
+
+    - name: Install ${{ inputs.tools }}
+      if: inputs.tools != ''
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/tools/bin"
+        cd "$RUNNER_TEMP/tools"
+        # fetch URL SHA256 FILE: a download that has to match its pinned digest.
+        fetch() {
+          curl -fsSL --retry 3 -o "$3" "$1"
+          echo "$2  $3" | shasum -a 256 -c -
+        }
+        for tool in $TOOLS; do
+          case "$tool" in
+            swiftlint)
+              fetch https://github.com/realm/SwiftLint/releases/download/0.65.1/portable_swiftlint.zip \
+                c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0 swiftlint.zip
+              unzip -q -o swiftlint.zip swiftlint -d bin
+              bin/swiftlint version
+              ;;
+            shellcheck)
+              fetch https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.darwin.aarch64.tar.xz \
+                56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79 shellcheck.tar.xz
+              tar -xJf shellcheck.tar.xz
+              mv shellcheck-v0.11.0/shellcheck bin/
+              bin/shellcheck --version
+              ;;
+            *)
+              echo "::error::unknown tool $tool"
+              exit 1
+              ;;
+          esac
+        done
+        echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"

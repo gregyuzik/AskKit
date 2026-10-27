@@ -1,0 +1,119 @@
+# The steps are scripts/ci.sh's, which the push gate runs too: one job per step,
+# so they run side by side, and the package builds as a matrix, so one run
+# reports every platform. Three stay local runs: the soft-deprecation check
+# (scripts/soft-deprecation-check.sh), the UI smoke suite (scripts/ui-smoke.sh),
+# and the package's tests on the iOS simulator (scripts/ci.sh test-ios). A
+# hosted runner is a virtual Mac, and its simulator drew a view in up to a
+# minute, which starved the main actor that half the suite's deadlines run on.
+name: CI
+
+# The root's Markdown files are skipped by name, all but README.md: the checks
+# job compares README's Adopt code with ReadmeDomain.swift and
+# ReadmeAssistantDomain.swift, so a change to it alone has to run them. A root Markdown file added later runs CI until it is
+# listed. A `.md` under Sources/ or Tests/ is a file SwiftPM reports as
+# unhandled in its target, a warning the build checks fail on, so a change that
+# adds only one has to run them too.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "AGENTS.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "TRANSLATION.md"
+      - "docs/**"
+      - ".claude/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/CODEOWNERS"
+  pull_request:
+    paths-ignore:
+      - "AGENTS.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "TRANSLATION.md"
+      - "docs/**"
+      - ".claude/**"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/CODEOWNERS"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: swiftlint shellcheck
+      - run: scripts/ci.sh checks
+
+  test:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: scripts/ci.sh test
+
+  # The build matrix is ci.sh's own list, which the push gate builds too, so a
+  # destination added there is built by both. Read on Linux: it needs no Xcode,
+  # and a macOS minute costs ten of these.
+  destinations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: list
+        run: |
+          set -euo pipefail
+          list=$(scripts/ci.sh destinations | jq -R . | jq -sc .)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.destination }})
+    needs: destinations
+    runs-on: xcode-27
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        destination: ${{ fromJSON(needs.destinations.outputs.list) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: scripts/ci.sh build "$DESTINATION"
+        env:
+          DESTINATION: ${{ matrix.destination }}
+
+  demo:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: scripts/ci.sh demo
