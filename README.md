@@ -39,7 +39,7 @@ To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xco
 
 ## Requirements
 
-- **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4, with Xcode's Metal Toolchain component (`xcodebuild -downloadComponent MetalToolchain`): AskUI compiles a Metal shader.
+- **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4.
 - **A deployment target of 27.2** on every platform you build for.
 - **Platforms.** Both products build for iOS, macOS, visionOS, tvOS and watchOS, so a shared package can depend on them. The screen, and so Ask itself, exists on iOS, macOS and visionOS. On tvOS, AskCore's Foundation Models half (`AskDomain` and the engine with it) is compiled out, and on watchOS so is whatever names `SystemLanguageModel`, such as `AppleModelSeam`.
 - **Apple Intelligence** on the reader's device, for the on-device model. When no model can serve, the first screen says why and the composer is off, unless your domain's `firstScreenPolicy` says it can answer without one.
@@ -57,6 +57,43 @@ dependencies: [.product(name: "AskCore", package: "AskKit"), .product(name: "Ask
 Those are lines of a `Package.swift` of yours: a shared package that also builds for tvOS or watchOS adds `.tvOS("27.2")` and `.watchOS("27.2")`, and an app's project sets its deployment target itself. Or, in Xcode, File > Add Package Dependencies with the same URL. Add the `AskUI` and `AskCore` products to the targets that show the screen; a target that needs only the engine, or a type such as `AskLink`, takes `AskCore` alone. `AskUI` doesn't re-export `AskCore`, so a file that uses both imports both. The module names are generic, so check that nothing else in your build is called `AskCore` or `AskUI`. AskKit has no dependencies of its own.
 
 **Versions.** AskKit is at 0.x, and a minor version may break the API. A new case in a public enum is a breaking change, allowed in a 0.x minor version, because it stops an exhaustive `switch` compiling: a new minor version can mean adding a case to a `switch` of yours over one of AskKit's enums. `from: "0.1.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.1.0")` holds you to 0.1.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
+
+## Adopt with a coding assistant
+
+To adopt AskKit with a coding assistant, such as Claude Code, Xcode's coding intelligence or Cursor, give it this prompt in your app's project. The assistant adds the package and works through [Adopt](#adopt) over your app's own data; review what it writes against those steps.
+
+```text
+Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
+data in their own words.
+
+1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.1.0" to the app target, and
+   link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
+   imports both.
+2. Before writing code, read README.md and docs/ARCHITECTURE.md in that repository, and use only the
+   API they and AskKit's doc comments name. Then study this app's data model: its types, where they
+   are stored and how the app queries them.
+3. Follow the README's Adopt steps. Implement one AskDomain over the app's data: Row (an AskRow),
+   SearchArguments (@Generable), brand (an AskBrand), overview(), makeTools(_:),
+   instructions(tier:isConversation:answerLanguage:), search(_:context:) and
+   starters(overview:window:). Each tool runs its work in context.withToolCall, records every row it
+   shows with record(rows:), clamps every field with AskPrompt.clamp and returns its lines unfenced.
+   Choose grounding: .retrieval, .toolCall or .notRequired. If the tools read none of the app's
+   rows, follow the README's "A domain without rows" instead.
+4. Make one seam with AppleModelSeam.make(privateCloudCompute: .undeclared), passing .declared only
+   if the app's entitlements file grants com.apple.developer.private-cloud-compute, and one
+   AskEngine(domain:seam:).
+5. Own one AskConversationStore(domain:engine:) at app scope, outside any view.
+6. Show AskScreen(store:) in a NavigationStack with .navigationTitle(store.brand.title), where the
+   app wants Ask, such as a tab of its own.
+7. Put the brand's copy, the starters and every other string the reader sees in the app's String
+   Catalog, resolved with String(localized:).
+8. Set the deployment target to 27.2 or later on every platform. In a target with main-actor default
+   isolation, mark the types AskKit uses off the main actor nonisolated and each tool's call
+   @concurrent. Ask shows on iOS, macOS and visionOS: in a target that also builds for tvOS or
+   watchOS, gate Ask's code as the README's Requirements and step 1 describe.
+9. Build and run. A development build answers on the device until you opt in to Private Cloud
+   Compute: https://github.com/gregyuzik/AskKit#development-builds-and-private-cloud-compute
+```
 
 ## Adopt
 
@@ -269,7 +306,7 @@ struct AskTab: View {
 | A page pushed over the screen | `.environment(\.askItemIsPushed, pushedID != nil)` on the screen | The screen holds its navigation bar open while it's true: a page pushed while the bar is minimized hangs the app. |
 | Actions the model proposes | A tool records an `AskProposal`, and you implement `AskDomain.perform(_:)` | The answer shows a confirmation card, and only the reader's tap reaches `perform`, which should be safe to run twice. A proposal that opens your own editor is a hand-off: conform a class to `AskDraftRouter` (`func open(_ proposal: AskProposal)`), set `askDraftOpener` to `AskDraftOpenAction(router)`, keeping the router as the tile opener's is, and `perform` is never called. Leave a proposing tool out where `context.isConversation` is false. |
 | A photo or a scan | `acceptsPhotoAttachments`, `AskScreen(store:onAttach:)` and `store.attachPhoto(_:label:reference:)`, or `AskScreen(store:composerAccessory:)` | A composer has one accessory button: yours (`AskComposerAccessory`) or the photo button. Only Private Cloud Compute reads photos; on the device the question runs on its words, and the thread says so. |
-| A spectrum look | `AskScreen(store:spectrum:)` with `.aurora`, or `AskSpectrum([…])` of your own colors | The composer's rim becomes a clear glass rod with the colors lit inside it, there whenever the composer is, so the field stands out as the place to type; while a turn is in flight the colors drift slowly round it. The send circle and the streaming caret take a gradient of them, on the slot's face too; everything else keeps `accent`. The send circle's glyph is white, or black where white falls under 3:1 on its lightest color. Increase Contrast puts the accent back, and Reduce Motion holds the rod's colors still. |
+| A spectrum look | `AskScreen(store:spectrum:)` with `.aurora`, or `AskSpectrum([…])` of your own colors | The send circle and the reveal's caret take a gradient of the colors, on the slot's face too; everything else keeps `accent`. The send circle's glyph is white, or black where white falls under 3:1 on its lightest color. Increase Contrast puts the accent back. |
 | The Ask tab's glyph | `Image(systemName: "text.bubble.badge.sparkles")` as the tab's `Label` icon | The glyph the demo's tab wears, in one colour like the bar's other items; AskKit ships none of its own. A host that wants two colours can give it `.symbolRenderingMode(.palette)`, whose first colour paints the sparkles and second the bubble. The bar then draws the colours as given and won't mark the selection, so pass the selected bubble's colour yourself, fixed and resolved for the colour scheme: in a tab item's palette `.tint` and `Color.accentColor` both come out the system blue whatever the app's accent, `.primary` comes out black on a dark bar, and a gradient is flattened to its first colour. The tab bar swaps in the `.fill` variant itself. |
 | The tab bar slot (iOS) | `.askComposerSlot(store, isEnabled:)` on the `TabView` that holds Ask, with `.tabBarMinimizeBehavior(.onScrollDown)` | The composer's face rides in the tab view's bottom accessory, beside the tab bar when it minimizes. It does nothing on macOS and visionOS, so a shared host needs no `#if`. |
 | The Mac menu | `.commands { AskCommands(store: ask.store) }` on the scene, or `AskCommands(isEnabled: ask.store.hasTurns) { … }` when your New Chat does more than start over | New Chat (⇧⌘N), Send (⌘Return) and Stop (⌘.) in the File menu, acting on the focused window's composer. `AskCommands` exists only on macOS, so a scene shared with iOS or visionOS wraps the modifier in `#if os(macOS)`, as the demo's `App.swift` does. |
@@ -407,7 +444,7 @@ Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`, and
 | `-askPush` | A tile pushes its row onto the Ask tab's stack instead of showing it in a sheet. |
 | `-askFold <shape>` | The screen arranged around a fold the simulator doesn't have: `book`, `bookBent`, `upright` or `uprightBent`. |
 | `-askEmptyLibrary` | An empty library, so the first screen is the nothing-to-ask one; `-askEmptyLibrary button` adds its button. |
-| `-askHoldTurn` | Every turn held in flight until Stop, the app answering as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up and the spectrum's glass rod keeps drifting, for screenshots and profiles of a turn in flight. Not in the schemes: pass it at launch, as `xcrun simctl launch <device> com.example.askkitdemo -askHoldTurn`. |
+| `-askHoldTurn` | Every turn held in flight until Stop, the app answering as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. Not in the schemes: pass it at launch, as `xcrun simctl launch <device> com.example.askkitdemo -askHoldTurn`. |
 | `-askAssistant` | The assistant in place of the library: no tiles, and under each answer the line saying what it stood on, the assistant's own words where a tool grounded it and "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed under Reminders. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing. |
 
 `-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on the device writes Hebrew.
