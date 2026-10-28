@@ -578,6 +578,25 @@ final class AskScrollFollow {
         jumped(at: now)
     }
 
+    /// The thread has appeared, or taken a new last turn, and the screen is
+    /// sending it to its own end, with `streaming` saying whether an answer
+    /// is being written as it does (`AskScreen`'s `thread`).
+    ///
+    /// **Told what is streaming, because the screen may be built mid-stream.**
+    /// One store can stand behind a screen in each of several windows, and a
+    /// split view's detail rebuilds its screen, so a screen can appear with an
+    /// answer already streaming. Its follow is new, and `streamingChanged(_:at:)`
+    /// hears only a stream starting or stopping: told only that the thread was
+    /// sent to its end, the follow kept the answer's growth for
+    /// `ownGrowthWindow` and then let it write itself below the composer, and
+    /// `showsJumpPill` took the settled rule, so the reader got no pill either,
+    /// until the turn ended. Both ways, so a stream this follow last heard of
+    /// never outlives its turn.
+    func threadAppeared(streaming: Bool, at now: TimeInterval = Date.timeIntervalSinceReferenceDate) {
+        isStreaming = streaming
+        jumped(at: now)
+    }
+
     /// The reader tapped the pill, or the thread was sent to its own end.
     ///
     /// Either way the thread is on its way to its foot, measuring the rows it

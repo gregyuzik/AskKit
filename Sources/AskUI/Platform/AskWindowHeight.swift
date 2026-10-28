@@ -4,7 +4,7 @@ import UIKit
 
 /// Reports the height of the window the screen is in, for the first screen to
 /// arrange itself by (`AskFirstScreen.isSideBySide`), and keeps that window
-/// for the keyboard's layout pass (`AskScreenWindow`).
+/// for the keyboard (`AskScreenWindow`).
 ///
 /// **UIKit, because nothing in SwiftUI gives a height the keyboard leaves
 /// alone.** A view behind the screen that ignored every safe area, the
@@ -16,9 +16,9 @@ import UIKit
 /// side by side for a frame. A window's bounds change only when the window
 /// does.
 ///
-/// The height is reported on the next turn of the main queue, never from
-/// inside a layout pass, and only when it changes. The window is kept at
-/// once, since nothing redraws on it.
+/// The height is reported from a main-actor task, on a later turn of the
+/// main queue and never from inside a layout pass, and only when it changes.
+/// The window is kept at once, since nothing redraws on it.
 struct AskWindowHeightReader: UIViewRepresentable {
     /// Where the window the screen is in is kept, or nil to keep it nowhere.
     var window: AskScreenWindow?
@@ -62,18 +62,19 @@ struct AskWindowHeightReader: UIViewRepresentable {
         private func report() {
             guard let height = window?.bounds.height, height != reported else { return }
             reported = height
-            DispatchQueue.main.async { [weak self] in self?.onChange?(height) }
+            Task { [weak self] in self?.onChange?(height) }
         }
     }
 }
 
 /// The window an `AskScreen` is in, as `AskWindowHeightReader`'s probe finds
-/// it, for the keyboard's change to lay out
-/// (`AskKeyboard.change(_:to:duration:curve:in:)`).
+/// it: where the keyboard's change lays out
+/// (`AskKeyboard.change(_:to:duration:curve:in:)`), and where the screen
+/// puts its keyboard away (`AskKeyboard.putAway(_:in:)`).
 ///
 /// **A reference the keyboard's observers hold**, since they are made once,
 /// as the screen first appears, and read the window when the keyboard moves,
-/// which is after it has joined one. **Weak**, because the window holds the
+/// which is after it has joined one. A put-away reads it as it resigns. **Weak**, because the window holds the
 /// screen's hosting view, and so the state that holds this: held strongly, a
 /// closed window would never go.
 final class AskScreenWindow {

@@ -339,9 +339,9 @@ nonisolated struct AskFoldSplit: Equatable, Sendable {
 }
 
 extension EnvironmentValues {
-    /// Where the first screen goes around a fold across it, handed down by
-    /// `AskScreen`, which reads the fold from the scroll view the first
-    /// screen sits in. Nil everywhere else.
+    /// Where the first screen goes around a fold across it, set in the
+    /// environment by `AskScreen`, which reads the fold from the scroll view
+    /// the first screen sits in. Nil everywhere else.
     @Entry var askFoldSplit: AskFoldSplit?
 
     /// The fold a host asked the screen to arrange itself around in place of
