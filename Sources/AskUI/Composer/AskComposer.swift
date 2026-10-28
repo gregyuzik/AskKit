@@ -4,8 +4,9 @@ import AskCore
 import SwiftUI
 
 /// The Ask composer: a text field and its circle on a glass capsule, tinted
-/// with the host's accent at half strength, lighter than the question bubble's
-/// fill of it, so the place you type and the thing you typed read as one.
+/// with the host's accent at up to half strength, lighter than the question
+/// bubble's fill of it, so the place you type and the thing you typed read as
+/// one.
 /// `AskScreen` draws one in its bottom bar.
 ///
 /// The field grows from one line to four, and the capsule with it, its
@@ -50,9 +51,10 @@ public struct AskComposer: View {
     /// Whether `AskScreen` has this composer resting in a host's slot
     /// (`askComposerRests`), where both buttons hide by name.
     @Environment(\.askComposerRests) private var rests
-    /// The appearance the accent is resolved in to choose the capsule's tint
-    /// (`capsuleTint`).
-    @Environment(\.colorScheme) private var colorScheme
+    /// What the accent is resolved in to choose the capsule's tint
+    /// (`capsuleTint`): the whole environment, not the appearance alone, since
+    /// an asset color's variants follow Increase Contrast as well.
+    @Environment(\.self) private var environment
     #if os(macOS)
     /// What the menu bar's Send and Stop call (`AskComposerCommand`): one
     /// object for the composer's life, so the value handed up compares equal
@@ -71,9 +73,11 @@ public struct AskComposer: View {
     ///     field when there is nothing to send, and on iOS and visionOS takes
     ///     the focus of a focused, empty field away.
     ///   - placeholder: What the field shows while `draft` is empty, wrapping
-    ///     to two lines.
-    ///   - accent: The capsule's tint, at half strength, and the circle's
-    ///     fill.
+    ///     to as many lines as the field grows to, four at most, with the
+    ///     capsule growing to hold them.
+    ///   - accent: The capsule's tint, at up to half strength (less on a
+    ///     light accent in dark mode, where the draft's words would fall under
+    ///     4.5:1 at half), and the circle's fill.
     ///   - isThinking: Whether a turn is in flight. The circle then stops, the
     ///     accessory button is disabled, and Return types nothing.
     ///   - acceptsAttachments: Whether the domain takes photos. With
@@ -84,8 +88,12 @@ public struct AskComposer: View {
     ///     no turn is in flight.
     ///   - onStop: Stops the turn in flight, from the circle or ⌘.
     ///   - onAttach: What the photo button does, such as presenting a picker.
+    ///     Unused while `accessory` is set.
     ///   - accessory: The accessory button before the field, in place of the
-    ///     photo button.
+    ///     photo button. It shows whatever `acceptsAttachments` says, so the
+    ///     photo button passed here (`AskComposerAccessory.photo(_:)`) shows
+    ///     for a domain that takes no photos too: pass `onAttach` instead for
+    ///     one that shows only where the domain takes them.
     public init(
         draft: Binding<String>,
         isFocused: FocusState<Bool>.Binding,
@@ -196,12 +204,23 @@ public struct AskComposer: View {
     /// bubble's fill of it.
     static let tint = 0.5
 
-    /// The accent as the capsule wears it, at `tint(for:isLight:)`.
+    /// The accent as the capsule wears it, at `tint(for:in:)`.
     private var capsuleTint: Color {
-        var environment = EnvironmentValues()
-        environment.colorScheme = colorScheme
-        let resolved = AskContrast.RGB(accent.resolve(in: environment))
-        return accent.opacity(Self.tint(for: resolved, isLight: colorScheme == .light))
+        accent.opacity(Self.tint(for: accent, in: environment))
+    }
+
+    /// How strongly the capsule wears `accent` where it is drawn:
+    /// `tint(for:isLight:)` on the accent as `environment` resolves it.
+    ///
+    /// **Resolved where it is drawn, not in an environment of its own.** An
+    /// asset accent with a High Contrast variant resolves to it only in an
+    /// environment asking for more contrast (measured on the Mac, with an
+    /// asset catalog's color). Resolved in an empty environment given only
+    /// the appearance, the standard variant is the one measured, and under
+    /// Increase Contrast the capsule wears the other at the strength worked
+    /// out for it.
+    static func tint(for accent: Color, in environment: EnvironmentValues) -> Double {
+        tint(for: AskContrast.RGB(accent.resolve(in: environment)), isLight: environment.colorScheme == .light)
     }
 
     /// How strongly the capsule wears `accent`: `tint`, or less where the
@@ -250,11 +269,49 @@ public struct AskComposer: View {
     }
 
     private var field: some View {
-        // An empty label and a placeholder drawn by hand: SwiftUI draws a
-        // `prompt:` in its own placeholder color and discards any style
-        // attached to it, and that color measures about 1.3:1 on tinted glass.
+        // **The placeholder sizes the field, from inside the field's own
+        // stack.** An overlay is offered the field's frame, one line while the
+        // draft is empty, so there the host's hint ends in an ellipsis at the
+        // accessibility sizes and in the longer locales, however many lines
+        // it is let wrap to: measured on the Mac, a hint 120 pt wide in an
+        // overlay under `.lineLimit(1...2)` stayed one 16 pt line. Beside the
+        // field it wraps to as many lines as the field grows to, and the
+        // capsule grows with it, as it does for a draft that long.
+        //
+        // **On the field's first baseline**, so the hint's first line sits
+        // where the draft's will: measured on the Mac, a field padded 10 pt
+        // from the top took the hint's first line down with it, where top
+        // alignment left the hint 10 pt above the text.
+        ZStack(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
+            if draft.isEmpty {
+                placeholderText
+            }
+            textField
+        }
+        // A fixed inset, not one scaled with the text: the target grows
+        // only by what the glyph grows (`AskComposerMetrics`), and an inset
+        // scaled in proportion made one line of the largest text 132 pt
+        // tall, a field taller than the button it was padded to match.
+        .padding(.vertical, AskComposerMetrics.fieldInset)
+        // **The row is bottom-aligned, so a field shorter than the button
+        // sinks below the capsule's center.** Bottom is right for the
+        // field that has grown: the circle stays with the last line, the
+        // way Messages keeps it. It is wrong for the single line, which is
+        // every line most readers ever type: measured on macOS, a 16 pt
+        // field in a 44 pt row put the text 19 pt from the capsule's top
+        // and 13 pt from its bottom. At least as tall as the button, the
+        // one line centers, and once the field is taller than that, the
+        // frame passes through and the bottom alignment has its row back.
+        .frame(minHeight: target)
+    }
+
+    private var textField: some View {
+        // An empty label and a placeholder drawn by hand (`placeholderText`):
+        // SwiftUI draws a `prompt:` in its own placeholder color and discards
+        // any style attached to it, and that color measures about 1.3:1 on
+        // tinted glass.
         TextField("", text: $draft, axis: .vertical)
-            .lineLimit(1...4)
+            .lineLimit(AskComposerMetrics.lines)
             .textFieldStyle(.plain)
             .font(.body)
             #if os(iOS) || os(visionOS)
@@ -285,6 +342,16 @@ public struct AskComposer: View {
             // the same blank draft. A repeat is handled as the press it
             // repeats: a send has emptied the draft by then, so its repeats
             // are taken as nothing to send.
+            //
+            // **The Return that confirms an input method's composition is
+            // unmeasured.** Typing Japanese, Chinese or Korean on a hardware
+            // keyboard, a Return can be the one that confirms what the input
+            // method is composing, and that one should send nothing. SwiftUI
+            // has no way to see a field's marked text: neither `KeyPress` nor
+            // `TextSelection` carries it, in 27.2's interfaces or its
+            // documentation. So this handler can't tell that Return from one
+            // that sends, and whether the input method takes it before
+            // `onKeyPress` hears it hasn't been watched.
             .onKeyPress(.return, phases: AskComposerReturn.phases) { press in
                 switch AskComposerReturn.of(shift: press.modifiers.contains(.shift), draft: draft, isThinking: isThinking) {
                 case .newline:
@@ -296,52 +363,10 @@ public struct AskComposer: View {
                     return .handled
                 }
             }
-            .overlay(alignment: .leading) {
-                if draft.isEmpty {
-                    Text(placeholder)
-                        .font(.body)
-                        // Wraps rather than truncating: at accessibility sizes,
-                        // and in the longer locales, one line cuts the
-                        // placeholder mid-word.
-                        .lineLimit(1...2)
-                        // **Text a reader has to read, so 4.5:1 on the
-                        // capsule's tint.** `.secondary` comes to 2.66:1
-                        // there in light mode, estimated as a flat blend of the
-                        // system blue (#0088FF) at half strength over white,
-                        // and is 3.44:1 even on white (`AskGlassForeground`).
-                        .foregroundStyle(AskGlassForeground(tint: capsuleTint, minimum: AskGlassForeground.text))
-                        .allowsHitTesting(false)
-                        // **No element, rather than a hidden one.** Hidden by
-                        // name, it comes back wherever something above it is
-                        // un-hidden by name: `AskScreen` hides the resting
-                        // composer with `.accessibilityHidden(composerRests)`,
-                        // and whenever the composer is up that is false, so
-                        // the placeholder would be a second thing called "Your
-                        // question" over the field. Walked in the demo on the
-                        // iOS 27.1 simulator through UIAccessibility's
-                        // container calls: listed under that modifier, not
-                        // listed without it, and not listed with this.
-                        .accessibilityRepresentation { EmptyView() }
-                }
-            }
-            // A fixed inset, not one scaled with the text: the target grows
-            // only by what the glyph grows (`AskComposerMetrics`), and an inset
-            // scaled in proportion made one line of the largest text 132 pt
-            // tall, a field taller than the button it was padded to match.
-            .padding(.vertical, AskComposerMetrics.fieldInset)
-            // **The row is bottom-aligned, so a field shorter than the button
-            // sinks below the capsule's center.** Bottom is right for the
-            // field that has grown: the circle stays with the last line, the
-            // way Messages keeps it. It is wrong for the single line, which is
-            // every line most readers ever type: measured on macOS, a 16 pt
-            // field in a 44 pt row put the text 19 pt from the capsule's top
-            // and 13 pt from its bottom. At least as tall as the button, the
-            // one line centers, and once the field is taller than that, the
-            // frame passes through and the bottom alignment has its row back.
-            .frame(minHeight: target)
             .accessibilityLabel(AskComposerWords.yourQuestion)
-            // The placeholder has no element of its own (above), so its words,
-            // the host's hint about what to ask, reach VoiceOver here.
+            // The placeholder has no element of its own (`placeholderText`), so
+            // its words, the host's hint about what to ask, reach VoiceOver
+            // here.
             .accessibilityHint(Text(placeholder))
             // Voice Control answers to the words in the field, the draft or
             // the placeholder, as well as to "Your question" (`AskSpokenName`).
@@ -349,6 +374,38 @@ public struct AskComposer: View {
                 AskSpokenName.inputLabels(showing: draft.isEmpty ? placeholder : draft, named: AskComposerWords.yourQuestion)
             )
             .accessibilityIdentifier(AskAccessibility.field)
+    }
+
+    /// The host's hint, drawn while the draft is empty, beside the field it
+    /// sizes (`field`).
+    private var placeholderText: some View {
+        Text(placeholder)
+            .font(.body)
+            // As many lines as the field grows to, and no more: a hint any
+            // longer would hold the capsule taller than a draft can make it.
+            .lineLimit(AskComposerMetrics.lines.upperBound)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // **Text a reader has to read, so 4.5:1 on the capsule's tint.**
+            // `.secondary` comes to 2.66:1 there in light mode, estimated as a
+            // flat blend of the system blue (#0088FF) at half strength over
+            // white, and is 3.44:1 even on white (`AskGlassForeground`).
+            .foregroundStyle(AskGlassForeground(tint: capsuleTint, minimum: AskGlassForeground.text))
+            // **A tap on the hint puts the reader in the field.** The field
+            // lies over the hint's first line and takes a tap there itself,
+            // but an empty field is one line tall, so the hint's other lines
+            // are outside it, where a tap would reach nothing.
+            .contentShape(.rect)
+            .onTapGesture { isFocused = true }
+            // **No element, rather than a hidden one.** Hidden by name, it
+            // comes back wherever something above it is un-hidden by name:
+            // `AskScreen` hides the resting composer with
+            // `.accessibilityHidden(composerRests)`, and whenever the
+            // composer is up that is false, so the placeholder would be a
+            // second thing called "Your question" over the field. Walked in
+            // the demo on the iOS 27.1 simulator through UIAccessibility's
+            // container calls: listed under that modifier, not listed without
+            // it, and not listed with this.
+            .accessibilityRepresentation { EmptyView() }
     }
 
     /// Whether the button's job right now is to put the keyboard away.
@@ -581,6 +638,10 @@ nonisolated enum AskComposerMetrics {
     static let target: CGFloat = AskGrowth.touchTarget
     static let fieldInset: CGFloat = 11
     #endif
+
+    /// The lines the field grows through, and the most the placeholder wraps
+    /// to.
+    static let lines: ClosedRange<Int> = 1...4
 
     /// The circle around the glyphs, given the widest one as the text scales
     /// it.

@@ -23,7 +23,10 @@ import SwiftUI
 /// held anywhere, a host's own `Sendable` value included, which
 /// `AskCrossPostureTests` pins.
 public struct AskComposerAccessory {
-    /// The SF Symbol the button shows, drawn bare in the secondary style.
+    /// The SF Symbol the button shows, drawn bare: in the secondary style
+    /// where that holds 3:1 on the composer's tint, and in the primary style
+    /// where it doesn't, as on the default accent's capsule in light mode, and
+    /// under Increase Contrast.
     public let systemImage: String
     /// What VoiceOver calls it: the host's own words, from the host's own
     /// catalog, because the glyph's name isn't a label.
@@ -36,8 +39,9 @@ public struct AskComposerAccessory {
     /// Creates an accessory button.
     ///
     /// - Parameters:
-    ///   - systemImage: The SF Symbol the button shows, drawn bare in the
-    ///     secondary style.
+    ///   - systemImage: The SF Symbol the button shows, drawn bare, in the
+    ///     secondary style or, where that falls under 3:1 on the composer's
+    ///     tint and under Increase Contrast, the primary.
     ///   - label: What VoiceOver calls the button, in the host's own words.
     ///   - identifier: The button's accessibility identifier.
     ///   - action: What a tap does, such as presenting the host's scanner.
@@ -51,6 +55,10 @@ public struct AskComposerAccessory {
     /// The button before the field, if any: the host's accessory button, else
     /// the photo button where the domain accepts photos and the host can take
     /// one. The composer and its face in a tab bar's slot both draw this one.
+    ///
+    /// **The host's button wins, and shows whatever the domain takes.** With
+    /// one set, `onAttach` goes unused, and the photo button passed as the
+    /// host's own (`photo(_:)`) shows for a domain that takes no photos too.
     static func leading(
         _ accessory: AskComposerAccessory?, acceptsAttachments: Bool, onAttach: (() -> Void)?
     ) -> AskComposerAccessory? {
@@ -62,6 +70,11 @@ public struct AskComposerAccessory {
     /// The photo button: what a domain that accepts photo attachments gets
     /// when the host passes `onAttach`. Its glyph is `photo`, VoiceOver calls
     /// it "Add a photo", and its identifier is `AskAccessibility.attach`.
+    ///
+    /// Passed as the accessory button itself, it shows whether or not the
+    /// domain accepts photos, and the `onAttach` beside it goes unused. Pass
+    /// `onAttach` instead for a photo button that shows only where the
+    /// domain takes photos.
     ///
     /// - Parameter action: What a tap does, such as presenting the host's
     ///   photo picker.

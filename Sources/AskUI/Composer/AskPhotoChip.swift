@@ -77,6 +77,10 @@ struct AskPhotoChip: View {
             .scaledToFill()
             .frame(width: thumbnail, height: thumbnail)
             .clipShape(.rect(cornerRadius: 8))
+            // A photo keeps its colors under Smart Invert, as Photos keeps
+            // its own: inverted, it shows the reader a negative of what they
+            // picked.
+            .accessibilityIgnoresInvertColors()
     }
 
     private var words: some View {
@@ -105,12 +109,20 @@ struct AskPhotoChip: View {
         Button(action: onRemove) {
             Image(systemName: "xmark.circle.fill")
                 .font(.title3)
-                .symbolRenderingMode(.hierarchical)
+                // **One color, the cross cut out of the disc**, so the cross
+                // shows the chip's glass through it, and what draws it is the
+                // disc against that glass: the pair `AskGlassForeground`
+                // holds to a glyph's 3:1. Hierarchical, the cross and the
+                // disc are two strengths of one color against each other, a
+                // pair the estimate doesn't see, and in `.secondary` under
+                // 3:1 apart.
+                .symbolRenderingMode(.monochrome)
                 .frame(width: target, height: target)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
+        // On the chip's own glass, which wears no tint.
+        .foregroundStyle(AskGlassForeground(minimum: AskGlassForeground.glyph))
         .accessibilityLabel(
             Text("Remove photo", bundle: #bundle, comment: "VoiceOver label for the button on the chip above the Ask composer that takes the waiting photo back out.")
         )
