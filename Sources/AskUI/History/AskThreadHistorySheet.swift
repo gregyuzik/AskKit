@@ -6,8 +6,11 @@ import SwiftUI
 /// The reader's chats in a sheet, from the toolbar's button: the list
 /// (`AskThreadHistoryList`), a search field, and Delete All Chats in the bar.
 ///
-/// An earlier chat opens behind the sheet as it closes, and Delete All Chats
-/// closes it too, since nothing is left in it to look at.
+/// An earlier chat opens behind the sheet as it closes, and VoiceOver hears
+/// which (`AskChatOpening`): the row it activated goes with the sheet, and the
+/// focus goes back to the History button, which says nothing of the chat.
+/// Delete All Chats closes the sheet too, since nothing is left in it to look
+/// at.
 struct AskThreadHistorySheet: View {
     let current: AskThreadSummary?
     let history: [AskThreadSummary]
@@ -27,6 +30,7 @@ struct AskThreadHistorySheet: View {
                 query: query,
                 onOpen: { summary in
                     dismiss()
+                    AskChatOpening.announce(summary)
                     onOpen(summary)
                 },
                 onDelete: onDelete
