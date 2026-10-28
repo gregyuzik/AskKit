@@ -65,10 +65,10 @@ AURORA_STOPS = (0.0, 0.3, 0.55, 0.8, 1.0)
 # The bubble's width on the 1024 grid at full size, the front plate's. Then the plates, back to
 # front: each one's scale about the centre, its offset from the centre after that (y down) and its
 # opacity. Each plate is a group of its own, and with the field that's Icon Composer's limit of four.
-PLATE_WIDTH = 440
+PLATE_WIDTH = 638
 PLATE_SCALES = (0.72, 0.86, 1.0)
-PLATE_OFFSETS = ((0, -128), (0, -60), (0, 36))
-PLATE_OPACITY = (0.45, 0.7, 0.95)
+PLATE_OFFSETS = ((0, -161), (0, -62), (0, 77))
+PLATE_OPACITY = (0.25, 0.55, 0.95)
 TRANSLUCENCY = 0.5
 
 # The field, sRGB, from its top right corner to its bottom left.
