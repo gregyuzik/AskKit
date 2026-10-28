@@ -59,21 +59,25 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 # it, so emptying it, with nothing else changed, can fail that step, and a
 # cache that left it out of the key would skip the step on the strength of the
 # list before.
+#
+# Nor is this hook, which reaches no compiler either: it decides what passing
+# means (above), so a cache that left it out of the key would count a tree as
+# passed under the gate it replaced. It falls through to the default, as
+# scripts/ci.sh does.
 gate_irrelevant() {
   case "$1" in
     Sources/*|Tests/*|Demo/*/*|.github/api-breakage-allowlist.txt) return 1 ;;
-    docs/*|.claude/*|.github/*|scripts/git-hooks/*|*.md|.gitignore) return 0 ;;
+    docs/*|.claude/*|.github/*|*.md|.gitignore) return 0 ;;
   esac
   return 1
 }
 
 # Whether a step of this gate reads a path from the working tree: everything
-# `gate_irrelevant` doesn't call docs, and some files it does, which reach no
-# compiler but which a check reads where it stands:
+# `gate_irrelevant` doesn't call docs, this hook included, which git runs from
+# the working tree and check-shell.sh lints there, and some files it does call
+# docs, which reach no compiler but which a check reads where it stands:
 # - README.md, whose Adopt code `ci.sh checks` compares with the README sample
 #   files;
-# - scripts/git-hooks/*, which git runs from the working tree and check-shell.sh
-#   lints there;
 # - a tracked `*.sh` anywhere, which check-shell.sh lints, and a `*.swift`
 #   anywhere but .claude/, which swiftlint lints;
 # - the workflows, the setup action, Dependabot's config and the two linters'
@@ -82,7 +86,7 @@ gate_irrelevant() {
 # edit would then cost the full build.
 gate_reads() {
   case "$1" in
-    README.md|scripts/git-hooks/*|*.sh) return 0 ;;
+    README.md|*.sh) return 0 ;;
     .github/workflows/*|.github/actions/*|.github/dependabot.yml) return 0 ;;
     .github/actionlint.yaml|.github/zizmor.yml) return 0 ;;
     .claude/*) return 1 ;;

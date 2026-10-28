@@ -1,11 +1,11 @@
 # zizmor's settings, which `scripts/ci.sh checks` passes with --config.
 rules:
   # zizmor asks for `uses: $/.github/actions/setup`, GitHub's self-repository
-  # form, over `./.github/actions/setup`. actionlint 1.7.12 rejects that form as
-  # an action with no ref, and the risk it closes is an action loaded from what
-  # an earlier step put on disk: every job here checks out this repository
-  # alone, and runs nothing before the setup action. Move to `$/` once
-  # actionlint reads it.
+  # form, over `./.github/actions/setup`. actionlint 1.7.12, the version CI
+  # pins, rejects that form as an action with no ref, so ci.yml keeps `./`, and
+  # the risk the form closes, an action loaded from what an earlier step put on
+  # disk, isn't one here: every job checks out this repository alone, and runs
+  # nothing before the setup action.
   self-repository:
     ignore:
       - ci.yml
