@@ -15,8 +15,8 @@ its other top corner, mirrored. Three outputs:
   bottom left to top right, not across each plate, so where plates overlap their colors agree. The
   images are Display P3 PNGs because Icon Composer clamps an SVG's gradients to sRGB and takes only
   two colors in a fill. Behind them lies a pastel field, peach-cream through pink to pale teal (deep
-  plum through indigo to deep teal in dark), crossed by a soft beam. In the clear and tinted looks,
-  which bring a field of their own, the field hides and the plates turn white.
+  plum through indigo to deep teal in dark). In the clear and tinted looks, which bring a field of
+  their own, the field hides and the plates turn white.
 - `Demo/AskKitDemo/Assets.xcassets/AppIcon.solidimagestack/` — visionOS's three layers: the field at
   the back, the two back plates in the middle and the front plate in front, so the plates part in
   parallax, scaled to sit inside the round mask.
@@ -71,15 +71,11 @@ PLATE_OFFSETS = ((0, -128), (0, -60), (0, 36))
 PLATE_OPACITY = (0.45, 0.7, 0.95)
 TRANSLUCENCY = 0.5
 
-# The field, sRGB, from its top right corner to its bottom left, and the beam across it: its colour
-# in Display P3, its opacity, how far below the centre it runs before it turns, its width (both in
-# grid units) and how far it turns, in degrees.
+# The field, sRGB, from its top right corner to its bottom left.
 FIELD = {
     "light": (("#fcebd8", 0.0), ("#f7dfdf", 0.5), ("#a8d9e2", 1.0)),
     "dark": (("#2b1a35", 0.0), ("#15112a", 0.55), ("#0e2433", 1.0)),
 }
-BEAM = {"light": (AURORA[4], 0.24), "dark": (AURORA[1], 0.22)}
-BEAM_OFFSET, BEAM_WIDTH, BEAM_TURN = 154, 307, 21.8
 
 # visionOS draws the stack inside a round mask, so its art is scaled down about the centre, and this
 # many plates sit in the middle layer, the rest in front.
@@ -238,40 +234,23 @@ def hex_rgb(code: str) -> tuple[float, float, float]:
 
 
 def field(appearance: str) -> Image.Image:
-    """The field and its beam, in sRGB values."""
+    """The field, in sRGB values."""
     ys, xs = np.mgrid[0:1024, 0:1024] + 0.5
     colors, stops = zip(*FIELD[appearance])
     rgb = ramp(((1024 - xs) + ys) / 2048, [hex_rgb(c) for c in colors], stops)
-    beam, opacity = BEAM[appearance]
-    # Distance across the beam: turned by BEAM_TURN about the centre, it runs BEAM_OFFSET below it.
-    turn = np.radians(BEAM_TURN)
-    across = -(xs - 512) * np.sin(turn) + (ys - 512) * np.cos(turn) - BEAM_OFFSET
-    strength = opacity * np.clip(1 - np.abs(across) / (BEAM_WIDTH / 2), 0, 1)[:, :, None]
-    # The beam is P3; over an sRGB field at a quarter's opacity or less the gamut doesn't show.
-    rgb = rgb * (1 - strength) + np.array(beam) * strength
     return Image.fromarray(np.round(rgb * 255).astype(np.uint8), "RGB").convert("RGBA")
 
 
 def field_svg(appearance: str) -> str:
-    """The field and its beam as Icon Composer draws them: the field's gradient across the square,
-    and the beam a band whose gradient fades from clear to its colour and back."""
-    def stop(offset, color, opacity=1.0):
-        return f'<stop offset="{offset}" stop-color="{color}" stop-opacity="{opacity}"/>'
-    beam, opacity = BEAM[appearance]
-    beam_color = "color(display-p3 " + " ".join(f"{v:.2f}" for v in beam) + ")"
-    top = 512 + BEAM_OFFSET - BEAM_WIDTH / 2
-    # The beam's gradient is in user space: Icon Composer measures a bounding-box gradient on a
-    # turned shape wrongly, and the beam comes out a flat band with hard edges.
+    """The field as Icon Composer draws it, its gradient across the square."""
+    def stop(offset, color):
+        return f'<stop offset="{offset}" stop-color="{color}" stop-opacity="1.0"/>'
     return ('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">\n'
             '<defs>\n'
             '<linearGradient id="field" x1="1" y1="0" x2="0" y2="1">'
             + "".join(stop(o, c) for c, o in FIELD[appearance]) + '</linearGradient>\n'
-            f'<linearGradient id="beam" gradientUnits="userSpaceOnUse" x1="0" y1="{top:g}" x2="0" y2="{top + BEAM_WIDTH:g}">'
-            + stop(0, beam_color, 0) + stop(0.5, beam_color, opacity) + stop(1, beam_color, 0) + '</linearGradient>\n'
             '</defs>\n'
             '<rect width="1024" height="1024" fill="url(#field)"/>\n'
-            f'<rect x="-1024" y="{top:g}" width="3072" height="{BEAM_WIDTH}" fill="url(#beam)" '
-            f'transform="rotate({BEAM_TURN} 512 512)"/>\n'
             '</svg>\n')
 
 
