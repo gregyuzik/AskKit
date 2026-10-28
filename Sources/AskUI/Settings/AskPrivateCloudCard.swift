@@ -105,7 +105,9 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
     /// The sentence the card shows for this state.
     ///
     /// - Parameter resetDate: When the quota comes back. Read by
-    ///   `.limitReached` alone, and ignored elsewhere.
+    ///   `.limitReached` alone, and ignored elsewhere. Its time for a reset
+    ///   later today, its day and time for one on a later day, and nothing
+    ///   for one already past.
     /// - Returns: The sentence, localized.
     public func message(resetDate: Date? = nil) -> String {
         switch self {
@@ -116,17 +118,10 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
             return String(localized: "Private Cloud Compute is near today's limit.", bundle: #bundle,
                           comment: "Settings line: the daily Private Cloud Compute quota is nearly spent. Nothing changes until it is.")
         case .limitReached:
-            // The same words the thread shows when a turn fails on the quota,
-            // from AskCore's catalog. Two copies of one sentence drift.
-            let reached = AskError.quotaReached(resetDate: resetDate).errorDescription ?? ""
-            guard let resetDate else { return reached }
-            let resets = String(
-                localized: "It resets at \(resetDate.formatted(date: .omitted, time: .shortened)).",
-                bundle: #bundle,
-                comment: "Follows the Private Cloud Compute limit line: the time of day the daily limit comes back. The placeholder is a time alone, such as 5:00 PM."
-            )
-            // With no space after a full-width full stop (`AskSentences`).
-            return AskSentences.joined(reached, resets)
+            // The quota banner's line, word for word: AskCore's sentence, the
+            // one the thread shows when a turn fails on the quota, and when it
+            // resets by the day it falls on. Two copies drift.
+            return AskQuotaBanner.line(resetDate: resetDate)
         case .notEntitled:
             return String(localized: "Private Cloud Compute isn't enabled in this build.", bundle: #bundle,
                           comment: "Settings line: the running app does not carry the Private Cloud Compute entitlement, so answers come from the on-device model.")
@@ -152,8 +147,8 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
 ///
 /// **No toggle.** Private Cloud Compute serves every turn it can and the
 /// on-device model serves the rest. That is house rule 1, and a switch here
-/// would be a second, contradictory answer to a question the engine has
-/// already settled. The card reports, and the navigation bar over the thread
+/// would be a second, contradictory answer to a question the engine decides
+/// on every turn. The card reports, and the navigation bar over the thread
 /// says which tier is answering.
 ///
 /// Made from the store, and not generic over its domain: it lives in an app's
@@ -187,10 +182,10 @@ public struct AskPrivateCloudCard: View {
     /// list is read again when New Chat removes them or a verdict adds one.
     private let feedbackRevision: @MainActor () -> Int
 
-    @State private var evalReport: String?
-    /// The evaluation the button asked for, while it runs: the identity of its
-    /// `.task(id:)`, so it ends with the card. Nil while none runs.
-    @State private var evalRun: UUID?
+    /// The evaluation the row runs, and its report: in the card's state, so
+    /// it ends with the card and outlasts the row's coming and going
+    /// (`AskEvalRun`).
+    @State private var evalRun = AskEvalRun()
     @State private var feedbackAttachments: [URL] = []
 
     /// Creates the card for `store`: its mirror, its route to a higher limit
@@ -236,6 +231,11 @@ public struct AskPrivateCloudCard: View {
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.capsule)
+                // The label is the tint, and the system blue on the style's
+                // gray is under 4.5:1 in both appearances; `.primary` is what
+                // the confirmation card's "Not now" wears on the same gray,
+                // for the same reason, and the fill still marks it a button.
+                .tint(.primary)
                 .accessibilityIdentifier(AskAccessibility.privateCloudShowOptions)
             }
             explanation
@@ -314,18 +314,21 @@ public struct AskPrivateCloudCard: View {
     /// Markdown, and a `ShareLink` that appears once there is something to
     /// share is one control instead of a presentation.
     ///
-    /// **The evaluation ends with the card.** It runs in the row's
-    /// `.task(id:)`, which is cancelled as the card goes, so leaving Settings
-    /// stops a run that would otherwise go on generating, spending Private
-    /// Cloud Compute's quota where that serves, for a report nothing would
-    /// show, and coming back couldn't start a second beside it.
+    /// **The evaluation ends with the card, and only with it.** It runs in a
+    /// task the card's state holds (`AskEvalRun`), which the state's going
+    /// cancels, so leaving Settings stops a run that would otherwise go on
+    /// generating, spending Private Cloud Compute's quota where that serves,
+    /// for a report nothing would show. The row's coming and going leaves it
+    /// running: tied to the row's appearance, as a `.task(id:)` ties it, a row
+    /// scrolled away and back, or under a page pushed and popped, would start
+    /// it over while it was still asked for, and spend the quota again.
     @ViewBuilder
     private func evalRow(_ run: @escaping @Sendable () async -> String) -> some View {
-        let isRunningEval = evalRun != nil
+        let isRunningEval = evalRun.isRunning
         Divider()
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                evalRun = UUID()
+                evalRun.start(run)
             } label: {
                 HStack(spacing: 8) {
                     // Verbatim throughout this row: it is developer copy,
@@ -338,7 +341,7 @@ public struct AskPrivateCloudCard: View {
             }
             .disabled(isRunningEval)
             .accessibilityIdentifier(AskAccessibility.privateCloudRunEval)
-            if let evalReport {
+            if let evalReport = evalRun.report {
                 ShareLink(item: evalReport) {
                     Text(verbatim: "Share results")
                 }
@@ -348,15 +351,45 @@ public struct AskPrivateCloudCard: View {
                     .textSelection(.enabled)
             }
         }
-        .task(id: evalRun) {
-            // Also run as the row appears, with nothing asked for.
-            guard evalRun != nil else { return }
-            let report = await run()
-            // A run the card's going cancelled reports to nothing.
-            guard !Task.isCancelled else { return }
-            evalReport = report
-            evalRun = nil
+    }
+}
+
+/// The evaluation `AskPrivateCloudCard`'s row runs, and the report it last
+/// gave: one run at a time, and over when the card goes.
+///
+/// **An object in the card's state, so the run's life is the card's.** The
+/// task is the object's, and the object's going, with the state that holds
+/// it, cancels it. The task holds the object weakly, so a run under way never
+/// keeps the card's state alive past the card.
+@MainActor
+@Observable
+final class AskEvalRun {
+    /// The report of the last run that finished, or nil before one has.
+    private(set) var report: String?
+    /// Whether a run is under way.
+    private(set) var isRunning = false
+    /// The run under way, or nil.
+    @ObservationIgnored private(set) var task: Task<Void, Never>?
+
+    /// Runs `body`, unless a run is already under way, which goes on as it
+    /// was: one evaluation spends the quota once.
+    ///
+    /// - Parameter body: Runs the host's evaluation and returns its report.
+    func start(_ body: @escaping @Sendable () async -> String) {
+        guard task == nil else { return }
+        isRunning = true
+        task = Task { [weak self] in
+            let report = await body()
+            // Gone with the card, the run reports to nothing.
+            guard let self else { return }
+            self.report = report
+            isRunning = false
+            task = nil
         }
+    }
+
+    deinit {
+        task?.cancel()
     }
 }
 

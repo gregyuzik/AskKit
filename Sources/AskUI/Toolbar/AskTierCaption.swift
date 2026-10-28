@@ -64,6 +64,17 @@ public struct AskTierCaption: ViewModifier {
                         // width, and without this "On device" breaks over two
                         // lines.
                         label.fixedSize()
+                            // **Capped, with the Large Content Viewer past the
+                            // cap, as the bar's own items are.** The bar's
+                            // row keeps its height at every text size, and at
+                            // the largest `.caption` is 40 pt: two lines would
+                            // stand about twice the row's height, and one is
+                            // about 420 pt beside the tab bar in the middle. A
+                            // long press shows the caption at the reader's
+                            // size, as it does the face in the tab bar's slot
+                            // (`AskComposerSlot`).
+                            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                            .accessibilityShowsLargeContentViewer()
                     }
                     // A caption, not a control, so no glass behind it.
                     .sharedBackgroundVisibility(.hidden)
