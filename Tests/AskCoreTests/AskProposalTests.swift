@@ -87,7 +87,9 @@ import Testing
             from: Data(#"{"question":"Where is The Peregrine?","text":"The Peregrine is on your shelf.","proposalOutcome":{"postponed":{}}}"#.utf8)
         )
         #expect(entry.question == "Where is The Peregrine?")
-        #expect(entry.proposalOutcome == nil)
+        // Not none, which would offer the action again: what the newer build
+        // wrote may say it ran (`anOutcomeALaterBuildWroteReadsAsPerforming`).
+        #expect(entry.proposalOutcome == .performing)
     }
 
     @Test func everyCopyOfAnAnswerKeepsItsProposal() {

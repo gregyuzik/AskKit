@@ -8,9 +8,10 @@ import os
 /// transcript is the reader's own questions about their own data, so it leaves
 /// the device only by an explicit share, from the diagnostics row of
 /// `AskPrivateCloudCard`. Until then it stays on the device as the thread
-/// does: excluded from backup, and under complete file protection except on
-/// macOS. Only the newest `maxKept` are kept, and they go when the chat they
-/// came from leaves the screen: New Chat, Delete All Chats, or an earlier chat
+/// does (`AskStoredFile`): excluded from backup, and under complete file
+/// protection except on a Mac, in `feedback/`, which is made the same way.
+/// Only the newest `maxKept` are kept, and they go when the chat they came
+/// from leaves the screen: New Chat, Delete All Chats, or an earlier chat
 /// opened in its place.
 ///
 /// Behind no platform gate, like `AskThreadStore`: Foundation alone.
@@ -22,6 +23,10 @@ public actor AskFeedbackAttachments {
     public static var maxKept: Int { 10 }
 
     private let directory: URL?
+    /// The names of the attachments kept since a removal of every one of
+    /// them that couldn't list the folder, which the retry of that removal
+    /// spares: they are the next chat's. Nil while no such removal is owed.
+    private var keptSince: Set<String>?
 
     /// The attachments kept under the host's folder, or in `directory` when
     /// one is given.
@@ -56,30 +61,14 @@ public actor AskFeedbackAttachments {
     public func save(_ data: Data, sentiment: AskFeedback.Sentiment, at date: Date = .now) -> URL? {
         guard let directory else { return nil }
         let url = directory.appending(path: Self.unusedName(in: directory, at: date, sentiment: sentiment))
-        // The thread store's reasoning, and its measurement: data protection
-        // is an iOS-family feature, and on macOS the option fails the write.
-        #if os(macOS)
-        let options: Data.WritingOptions = [.atomic]
-        #else
-        let options: Data.WritingOptions = [.atomic, .completeFileProtection]
-        #endif
+        // Before the write: a refused backup exclusion fails it with the
+        // file on disk, which is this chat's as much as one that took.
+        keptSince?.insert(url.lastPathComponent)
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try data.write(to: url, options: options)
+            try AskStoredFile.write(data, to: url, ownFolder: true, logger: logger)
         } catch {
-            logger.error("a feedback attachment could not be written: \(error.localizedDescription, privacy: .public)")
+            logger.error("a feedback attachment could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return nil
-        }
-        // Its own step, as in the thread store. The file is on disk whatever
-        // happens here, so a failure is logged and the prune still runs: inside
-        // the write's `do`, it would return nil before the prune.
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var marked = url
-        do {
-            try marked.setResourceValues(values)
-        } catch {
-            logger.error("a feedback attachment could not be excluded from backup: \(error.localizedDescription, privacy: .public)")
         }
         prune()
         return url
@@ -95,7 +84,7 @@ public actor AskFeedbackAttachments {
     /// there, since the atomic write replaces it.
     private static func unusedName(in directory: URL, at date: Date, sentiment: AskFeedback.Sentiment) -> String {
         let seconds = Int(date.timeIntervalSince1970)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
+        let names = AskStoredFile.names(in: directory) ?? []
         var sequence = names.compactMap(stamp(of:)).filter { $0.seconds == seconds }.map(\.sequence).max().map { $0 + 1 } ?? 1
         func name() -> String {
             sequence == 1
@@ -144,15 +133,18 @@ public actor AskFeedbackAttachments {
         }
     }
 
-    /// Every attachment kept, newest first.
+    /// Every attachment kept, newest first. None where the folder won't
+    /// list.
     public func urls() -> [URL] {
-        guard let directory,
-              let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))
-        else { return [] }
-        return names
-            .filter { $0.hasPrefix("feedback-") && $0.hasSuffix(".json") }
-            .sorted(by: Self.isNewer)
-            .map { directory.appending(path: $0) }
+        guard let directory, let names = attachmentNames() else { return [] }
+        return names.sorted(by: Self.isNewer).map { directory.appending(path: $0) }
+    }
+
+    /// The names of every attachment kept, or nil where the folder won't
+    /// list (`AskStoredFile.names(in:)`).
+    private func attachmentNames() -> [String]? {
+        guard let directory else { return [] }
+        return AskStoredFile.names(in: directory)?.filter { $0.hasPrefix("feedback-") && $0.hasSuffix(".json") }
     }
 
     /// Remove every attachment kept, and say whether all are gone: a
@@ -166,41 +158,70 @@ public actor AskFeedbackAttachments {
     /// Remove every attachment kept, and those named in `owed`, as the store
     /// does when a chat leaves the screen, and hand back the names of those
     /// that wouldn't go, for `remove(named:)` to try again. `owed` is what an
-    /// earlier chat's removal left: a folder that can't be listed lists
-    /// nothing, and its names would be forgotten.
+    /// earlier chat's removal left.
     ///
     /// **Names, so a retry removes these and nothing else.** An attachment
     /// kept after, by a verdict in the chat that came next, is that chat's,
     /// and goes with it.
+    ///
+    /// **A folder that won't list owes them all.** It names no attachment,
+    /// and read as empty, every transcript would stay while the removal said
+    /// they had gone. So what is handed back holds `everyAttachment`, which
+    /// the retry turns into the names the folder lists by then, less those
+    /// kept since.
     package func removeEvery(also owed: Set<String> = []) -> Set<String> {
-        remove(named: Set(urls().map(\.lastPathComponent)).union(owed))
+        guard let names = attachmentNames() else {
+            keptSince = []
+            logger.error("the feedback folder could not be listed, so every attachment in it is still owed")
+            return remove(named: owed.subtracting([Self.everyAttachment])).union([Self.everyAttachment])
+        }
+        // Every one is listed, so an earlier removal's `everyAttachment` is
+        // settled here.
+        keptSince = nil
+        return remove(named: Set(names).union(owed.subtracting([Self.everyAttachment])))
     }
 
     /// Remove the attachments with these names, and hand back the names of
     /// those still there. One already gone counts as removed, and a name that
-    /// isn't an attachment's is left alone and dropped.
+    /// isn't an attachment's is left alone and dropped, but for
+    /// `everyAttachment`, which stays owed while the folder won't list.
     package func remove(named names: Set<String>) -> Set<String> {
         guard let directory else { return [] }
+        var names = names
         var left: Set<String> = []
+        if names.remove(Self.everyAttachment) != nil {
+            if let listed = attachmentNames() {
+                names.formUnion(Set(listed).subtracting(keptSince ?? []))
+                keptSince = nil
+            } else {
+                left.insert(Self.everyAttachment)
+            }
+        }
         for name in names where name.hasPrefix("feedback-") && name.hasSuffix(".json") && !name.contains("/") {
             do {
                 try FileManager.default.removeItem(at: directory.appending(path: name))
             } catch let error as CocoaError where error.code == .fileNoSuchFile {
                 // Gone already.
             } catch {
-                logger.error("a feedback attachment could not be removed: \(error.localizedDescription, privacy: .public)")
+                logger.error("a feedback attachment could not be removed: \(AskStoredFile.tag(for: error), privacy: .public)")
                 left.insert(name)
             }
         }
         return left
     }
 
+    /// Stands, among the names a removal owes, for every attachment that was
+    /// in the folder when a folder that wouldn't list kept the removal from
+    /// naming them (`removeEvery(also:)`). No attachment is named it: each
+    /// starts with `feedback-`.
+    static var everyAttachment: String { "*" }
+
     private func prune() {
         for stale in urls().dropFirst(Self.maxKept) {
             do {
                 try FileManager.default.removeItem(at: stale)
             } catch {
-                logger.error("an old feedback attachment could not be removed: \(error.localizedDescription, privacy: .public)")
+                logger.error("an old feedback attachment could not be removed: \(AskStoredFile.tag(for: error), privacy: .public)")
             }
         }
     }

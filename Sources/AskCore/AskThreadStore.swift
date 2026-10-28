@@ -54,7 +54,9 @@ nonisolated public struct AskThreadEntry<Row: AskRow>: Codable, Sendable, Equata
     public private(set) var feedback: AskFeedback.Sentiment?
     /// What the reader did with the answer's proposal, so a thread read back
     /// shows the card as they left it rather than asking again: `.performing`
-    /// from the reader's yes until the app says what came of it.
+    /// from the reader's yes until the app says what came of it. Read back as
+    /// `.performing` too when an outcome was written that this build can't
+    /// decode (`init(from:)`).
     public private(set) var proposalOutcome: AskProposalOutcome?
     /// The photo the question was asked with: what it shows and where the
     /// host keeps it, never its pixels.
@@ -99,8 +101,9 @@ nonisolated public struct AskThreadEntry<Row: AskRow>: Codable, Sendable, Equata
 
     /// Decodes an entry field by field. Every field but the question has a
     /// default, so a thread written before a field existed still decodes, and
-    /// a failure, a tier, a verdict, a proposal's outcome or a photo that a
-    /// newer build wrote differently costs only itself.
+    /// a failure, a tier, a verdict or a photo that a newer build wrote
+    /// differently costs only itself. A proposal's outcome is the exception,
+    /// which reads as one nothing has answered yet.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         question = try container.decode(String.self, forKey: .question)
@@ -120,9 +123,17 @@ nonisolated public struct AskThreadEntry<Row: AskRow>: Codable, Sendable, Equata
         // `try?`, as for `failure`: a verdict a newer build wrote is a lost
         // thumb, never a lost turn.
         feedback = try? container.decodeIfPresent(AskFeedback.Sentiment.self, forKey: .feedback)
-        // And for the same reason: an outcome a newer build wrote shows the
-        // card with no outcome, and never loses the turn.
-        proposalOutcome = try? container.decodeIfPresent(AskProposalOutcome.self, forKey: .proposalOutcome)
+        // An outcome this build can't decode never loses the turn either, and
+        // never reads as none: on the newest turn, none offers the card's
+        // action again, and what a newer build wrote there, or a damaged
+        // field held, may say it ran. Read as a perform nothing has answered,
+        // the card takes no tap (`AskProposalPhase.outcomeUnknown`), so the
+        // action is never done twice. Absent or null is still none.
+        do {
+            proposalOutcome = try container.decodeIfPresent(AskProposalOutcome.self, forKey: .proposalOutcome)
+        } catch {
+            proposalOutcome = .performing
+        }
         // And again: a photo a newer build described differently costs the
         // thumbnail and the line under the question, never the turn.
         photo = try? container.decodeIfPresent(AskQuestionPhoto.self, forKey: .photo)
@@ -332,6 +343,9 @@ nonisolated public enum AskThreadRead<Row: AskRow>: Sendable {
 /// Device-local and excluded from backup: a thread is a conversation about
 /// the host's data, not a record of it. Written after a turn ends, never
 /// mid-stream, so a crash mid-answer costs that answer and nothing before it.
+/// Every file is written, read and listed through `AskStoredFile`: under
+/// complete file protection except on a Mac, and never past
+/// `AskStoredFile.maxBytes`.
 ///
 /// **Writes happen off the main actor,** so encoding and writing the whole
 /// thread never lands on the frame that ends a turn.
@@ -417,7 +431,7 @@ public actor AskThreadStore<Row: AskRow> {
         guard let url else { return .empty }
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            data = try AskStoredFile.contents(of: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             // `fileReadNoSuchFile` (260), not `fileNoSuchFile` (4): reading
             // and removing report a missing file with different codes, and the
@@ -425,19 +439,28 @@ public actor AskThreadStore<Row: AskRow> {
             // persistence off for every fresh install.
             return .empty
         } catch {
-            // Not "no thread". Something is there and can't be read, and the
-            // caller must not write over it.
-            logger.error("the Ask thread could not be read: \(error.localizedDescription, privacy: .public)")
+            // Not "no thread". Something is there and can't be read, or is
+            // past the ceiling, and the caller must not write over it.
+            logger.error("the Ask thread could not be read: \(AskStoredFile.tag(for: error), privacy: .public)")
             return .unreadable
         }
-        let decoded: ([AskThreadEntry<Row>], dropped: Int)
+        let decoded: (entries: [AskThreadEntry<Row>], dropped: Int, droppedRows: Int)
         do {
             decoded = try Self.decodeEntries(from: data)
         } catch {
-            logger.error("the Ask thread on disk is not a thread: \(error.localizedDescription, privacy: .public)")
+            logger.error("the Ask thread on disk is not a thread: \(AskStoredFile.tag(for: error), privacy: .public)")
             return .unreadable
         }
-        let (entries, dropped) = decoded
+        let (entries, dropped, droppedRows) = decoded
+        if droppedRows > 0 {
+            // Each costs its answer that row and nothing else, so nothing on
+            // screen says so, and the next save writes the answers without
+            // them: the host's row type no longer reads what it wrote.
+            logger.error("""
+                \(droppedRows, privacy: .public) row(s) in the Ask thread on disk no longer decode, \
+                and are left out of their answers
+                """)
+        }
         guard dropped > 0 else { return .thread(entries, dropped: 0) }
         guard !entries.isEmpty else {
             logger.error("none of the \(dropped, privacy: .public) Ask turn(s) on disk decode")
@@ -451,33 +474,29 @@ public actor AskThreadStore<Row: AskRow> {
         return .thread(entries, dropped: dropped)
     }
 
-    /// Decode the array element by element. Throws only when the top level
-    /// isn't an array at all, when there is nothing to salvage.
-    static func decodeEntries(from data: Data) throws -> ([AskThreadEntry<Row>], dropped: Int) {
-        let salvaged = try JSONDecoder().decode(AskSalvagedThread<Row>.self, from: data)
-        return (salvaged.entries, salvaged.dropped)
+    /// Decode the array element by element, counting the turns that didn't
+    /// decode and the rows left out of the answers that did
+    /// (`AskDroppedRows`). Throws only when the top level isn't an array at
+    /// all, when there is nothing to salvage.
+    static func decodeEntries(from data: Data) throws -> (entries: [AskThreadEntry<Row>], dropped: Int, droppedRows: Int) {
+        let droppedRows = AskDroppedRows()
+        let decoder = JSONDecoder()
+        if let key = AskDroppedRows.key { decoder.userInfo[key] = droppedRows }
+        let salvaged = try decoder.decode(AskSalvagedThread<Row>.self, from: data)
+        return (salvaged.entries, salvaged.dropped, droppedRows.total)
     }
 
     /// Write the thread, and say whether it is on disk. An empty thread
     /// removes the file, as `clear()` does.
     ///
-    /// Capped at `maxPersistedTurns`, oldest dropped.
+    /// Capped at `maxPersistedTurns`, oldest dropped. Written as every file
+    /// here is (`AskStoredFile.write(_:to:ownFolder:logger:)`): atomically,
+    /// excluded from backup, and with complete file protection except on a
+    /// Mac, so a whole chat transcript isn't readable on a device that is
+    /// locked after being unlocked once. A thread past
+    /// `AskStoredFile.maxBytes` isn't written: it would never read back.
     ///
-    /// Written with `.completeFileProtection` wherever it exists, so a whole
-    /// chat transcript isn't readable on a device that is locked after being
-    /// unlocked once: the default class,
-    /// `CompleteUntilFirstUserAuthentication`, keeps it readable from the
-    /// first unlock until reboot.
-    ///
-    /// **Not on macOS, which doesn't ignore the option: it fails.** Data
-    /// protection is an iOS-family feature; on macOS the option makes the
-    /// atomic write return `NSCocoaErrorDomain` 513 ("Creating a temporary
-    /// file via mktemp failed", `EPERM` underneath), and nothing is written at
-    /// all. Measured: with the option on macOS, every write-then-read test in
-    /// this package fails, which is what keeps a Mac build from shipping a
-    /// thread that silently never persists.
-    ///
-    /// **False means these turns are not on disk here.** A caller must then
+    /// **False means these turns may not be on disk here.** A caller must then
     /// keep every other copy of them: not delete the chat it opened from the
     /// archive (`AskThreadArchive.remove(_:)`), and not write anything else
     /// over the chat they replace. On the iOS family the complete protection
@@ -494,36 +513,15 @@ public actor AskThreadStore<Row: AskRow> {
             try write(JSONEncoder().encode(Array(entries.suffix(Self.maxPersistedTurns))), to: url)
             return true
         } catch {
-            logger.error("the Ask thread could not be written: \(error.localizedDescription, privacy: .public)")
+            logger.error("the Ask thread could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
     }
 
-    /// Every file this store writes: atomically, under `save`'s protection,
-    /// excluded from backup.
-    ///
-    /// The folder is made on every write, not once: made once and
-    /// remembered, a folder removed while the app runs would fail every write
-    /// for the rest of the process. Its own step, as in `AskThreadArchive`:
-    /// the backup exclusion is logged rather than taking the write with it.
+    /// Every file this store writes, in the app's folder, which is the
+    /// host's too, so it is made bare (`AskStoredFile`).
     private func write(_ data: Data, to file: URL) throws {
-        #if os(macOS)
-        let options: Data.WritingOptions = [.atomic]
-        #else
-        let options: Data.WritingOptions = [.atomic, .completeFileProtection]
-        #endif
-        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: file, options: options)
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var marked = file
-        do {
-            try marked.setResourceValues(values)
-        } catch {
-            // The type's doc says the thread is excluded from backup. A
-            // failure discarded here would break that silently.
-            logger.error("an Ask thread file could not be excluded from backup: \(error.localizedDescription, privacy: .public)")
-        }
+        try AskStoredFile.write(data, to: file, ownFolder: false, logger: logger)
     }
 
     /// Forget the thread on disk, as a chat ends: New Chat, for one. Says
@@ -541,7 +539,7 @@ public actor AskThreadStore<Row: AskRow> {
         } catch let error as CocoaError where error.code == .fileNoSuchFile {
             // Already gone. New Chat on an empty thread.
         } catch {
-            logger.error("the Ask thread could not be deleted: \(error.localizedDescription, privacy: .public)")
+            logger.error("the Ask thread could not be deleted: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
         return true
@@ -553,15 +551,23 @@ public actor AskThreadStore<Row: AskRow> {
     /// say whether it moved.
     ///
     /// Only one that was read and would not decode: bytes that aren't an
-    /// array, or an array none of whose turns decode. This build can make
-    /// nothing of it, and the next answer needs its place. One that could not
-    /// be read at all stays where it is, since a locked device makes a good
-    /// thread unreadable for a while, and moving it would take it out of the
-    /// reader's current chat for good. So does one read in part: it is a
+    /// array, or an array none of whose turns decode. And one past
+    /// `AskStoredFile.maxBytes`, which no read takes. This build can make
+    /// nothing of either, and the next answer needs its place. One that could
+    /// not be read at all stays where it is, since a locked device makes a
+    /// good thread unreadable for a while, and moving it would take it out of
+    /// the reader's current chat for good. So does one read in part: it is a
     /// thread.
     package func setAsideIfNotAThread() -> Bool {
-        guard let url, let data = try? Data(contentsOf: url) else { return false }
-        if let decoded = try? Self.decodeEntries(from: data), !decoded.0.isEmpty || decoded.dropped == 0 {
+        guard let url else { return false }
+        do {
+            let data = try AskStoredFile.contents(of: url)
+            if let decoded = try? Self.decodeEntries(from: data), !decoded.entries.isEmpty || decoded.dropped == 0 {
+                return false
+            }
+        } catch let error as CocoaError where error.code == .fileReadTooLarge {
+            // Past the ceiling: moved, whole, for a build that reads it.
+        } catch {
             return false
         }
         return moveAside(url, unread: true)
@@ -592,7 +598,7 @@ public actor AskThreadStore<Row: AskRow> {
     /// Filed first and removed after, so an archive that cannot be written
     /// leaves the file for the next launch rather than losing it. One that
     /// still will not read whole stays too, and so does an original whose
-    /// chat can't be read whole now: merged into what did read, the rest of
+    /// chat can't be read whole now: joined with what did read, the rest of
     /// that chat would be written over.
     ///
     /// **Before the thread is read**, since it may write the thread: called
@@ -602,8 +608,8 @@ public actor AskThreadStore<Row: AskRow> {
     package func recoverSetAside(into archive: AskThreadArchive<Row>) async -> Int {
         var recovered = 0
         for file in setAsideFiles() {
-            guard let data = try? Data(contentsOf: file),
-                  case let (entries, dropped)? = try? Self.decodeEntries(from: data) else { continue }
+            guard let data = try? AskStoredFile.contents(of: file),
+                  case let (entries, dropped, _)? = try? Self.decodeEntries(from: data) else { continue }
             if entries.isEmpty {
                 // Every turn dropped stays for a build that reads them. An
                 // empty array holds nothing to keep.
@@ -619,8 +625,8 @@ public actor AskThreadStore<Row: AskRow> {
             }
         }
         for file in originalFiles() {
-            guard let data = try? Data(contentsOf: file),
-                  case let (entries, dropped)? = try? Self.decodeEntries(from: data), dropped == 0 else { continue }
+            guard let data = try? AskStoredFile.contents(of: file),
+                  case let (entries, dropped, _)? = try? Self.decodeEntries(from: data), dropped == 0 else { continue }
             switch mergeIntoThread(entries) {
             case .merged:
                 recovered += 1
@@ -662,7 +668,7 @@ public actor AskThreadStore<Row: AskRow> {
         guard let url else { return .notThisChat }
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            data = try AskStoredFile.contents(of: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             return .notThisChat
         } catch {
@@ -671,7 +677,7 @@ public actor AskThreadStore<Row: AskRow> {
         }
         // A thread that doesn't read whole is left alone: written back with
         // these turns, it would lose its own that didn't decode.
-        guard case let (thread, dropped)? = try? Self.decodeEntries(from: data), dropped == 0 else { return .notWritten }
+        guard case let (thread, dropped, _)? = try? Self.decodeEntries(from: data), dropped == 0 else { return .notWritten }
         guard let summary = AskThreadSummary.of(thread, id: UUID(), fallbackDate: .distantPast),
               summary.isSameChat(as: turns) else { return .notThisChat }
         return save(AskThreadEntry.merging(turns, into: thread)) ? .merged : .notWritten
@@ -686,24 +692,59 @@ public actor AskThreadStore<Row: AskRow> {
     /// the reader's chat waiting for the next launch to file it. A retry that
     /// removed every file beside the thread would delete it with the ones
     /// Delete All Chats was owed.
+    ///
+    /// **A folder that won't list owes them all.** It names no file, and read
+    /// as empty, every file beside the thread would stay while Delete All
+    /// Chats reported them gone, and nothing would try again. So what is
+    /// handed back is `everyFileKeptAside`, which the retry turns into the
+    /// names the folder lists by then, less those this store has kept beside
+    /// the thread since (`keptAsideSince`).
     package func removeEverySetAside() -> Set<String> {
-        removeSetAside(named: Set((setAsideFiles() + originalFiles()).map(\.lastPathComponent)))
+        guard let names = keptAsideNames() else {
+            keptAsideSince = []
+            logger.error("the Ask thread's folder could not be listed, so the files kept beside the thread are still owed")
+            return [Self.everyFileKeptAside]
+        }
+        keptAsideSince = nil
+        return removeSetAside(named: Set(names))
     }
 
     /// Forget the files waiting beside the thread with these names, and hand
     /// back the names of those still there. A file already gone counts as
     /// forgotten, and a name that isn't one of this thread's set-aside or
-    /// original files is left alone and dropped.
+    /// original files is left alone and dropped, but for
+    /// `everyFileKeptAside`, which stays owed while the folder won't list.
     package func removeSetAside(named names: Set<String>) -> Set<String> {
         guard let folder = url?.deletingLastPathComponent() else { return [] }
-        let prefixes = [setAsidePrefix, originalPrefix].compactMap { $0 }
+        var names = names
         var left: Set<String> = []
+        if names.remove(Self.everyFileKeptAside) != nil {
+            if let listed = keptAsideNames() {
+                names.formUnion(Set(listed).subtracting(keptAsideSince ?? []))
+                keptAsideSince = nil
+            } else {
+                left.insert(Self.everyFileKeptAside)
+            }
+        }
+        let prefixes = [setAsidePrefix, originalPrefix].compactMap { $0 }
         for name in names where name.hasSuffix(".json") && !name.contains("/")
             && prefixes.contains(where: { name.hasPrefix($0) }) {
             if !remove(folder.appending(path: name)) { left.insert(name) }
         }
         return left
     }
+
+    /// Stands, among the names a deletion owes, for every file that was
+    /// beside the thread when a folder that wouldn't list kept Delete All
+    /// Chats from naming them (`removeEverySetAside()`). No file is named
+    /// it: each ends in `.json`.
+    static var everyFileKeptAside: String { "*" }
+
+    /// The names of the files this store has kept beside the thread since a
+    /// Delete All Chats that couldn't list the folder, which the retry of that
+    /// deletion spares: a chat New Chat set aside since is the reader's. Nil
+    /// while no such deletion is owed. In memory only, as the debt is.
+    private var keptAsideSince: Set<String>?
 
     /// `ask-thread-unreadable-`, from the thread's own name.
     private var setAsidePrefix: String? {
@@ -723,6 +764,7 @@ public actor AskThreadStore<Row: AskRow> {
         let aside = url.deletingLastPathComponent().appending(path: "\(setAsidePrefix)\(UUID().uuidString).json")
         do {
             try FileManager.default.moveItem(at: url, to: aside)
+            keptAsideSince?.insert(aside.lastPathComponent)
             if unread {
                 logger.notice("the Ask thread could not be read, and was set aside")
             } else {
@@ -730,7 +772,7 @@ public actor AskThreadStore<Row: AskRow> {
             }
             return true
         } catch {
-            logger.error("the Ask thread could not be set aside: \(error.localizedDescription, privacy: .public)")
+            logger.error("the Ask thread could not be set aside: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
     }
@@ -740,13 +782,14 @@ public actor AskThreadStore<Row: AskRow> {
     /// thread in part, before anything is written, would otherwise add one.
     private func keepOriginal(_ data: Data) -> Bool {
         guard let url, let originalPrefix else { return false }
-        if originalFiles().contains(where: { (try? Data(contentsOf: $0)) == data }) { return true }
+        if originalFiles().contains(where: { (try? AskStoredFile.contents(of: $0)) == data }) { return true }
         let original = url.deletingLastPathComponent().appending(path: "\(originalPrefix)\(UUID().uuidString).json")
         do {
             try write(data, to: original)
+            keptAsideSince?.insert(original.lastPathComponent)
             return true
         } catch {
-            logger.error("the Ask thread could not be kept whole: \(error.localizedDescription, privacy: .public)")
+            logger.error("the Ask thread could not be kept whole: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
     }
@@ -759,8 +802,9 @@ public actor AskThreadStore<Row: AskRow> {
         let original = file.deletingLastPathComponent().appending(path: "\(originalPrefix)\(UUID().uuidString).json")
         do {
             try FileManager.default.moveItem(at: file, to: original)
+            keptAsideSince?.insert(original.lastPathComponent)
         } catch {
-            logger.error("an Ask thread set aside could not be kept as an original: \(error.localizedDescription, privacy: .public)")
+            logger.error("an Ask thread set aside could not be kept as an original: \(AskStoredFile.tag(for: error), privacy: .public)")
         }
     }
 
@@ -772,13 +816,25 @@ public actor AskThreadStore<Row: AskRow> {
         files(withPrefix: originalPrefix)
     }
 
+    /// The files with `prefix` beside the thread, or none where the folder
+    /// won't list: a read finds nothing to put back, and the next launch
+    /// looks again.
     private func files(withPrefix prefix: String?) -> [URL] {
         guard let folder = url?.deletingLastPathComponent(), let prefix,
-              let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))
+              let names = AskStoredFile.names(in: folder)
         else { return [] }
         return names.filter { $0.hasPrefix(prefix) && $0.hasSuffix(".json") }
             .sorted()
             .map { folder.appending(path: $0) }
+    }
+
+    /// The names of every set-aside and original file, or nil where the
+    /// folder won't list.
+    private func keptAsideNames() -> [String]? {
+        guard let folder = url?.deletingLastPathComponent() else { return [] }
+        guard let names = AskStoredFile.names(in: folder) else { return nil }
+        let prefixes = [setAsidePrefix, originalPrefix].compactMap { $0 }
+        return names.filter { name in name.hasSuffix(".json") && prefixes.contains { name.hasPrefix($0) } }
     }
 
     @discardableResult
@@ -789,7 +845,7 @@ public actor AskThreadStore<Row: AskRow> {
         } catch let error as CocoaError where error.code == .fileNoSuchFile {
             return true
         } catch {
-            logger.error("an Ask thread kept aside could not be deleted: \(error.localizedDescription, privacy: .public)")
+            logger.error("an Ask thread kept aside could not be deleted: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
     }

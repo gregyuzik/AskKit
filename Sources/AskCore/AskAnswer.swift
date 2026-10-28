@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// One answer: the prose, the rows behind it, the rows to show, what kind of
 /// question it was, and what grounded it.
@@ -113,8 +114,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         text = try container.decode(String.self, forKey: .text)
-        matches = Self.salvagedRows(in: container, forKey: .matches)
-        tiles = Self.salvagedRows(in: container, forKey: .tiles)
+        let droppedRows = AskDroppedRows.key.flatMap { decoder.userInfo[$0] as? AskDroppedRows }
+        matches = Self.salvagedRows(in: container, forKey: .matches, counting: droppedRows)
+        tiles = Self.salvagedRows(in: container, forKey: .tiles, counting: droppedRows)
         followUps = try container.decodeIfPresent([String].self, forKey: .followUps) ?? []
         questionKind = try container.decodeIfPresent(String.self, forKey: .questionKind)
         isTruncated = try container.decodeIfPresent(Bool.self, forKey: .isTruncated) ?? false
@@ -132,8 +134,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// decode: a host that adds a field to its row type makes every row saved
     /// before it fail, and one such row costs the answer that row, never the
     /// turn. A list that is missing, null or not a list at all is no rows.
+    /// The rows left out are added to `droppedRows`, for the read to log.
     private static func salvagedRows<Key: CodingKey>(
-        in container: KeyedDecodingContainer<Key>, forKey key: Key
+        in container: KeyedDecodingContainer<Key>, forKey key: Key, counting droppedRows: AskDroppedRows?
     ) -> [Row] {
         guard var list = try? container.nestedUnkeyedContainer(forKey: key) else { return [] }
         var rows: [Row] = []
@@ -145,6 +148,11 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
                 // the skip exists; one that can't even skip would spin here.
                 break
             }
+        }
+        // A JSON list knows its length, so a list cut short by a row that
+        // couldn't be skipped counts the rows after it too.
+        if let droppedRows, let count = list.count, count > rows.count {
+            droppedRows.add(count - rows.count)
         }
         return rows
     }
@@ -548,6 +556,29 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     }
 }
 
+/// Counts the rows a read leaves out of their answers (`AskAnswer`'s
+/// `salvagedRows`), handed to the decoder in its `userInfo` by a read that
+/// logs them (`AskThreadStore.decodeEntries(from:)`).
+///
+/// A row a host's type has evolved past costs its answer that row and never
+/// the turn, so nothing else would say it went: a migration gone wrong would
+/// take every saved tile, and the next save would write the answers back
+/// without them.
+nonisolated final class AskDroppedRows: Sendable {
+    /// Where a decoder's `userInfo` holds one. Optional only because
+    /// `CodingUserInfoKey`'s initializer is.
+    static let key = CodingUserInfoKey(rawValue: "AskKit.droppedRows")
+
+    private let count = Mutex(0)
+
+    /// How many rows were left out.
+    var total: Int { count.withLock { $0 } }
+
+    func add(_ rows: Int) {
+        count.withLock { $0 += rows }
+    }
+}
+
 /// Consumes one element of a list of any shape, so a row that no longer
 /// decodes can be stepped over.
 nonisolated private struct AskSkippedRow: Decodable {
@@ -593,6 +624,6 @@ nonisolated enum AskScripts {
         0xFF66...0xFF9F, // Halfwidth Katakana
         0xFFA0...0xFFDC, // Halfwidth Hangul
         0x1B000...0x1B16F, // Kana Supplement and Extended-A
-        0x20000...0x3134F // CJK Unified Ideographs Extensions B to G
+        0x20000...0x3347F // CJK Unified Ideographs Extensions B to J, and the Compatibility Supplement among them
     ]
 }

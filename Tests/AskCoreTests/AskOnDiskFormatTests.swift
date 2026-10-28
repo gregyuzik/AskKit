@@ -214,7 +214,7 @@ import Testing
         let data = Data(AskOnDiskFormatFixtures.thread.utf8)
         #expect(try JSONDecoder().decode([AskThreadEntry<Row>].self, from: data) == thread())
         // As the thread store reads it, entry by entry, with none dropped.
-        let (entries, dropped) = try AskThreadStore<Row>.decodeEntries(from: data)
+        let (entries, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: data)
         #expect(entries == (try thread()))
         #expect(dropped == 0)
     }
@@ -267,9 +267,45 @@ import Testing
         #expect(read.failureMessage == "Paused.")
     }
 
+    /// An outcome a later build wrote, which this build has no case for,
+    /// reads back as a perform nothing has answered, whose card takes no tap,
+    /// and so does one that won't decode at all. Read as no outcome, the
+    /// newest turn's card would offer again an action that may have run.
+    @Test func anOutcomeALaterBuildWroteReadsAsPerforming() throws {
+        let proposalID = try #require(UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF"))
+        let entry = AskThreadEntry<Row>(
+            question: "Can I lend Abbey Road to Sam?",
+            text: "Abbey Road is on your shelf.",
+            answer: AskAnswer(
+                text: "Abbey Road is on your shelf.",
+                proposal: AskProposal(id: proposalID, title: "Mark Abbey Road as lent", actionLabel: "Mark as lent")
+            ),
+            tier: .privateCloud,
+            askedAt: Date(timeIntervalSinceReferenceDate: 783_000_300.5),
+            proposalOutcome: .confirmed("Lent to Sam.")
+        )
+        let turn = try #require(String(bytes: JSONEncoder().encode([entry]), encoding: .utf8))
+        #expect(turn.contains(#""confirmed""#))
+        let later = Data(turn.replacingOccurrences(of: #""confirmed""#, with: #""scheduled""#).utf8)
+        let (entries, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: later)
+        #expect(dropped == 0)
+        #expect(entries.map(\.proposalOutcome) == [.performing])
+        #expect(entries.map(\.question) == [entry.question])
+        #expect(entries.first?.answer == entry.answer)
+
+        let damaged = try JSONDecoder().decode(
+            AskThreadEntry<Row>.self, from: Data(#"{"question":"q","proposalOutcome":12}"#.utf8)
+        )
+        #expect(damaged.proposalOutcome == .performing)
+        // No outcome written is still none: the card asks.
+        for absent in [#"{"question":"q"}"#, #"{"question":"q","proposalOutcome":null}"#] {
+            #expect(try JSONDecoder().decode(AskThreadEntry<Row>.self, from: Data(absent.utf8)).proposalOutcome == nil)
+        }
+    }
+
     @Test func aThreadAnEarlierBuildWroteReadsBackWhole() throws {
         let data = Data(AskOnDiskFormatFixtures.olderThread.utf8)
-        let (entries, dropped) = try AskThreadStore<Row>.decodeEntries(from: data)
+        let (entries, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: data)
         #expect(entries == (try olderThread()))
         #expect(dropped == 0)
     }
@@ -318,7 +354,7 @@ import Testing
         )
         let fixture = Data(AskOnDiskFormatFixtures.proposalInFlight.utf8)
         #expect(try canonical(JSONEncoder().encode([entry])) == canonical(fixture))
-        let (entries, dropped) = try AskThreadStore<Row>.decodeEntries(from: fixture)
+        let (entries, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: fixture)
         #expect(entries == [entry])
         #expect(dropped == 0)
     }
@@ -342,12 +378,12 @@ import Testing
     /// recording nothing, and so does one written with none: the field is
     /// left out, never written as null.
     @Test func anAnswerWrittenWithoutAGroundingReadsAsNone() throws {
-        let (older, dropped) = try AskThreadStore<Row>.decodeEntries(from: Data(AskOnDiskFormatFixtures.olderThread.utf8))
+        let (older, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: Data(AskOnDiskFormatFixtures.olderThread.utf8))
         #expect(older.first?.answer != nil)
         #expect(older.first?.answer?.grounding == nil)
         #expect(dropped == 0)
 
-        let (current, _) = try AskThreadStore<Row>.decodeEntries(from: Data(AskOnDiskFormatFixtures.thread.utf8))
+        let (current, _, _) = try AskThreadStore<Row>.decodeEntries(from: Data(AskOnDiskFormatFixtures.thread.utf8))
         #expect(current.map { $0.answer?.grounding } == [.toolCall, nil, nil])
         let written = try #require(String(bytes: JSONEncoder().encode(thread()[2]), encoding: .utf8))
         #expect(!written.contains("grounding"))
