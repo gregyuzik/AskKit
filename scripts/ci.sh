@@ -16,7 +16,8 @@
 #                 test T, such as AskScreenSmokeTests/<test>
 #   build DEST    the package for one xcodebuild destination
 #   builds        the package for all eight destinations
-#   destinations  those eight, one per line: CI's build matrix reads them
+#   destinations  those eight, one per line: CI's build matrix and
+#                 scripts/soft-deprecation-check.sh read them
 #   demo          the demo's three apps and its UI-test bundle
 #   all           checks, test, api, builds and demo: what the push gate runs,
 #                 and the default. CI runs each of them as a job.
