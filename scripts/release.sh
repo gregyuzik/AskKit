@@ -2,12 +2,12 @@
 # Releases AskKit: a signed tag on origin/main and the GitHub release made from
 # it, once CI has passed on that commit and CHANGELOG.md says what's in it.
 #
-# usage: scripts/release.sh [--dry-run] VERSION    (such as 0.2.0, with no v)
+# usage: scripts/release.sh [-n|--dry-run] VERSION    (such as 0.2.0, with no v)
 #
 # The tag is the release: SwiftPM resolves a host's dependency by tag. So it is
 # made and signed here, with your git signing key, and pushed before the
 # release. `gh release create` given a tag that doesn't exist yet makes one on
-# GitHub, unsigned, which is how v0.1.0 went out; `--verify-tag` refuses to.
+# GitHub, unsigned; `--verify-tag` refuses to.
 # The protect-release-tags ruleset won't let a v* tag move or go, the
 # release-tag-creation ruleset lets only an admin push a new one, and releases
 # are immutable, so a release that went out wrong stays out: everything that
@@ -21,7 +21,7 @@
 # - the tag exists neither here nor on origin;
 # - `CI passed` has passed on that commit. A push that changed only docs runs
 #   no CI, so for one of those it starts a run (`gh workflow run`) and waits.
-# --dry-run does all of that, CI included, and tags nothing.
+# -n or --dry-run does all of that, CI included, and tags nothing.
 #
 # Afterwards the API allowlist is emptied in a pull request, since the new tag
 # is `ci.sh api`'s baseline and the breaks it lists were against the old one.
@@ -41,7 +41,7 @@ dry=0
 case "${1:-}" in
   -n|--dry-run) dry=1; shift ;;
 esac
-[ "$#" -eq 1 ] || fail "usage: scripts/release.sh [--dry-run] VERSION, such as 0.2.0"
+[ "$#" -eq 1 ] || fail "usage: scripts/release.sh [-n|--dry-run] VERSION, such as 0.2.0"
 version=$1
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "'$version' isn't MAJOR.MINOR.PATCH, with no v"
 tag="v$version"

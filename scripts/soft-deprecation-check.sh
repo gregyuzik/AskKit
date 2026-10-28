@@ -10,9 +10,9 @@
 # that 100000, 10000 or 1000, and the compiler warns about none of them.
 #
 # What it builds, Debug, into one DerivedData: what the push gate builds (the
-# package for the five platforms and the three device legs, the demo's three apps
-# and its UI-test bundle), plus the package's test targets for macOS, the one
-# platform `swift test` runs them on.
+# package for each destination `scripts/ci.sh destinations` lists, the demo's
+# three apps and its UI-test bundle), plus the package's test targets for macOS,
+# the one platform `swift test` runs them on.
 #
 # usage: scripts/soft-deprecation-check.sh [--reuse] [--keep] [--strict] [--out FILE]
 #   --reuse     skip the builds and read the index a --keep run left behind
@@ -57,16 +57,20 @@ done
 mkdir -p "$work/logs" "$(dirname "$out")"
 
 # name|action|scheme|destination. A `demo-` name builds the demo project; the
-# rest build the package's own SwiftPM scheme.
-builds=(
-  "package-ios|build|AskKit-Package|generic/platform=iOS Simulator"
-  "package-macos|build|AskKit-Package|generic/platform=macOS"
-  "package-visionos|build|AskKit-Package|generic/platform=visionOS Simulator"
-  "package-tvos|build|AskKit-Package|generic/platform=tvOS Simulator"
-  "package-watchos|build|AskKit-Package|generic/platform=watchOS Simulator"
-  "package-ios-device|build|AskKit-Package|generic/platform=iOS"
-  "package-visionos-device|build|AskKit-Package|generic/platform=visionOS"
-  "package-watchos-device|build|AskKit-Package|generic/platform=watchOS"
+# rest build the package's own SwiftPM scheme. The package's destinations are
+# ci.sh's one list, read rather than copied, so a destination the push gate and
+# CI build is indexed here too. The demo's four schemes are ci.sh's `step_demo`,
+# repeated.
+destinations=$("$repo/scripts/ci.sh" destinations)
+[ -n "$destinations" ] || {
+  echo "soft-deprecation-check: scripts/ci.sh destinations listed nothing" >&2
+  exit 1
+}
+builds=()
+while IFS= read -r destination; do
+  builds+=("package-$(printf %s "$destination" | tr -c 'A-Za-z0-9' '-')|build|AskKit-Package|$destination")
+done <<<"$destinations"
+builds+=(
   "package-tests|build-for-testing|AskKit-Package|platform=macOS,arch=arm64"
   "demo-ios|build|AskKitDemo_iOS|generic/platform=iOS Simulator"
   "demo-macos|build|AskKitDemo_macOS|generic/platform=macOS"

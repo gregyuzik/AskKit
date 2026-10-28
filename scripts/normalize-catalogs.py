@@ -33,6 +33,7 @@ reports which files it rewrote.
 import json
 import os
 import sys
+import tempfile
 from collections import OrderedDict
 
 # Imported, not restated: the completeness ratchet owns catalog discovery, and
@@ -60,6 +61,32 @@ def serialized(catalog):
                       separators=(",", " : ")) + "\n"
 
 
+def write_atomically(path, text):
+    """Replace `path` with `text` whole or not at all.
+
+    Written in place, a catalog is empty from the moment the file opens until
+    the last byte lands, and an interrupted run leaves it truncated: a broken
+    catalog, or one that parses with strings missing. So the new text goes to a
+    file beside it, which takes its mode, and a rename puts it in place. That
+    file's name is hidden, so if a kill leaves it behind, SwiftPM and the push
+    gate pass over it.
+    """
+    directory, name = os.path.split(path)
+    handle = tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=directory or ".", prefix=f".{name}.",
+        suffix=".tmp", delete=False)
+    try:
+        with handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(handle.name, os.stat(path).st_mode & 0o7777)
+        os.replace(handle.name, path)
+    except BaseException:
+        os.unlink(handle.name)
+        raise
+
+
 def main():
     check_only = "--check" in sys.argv[1:]
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,8 +101,7 @@ def main():
             continue
         out_of_shape.append(path)
         if not check_only:
-            with open(path, "w", encoding="utf-8") as handle:
-                handle.write(after)
+            write_atomically(path, after)
 
     if not out_of_shape:
         print("✓ catalogs already normalized")

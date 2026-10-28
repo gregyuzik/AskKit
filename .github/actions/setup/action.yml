@@ -1,5 +1,5 @@
 name: Set up
-description: Selects the image's newest Xcode release or release candidate, 27.2 or later (a beta only when neither exists), and installs the pinned tools a job names.
+description: Fails on a runner that isn't GitHub-hosted, selects the image's newest Xcode release or release candidate, 27.2 or later (a beta only when neither exists), and installs the pinned tools a job names.
 
 # Xcode isn't pinned. A job takes the image's newest Xcode release or release
 # candidate, by version, when that is 27.2 or later; a beta only when neither
@@ -24,10 +24,30 @@ inputs:
 runs:
   using: composite
   steps:
-    # Both steps write an environment file, which zizmor flags because a value
-    # someone else controls could set a variable later steps run with. Here the
-    # values are paths on the image, an Xcode's folder and the tools' own, and
-    # CI runs on push and pull_request only, with a read-only token.
+    # CI runs a pull request's code, a fork's included, which is safe only on a
+    # machine made for the one job and thrown away after it: a GitHub-hosted
+    # runner. `xcode-27` names one (a job's log opens with "Hosted Compute
+    # Agent" and the image, xcode-27-arm64), but nothing else checks that:
+    # actionlint doesn't know the label, and .github/actionlint.yaml lists it
+    # as a self-hosted runner's to quiet it. A pull request can edit this step
+    # away, as it can the workflow, so it doesn't stop a hostile one. What it
+    # does is fail every other run, a push to main's and the weekly one's
+    # included, once the label reaches a self-hosted runner, so the change
+    # shows on its first run instead of going on unnoticed.
+    - name: Insist on a GitHub-hosted runner
+      shell: bash
+      run: |
+        if [ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]; then
+          echo "::error::RUNNER_ENVIRONMENT is '${RUNNER_ENVIRONMENT:-}', not github-hosted, and AskKit's CI runs pull requests' code only on GitHub-hosted runners: check what runs-on: xcode-27 reaches."
+          exit 1
+        fi
+
+    # The two steps after this one write an environment file, which zizmor
+    # flags because a value someone else controls could set a variable later
+    # steps run with. Here the values are paths on the image, an Xcode's folder
+    # and the tools' own, on a GitHub-hosted runner (the step above), and every
+    # run has a read-only token, whatever starts it: a push, a pull request,
+    # the weekly schedule or `workflow_dispatch`.
     - name: Select the newest Xcode
       shell: bash
       run: | # zizmor: ignore[github-env] DEVELOPER_DIR is an Xcode folder on the image

@@ -16,7 +16,8 @@
 #                 test T, such as AskScreenSmokeTests/<test>
 #   build DEST    the package for one xcodebuild destination
 #   builds        the package for all eight destinations
-#   destinations  those eight, one per line: CI's build matrix reads them
+#   destinations  those eight, one per line: CI's build matrix and
+#                 scripts/soft-deprecation-check.sh read them
 #   demo          the demo's three apps and its UI-test bundle
 #   all           checks, test, api, builds and demo: what the push gate runs,
 #                 and the default. CI runs each of them as a job.
@@ -50,8 +51,9 @@ usage() {
 # alone: at a deployment target of 27 Xcode drops arm64_32, the 32-bit-`Int`
 # slice, from `ARCHS_STANDARD`.
 #
-# The one list: the push gate builds it, and CI's build matrix is read from
-# `ci.sh destinations`, so a destination added here is built by both.
+# The one list: the push gate builds it, and CI's build matrix and
+# scripts/soft-deprecation-check.sh read it from `ci.sh destinations`, so a
+# destination added here is built by all three.
 destinations=(
   "generic/platform=iOS Simulator"
   "generic/platform=macOS"
@@ -158,7 +160,7 @@ no_warnings() { # log what
 simulator() { # name
   local sdk
   sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
-  xcrun simctl list devices available -j | python3 -c '
+  xcrun simctl list devices available -j | python3 -I -c '
 import json, re, sys
 name, sdk = sys.argv[1], sys.argv[2].split(".")[:2]
 found = []
@@ -185,13 +187,13 @@ step_checks() {
   # only thing between AskKit's strings and shipping English to every other
   # locale.
   say "String Catalog completeness"
-  python3 scripts/check-catalog-completeness.py || fail "the String Catalogs are missing translations"
+  python3 -I scripts/check-catalog-completeness.py || fail "the String Catalogs are missing translations"
   # Xcode rewrites a whole catalog in its own serialization when it exports or
   # edits one, and says nothing. That turns a small change into a diff nobody
   # reads, which is where a translation regression hides. Checked rather than
   # fixed, so the step fails loudly instead of rewriting the tree.
   say "String Catalog shape"
-  python3 scripts/normalize-catalogs.py --check ||
+  python3 -I scripts/normalize-catalogs.py --check ||
     fail "the String Catalogs aren't in the committed shape: python3 scripts/normalize-catalogs.py restores it"
   # README.md's Adopt section shows ReadmeDomain.swift and
   # ReadmeAssistantDomain.swift, which the package's tests compile and run. An
@@ -290,14 +292,19 @@ step_test() {
     { grep -E 'recorded an issue|error:' "$log" || true; } | head -20 >&2
     exit 1
   fi
-  # The tests the test targets' runs report, summed, must reach 600. The count
-  # is of tests run, a skipped one included, so it is the count of what
-  # compiled in. The minimum sits under the suite's real count to leave room for
-  # a deliberate deletion; raise it as the suite grows, or the widening gap lets
-  # more of the suite go missing unnoticed.
+  # The tests the test targets' runs report, summed, must reach 1,350. The
+  # count is of tests run, a skipped one included, so it is the count of what
+  # compiled in: 1,417 when the minimum was set (AskCoreTests 730, AskUITests
+  # 629, AskCrossPostureTests 58). The 67 between them leave room for a
+  # deliberate deletion, and fail a run that lost more: a big file's
+  # over-tight `#if` (AskConversationStoreTests holds 226), or the platform
+  # line every AskUI test file opens with, edited across them. A smaller file
+  # can still go unnoticed, and so can all of AskCrossPostureTests (1,359
+  # would pass). Raise the minimum as the suite grows, or the widening gap
+  # lets more of the suite go missing unnoticed.
   ran=$(sed -nE 's/.*Test run with ([0-9]+) tests.*/\1/p' "$log" | awk '{ s += $1 } END { print s + 0 }')
-  if [ "$ran" -lt 600 ]; then
-    say "only $ran tests ran (minimum 600), so part of the suite likely didn't compile in — $log"
+  if [ "$ran" -lt 1350 ]; then
+    say "only $ran tests ran (minimum 1,350), so part of the suite likely didn't compile in — $log"
     exit 1
   fi
   # The tests that race the wall clock stand down while the Mac is under load
@@ -335,10 +342,9 @@ step_test() {
 #
 # Its warnings aren't scanned: `test` scans the working tree's, and the
 # baseline's belong to a released tree built with a newer Xcode, so they aren't
-# this change's to fix (v0.1.0's AskGlassRod.metal is one). Cold, because the
-# digester keeps the baseline it dumped for a tag in its scratch and reuses it,
-# and one an older Xcode dumped isn't the next one's to compare with. It takes
-# about 30 seconds.
+# this change's to fix. Cold, because the digester keeps the baseline it dumped
+# for a tag in its scratch and reuses it, and one an older Xcode dumped isn't
+# the next one's to compare with. It takes about 30 seconds.
 step_api() {
   local allowlist=.github/api-breakage-allowlist.txt scratch="$work/api" log="$logs/api.log"
   local bad baseline breaks
@@ -383,9 +389,17 @@ step_api() {
 # instead, and not in CI, whose virtual Mac draws views too slowly for the
 # suite's deadlines.
 #
-# The minimum is `step_test`'s, read from the result bundle, since `-quiet` keeps
-# the per-test lines out of the log. The bundle keeps each failure, so a failure
-# collects no sysdiagnose: on a CI runner that took ten minutes and timed out.
+# The minimum is lower than `step_test`'s, and counts tests passed, read from the
+# result bundle, since `-quiet` keeps the per-test lines out of the log. The
+# simulator compiles 1,382 of the Mac's 1,417, since 35 in AskUITests compile
+# for the Mac alone, and a result bundle from a tree two tests smaller passed
+# 1,380: AskCoreTests 728, AskUITests 594, AskCrossPostureTests 58. The twelve
+# tests that race the wall clock count as skipped, not passed, while the Mac is
+# under load, so 1,320 leaves room for them and for a deliberate deletion.
+# Raise it with `step_test`'s.
+#
+# The bundle keeps each failure, so a failure collects no sysdiagnose: on a CI
+# runner that took ten minutes and timed out.
 step_test_ios() {
   local sim log="$logs/test-ios.log" results="$work/test-ios.xcresult" passes
   sim=$(simulator "iPhone 18 Pro")
@@ -399,9 +413,9 @@ step_test_ios() {
     exit 1
   fi
   passes=$(xcrun xcresulttool get test-results summary --path "$results" --compact |
-    python3 -c 'import json, sys; print(json.load(sys.stdin).get("passedTests", 0))')
-  if [ "$passes" -lt 600 ]; then
-    say "only $passes tests passed on iOS (minimum 600), so part of the suite likely didn't compile in — $results"
+    python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("passedTests", 0))')
+  if [ "$passes" -lt 1320 ]; then
+    say "only $passes tests passed on iOS (minimum 1,320), so part of the suite likely didn't compile in — $results"
     exit 1
   fi
   say "$passes tests passed on iOS"
@@ -469,6 +483,9 @@ step_builds() {
 #
 # The UI smoke suite is built and not run: a simulator UI test would be the
 # flakiest part of a gate every change passes. scripts/ui-smoke.sh runs it.
+#
+# scripts/soft-deprecation-check.sh builds these four too, from a list of its
+# own: a scheme added here goes there as well.
 step_demo() {
   local failed=0
   demo_build AskKitDemo_iOS "generic/platform=iOS Simulator" || failed=1
