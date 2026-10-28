@@ -9,6 +9,15 @@ change, allowed in a 0.x minor version, because it stops a host's exhaustive `sw
 
 ## [Unreleased]
 
+### Added
+
+- **A privacy manifest for AskCore.** `AskCore`'s resource bundle carries a `PrivacyInfo.xcprivacy`, so
+  an app that embeds AskKit gets a complete privacy report. It declares the two required-reason APIs
+  AskCore calls: user defaults for `CA92.1`, read only for the launch's own arguments (`ASK_LIVE_PCC`),
+  and the file timestamp for `C617.1`, the modification date of a chat file in the app's own container.
+  It declares no tracking and no collected data: AskKit sends nothing to its developer or any third
+  party. AskUI calls none of these APIs, and carries no manifest.
+
 ### Removed
 
 - **The Glass Rod round the composer.** The spectrum look's clear glass tube of colors round the
