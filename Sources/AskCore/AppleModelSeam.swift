@@ -849,7 +849,9 @@ public actor AppleModelSeam: AskModelSeam {
     /// except the quota's, is derived here. The quota half stays in
     /// `refreshStatus`, which reads the real model.
     nonisolated static func snapshot(from states: [AskTierState]) -> AskModelStatus.Snapshot {
-        let next = askServableTiers(from: states).first ?? heldTier(in: states)
+        // With nothing servable, a held Private Cloud Compute is still next,
+        // by the test the engine's turn reads (`askHeldTier(from:)`).
+        let next = askServableTiers(from: states).first ?? askHeldTier(from: states)?.tier
         var snapshot = AskModelStatus.Snapshot(
             nextTier: next,
             unavailability: next == nil ? askUnavailability(from: states) : nil
@@ -865,22 +867,6 @@ public actor AppleModelSeam: AskModelSeam {
                 : (cloud.unavailability ?? .unknown)
         }
         return snapshot
-    }
-
-    /// Private Cloud Compute, when nothing can serve and the tier is out only
-    /// for a while: it is up and writes the language, and only a cooldown or
-    /// a spent quota excludes it.
-    ///
-    /// **A hold is the tier saying "not now", not "can't".** With nowhere to
-    /// hand down to, a question is the turn's error, which Try Again retries
-    /// (house rule 1), so the mirror names the tier rather than a reason. A
-    /// reason would put up the can't-serve first screen after New Chat, in
-    /// the on-device tier's words, for an outage that lifts in a minute or at
-    /// the quota's reset.
-    nonisolated static func heldTier(in states: [AskTierState]) -> AskTier? {
-        guard let cloud = states.first(where: { $0.tier == .privateCloud }),
-              cloud.isAvailable, cloud.speaksLanguage, cloud.isCooled || cloud.quotaReached else { return nil }
-        return .privateCloud
     }
 
     /// Shows Private Cloud Compute's limit-increase suggestion, when the quota

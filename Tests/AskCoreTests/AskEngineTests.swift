@@ -1191,26 +1191,43 @@ private extension Trait where Self == ConditionTrait {
         #expect(seam.transportFailures.withLock { $0 } == [.privateCloud])
     }
 
-    /// A spent quota with nothing below it is asked as a cooled tier is, and
-    /// a quota still spent is the turn's error, retryable, beside the banner
-    /// that says when it resets: not the on-device tier's reason. A quota
-    /// both spent and cooled is asked the same way.
-    @Test func aSpentQuotaWithNothingBelowIsAskedAndFailsRetryably() async {
+    /// A spent quota with nothing below it is asked nothing: until its reset,
+    /// every request could only fail as the quota, and each would spend one.
+    /// The turn fails at once as the quota, retryably and with the reset the
+    /// mirror's banner shows, on the tier the mirror names: not with the
+    /// on-device tier's reason, which offers no Try Again. A quota both spent
+    /// and cooled is the same, since a cooldown lifting leaves it spent. Once
+    /// it resets, Try Again asks.
+    @Test func aSpentQuotaWithNothingBelowFailsAtOnceAskingNothing() async {
         for cooled in [false, true] {
-            let (engine, seam, _) = makeEngine(states: [
+            let (engine, seam, log) = makeEngine(states: [
                 AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, quotaReached: true, isCooled: cooled),
                 .down(.onDevice, .modelNotReady)
             ])
+            let reset = Date(timeIntervalSinceNow: 3_600)
+            seam.status.apply(AskModelStatus.Snapshot(nextTier: .privateCloud, quotaReached: true, resetDate: reset))
             let session = seam.session(for: .privateCloud)
-            session.script(FakeSession.Script(error: AskError.quotaReached(resetDate: nil)))
+            session.script(grounded("After the reset."))
             let recording = await record(engine.ask("q"))
             #expect(recording.tiers == [.privateCloud])
-            #expect(recording.askError == .quotaReached(resetDate: nil))
+            #expect(recording.askError == .quotaReached(resetDate: reset))
             #expect(recording.askError?.isRetryable == true)
-            #expect(session.prompts.withLock { $0 }.count == 1)
-            // A spent quota is no network fault, and cools nothing.
+            #expect(recording.restarts.isEmpty)
+            // No session built, no prompt sent.
+            #expect(seam.instructionsSeen.withLock { $0 }.isEmpty)
+            #expect(session.prompts.withLock { $0 }.isEmpty)
+            #expect(log.routings.withLock { $0 }.contains(
+                "privateCloud is out of quota, with no tier below that can serve — asking nothing until its reset"
+            ))
+            // A spent quota is no network fault, and cools nothing. The
+            // mirror is refreshed all the same, for the banner.
             await eventually { seam.refreshes.withLock { $0 } >= 1 }
             #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+
+            seam.set([.serving(.privateCloud), .down(.onDevice, .modelNotReady)])
+            let again = await record(engine.ask("q"))
+            #expect(again.tiers == [.privateCloud])
+            #expect(again.answer?.text == "After the reset.")
         }
     }
 
