@@ -159,7 +159,7 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    usage and its window), every generation, the grounded retry's planner and search, and a hand-down. A
    hook or a read still running when it passes is abandoned, so one that never returns can't hold the
    turn, or every question after it. An on-device generation the deadline abandons still holds the
-   generation gate until it returns, for 90 s at most ([the generation
+   generation gate until it returns, within the holder's 90 s ([the generation
    gate](#the-deadline-and-the-generation-gate)), and the next on-device question waits there inside its
    own deadline.
 4. **The question.** It loses what draws nothing, as a link's does, then is trimmed and clamped to 500
@@ -1280,8 +1280,7 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
 - **overflow menu**: the toolbar's menu for items that don't fit.
 - **bottom edge**: the bottom of the viewport.
 - **merge**: in prose, only what settled chunks do in the reveal. Two copies of one chat made one are
-  **joined** ([Persistence and history](#persistence-and-history)), though identifiers say merge for
-  that too (`AskThreadArchive.merge`, `AskThreadEntry.merging`), as `AskCollector.mergePayload` does for
-  its payloads, and keep it.
+  **joined** ([Persistence and history](#persistence-and-history)). Identifiers keep the word
+  (`AskThreadArchive.merge`, `AskThreadEntry.merging`, `AskCollector.mergePayload`).
 - **gate**: always named: the generation gate (`AskGenerationGate`), Private Cloud Compute's context
   gate, the push gate (`scripts/git-hooks/pre-push`), or a platform gate (an `#if` condition).
