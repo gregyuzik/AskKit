@@ -99,9 +99,10 @@ nonisolated struct AskGlassForeground: ShapeStyle {
 /// A glyph drawn on a fill of the host's accent: white, or black on an accent
 /// too light to hold white at 3:1 (`AskContrast.prefersBlack(on:minimum:)`).
 ///
-/// **White was fixed, and the accent is the host's.** The system blue holds
-/// white at 3.5:1 and keeps it. A yellow or a mint accent put a white arrow at
-/// under 2:1, and black is over 10:1 on either.
+/// **The accent is the host's, so white can't be taken for granted.** The
+/// system blue holds a white arrow at 3.52:1 and keeps it. A yellow or a mint
+/// accent would leave it at 1.41:1 on #FFD60A and 1.51:1 on #63E6E2, where
+/// black is over 13:1 on either.
 nonisolated struct AskOnAccent: ShapeStyle {
     let accent: Color
 
@@ -111,42 +112,60 @@ nonisolated struct AskOnAccent: ShapeStyle {
 }
 
 /// A system button style's label on a fill of the host's accent, such as
-/// `.borderedProminent` tinted with it: the style's own, white, except where
-/// white falls under 3:1 on the accent and black does better, where the label
-/// and a spinner in it are black (`AskContrast.prefersBlack(on:minimum:)`).
-/// Disabled, it is the style's whatever the accent, so the style's disabled
-/// look stands.
+/// `.borderedProminent` tinted with it: the style's own white where white
+/// holds 4.5:1 on the accent, and black, the label and a spinner in it, where
+/// white falls under that and black does better
+/// (`AskContrast.prefersBlack(on:minimum:)`). Disabled, it is the style's
+/// whatever the accent, so the style's disabled look stands.
 ///
-/// **White, as the system's prominent buttons draw it.** They put a white label
-/// on the accent whatever it is, and a label of ours beside one of theirs
-/// matches only in white. White is 3.52:1 on the system blue (#0088FF) and
-/// 3.23:1 on its dark #0091FF, which Apple's audit reads as "nearly passed",
-/// not failed; black would be 5.97:1 and 6.49:1. The label turns black only
-/// where white is under 3:1, the bar that holds a glyph on the accent
-/// (`AskOnAccent`): white on yellow is 1.51:1 and black 13.89:1, on mint
-/// 2.12:1 and 9.91:1. Either way the label holds 3:1 on every accent, since
-/// black is over 7:1 wherever white is under 3:1.
+/// **Text's 4.5:1, not a glyph's 3:1.** The label is words to read, at the
+/// style's own size and weight: AskKit sets neither on it, and 3:1 is the bar
+/// for large or bold text. Apple's audit holds it to more than 3:1 as well: it
+/// reads white on the system blue, 3.52:1, as "nearly passed", short of its
+/// bar, where 3:1 would pass it. So the label is black on the system blue,
+/// 5.97:1 on #0088FF and 6.49:1 on dark mode's #0091FF, where white is 3.52:1
+/// and 3.23:1; black on #007AFF, 5.23:1 to white's 4.02:1, and on the system
+/// red (#FF383C), 5.88:1 to 3.57:1; and white on a dark accent such as navy.
+/// Either way it holds 4.5:1 on every accent: white and black are both about
+/// 4.58:1 where they cross, so one of the two always clears it.
 ///
 /// **On the label, not the button**: the style draws its label white whatever
-/// the tint, and a style set outside the label is the style's to ignore.
+/// the tint, and a style set outside the label is the style's to ignore. The
+/// button wears the same `accent` as its tint, so the fill under the words is
+/// the color they were judged on.
+///
+/// **visionOS keeps the style's own label.** Its prominent button is a
+/// `.bordered` platter with no fill of the accent (`askGlassButton`), so no
+/// accent sits under the words to judge them on, and black there would be
+/// black on a dark platter.
 ///
 /// Text on a fill of the accent over the screen, such as the question bubble,
-/// is `AskOnFill`, held to 4.5:1 rather than 3:1: it is text to read, and no
-/// system button sits beside it to match.
+/// is `AskOnFill`, held to the same 4.5:1 on the fill as it is worn, opacity
+/// and the screen under it included.
 struct AskOnAccentLabel: ViewModifier {
     let accent: Color
 
     @Environment(\.self) private var environment
 
     func body(content: Content) -> some View {
-        if environment.isEnabled,
-           AskContrast.prefersBlack(on: AskContrast.RGB(accent.resolve(in: environment)), minimum: AskContrast.whiteLabelMinimum) {
+        if environment.isEnabled, Self.isBlack(on: AskContrast.RGB(accent.resolve(in: environment))) {
             content
                 .foregroundStyle(.black)
                 .tint(.black)
         } else {
             content
         }
+    }
+
+    /// Whether the words on `accent` are black rather than the style's white:
+    /// where white falls under text's 4.5:1 on it and black does better.
+    /// Never on visionOS, where no fill of the accent sits under them.
+    nonisolated static func isBlack(on accent: AskContrast.RGB) -> Bool {
+        #if os(visionOS)
+        false
+        #else
+        AskContrast.prefersBlack(on: accent, minimum: AskGlassForeground.text)
+        #endif
     }
 }
 
@@ -157,11 +176,11 @@ struct AskOnAccentLabel: ViewModifier {
 ///
 /// **The ground is the fill over the screen** (`AskContrast.screen(isLight:)`),
 /// worked out flat, which a fill is, where glass's ground is an estimate. At
-/// the bubble's 60%, the system blue holds white at 6.68:1 in dark mode and
-/// black at 9.83:1 in light. A light accent leaves white short in dark mode:
-/// 3.29:1 on yellow (#FFD60A), 3.47:1 on mint (#63E6E2) and 3.85:1 on cyan
-/// (#64D2FF), where black is 6.38:1, 6.06:1 and 5.45:1, so the words there
-/// are black. In light mode black holds on every accent AskKit has been
+/// the bubble's 60%, the system blue holds white at 6.28:1 in dark mode, on
+/// its #0091FF, and black at 9.83:1 in light, on #0088FF. A light accent
+/// leaves white short in dark mode: 3.29:1 on yellow (#FFD60A), 3.47:1 on
+/// mint (#63E6E2) and 3.85:1 on cyan (#64D2FF), where black is 6.38:1, 6.06:1
+/// and 5.45:1, so the words there are black. In light mode black holds on every accent AskKit has been
 /// measured with, 8.56:1 at the least, on indigo.
 ///
 /// **A fixed color is right here, as it isn't on glass** (`AskGlassForeground`):
@@ -329,9 +348,9 @@ nonisolated enum AskContrast {
         return Double(hundredths) / 100
     }
 
-    /// The contrast white has to keep on the accent before a label turns black
-    /// (`AskOnAccentLabel`): a glyph's bar, not the 4.5:1 of text on glass,
-    /// because the system's prominent buttons draw their words white.
+    /// A glyph's bar for white on the accent, 3:1, the one `AskOnAccent` and
+    /// `AskSendGlyph` hold white to before a glyph turns black. Words on the
+    /// accent are held to text's 4.5:1 instead (`AskOnAccentLabel.isBlack(on:)`).
     static let whiteLabelMinimum = AskGlassForeground.glyph
 
     /// Whether what is drawn on `accent` is black: where white falls under
