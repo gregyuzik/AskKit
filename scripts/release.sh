@@ -8,9 +8,11 @@
 # made and signed here, with your git signing key, and pushed before the
 # release. `gh release create` given a tag that doesn't exist yet makes one on
 # GitHub, unsigned, which is how v0.1.0 went out; `--verify-tag` refuses to.
-# The protect-release-tags ruleset won't let a v* tag move or go, and releases
+# The protect-release-tags ruleset won't let a v* tag move or go, the
+# release-tag-creation ruleset lets only an admin push a new one, and releases
 # are immutable, so a release that went out wrong stays out: everything that
-# can be checked first is.
+# can be checked first is. Once it's out, `gh release verify` checks GitHub's
+# attestation of it.
 #
 # It tags origin/main as fetched, whatever is checked out here, once:
 # - CHANGELOG.md there has a `## [VERSION] - YYYY-MM-DD` section, which becomes
@@ -133,12 +135,33 @@ if ! git tag -v "$tag" >/dev/null 2>&1; then
   git tag -d "$tag" >/dev/null
   fail "$tag's signature doesn't verify here (an SSH key has to be in gpg.ssh.allowedSignersFile), so the tag is deleted, unpushed"
 fi
-git push origin "refs/tags/$tag"
+# A push the hooks or the release-tag rulesets refuse leaves the tag here only,
+# where a second run would stop at "exists here already", so it goes.
+if ! git push origin "refs/tags/$tag"; then
+  git tag -d "$tag" >/dev/null
+  fail "origin refused $tag (above), so the tag is deleted here too, unpushed: fix that and run this again"
+fi
 
 notes_file=$(mktemp -t askkit-release.XXXXXX)
 trap 'rm -f "$notes_file"' EXIT
 printf '%s\n' "$notes" >"$notes_file"
-gh release create "$tag" --verify-tag --title "AskKit $version" --notes-file "$notes_file"
+gh release create "$tag" --verify-tag --title "AskKit $version" --notes-file "$notes_file" ||
+  fail "$tag is pushed but has no release: gh release create $tag --verify-tag --title 'AskKit $version' --notes-file <the CHANGELOG section>"
+
+# An immutable release carries GitHub's attestation of its tag, which
+# `gh release verify` checks, as an adopter can. It is made with the release,
+# and may take a moment to appear. Its absence is said, not fatal: the release
+# is out either way.
+verified=0
+for _ in 1 2 3 4 5 6; do
+  if gh release verify "$tag" >/dev/null 2>&1; then verified=1; break; fi
+  sleep 5
+done
+if [ "$verified" = 1 ]; then
+  say "gh release verify $tag: the release's attestation checks out"
+else
+  say "warning: gh release verify $tag found no attestation: check that releases are immutable (Settings, General, Releases)"
+fi
 
 if git show "$sha:.github/api-breakage-allowlist.txt" | grep -q '^API breakage: '; then
   say "next: empty .github/api-breakage-allowlist.txt, keeping its comments, in a pull request: $tag is the API check's baseline now"

@@ -10,3 +10,19 @@ __pycache__/
 xcuserdata/
 .vscode/
 .idea/
+# Keys, certificates and profiles never belong here. GitHub's push rulesets,
+# which could refuse them on the server, are for organizations' repos only, so
+# this keeps `git add -A` from picking one up.
+*.p8
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+*.jks
+*.keystore
+.env
+.env.*
