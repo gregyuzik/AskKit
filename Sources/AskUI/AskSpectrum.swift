@@ -5,17 +5,14 @@ import SwiftUI
 /// A run of colors the Ask screen wears where a host asks for it: the spectrum
 /// look, `AskScreen(store:spectrum:)`.
 ///
-/// **Three things wear it, and nothing else.** Its colors light a glass rod
-/// round the composer's rim (`AskGlassRod`), there whenever the composer is,
-/// so the place to type stands out: still at rest, and drifting slowly round
-/// the rim while a turn is in flight. The send circle is filled with a
-/// gradient of it, top leading to bottom trailing, and the caret at the end
-/// of an answer being written is drawn in the same gradient. The question
-/// bubbles, the wait row's shimmer and every tint keep the accent. With no
-/// spectrum the screen draws as it always has.
+/// **Two things wear it, and nothing else.** The send circle is filled with
+/// a gradient of it, top leading to bottom trailing, and the caret at the end
+/// of an answer being written is drawn in the same gradient. The composer's
+/// glass, the question bubbles, the wait row's shimmer and every tint keep
+/// the accent. With no spectrum the screen draws as it always has.
 ///
-/// The rod and the send circle go to whichever face is on screen: the
-/// composer in the screen's bar, or its face in a host's tab bar slot
+/// The send circle wears it on whichever face is on screen: the composer in
+/// the screen's bar, or its face in a host's tab bar slot
 /// (`askComposerSlot`), for a host that rests the composer there.
 ///
 /// **The send circle's glyph is white, or black where white falls under 3:1
@@ -24,19 +21,14 @@ import SwiftUI
 /// and no point between two stops is lighter than the lighter of them, so the
 /// stops are where white is weakest.
 ///
-/// **Accessibility.** Under Increase Contrast there is no rod, and the send
-/// circle and the caret go back to the accent. Under Reduce Motion the rod
-/// stays and its colors hold still, in flight as at rest; the caret goes, as
-/// it does without a spectrum. The rod is a fill, never glass and never a
-/// material, so Reduce Transparency, which the glass follows on its own,
-/// leaves it as it is.
+/// **Accessibility.** Under Increase Contrast the send circle and the caret
+/// go back to the accent. Under Reduce Motion the caret goes, as it does
+/// without a spectrum.
 ///
 /// **Isolation.** A value, built and compared on any actor.
 nonisolated public struct AskSpectrum: Sendable, Hashable {
-    /// The colors, in order, at least two: the glass rod runs out and back
-    /// through them, the first at the send circle and the last at the far
-    /// end, and the send circle and the caret are filled with them, except
-    /// for `aurora`'s.
+    /// The colors, in order, at least two: the send circle and the caret are
+    /// filled with them, except for `aurora`'s.
     public let colors: [Color]
     /// What the send circle and the caret are filled with: `colors`, except
     /// for `aurora`, whose ends white can't hold a glyph on.
@@ -51,8 +43,7 @@ nonisolated public struct AskSpectrum: Sendable, Hashable {
     /// where one stop is too light for white, the glyph is black over all of
     /// them.
     ///
-    /// - Parameter colors: The colors, in the order the rod runs through them
-    ///   and the gradients run.
+    /// - Parameter colors: The colors, in the order the gradients run.
     public init(_ colors: [Color]) {
         let stops = Self.twoOrMore(colors)
         self.init(stops, fill: stops)
@@ -78,16 +69,15 @@ nonisolated public struct AskSpectrum: Sendable, Hashable {
     /// through all five together, from the stack's bottom left corner to its
     /// top right. Cyan, blue, violet, magenta, coral.
     ///
-    /// **The glass rod runs out and back through all five, cyan at the send
-    /// circle and coral at the far end, and the send circle and the caret
-    /// run from blue to violet.** White is 3.81:1 on the blue and 3.95:1 on
-    /// the violet, and no point between them is lighter than the blue, so the
-    /// glyph holds 3.81:1 wherever it sits. The others would not hold it with
-    /// room to spare: white is 1.65:1 on the cyan, 2.39:1 on the coral and
-    /// 3.05:1 on the magenta, and a fill run on from the violet to the magenta
-    /// comes to 3.40:1 under the corners of the widest glyph, the chevron that
-    /// puts the keyboard away. WCAG 2's ratio, from each color's luminance in
-    /// P3's own terms.
+    /// **The send circle and the caret run from blue to violet**, two of the
+    /// five. White is 3.81:1 on the blue and 3.95:1 on the violet, and no
+    /// point between them is lighter than the blue, so the glyph holds 3.81:1
+    /// wherever it sits. The others would not hold it with room to spare:
+    /// white is 1.65:1 on the cyan, 2.39:1 on the coral and 3.05:1 on the
+    /// magenta, and a fill run on from the violet to the magenta comes to
+    /// 3.40:1 under the corners of the widest glyph, the chevron that puts the
+    /// keyboard away. WCAG 2's ratio, from each color's luminance in P3's own
+    /// terms.
     public static let aurora = AskSpectrum(
         [cyan, blue, violet, magenta, coral],
         fill: [blue, violet]
@@ -102,24 +92,17 @@ nonisolated public struct AskSpectrum: Sendable, Hashable {
 
 /// What the send circle and the caret wear: the host's spectrum, or the
 /// accent. Read once from the screen's options and the reader's contrast
-/// setting, so the circle, the caret and the rod can't disagree.
+/// setting, so the circle and the caret can't disagree.
 nonisolated enum AskSpectrumLook: Equatable {
     case accent(Color)
     case spectrum(AskSpectrum)
 
     /// The spectrum where the host set one, and the accent under Increase
-    /// Contrast, where a gradient behind a glyph and a glowing rod round the
-    /// capsule are what the reader asked to be rid of.
+    /// Contrast, where a gradient behind a glyph is what the reader asked to
+    /// be rid of.
     static func of(accent: Color, spectrum: AskSpectrum?, contrast: ColorSchemeContrast) -> Self {
         guard let spectrum, contrast != .increased else { return .accent(accent) }
         return .spectrum(spectrum)
-    }
-
-    /// What lights the glass rod round the composer: the spectrum, or
-    /// nothing.
-    var glow: AskSpectrum? {
-        guard case .spectrum(let spectrum) = self else { return nil }
-        return spectrum
     }
 
     /// The streaming caret: a dot of the accent, or of the spectrum's fill.

@@ -12,8 +12,9 @@ import SwiftUI
 /// here invents a stage or paces a delay to have something to show.
 ///
 /// The shimmer is the row's one ornament, in the accent whatever the host's
-/// spectrum, which glows around the composer instead (`AskSpectrum`). It goes
-/// under Reduce Motion: a mask sweeping a gradient is motion by any reading.
+/// spectrum, which only the send circle and the caret wear (`AskSpectrum`).
+/// It goes under Reduce Motion: a mask sweeping a gradient is motion by any
+/// reading.
 ///
 /// **Two lines, and the upper one is the phrase this one replaced**
 /// (`AskWaitWindow`). A grounded turn moves through phrases, and a row that

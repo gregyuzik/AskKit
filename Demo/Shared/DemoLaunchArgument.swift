@@ -49,12 +49,11 @@ nonisolated enum DemoLaunchArgument {
 
     /// Hold every turn in flight until Stop: the demo answers every question
     /// itself, as under `scriptedAnswer`, and its answer never comes, so the
-    /// wait row stays up and the spectrum's glass rod keeps drifting. The
-    /// turn's deadline is ten minutes rather than 45 s.
+    /// wait row stays up. The turn's deadline is ten minutes rather than 45 s.
     ///
     /// For what only shows while a turn is in flight: screenshots of the wait
-    /// row and the rod's drift, and a profile of what the screen costs while
-    /// it waits, which a real turn ends before a 10 s trace does.
+    /// row, and a profile of what the screen costs while it waits, which a
+    /// real turn ends before a 10 s trace does.
     ///
     /// Not in the schemes' Run arguments: pass it at launch, as
     /// `xcrun simctl launch <device> com.example.askkitdemo -askHoldTurn`.

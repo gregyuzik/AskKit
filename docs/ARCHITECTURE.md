@@ -777,40 +777,12 @@ and Stop in the menu bar, acting on the composer in the focused window.
 (`AskComposerAccessory`). There is only ever one: two on a phone leave room for a word and a half.
 
 **The spectrum.** A host may hand the screen a run of colors (`AskSpectrum`, such as `.aurora`), and
-three things wear it in place of the accent: the Glass Rod, its colors lit inside a clear glass tube
-round the composer's rim; the send circle, filled with a gradient of it corner to corner; and the
-reveal's caret, in the same gradient over a soft glow of itself. The question bubbles, the wait row's
-shimmer and every tint keep the accent. With no spectrum the screen is as it was.
-- **The Glass Rod** (`AskGlassRod`) is always there while the composer is, at rest as in flight, so the
-  field reads as the place to type. One Metal shader draws it (`AskGlassRod.metal`): each point across
-  the rim casts a ray into a tube about 6 pt across and bends it, once for each of red, green and blue,
-  so the glowing core splits into a faint prism fringe at its sides, with Fresnel toward the tube's
-  silhouette, a highlight from the upper left, a soft glow just past the tube and, in light mode, a
-  faint dark line at the silhouette that draws it on white. The colors are placed by length round the
-  rim, out and back: the first at the trailing end, where the send circle is, the last at the leading
-  end, and the rest both ways round between, at one pace on the straights and round the corners. Run
-  round as a cycle, the last met the first beside the send circle, and colors across the wheel from
-  each other, as aurora's coral and cyan are, mixed to grey there. Light past white is clipped a
-  channel at a time, which whitens the core, but only for what sRGB holds of a color, so a Display P3
-  color stays one. No blur, no mask, no offscreen layer.
-- **Still at rest, drifting in flight.** At rest nothing ticks: the fill renders when it appears and
-  when the layout changes. While a turn is in flight the colors drift slowly round the rod and
-  shimmer, 20 frames a second; that drift is the only difference, the same rod at the same brightness.
-  It starts from the colors at rest, and at the turn's end the Stage's own animation fades it back to
-  them (house rule 4). Every rod reads one clock, the store's (`rodClock`), set in the update
-  `isThinking` changes in, so the composer's and the face's drift in step, a rod that comes into sight
-  mid-turn picks the drift up where it is, and a send while the last turn's drift is still fading
-  carries the colors on from where they stopped.
-- **It draws over the glass's edge and under what sits on the glass**, a fill, never glass or a
-  `Material`. Edge Light was a fill behind the glass, which the glass took up through its edge; a tube's
-  highlight and fringe behind the glass would be the glass's to lens, so the rod is the composer's
-  content's background instead: the glass goes under it, keeping its highlight sharp, and the field and
-  the circles go over it, its inner side a few points clear of them at every height. Its glow stops
-  short of a photo waiting over the composer, rather than wash the chip. On the face in a host's slot,
-  which the slot's own glass holds, it sits just inside the face's edge, over the wash, its glow falling
-  inward.
-- **Under Increase Contrast** there is no rod, and the circle and the caret take the accent. Under
-  Reduce Motion the rod stays and its colors hold still.
+two things wear it in place of the accent: the send circle, filled with a gradient of it corner to
+corner, on the face in a host's slot too; and the reveal's caret, in the same gradient over a soft glow
+of itself. The composer's glass, the question bubbles, the wait row's shimmer and every tint keep the
+accent. With no spectrum the screen is as it was, and under Increase Contrast the circle and the caret
+take the accent. The composer draws no colored outline: the Glass Rod was one, and it went
+([Rejected designs](#6-rejected-designs)).
 
 **The slot.** A host with a tab bar can rest the composer's face in the tab view's bottom accessory, the
 slot (`askComposerSlot`), wherever the tab bar runs along the bottom on iOS. That is what the Ask screen
@@ -1107,14 +1079,17 @@ Each of these is the obvious thing to try, and each was ruled out for the reason
 - **A turning conic gradient for the spectrum's glow**, a ring of its colors blurred behind the
   composer. It read as a loading wheel. It moved by angle, so on a capsule about seven times as wide as
   tall it raced round the ends and crawled along the sides. And blur was its only softness, so on white
-  it smudged. The Glass Rod places its colors by length round the rim, and its light is arithmetic
-  ([The composer and the keyboard](#the-composer-and-the-keyboard)).
+  it smudged.
 - **Edge Light, a glow in the composer's rim lit only while a turn was in flight**: a crisp line of the
   colors with a close bloom and a wide one, behind the glass, that ran round from the send circle at the
-  send and drew back into the rim at the end. It said the model was working, but the field needs a
-  standing highlight that marks where to type, at rest as much as in flight, and a light that came only
-  with a turn gave none. On white its first cut was too faint to read as a border. The Glass Rod is
-  always there and draws over the glass's edge; the turn only sets its colors drifting.
+  send and drew back into the rim at the end. On white its first cut was too faint to read as a border.
+- **The Glass Rod, a clear glass tube of the spectrum's colors round the composer's rim**, in 0.1.0. One
+  Metal shader cast each point across the rim into a tube about 6 pt across, with a prism fringe, a
+  highlight and a soft glow past it, the colors placed by length round the rim; it stood still at rest,
+  to mark the field as the place to type, and drifted while a turn was in flight. A colored outline
+  round the field was too distracting, and the composer was better without it. It went, and with it
+  AskUI's only Metal shader and the Metal Toolchain every build needed for it. The composer is plain
+  glass in the accent's tint, and the spectrum stays on the send circle and the caret.
 - **A view builder for the accessory button.** It would add a sixth type parameter to an `AskScreen`
   that already spells five, across the modifiers that set its views, and every host with no accessory
   button would pay for it in its declarations. The button is always the same shape, a bare glyph on the
@@ -1218,8 +1193,8 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
   Foundation Models.
 - **settle**: a turn settles when it ends, with an answer, a failure or a stop; a chunk, once drawn
   (`AskArrivals.settle(forLength:)`).
-- **spectrum**: a host's run of colors (`AskSpectrum`) that the composer's glass rod, the send circle and
-  the caret wear in place of the accent.
+- **spectrum**: a host's run of colors (`AskSpectrum`) that the send circle and the caret wear in place of
+  the accent.
 - **Stage**: `AskStage`, the one animation key a turn can reach.
 - **steer**: a prompt line that nudges the model without being the question: the domain's per-turn
   lines, a scope line, or "Another pick"'s list of what not to choose again (`AskOrigin.reroll`).

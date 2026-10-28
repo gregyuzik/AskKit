@@ -7,7 +7,6 @@ Bugs and feature requests go in issues, which have a form each; a security probl
 ## Toolchain
 
 - **Xcode 27.2 or later**, on a Mac with Apple silicon. Swift 6.4, and every deployment target is 27.2.
-- **Xcode's Metal Toolchain**, a component Xcode installs apart from itself (`xcodebuild -downloadComponent MetalToolchain`): AskUI compiles a Metal shader, the spectrum's glass rod (`AskGlassRod.metal`), under `swift build` and in Xcode alike.
 - **SwiftLint and ShellCheck**: `brew install swiftlint shellcheck`. `scripts/ci.sh checks` fails without either; `ASKKIT_SKIP_SHELLCHECK=1` skips ShellCheck, and says so, where you can't install it, and CI runs it all the same. CI pins SwiftLint 0.65.1 and ShellCheck 0.11.0 (`.github/actions/setup/action.yml`): when a check passes for you and fails there, compare versions first.
 - **Python 3**, for the String Catalog checks.
 - **An iPhone 18 Pro simulator**, for the iOS tests and the UI smoke suite, which look for it by name. With none, make one on the iOS runtime of the selected Xcode: `xcrun simctl create "iPhone 18 Pro" com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro com.apple.CoreSimulator.SimRuntime.iOS-27-2` (`xcrun simctl list runtimes` names the runtimes installed).

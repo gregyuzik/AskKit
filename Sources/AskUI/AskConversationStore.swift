@@ -256,18 +256,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// saved thread to be read, or for the chat to change (New Chat, Delete
     /// All Chats, an earlier chat opening), counts. The composer's button is
     /// Stop meanwhile.
-    public private(set) var isThinking = false {
-        didSet {
-            guard isThinking != oldValue else { return }
-            rodClock = isThinking ? rodClock.started(at: .now) : rodClock.stopped(at: .now)
-        }
-    }
-    /// The clock a spectrum's glass rod drifts by (`AskGlassRodClock`), set
-    /// as `isThinking` changes and in the same update, so every rod on
-    /// screen, the composer's and the face's in a host's slot, reads one
-    /// clock, and a rod that comes into sight mid-turn picks the drift up
-    /// where it is.
-    private(set) var rodClock = AskGlassRodClock.resting
+    public private(set) var isThinking = false
     /// The composer's text. Lives here so a half-typed question survives a trip
     /// to another screen.
     ///

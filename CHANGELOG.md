@@ -9,6 +9,14 @@ change, allowed in a 0.x minor version, because it stops a host's exhaustive `sw
 
 ## [Unreleased]
 
+### Removed
+
+- **The Glass Rod round the composer.** The spectrum look's clear glass tube of colors round the
+  composer's rim, there at rest and drifting while a turn was in flight, was too distracting, and the
+  composer was better without it: it is plain glass again, in the accent's tint. A spectrum tints the
+  send circle and the streaming caret, on the slot's face too, and nothing else. With the rod went
+  AskUI's only Metal shader, so building AskKit no longer needs Xcode's Metal Toolchain.
+
 ## [0.1.0] - 2026-10-27
 
 The first public release: a complete Ask screen over Apple's Foundation Models, for any kind of app. A

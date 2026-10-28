@@ -75,6 +75,28 @@ import Testing
         #expect(AskComposerMetrics.target(widestGlyph: smallest) == AskComposerMetrics.target)
     }
 
+    /// **The capsule's corners keep the circles' inset at every size.** At
+    /// one line, where the row is the target's height, the capsule's ends are
+    /// half its height; as the field grows the corners keep that radius,
+    /// centred where the circles are, at the bottom of the row, so a circle
+    /// sits as far inside the edge at four lines as at one, and at the largest
+    /// text as at the default. A capsule four lines tall, 114 pt with ends
+    /// 57 pt round, put the send circle's rim 7 pt past its edge.
+    @Test func theCapsulesCornersKeepTheCirclesInsetAtEverySize() {
+        let widest = AskComposerMetrics.widestGlyph
+        let inset = AskComposerMetrics.edge + (AskComposerMetrics.target - AskComposerMetrics.circle) / 2
+        for scaled in [widest * 14 / 17, widest, 1.5 * widest, widest * 53 / 17] {
+            let corner = AskComposerMetrics.corner(widestGlyph: scaled)
+            let target = AskComposerMetrics.target(widestGlyph: scaled)
+            let circle = AskComposerMetrics.circle(widestGlyph: scaled)
+            // A capsule at one line, whose corners are centred on each
+            // circle's, a target `edge` in from the bottom and the side.
+            #expect(2 * corner == target + 2 * AskComposerMetrics.edge)
+            // So each circle is as far in as at the default size.
+            #expect(abs(corner - circle / 2 - inset) < 1e-9)
+        }
+    }
+
     // MARK: The photo chip
 
     /// The thumbnail grows by what a line of its title grows, and the remove
