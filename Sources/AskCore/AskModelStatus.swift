@@ -74,10 +74,37 @@ nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTi
 /// matters (off, ineligible, still downloading), where Private Cloud Compute
 /// can be out for reasons of its own that say nothing about whether Ask could
 /// work at all.
+///
+/// **Except for a hold.** A Private Cloud Compute held off only by a
+/// cooldown or a spent quota would serve once the hold lifts, and the turn's
+/// error is then that hold's (`askHeldOutage(from:)`), which the engine asks
+/// first: the on-device tier's reason would tell the reader to wait for a
+/// download, or that nothing can be done, with no Try Again.
 nonisolated package func askUnavailability(from states: [AskTierState]) -> AskUnavailability {
     if states.contains(where: { $0.isAvailable && !$0.speaksLanguage }) { return .languageNotSupported }
     let tier = states.first { $0.tier == .onDevice } ?? states.first
     return tier?.unavailability ?? .unknown
+}
+
+/// The outage behind "nothing can serve" when Private Cloud Compute is up and
+/// speaks the app's language and is held off only by a spent quota or a
+/// cooldown: `.quotaReached` or `.privateCloudUnreachable`, both retryable.
+/// Nil when the tier is down anyway, doesn't speak the language, or isn't
+/// held.
+///
+/// House rule 1: an outage with nowhere to hand down is the turn's error,
+/// which Try Again retries. The cooldown that outage leaves, or a spent
+/// quota, must not turn the next turn's error into the on-device tier's
+/// reason (`askUnavailability(from:)`), which offers no Try Again. A spent
+/// quota reads first, the longer of the two holds. Its reset date is the
+/// mirror's (`AskModelStatus.resetDate`), which the quota banner shows: a
+/// tier's state carries none.
+nonisolated func askHeldOutage(from states: [AskTierState]) -> AskError? {
+    guard let cloud = states.first(where: { $0.tier == .privateCloud }),
+          cloud.isAvailable, cloud.speaksLanguage else { return nil }
+    if cloud.quotaReached { return .quotaReached(resetDate: nil) }
+    if cloud.isCooled { return .privateCloudUnreachable }
+    return nil
 }
 
 /// Whether a triaged failure says the *tier* can't serve right now, as

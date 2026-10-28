@@ -81,6 +81,20 @@ import Testing
         #expect(ask.isRetryable)
     }
 
+    /// On Private Cloud Compute a timeout is the tier not answering, as a
+    /// timed-out connection to it is (`NSURLErrorTimedOut`): an outage the
+    /// turn is handed down from and the tier cooled for, so a tier that
+    /// keeps timing out doesn't fail every turn while the on-device model
+    /// could answer (house rule 1).
+    @Test func aTimeoutOnPrivateCloudComputeIsAnOutage() {
+        let error = LanguageModelError.timeout(.init(debugDescription: "slow"))
+        let ask = AskTriage.askError(from: error, tier: .privateCloud)
+        #expect(ask == .privateCloudUnreachable)
+        #expect(ask == AskTriage.askError(from: URLError(.timedOut), tier: .privateCloud))
+        #expect(askIsTierOutage(ask))
+        #expect(ask.isRetryable)
+    }
+
     // MARK: - Private Cloud Compute's own family
 
     @Test func networkFailureAndServiceUnavailableBothCoolTheCloud() {
@@ -265,6 +279,29 @@ import Testing
         let tag = AskTriage.tag(for: long)
         #expect(tag.count == 60)
         #expect(tag.hasPrefix("ToolCallError(") && tag.hasSuffix(")"))
+    }
+
+    /// An error that is already an `AskError` reads as itself, and so does
+    /// one a tool threw: the domain chose it, as the engine passes on one
+    /// the domain's search throws. A host triaging its own sessions' errors
+    /// gets what the engine would have shown.
+    @Test func anAskErrorReadsAsItselfThrownByATool() {
+        #expect(AskTriage.askError(from: AskError.refused, tier: .onDevice) == .refused)
+        #expect(AskTriage.askError(from: AskError.quotaReached(resetDate: nil), tier: .privateCloud) == .quotaReached(resetDate: nil))
+        let thrown = LanguageModelSession.ToolCallError(tool: TriageShelfTool(), underlyingError: AskError.photosNotSupported)
+        #expect(AskTriage.askError(from: thrown, tier: .privateCloud) == .photosNotSupported)
+        // Anything else a tool threw is still the tool's failure, never the
+        // tier's: a host's network error inside one doesn't cool Private
+        // Cloud Compute.
+        let offline = LanguageModelSession.ToolCallError(tool: TriageShelfTool(), underlyingError: URLError(.notConnectedToInternet))
+        #expect(AskTriage.askError(from: offline, tier: .privateCloud) == .model(tag: "ToolCallError(NSURLErrorDomain#-1009)"))
+    }
+
+    /// A cancellation, bare or inside a tool's failure, is a stop.
+    @Test func aCancellationReadsAsAStop() {
+        #expect(AskTriage.askError(from: CancellationError(), tier: .privateCloud) == .stopped)
+        let cancelled = LanguageModelSession.ToolCallError(tool: TriageShelfTool(), underlyingError: CancellationError())
+        #expect(AskTriage.askError(from: cancelled, tier: .onDevice) == .stopped)
     }
 
     // MARK: - The context gate and offline, wherever they sit

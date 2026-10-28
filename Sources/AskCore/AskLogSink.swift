@@ -261,10 +261,28 @@ nonisolated public struct AskOSLogSink: AskLogSink {
         }
     }
 
-    /// Logs the line under `[routing]`, at info level.
+    /// Logs the line under `[routing]`, at `routingLevel`.
     public func routing(_ line: String) {
-        logger.info("[routing] \(line, privacy: .public)")
+        logger.log(level: Self.routingLevel, "[routing] \(line, privacy: .public)")
     }
+
+    /// Notice, which the log store keeps: the routing lines say why a turn ran
+    /// where it did and why one failed, by its tag, and they are wanted after
+    /// the fact. At info level they were kept in memory only, and Console
+    /// hides them.
+    static var routingLevel: OSLogType { .default }
+
+    /// Logs a mistake in the domain an engine was built with under
+    /// `[domain]`, at `domainMistakeLevel`. The line is logged once, as the
+    /// engine is built (`AskEngine.init(domain:seam:log:)`).
+    func domainMistake(_ line: String) {
+        logger.log(level: Self.domainMistakeLevel, "[domain] \(line, privacy: .public)")
+    }
+
+    /// Fault, which the log store keeps and Console and Xcode set apart: a
+    /// domain mistake is a bug in the host's code whose cost is otherwise
+    /// silent.
+    static var domainMistakeLevel: OSLogType { .fault }
 
     /// Logs the `[feedback]` line as public: it is the answer's shape (a
     /// verdict, a tier, a kind from a fixed vocabulary, two counts and whether

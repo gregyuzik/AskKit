@@ -411,6 +411,8 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
     let planPrompts = Mutex<[String]>([])
     /// How long the planner takes to choose, for a test that needs it slow.
     let planDelay = Mutex<Duration?>(nil)
+    /// Thrown by the planner, raw, the way a session's failure arrives.
+    let planError = Mutex<(any Error)?>(nil)
 
     func plan<Arguments: Generable & Sendable>(
         _ type: Arguments.Type,
@@ -420,6 +422,7 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
         planCalls.withLock { $0 += 1 }
         planPrompts.withLock { $0.append(prompt) }
         if let delay = planDelay.withLock({ $0 }) { try await Task.sleep(for: delay) }
+        if let error = planError.withLock({ $0 }) { throw error }
         // A rowless domain's planner has nothing to choose, and chooses it.
         if let nothing = AskNoSearchArguments() as? Arguments { return nothing }
         guard let arguments = FakeSearchArguments(query: "planned") as? Arguments else {
@@ -435,8 +438,19 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
         await countRead.pass()
         return observedCalls.withLock { $0 }
     }
-    func usage() async -> AskUsage? { state.withLock { $0.usage } }
-    func contextSize() async -> Int? { state.withLock { $0.contextSize } }
+    /// Where `usage()` and `contextSize()` can be made to wait, as a host's
+    /// session that never answers them would.
+    let usageHold = TestHold()
+    let contextSizeHold = TestHold()
+
+    func usage() async -> AskUsage? {
+        await usageHold.pass()
+        return state.withLock { $0.usage }
+    }
+    func contextSize() async -> Int? {
+        await contextSizeHold.pass()
+        return state.withLock { $0.contextSize }
+    }
     func tokenCount(for text: String) async -> Int? { nil }
     /// Holds `prewarm` until `releasePrewarm()`, so a test can ask a question
     /// while a warm is still being made.

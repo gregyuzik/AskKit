@@ -287,8 +287,11 @@ nonisolated package enum AskContinuation {
                 + "</rows>\n"
         }
         for entry in kept {
+            // The question as the reader saw it, as the engine asks it: a
+            // thread read back from disk carries the one they sent, with any
+            // tag characters or bidi controls a paste brought along.
             text += "<previous_question>"
-                + AskPrompt.sanitizeForFence(AskPrompt.clamp(entry.question, questionLimit))
+                + AskPrompt.sanitizeForFence(AskPrompt.clamp(AskPrompt.droppingInvisibles(entry.question), questionLimit))
                 + "</previous_question><previous_answer>"
                 + AskPrompt.sanitizeForFence(AskPrompt.clamp(entry.answer, answerLimit))
                 + "</previous_answer>\n"
