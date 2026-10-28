@@ -269,25 +269,16 @@ public struct AskComposer: View {
     }
 
     private var field: some View {
-        // **The placeholder sizes the field, from inside the field's own
-        // stack.** An overlay is offered the field's frame, one line while the
-        // draft is empty, so there the host's hint ends in an ellipsis at the
-        // accessibility sizes and in the longer locales, however many lines
-        // it is let wrap to: measured on the Mac, a hint 120 pt wide in an
-        // overlay under `.lineLimit(1...2)` stayed one 16 pt line. Beside the
-        // field it wraps to as many lines as the field grows to, and the
-        // capsule grows with it, as it does for a draft that long.
-        //
-        // **On the field's first baseline**, so the hint's first line sits
-        // where the draft's will: measured on the Mac, a field padded 10 pt
-        // from the top took the hint's first line down with it, where top
-        // alignment left the hint 10 pt above the text.
-        ZStack(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
-            if draft.isEmpty {
-                placeholderText
-            }
-            textField
-        }
+        AskComposerFieldStack(
+            placeholder: draft.isEmpty ? placeholder : nil,
+            // **Text a reader has to read, so 4.5:1 on the capsule's tint.**
+            // `.secondary` comes to 2.66:1 there in light mode, estimated as
+            // a flat blend of the system blue (#0088FF) at half strength over
+            // white, and is 3.44:1 even on white (`AskGlassForeground`).
+            style: AskGlassForeground(tint: capsuleTint, minimum: AskGlassForeground.text),
+            focusField: { isFocused = true },
+            field: { textField }
+        )
         // A fixed inset, not one scaled with the text: the target grows
         // only by what the glyph grows (`AskComposerMetrics`), and an inset
         // scaled in proportion made one line of the largest text 132 pt
@@ -306,7 +297,8 @@ public struct AskComposer: View {
     }
 
     private var textField: some View {
-        // An empty label and a placeholder drawn by hand (`placeholderText`):
+        // An empty label and a placeholder drawn by hand
+        // (`AskComposerFieldStack`):
         // SwiftUI draws a `prompt:` in its own placeholder color and discards
         // any style attached to it, and that color measures about 1.3:1 on
         // tinted glass.
@@ -364,9 +356,9 @@ public struct AskComposer: View {
                 }
             }
             .accessibilityLabel(AskComposerWords.yourQuestion)
-            // The placeholder has no element of its own (`placeholderText`), so
-            // its words, the host's hint about what to ask, reach VoiceOver
-            // here.
+            // The placeholder has no element of its own
+            // (`AskComposerFieldStack`), so its words, the host's hint about
+            // what to ask, reach VoiceOver here.
             .accessibilityHint(Text(placeholder))
             // Voice Control answers to the words in the field, the draft or
             // the placeholder, as well as to "Your question" (`AskSpokenName`).
@@ -374,38 +366,6 @@ public struct AskComposer: View {
                 AskSpokenName.inputLabels(showing: draft.isEmpty ? placeholder : draft, named: AskComposerWords.yourQuestion)
             )
             .accessibilityIdentifier(AskAccessibility.field)
-    }
-
-    /// The host's hint, drawn while the draft is empty, beside the field it
-    /// sizes (`field`).
-    private var placeholderText: some View {
-        Text(placeholder)
-            .font(.body)
-            // As many lines as the field grows to, and no more: a hint any
-            // longer would hold the capsule taller than a draft can make it.
-            .lineLimit(AskComposerMetrics.lines.upperBound)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // **Text a reader has to read, so 4.5:1 on the capsule's tint.**
-            // `.secondary` comes to 2.66:1 there in light mode, estimated as a
-            // flat blend of the system blue (#0088FF) at half strength over
-            // white, and is 3.44:1 even on white (`AskGlassForeground`).
-            .foregroundStyle(AskGlassForeground(tint: capsuleTint, minimum: AskGlassForeground.text))
-            // **A tap on the hint puts the reader in the field.** The field
-            // lies over the hint's first line and takes a tap there itself,
-            // but an empty field is one line tall, so the hint's other lines
-            // are outside it, where a tap would reach nothing.
-            .contentShape(.rect)
-            .onTapGesture { isFocused = true }
-            // **No element, rather than a hidden one.** Hidden by name, it
-            // comes back wherever something above it is un-hidden by name:
-            // `AskScreen` hides the resting composer with
-            // `.accessibilityHidden(composerRests)`, and whenever the
-            // composer is up that is false, so the placeholder would be a
-            // second thing called "Your question" over the field. Walked in
-            // the demo on the iOS 27.1 simulator through UIAccessibility's
-            // container calls: listed under that modifier, not listed without
-            // it, and not listed with this.
-            .accessibilityRepresentation { EmptyView() }
     }
 
     /// Whether the button's job right now is to put the keyboard away.
@@ -510,6 +470,66 @@ public struct AskComposer: View {
     private var inputLabels: [Text] {
         guard isThinking else { return [buttonLabel] }
         return [buttonLabel, AskComposerWords.stop]
+    }
+}
+
+/// The composer's field and the placeholder, the host's hint, in one stack:
+/// apart from the composer so the layout can be drawn in a test with a
+/// stand-in for the text field (`AskComposerPlaceholderTests`).
+///
+/// **The placeholder sizes the field, from inside the field's own stack.** An
+/// overlay is offered the field's frame, one line while the draft is empty, so
+/// there the host's hint ends in an ellipsis at the accessibility sizes and in
+/// the longer locales, however many lines it is let wrap to: measured on the
+/// Mac, a hint 120 pt wide in an overlay under `.lineLimit(1...2)` stayed one
+/// 16 pt line. Beside the field it wraps to as many lines as the field grows
+/// to, and the capsule grows with it, as it does for a draft that long.
+///
+/// **On the field's first baseline**, so the hint's first line sits where the
+/// draft's will: measured on the Mac, a text field padded 10 pt from the top
+/// took the hint's first line down with it, where top alignment left the hint
+/// 10 pt above the field's text.
+struct AskComposerFieldStack<Field: View>: View {
+    /// The host's hint, or nil once the draft has anything in it.
+    let placeholder: String?
+    /// What the hint is drawn in.
+    let style: AskGlassForeground
+    /// Puts the reader in the field.
+    let focusField: () -> Void
+    @ViewBuilder let field: Field
+
+    var body: some View {
+        ZStack(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
+            if let placeholder {
+                Text(placeholder)
+                    .font(.body)
+                    // As many lines as the field grows to, and no more: a
+                    // hint any longer would hold the capsule taller than a
+                    // draft can make it.
+                    .lineLimit(AskComposerMetrics.lines.upperBound)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(style)
+                    // **A tap on the hint puts the reader in the field.** The
+                    // field lies over the hint's first line and takes a tap
+                    // there itself, but an empty field is one line tall, so
+                    // the hint's other lines are outside it, where a tap
+                    // would reach nothing.
+                    .contentShape(.rect)
+                    .onTapGesture(perform: focusField)
+                    // **No element, rather than a hidden one.** Hidden by
+                    // name, it comes back wherever something above it is
+                    // un-hidden by name: `AskScreen` hides the resting
+                    // composer with `.accessibilityHidden(composerRests)`,
+                    // and whenever the composer is up that is false, so the
+                    // placeholder would be a second thing called "Your
+                    // question" over the field. Walked in the demo on the iOS
+                    // 27.1 simulator through UIAccessibility's container
+                    // calls: listed under that modifier, not listed without
+                    // it, and not listed with this.
+                    .accessibilityRepresentation { EmptyView() }
+            }
+            field
+        }
     }
 }
 
