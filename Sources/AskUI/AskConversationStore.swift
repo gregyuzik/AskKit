@@ -157,9 +157,12 @@ nonisolated public protocol AskAsking<Row>: Sendable {
     func resume(from tail: [AskThreadTail]) async
 
     /// A reader's thumbs on an answer. `isLatestTurn` is true only for the
-    /// newest turn, and only when a model answered it. Returns the session's
-    /// feedback attachment when one could be taken, which the store saves for
-    /// the diagnostics row to share. Defaulted to none.
+    /// newest turn, only when a model answered it, and only while the store
+    /// keeps feedback attachments (`AskConversationStore.offersFeedback`): it
+    /// is the word to take the session's attachment, which the SDK logs and
+    /// serializes as it hands it over, so none is taken that nothing keeps.
+    /// Returns the attachment when one could be taken, which the store saves
+    /// for the diagnostics row to share. Defaulted to none.
     func recordFeedback(_ feedback: AskFeedback, isLatestTurn: Bool) async -> Data?
 }
 
@@ -271,12 +274,12 @@ public final class AskConversationStore<Domain: AskDomain> {
             // type: the scope a host left with it goes too.
             if draft.isEmpty { draftScope = nil }
             // The reader's question has begun (typed, or put back by Edit &
-            // Resend), so warm the session it will run on. Once per question,
-            // not per keystroke: only the edge into the reader's own draft
-            // warms. A prefill isn't that edge: a link can come from anywhere,
-            // and a warm on Private Cloud Compute spends a request of the
-            // reader's quota though they sent nothing. Their first edit of it
-            // is.
+            // Resend or by a Stop before it was asked), so warm the session it
+            // will run on. Once per question, not per keystroke: only the edge
+            // into the reader's own draft warms. A prefill isn't that edge: a
+            // link can come from anywhere, and a warm on Private Cloud Compute
+            // spends a request of the reader's quota though they sent nothing.
+            // Their first edit of it is.
             let wasReaders = draftIsReaders
             draftIsReaders = !draft.isEmpty && !isPrefilling
             if draftIsReaders, !wasReaders, wantsWarm {
@@ -285,7 +288,8 @@ public final class AskConversationStore<Domain: AskDomain> {
         }
     }
     /// Whether the draft is the reader's own: typed, edited or put back by
-    /// Edit & Resend, rather than left by a prefill they haven't touched.
+    /// Edit & Resend or a Stop, rather than left by a prefill they haven't
+    /// touched.
     /// Only the reader's own draft warms a session.
     @ObservationIgnored private var draftIsReaders = false
     /// True while `prefill(_:scope:send:)` writes the draft, so the write
@@ -357,7 +361,9 @@ public final class AskConversationStore<Domain: AskDomain> {
         /// device, a full disk). The thread file is its last copy on disk, or
         /// an older save of it where it couldn't be written either (the chat
         /// itself then waits in `filingsOwed`), and is set aside before
-        /// anything is written in its place (`freeTheThreadsPlace()`).
+        /// anything is written in its place (`freeTheThreadsPlace()`). The
+        /// turns asked while it won't move are filed beside it
+        /// (`heldTurnsFiling`).
         case unfiled
     }
 
@@ -454,9 +460,15 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// coaching under a refused or ungrounded failure. `availableStarters`
     /// leaves out the ones the reader has asked or passed over.
     public private(set) var starters: [AskStarter] = []
-    /// The starters and coaching the reader has asked, and any chip they
-    /// passed over, by id: they don't come back in this thread.
+    /// The starters and coaching the reader has asked or passed over, by id:
+    /// they don't come back in this thread. A follow-up passed over is kept
+    /// apart (`declinedFollowUps`).
     public private(set) var declinedStarters: Set<String> = []
+    /// The follow-ups the reader passed over, by their words: they don't come
+    /// back in this thread. Apart from `declinedStarters`, whose ids are the
+    /// host's, such as a slug ("vinyl"): in one set, a follow-up worded as a
+    /// starter's id would hide that starter, and the starter the follow-up.
+    private var declinedFollowUps: Set<String> = []
     /// Whether the thread has been read back from disk yet. True once the read
     /// has finished, not once it has begun: a question asked in between waits
     /// for it.
@@ -530,20 +542,34 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// when some of its turns didn't decode, since the filing is then their
     /// only copy (`open`).
     @ObservationIgnored private var openedChatID: UUID?
-    /// The filing that keeps the turns asked while the thread's place holds
-    /// a thread that couldn't be read (`HeldThread.unreadable`), which the
-    /// list leaves out while they are on screen. It goes once they are
+    /// The filing that keeps the turns asked while the thread's place is held
+    /// (`heldThread`), by a thread that couldn't be read or a chat New Chat
+    /// couldn't file and that won't move aside, which the list leaves out
+    /// while they are on screen. It goes once they are
     /// written as the thread (`AskThreadArchive.endProvisional`), or once New
     /// Chat or an earlier chat opening files their chat over it
     /// (`AskThreadArchive.fileTheChatOnScreen`). Taken before
     /// the filing is awaited and cleared as the chat ends, never set after
     /// an await (`fileBesideTheHeldThread`).
     @ObservationIgnored private var heldTurnsFiling: UUID?
-    /// A question waits to be asked (`start`). An earlier chat opening opens
-    /// with it still waiting, to be asked there, rather than settling it as a
-    /// turn of the chat it replaces. Observed, since the newest card's phase
-    /// reads it (`proposalPhase(for:)`).
-    private var questionWaits = false
+    /// The question waiting to be asked (`start`), if any. An earlier chat
+    /// opening opens with it still waiting, to be asked there, rather than
+    /// settling it as a turn of the chat it replaces. Stop, or a newer
+    /// question, puts it back in the composer
+    /// (`returnTheWaitingQuestion()`). Observed, since the newest card's
+    /// phase reads whether there is one (`proposalPhase(for:)`).
+    private var waitingQuestion: WaitingQuestion?
+    /// Whether a question waits to be asked.
+    private var questionWaits: Bool { waitingQuestion != nil }
+
+    /// A question asked before it could reach the engine: its words, and
+    /// what goes with them.
+    private struct WaitingQuestion {
+        let text: String
+        let photo: AskQuestionPhoto?
+        let image: CGImage?
+        let scope: String?
+    }
     /// Whether a host's own `prewarm()` wants a session warm for the next
     /// question, until its `releaseWarmSession()`.
     @ObservationIgnored private var keepsWarm = false
@@ -668,7 +694,8 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// stopped first, and keeps what it had said. A question asked before the
     /// saved thread is read, or as the chat changes (New Chat, Delete All
     /// Chats, an earlier chat opening), waits for it, and is thinking
-    /// meanwhile.
+    /// meanwhile; one still waiting when another is asked goes back to the
+    /// composer, as Stop puts it back (`stop(byReader:)`).
     ///
     /// A question from the composer (`.typed`, or `.prefilled` from an entry
     /// point's `prefill(_:scope:send:)`) empties the draft and takes the photo
@@ -691,13 +718,10 @@ public final class AskConversationStore<Domain: AskDomain> {
     private func ask(_ question: String, origin: AskOrigin, scope: String?) {
         let fromComposer = origin == .typed || origin == .prefilled
         let pending = fromComposer ? pendingPhoto : nil
-        guard start(question, origin: origin, photo: pending?.photo, image: pending?.image, scope: scope) else {
-            return
-        }
-        // The composer's question has left it. Here rather than in `start`,
-        // which Try Again goes through too, with a question of its own.
-        if fromComposer { draft = "" }
-        if pending != nil { pendingPhoto = nil }
+        start(
+            question, origin: origin, photo: pending?.photo, image: pending?.image, scope: scope,
+            emptyingTheComposer: fromComposer
+        )
     }
 
     /// Put a photo in the composer, to go with the reader's next question: the
@@ -729,17 +753,26 @@ public final class AskConversationStore<Domain: AskDomain> {
 
     /// Start a turn: the question, the photo it goes with, and the pixels where
     /// this process still has them. False for a question with nothing in it,
-    /// which starts nothing.
+    /// which starts nothing. `emptyingTheComposer` for the composer's own
+    /// question, which leaves it: the draft and the photo waiting there.
     @discardableResult
     private func start(
         _ question: String,
         origin: AskOrigin,
         photo: AskQuestionPhoto?,
         image: CGImage?,
-        scope: String?
+        scope: String?,
+        emptyingTheComposer: Bool = false
     ) -> Bool {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
+        // Before a question still waiting comes back to the composer, below.
+        // Only for the composer's question: Try Again comes through here too,
+        // with a question of its own, and leaves the draft alone.
+        if emptyingTheComposer {
+            draft = ""
+            if pendingPhoto != nil { pendingPhoto = nil }
+        }
         // A question asked is the reader's attention elsewhere: an outcome that
         // lands after it leaves their focus where they took it.
         proposalOutcomeFocus = nil
@@ -747,7 +780,9 @@ public final class AskConversationStore<Domain: AskDomain> {
         // thread never holds two unfinished turns. The reader's question cut it
         // short, so the stop is theirs. Saved now, as Stop saves it: its own
         // task ends without a save once let go, and the newer turn's save
-        // comes only when that turn ends, after an app killed meanwhile.
+        // comes only when that turn ends, after an app killed meanwhile. One
+        // still waiting has no turn to keep it, and goes back to the composer.
+        returnTheWaitingQuestion()
         if settleTurnInFlight(byReader: true) { persist() }
 
         // A question can come before the saved thread has been read: an entry
@@ -771,13 +806,13 @@ public final class AskConversationStore<Domain: AskDomain> {
         let waitsForTheRead = keepsThread && !hasRestored
         guard !waitsForTheRead, changingChat == nil else {
             isThinking = true
-            questionWaits = true
+            waitingQuestion = WaitingQuestion(text: trimmed, photo: photo, image: image, scope: scope)
             // Begun at the tap, not a hop later.
             if waitsForTheRead { _ = restoration() }
             task = Task { [weak self] in
                 await self?.readyForAQuestion()
                 guard !Task.isCancelled else { return }
-                self?.questionWaits = false
+                self?.waitingQuestion = nil
                 self?.begin(trimmed, origin: origin, photo: photo, image: image, scope: scope)
             }
             return true
@@ -899,12 +934,10 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// `AskArrivals.settle`, 0.33 s, would snap a long chunk to full part-way
     /// through a drawing-in that takes up to 0.75 s. Read before the sleep:
     /// the turn is settled by the time this is called, so nothing more arrives
-    /// to lengthen it.
+    /// to lengthen it. And read on `clock`, the clock the chunks were stamped
+    /// on: on another, the wait would be the gap between two clocks.
     private func forgetChunksOnceSettled(_ id: UUID) {
-        let remaining = AskArrivals.timeUntilSettled(
-            turn(id)?.chunks ?? [],
-            at: Date.timeIntervalSinceReferenceDate
-        )
+        let remaining = AskArrivals.timeUntilSettled(turn(id)?.chunks ?? [], at: clock())
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(remaining + 0.05))
             guard let self, self.turn(id)?.isComplete == true else { return }
@@ -918,15 +951,23 @@ public final class AskConversationStore<Domain: AskDomain> {
         ask(starter.text, origin: .starter)
     }
 
-    /// Pass over a chip: it doesn't come back in this thread.
+    /// Pass over a chip: it doesn't come back in this thread. A follow-up on
+    /// offer is passed over by its words, and any other chip by its id
+    /// (`declinedFollowUps`).
     public func decline(_ starter: AskStarter) {
-        declinedStarters.insert(starter.id)
+        if followUps.contains(starter) {
+            declinedFollowUps.insert(starter.text)
+        } else {
+            declinedStarters.insert(starter.id)
+        }
     }
 
     /// Try Again: ask a failed turn's question again, the way it was first
-    /// asked. The failed turn, a message and never an answer, gives its place
-    /// to the re-ask. The composer's draft is left as it is; the question is
-    /// the turn's.
+    /// asked. A failed turn that drew nothing, a message and never an answer,
+    /// gives its place to the re-ask. One that drew prose before it failed
+    /// keeps it, and the question is asked again below it, as Ask again asks
+    /// it: nothing shown is taken back (house rule 5). The composer's draft is
+    /// left as it is; the question is the turn's.
     ///
     /// For the newest turn once it has failed. It does nothing for an older
     /// turn, which asked again would be pulled out of the middle of the thread
@@ -943,7 +984,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// a photo went with it.
     public func retry(_ turn: Turn) {
         guard !questionWaits, let last = turns.last, last.id == turn.id, last.failure != nil else { return }
-        turns.removeLast()
+        if !last.hasContent { turns.removeLast() }
         start(turn.question, origin: turn.origin, photo: turn.photo, image: turn.photoImage, scope: turn.scope)
     }
 
@@ -1050,7 +1091,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// engine. Where diagnostics are on (`offersFeedback`), the newest answer
     /// a model wrote, while its session is still kept and idle, has its
     /// feedback attachment saved too, for the diagnostics row to share; with
-    /// them off there is no row to share it from, and none is kept. An answer
+    /// them off there is no row to share it from, and none is taken. An answer
     /// the domain gave without a model has no transcript of its own, and the
     /// session's would describe some other exchange. The other thumb replaces
     /// the verdict; the same thumb again changes nothing.
@@ -1064,16 +1105,20 @@ public final class AskConversationStore<Domain: AskDomain> {
             tilesShown: answer.tiles.count, rowsRead: answer.matches.count,
             wasTruncated: answer.isTruncated
         )
-        // No tier is an answer the domain gave without a model.
-        let isLatest = turns.last?.id == turn.id && current.tier != nil
+        // No tier is an answer the domain gave without a model. And no
+        // attachment is taken that nothing would keep: the SDK logs and
+        // serializes the session's transcript as it hands it over.
         let keepsAttachment = offersFeedback
+        let takesAttachment = keepsAttachment && turns.last?.id == turn.id && current.tier != nil
         // Last launch's go first, ahead of this verdict's in the queue.
         forgetLastLaunchsAttachments()
         let previous = feedbackTask
         feedbackTask = Task { [weak self, engine, feedbackAttachments] in
             // In order: two quick taps are two lines in the log, oldest first.
             await previous?.value
-            guard let data = await engine.recordFeedback(feedback, isLatestTurn: isLatest), keepsAttachment else { return }
+            guard let data = await engine.recordFeedback(feedback, isLatestTurn: takesAttachment), keepsAttachment else {
+                return
+            }
             guard await feedbackAttachments.save(data, sentiment: sentiment) != nil else { return }
             self?.feedbackRevision += 1
         }
@@ -1186,13 +1231,19 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// a card whose proposal is already being carried out.
     ///
     /// **At most once.** The yes is saved with the turn before the domain is
-    /// asked (`AskProposalOutcome.performing`), so a chat that ends, or an app
-    /// that quits, while it works never offers the action again. The task
-    /// holds the store until the domain returns, and what came of it is
-    /// written onto the turn wherever it is by then: on screen, read back in a
-    /// chat opened again, or in the filing of a chat that has ended. Nothing
-    /// waits for it: New Chat and an earlier chat opening go ahead while it
-    /// works, so a perform that never returns holds up no chat.
+    /// asked (`AskProposalOutcome.performing`), and the domain is asked only
+    /// once that write has landed, so a chat that ends, or an app that quits,
+    /// while it works never offers the action again. A yes the disk refused
+    /// is never carried out, and nor is one whose chat ended before it was
+    /// saved (New Chat, Delete All Chats or an earlier chat opening in the
+    /// same moment): the card says it couldn't be done (`.failed(nil)`), as
+    /// a perform that failed does. The task holds the store until the domain
+    /// returns, and what came of it is written onto the turn wherever it is
+    /// by then: on screen, read back in a chat opened again, or in the filing
+    /// of a chat that has ended. Nothing waits for the domain: New Chat and
+    /// an earlier chat opening go ahead while it works, so a perform that
+    /// never returns holds up no chat. It is asked off the main actor
+    /// (`perform(_:of:logSubsystem:)`).
     ///
     /// A `.handOff` is never performed: the card opens the host's editor and
     /// calls `handOffProposal(_:line:)`, and a tap that reaches here for one
@@ -1216,24 +1267,62 @@ public final class AskConversationStore<Domain: AskDomain> {
             turn.proposalOutcome = .performing
         }
         proposalOutcomeFocus = awaitingTheOutcome ? id : nil
-        persist()
+        // A thread kept for the process only has no quit to outlive.
+        let saving = keepsThread ? saveTheYes() : nil
         let run = UUID()
         proposalTasks[run] = Task { [domain, brand] in
             let outcome: AskProposalOutcome
-            do {
-                outcome = .confirmed(try await domain.perform(proposal))
-            } catch let failure as AskProposalFailure {
-                outcome = .failed(failure.line)
-            } catch {
-                // Never the error's own words; `AskProposalFailure` says why.
-                // The tag, so the log can tell a host's own fault from one it
-                // meant to report.
+            if let saving, await !saving.value {
                 Logger(subsystem: brand.logSubsystem, category: "ask")
-                    .error("a proposal failed with an error it didn't explain: \(AskTriage.tag(for: error), privacy: .public)")
+                    .error("a proposal's yes could not be saved with its chat, so it was not carried out")
                 outcome = .failed(nil)
+            } else {
+                outcome = await Self.perform(proposal, of: domain, logSubsystem: brand.logSubsystem)
             }
             await self.settleProposal(of: id, diskTurn, with: outcome)
             self.proposalTasks[run] = nil
+        }
+    }
+
+    /// Save the reader's yes as the thread, after every write queued before
+    /// it, and say whether it is on disk with its chat still on screen once
+    /// the write has returned: only then is the domain asked.
+    ///
+    /// **A chat that ended before the write ran, or while it ran, is a
+    /// refusal.** The chat's own writes (New Chat's, Delete All Chats', an
+    /// earlier chat opening's) file or delete it from then on, and an
+    /// earlier chat opening may have filed it before the yes was given, so
+    /// nothing here can say the yes is on disk.
+    private func saveTheYes() -> Task<Bool, Never> {
+        let ends = threadEnds
+        return queueWrite { store in
+            // Before the read nothing is written (`persist()`), and no card
+            // takes a tap then, since a question waits for the read.
+            guard store.hasRestored, store.threadEnds == ends else { return false }
+            let saved = await store.writeThread(store.turns.filter(\.isComplete).map(\.entry))
+            return saved && store.threadEnds == ends
+        }
+    }
+
+    /// Carry `proposal` out off every actor, as `overview(of:)` reads the
+    /// overview: a plain `nonisolated async` perform runs where it is called
+    /// from, and a slow one on the main actor would hitch the screen. Says
+    /// what came of it: the domain's line, an `AskProposalFailure`'s, or a
+    /// failure with no words of its own for any other error.
+    @concurrent nonisolated private static func perform(
+        _ proposal: AskProposal, of domain: Domain, logSubsystem: String
+    ) async -> AskProposalOutcome {
+        do {
+            return .confirmed(try await domain.perform(proposal))
+        } catch let failure as AskProposalFailure {
+            return .failed(failure.line)
+        } catch {
+            // Never the error's own words; `AskProposalFailure` says why. The
+            // tag, so the log can tell a host's own fault from one it meant
+            // to report.
+            Logger(subsystem: logSubsystem, category: "ask")
+                .error("a proposal failed with an error it didn't explain: \(AskTriage.tag(for: error), privacy: .public)")
+            return .failed(nil)
         }
     }
 
@@ -1416,10 +1505,16 @@ public final class AskConversationStore<Domain: AskDomain> {
     ///   own line ("Couldn't answer that just now"), with Try Again either
     ///   way.
     ///
+    /// A question still waiting to be asked, for the saved thread's read or a
+    /// chat change, has no turn to keep it, and goes back to the composer,
+    /// with its scope and its photo, unless the reader has begun another
+    /// there (`returnTheWaitingQuestion()`).
+    ///
     /// A question asked after it, at once or not, reaches the engine after
     /// the engine has stopped.
     public func stop(byReader: Bool = false) {
         // A question asked after it waits in `start`.
+        returnTheWaitingQuestion()
         settleTurnInFlight(byReader: byReader)
         // Queued as a chat change is, not sent from a task of its own: the
         // engine's `stop()` cancels whatever it is asking when it lands, and
@@ -1510,6 +1605,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         pendingPhoto = nil
         isThinking = false
         declinedStarters = []
+        declinedFollowUps = []
         lastTerminalTurn = nil
         lastTerminalTurnEndedAt = nil
         proposalOutcomeFocus = nil
@@ -1731,7 +1827,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             self.feedbackRevision += 1
             // A transcript still on the device is tried again, by name. Those
             // owed before were tried too, and only the ones that went leave
-            // the debt: a retry may have settled some meanwhile.
+            // the debt: a retry may have paid some off meanwhile.
             self.deletionOwed.attachments.subtract(owed.subtracting(left))
             self.deletionOwed.attachments.formUnion(left)
             if !left.isEmpty { self.watchForProtectedData() }
@@ -1755,7 +1851,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     private func settleTurnInFlight(byReader: Bool) -> Bool {
         task?.cancel()
         task = nil
-        questionWaits = false
+        waitingQuestion = nil
         guard isThinking else { return false }
         isThinking = false
         guard let last = turns.last else { return false }
@@ -1772,6 +1868,21 @@ public final class AskConversationStore<Domain: AskDomain> {
         // cancellation.
         if !last.isComplete { markStopped(last.id, byReader: byReader) }
         return true
+    }
+
+    /// Put the question still waiting to be asked back in the composer, as
+    /// Stop or a newer question lets it go: it has no turn to keep it, as a
+    /// stopped turn keeps its question, and the draft it came from was
+    /// emptied as it was sent. Its scope comes back with it, and its photo
+    /// where none waits there. Only into an empty draft: one the reader has
+    /// begun since is the newer question, and the waiting one goes.
+    private func returnTheWaitingQuestion() {
+        guard let waiting = waitingQuestion, draft.isEmpty else { return }
+        draft = waiting.text
+        draftScope = waiting.scope
+        if pendingPhoto == nil, let photo = waiting.photo, let image = waiting.image {
+            attachPhoto(image, label: photo.label, reference: photo.reference)
+        }
     }
 
     /// Settle a turn that was stopped before it finished. What it had written
@@ -1842,7 +1953,8 @@ public final class AskConversationStore<Domain: AskDomain> {
     ///
     /// Beside those, what the disk refused is tried again: a thread the
     /// device was too locked to read, a save, a chat New Chat couldn't file,
-    /// and what Delete All Chats couldn't delete. The screen coming back is
+    /// what Delete All Chats couldn't delete, and the feedback attachments a
+    /// chat that ended left. The screen coming back is
     /// the moment the reader is looking, on every platform.
     ///
     /// **The overview holds back nothing else.** It is the host's hook, and
@@ -2032,6 +2144,14 @@ public final class AskConversationStore<Domain: AskDomain> {
             forgetLastLaunchsAttachments()
             return
         }
+        // Listening before the read, not once it has failed: protected data
+        // coming back between the two would reach nobody, and a thread that
+        // reads by then would stay held, its notice up, until the screen next
+        // came back. A word that lands while the read is under way waits for
+        // it (`retryWhatWaitsOnTheDisk()`), and the listening stops here
+        // where the read left nothing waiting.
+        watchForProtectedData()
+        defer { if heldThread == nil, !writesAreOwed { stopWatchingForProtectedData() } }
         // Before the list is read, so a thread set aside on an earlier launch
         // that reads now is in it.
         await thread.recoverSetAside(into: archive)
@@ -2067,10 +2187,8 @@ public final class AskConversationStore<Domain: AskDomain> {
             // be read at all may be a good one, and stays where it is until
             // it can be read (`retryWhatWaitsOnTheDisk()`).
             readFailed = true
-            if await !thread.setAsideIfNotAThread() {
-                heldThread = .unreadable
-                watchForProtectedData()
-            }
+            // Still listening, from before the read.
+            if await !thread.setAsideIfNotAThread() { heldThread = .unreadable }
         }
     }
 
@@ -2094,8 +2212,8 @@ public final class AskConversationStore<Domain: AskDomain> {
     ///
     /// Writes nothing in the thread's place while it is held (`heldThread`),
     /// which it checks when the write runs, since New Chat's own writes can
-    /// hold it: held by a thread that couldn't be read, the turns are filed
-    /// beside it (`heldTurnsFiling`). A read that failed leaves `turns` empty,
+    /// hold it: the turns are filed beside what holds it
+    /// (`heldTurnsFiling`). A read that failed leaves `turns` empty,
     /// which is indistinguishable from a fresh thread, and the next completed
     /// turn would write a one-entry array over a conversation that is still
     /// on disk and may read fine once the device is unlocked.
@@ -2115,16 +2233,16 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Write `entries` as the thread, unless the thread's place is held, and
-    /// say whether they are on disk. In the write queue. Held by a thread
-    /// that couldn't be read, they are filed beside it instead
-    /// (`fileBesideTheHeldThread`).
+    /// say whether they are on disk. In the write queue. Held, they are filed
+    /// beside what holds it instead (`fileBesideTheHeldThread`), once a chat
+    /// New Chat couldn't file has been tried aside and wouldn't move.
     ///
     /// A false from the thread store is owed: saved again as protected data
     /// comes back and as the screen does (`retryWhatWaitsOnTheDisk()`).
     private func writeThread(_ entries: [AskThreadEntry<Row>]) async -> Bool {
         switch heldThread {
         case .unreadable: return await fileBesideTheHeldThread(entries)
-        case .unfiled: guard await freeTheThreadsPlace() else { return false }
+        case .unfiled: guard await freeTheThreadsPlace() else { return await fileBesideTheHeldThread(entries) }
         case nil: break
         }
         let saved = await thread.save(entries)
@@ -2145,16 +2263,18 @@ public final class AskConversationStore<Domain: AskDomain> {
         return saved
     }
 
-    /// Keep the turns asked while the thread's place holds a thread that
-    /// couldn't be read, without writing over it: filed with the earlier
-    /// chats as a chat of their own, under one ID that each turn files again
-    /// over, and left out of the list while they are on screen
-    /// (`heldTurnsFiling`). Say whether they are on disk.
+    /// Keep the turns asked while the thread's place is held, by a thread
+    /// that couldn't be read or a chat New Chat couldn't file and that won't
+    /// move, without writing over it: filed with the earlier chats as a chat
+    /// of their own, under one ID that each turn files again over, and left
+    /// out of the list while they are on screen (`heldTurnsFiling`). Say
+    /// whether they are on disk.
     ///
     /// Kept only in memory, they would go with a process that ended before
-    /// New Chat filed them, and the notice that the thread couldn't be read
-    /// goes at the first question, so nothing would say they hadn't been
-    /// kept. Filed provisionally (`AskThreadArchive.fileProvisionally`): a
+    /// New Chat filed them or the place came free, and nothing on screen
+    /// says they weren't kept: the notice that the thread couldn't be read
+    /// goes at the first question, and a chat New Chat couldn't file has
+    /// none. Filed provisionally (`AskThreadArchive.fileProvisionally`): a
     /// copy of what is on screen, it takes no earlier chat's place in a full
     /// list, and New Chat files the chat over it
     /// (`AskThreadArchive.fileTheChatOnScreen`).
@@ -2202,9 +2322,15 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// All Chats couldn't delete. As protected data comes back
     /// (`UIApplication`'s `.protectedDataDidBecomeAvailable`, on the iOS
     /// family) and as the screen does (`refresh()`). Does nothing when
-    /// nothing waits.
+    /// nothing waits. A domain that keeps no thread can still owe the
+    /// feedback attachments a chat left, and those are tried again too.
+    ///
+    /// Asked while the saved thread is still being read, it waits for the
+    /// read rather than doing nothing, since what the read leaves held is
+    /// what it is for; a read nothing has begun, it doesn't begin.
     func retryWhatWaitsOnTheDisk() async {
-        guard keepsThread, hasRestored else { return }
+        if keepsThread, !hasRestored, let restoring { await restoring.value }
+        guard !keepsThread || hasRestored else { return }
         if heldThread == .unreadable { await rereadHeldThread() }
         if writesAreOwed {
             let ends = threadEnds
@@ -2295,10 +2421,10 @@ public final class AskConversationStore<Domain: AskDomain> {
         }
     }
 
-    /// Listen for protected data coming back while a thread waits on it: on
-    /// the iOS family, complete file protection refuses every read and write
-    /// of the thread while the device is locked. Elsewhere `refresh()` alone
-    /// tries again.
+    /// Listen for protected data coming back while a thread waits on it, or
+    /// is being read: on the iOS family, complete file protection refuses
+    /// every read and write of the thread while the device is locked.
+    /// Elsewhere `refresh()` alone tries again.
     private func watchForProtectedData() {
         #if os(iOS) || os(visionOS)
         guard protectedDataObservation == nil else { return }
@@ -2401,6 +2527,10 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// `openThread`'s change: the chat on screen filed, then the screen, then
     /// the disk, then the engine.
     private func open(_ summary: AskThreadSummary, request: Int) async {
+        // Read once the writes before it have run: New Chat's run on the write
+        // queue, not this one, and may still be about to hold the place for a
+        // chat they couldn't file or move (`endingWrites`).
+        await persisting?.value
         guard heldThread == nil else { return }
         let read = await archive.entries(for: summary.id)
         // The reader asked for something else while it read.
@@ -2456,6 +2586,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         draft = ""
         pendingPhoto = nil
         declinedStarters = []
+        declinedFollowUps = []
         lastTerminalTurn = nil
         lastTerminalTurnEndedAt = nil
         proposalOutcomeFocus = nil
@@ -2775,8 +2906,8 @@ public final class AskConversationStore<Domain: AskDomain> {
         // A follow-up the reader said not to suggest stays gone for the thread,
         // the way a declined starter does.
         return (last.answer?.followUps ?? [])
+            .filter { !declinedFollowUps.contains($0) }
             .map { AskStarter(text: $0, bank: "followUp") }
-            .filter { !declinedStarters.contains($0.id) }
     }
 
     /// Whether the last answer offers "Another pick": its stream has ended, it

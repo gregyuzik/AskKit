@@ -337,6 +337,20 @@ import Testing
         #expect(store.lastTerminalTurnEndedAt == nil)
     }
 
+    @Test func aFinishedTurnForgetsItsChunksOnTheStoresOwnClock() async {
+        // The chunks are stamped on the store's clock, so how long they have
+        // left to fade is read on it too. Read on the wall clock, a store on a
+        // clock ahead of it would keep them, and the timeline that draws them,
+        // for good.
+        let ahead = Date.timeIntervalSinceReferenceDate + 1_000_000
+        let asker = ScriptedAsker(.init(events: [.partial("You own three"), .answer(.of("You own three records."))]))
+        let store = makeStore(asker: asker, clock: { ahead })
+        store.ask("q")
+        await settle(store)
+        await eventually { store.turns.last?.chunks.isEmpty == true }
+        #expect(store.turns.last?.chunks.isEmpty == true)
+    }
+
     // MARK: - Lifecycle
 
     @Test func newChatEmptiesTheThreadAndBumpsTheGeneration() async {
@@ -525,6 +539,45 @@ import Testing
         #expect(store.turns[0].answer?.text == "Worked this time.")
         // Re-asked the way it was first asked.
         #expect(asker.questions.withLock { $0 }.map(\.1) == [.starter, .starter])
+    }
+
+    @Test func tryAgainUnderProseTheTurnDrewKeepsItAndAsksBelowIt() async throws {
+        // An outage under the restart floor, or a stream that ends with no
+        // answer, fails a turn under the prose it drew. Replaced by the re-ask,
+        // that prose would go from the screen and, at the next save, from the
+        // disk: nothing shown is taken back (house rule 5).
+        let url = temporaryLocation("askkit-retry-prose").appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let asker = ScriptedAsker()
+        asker.scripts([
+            .init(events: [.tier(.privateCloud), .partial("You own three")], error: AskError.privateCloudUnreachable),
+            .init(events: [.tier(.privateCloud), .answer(.of("You own three records."))])
+        ])
+        let store = makeStore(domain: domain, asker: asker, threadURL: url)
+        store.ask("What do I own?", origin: .starter)
+        await settle(store)
+        let failed = try #require(store.turns.last)
+        #expect(failed.failure?.retryable == true)
+
+        store.retry(failed)
+        await settle(store)
+        await store.flushPersistence()
+
+        #expect(store.turns.map(\.question) == ["What do I own?", "What do I own?"])
+        #expect(store.turns.first?.text == "You own three", "Try Again took back the prose the turn had drawn")
+        #expect(store.turns.first?.failure != nil)
+        #expect(store.turns.last?.answer?.text == "You own three records.")
+        // Re-asked the way it was first asked, below it, as Ask again asks.
+        #expect(asker.questions.withLock { $0 }.map(\.1) == [.starter, .starter])
+        let onDisk = await AskThreadStore<UIRow>(appDirectory: "unused", url: url).load().entries
+        #expect(onDisk.map(\.text) == ["You own three", "You own three records."])
+
+        // The kept failure is no longer the newest turn, so it asks nothing.
+        store.retry(failed)
+        await settle(store)
+        #expect(store.turns.count == 2)
     }
 
     @Test func askAgainAddsATurnRatherThanReplacingOne() async {
@@ -1370,6 +1423,55 @@ import Testing
                 "Stop wrote the empty thread it had over the one it had not read yet")
     }
 
+    @Test func aQuestionStoppedWhileItWaitsGoesBackToTheComposer() async {
+        // It has no turn yet, and the draft was emptied as it was sent:
+        // dropped, it would be gone without a trace, where a stopped turn
+        // keeps its question.
+        let url = temporaryLocation("askkit-stopped-back").appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let asker = ScriptedAsker(.init(events: [.answer(.of("Two."))]))
+        let store = await storeOverASavedThread(asker: asker, url: url)
+
+        store.draft = "two"
+        store.ask(store.draft)
+        #expect(store.draft.isEmpty)
+        store.stop(byReader: true)
+        #expect(store.draft == "two", "the reader would type the question again")
+        await store.restoreIfNeeded()
+        await store.flushPersistence()
+        #expect(asker.questions.withLock { $0 }.isEmpty)
+        #expect(store.turns.map(\.question) == ["one"])
+
+        // A draft the reader has begun since is theirs, and stays.
+        store.draft = ""
+        asker.parksStop.withLock { $0 = true }
+        store.stop(byReader: true)
+        store.ask("three")
+        store.draft = "four"
+        store.stop(byReader: true)
+        #expect(store.draft == "four")
+        asker.releaseStop()
+    }
+
+    @Test func aQuestionAskedWhileAnotherWaitsPutsTheOtherBackInTheComposer() async {
+        // Asked over a turn in flight, a question stops that turn where it
+        // stands, and the stopped turn keeps its question. One still waiting
+        // has no turn to keep it, so it goes back to the composer.
+        let url = temporaryLocation("askkit-second-waiting").appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let asker = ScriptedAsker(.init(events: [.answer(.of("Answer."))]))
+        let store = await storeOverASavedThread(asker: asker, url: url)
+
+        store.ask("Anything from 1970?", origin: .starter)
+        store.draft = "Which are on vinyl?"
+        store.ask(store.draft)
+        #expect(store.draft == "Anything from 1970?", "the first question went without a trace")
+        await store.restoreIfNeeded()
+        await settle(store)
+        #expect(store.turns.map(\.question) == ["one", "Which are on vinyl?"])
+        #expect(asker.questions.withLock { $0 }.map(\.0) == ["Which are on vinyl?"])
+    }
+
     // MARK: - Entry points
 
     @Test func aPrefillPutsTheQuestionInTheComposerAndAsksNothing() throws {
@@ -1751,6 +1853,33 @@ import Testing
         #expect(store.followUps.map(\.text) == ["Any on vinyl?"])
     }
 
+    @Test func aFollowUpAndAStarterAreDeclinedApartWhateverTheirWords() async throws {
+        // A follow-up is known by its words and a host's starter by its id, a
+        // slug such as "vinyl". In one set, declining either would hide the
+        // other wherever the two strings met.
+        var domain = UIDomain()
+        domain.starterIDs = ["owned", "1970", "vinyl"]
+        let asker = ScriptedAsker(.init(events: [.answer(.of("An answer.", followUps: ["vinyl"]))]))
+        let store = makeStore(domain: domain, asker: asker)
+        await store.refresh()
+        store.ask("q")
+        await settle(store)
+        let starter = try #require(store.availableStarters.first { $0.id == "vinyl" })
+
+        store.decline(starter)
+        #expect(store.followUps.map(\.text) == ["vinyl"], "declining a starter hid a follow-up")
+        store.decline(try #require(store.followUps.first))
+        #expect(store.followUps.isEmpty)
+        #expect(store.availableStarters.map(\.id) == ["owned", "1970"])
+
+        // And the other way about.
+        store.startOver()
+        store.ask("q")
+        await settle(store)
+        store.decline(try #require(store.followUps.first))
+        #expect(store.availableStarters.map(\.id) == ["owned", "1970", "vinyl"], "declining a follow-up hid a starter")
+    }
+
     // MARK: - A reader's verdict
 
     @Test func aVerdictIsKeptOnTheTurnAndSentToTheEngine() async throws {
@@ -1801,6 +1930,9 @@ import Testing
         await store.flushFeedback()
         #expect(store.turns.last?.feedback == .positive)
         #expect(asker.feedbacks.withLock { $0 }.count == 1)
+        // Nor is the engine asked to take one: the SDK logs and serializes the
+        // session's transcript as it hands it over, kept or not.
+        #expect(asker.feedbacks.withLock { $0 }.first?.isLatestTurn == false, "an attachment nothing keeps was taken")
         #expect(await AskFeedbackAttachments(appDirectory: "unused", directory: attachments).urls().isEmpty)
     }
 
@@ -2366,6 +2498,91 @@ import Testing
 
         domain.performed.release()
         await store.flushProposal()
+    }
+
+    @Test func theDomainIsAskedOnlyOnceTheYesIsOnDisk() async throws {
+        // Asked at once, beside a write still queued, a perform could land
+        // first, and an app killed meanwhile would read the card back with no
+        // yes on it and offer the action again.
+        let threadURL = temporaryLocation("askkit-offer-yes-first").appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: threadURL) }
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let (store, turn) = try await offeringStore(domain: domain, threadURL: threadURL)
+        await store.flushPersistence()
+        domain.performed.watchedThread.withLock { $0 = threadURL }
+
+        store.confirmProposal(turn)
+        await store.flushProposal()
+        #expect(domain.performed.outcomesOnDiskAtEntry.withLock { $0 } == [.performing])
+        #expect(store.proposalPhase(for: turn) == .done("Marked The Peregrine as lent."))
+    }
+
+    @Test func aYesTheDiskWontSaveIsNeverCarriedOut() async throws {
+        // Carried out with the yes on disk nowhere, the action could be done
+        // again by a card read back after a quit. So nothing is done, the card
+        // says it couldn't be, and the reader can say yes again.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let (store, turn) = try await offeringStore(domain: domain, threadURL: folder.thread, archiveDirectory: folder.archive)
+        await store.flushPersistence()
+        try setMode(0o500, folder.folder)
+
+        store.confirmProposal(turn, awaitingTheOutcome: true)
+        #expect(store.proposalPhase(for: turn) == .performing, "the card took a second tap while the yes was saved")
+        await store.flushProposal()
+        #expect(domain.performed.proposals.isEmpty, "carried out with the yes saved nowhere")
+        #expect(store.turns.last?.proposalOutcome == .failed(nil))
+        #expect(store.proposalPhase(for: turn) == .failed(nil, canRetry: true))
+        #expect(store.proposalAnnouncement?.line == AskAnnouncement.proposal(.failed(nil)))
+
+        try setMode(0o755, folder.folder)
+        store.confirmProposal(turn)
+        await store.flushProposal()
+        #expect(domain.performed.proposals == [Self.lendBook])
+        #expect(store.proposalPhase(for: turn) == .done("Marked The Peregrine as lent."))
+    }
+
+    @Test func aYesWhoseChatEndsBeforeItIsSavedIsNotCarriedOut() async throws {
+        // A host's own New Chat in the same breath as the yes ends the chat
+        // before the yes's write runs: the yes is never saved as the chat on
+        // screen, so nothing is done, and the chat's filing says so and offers
+        // the action again.
+        let threadURL = temporaryLocation("askkit-offer-ended").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-offer-ended")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let (store, turn) = try await offeringStore(domain: domain, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        await store.flushPersistence()
+
+        store.confirmProposal(turn)
+        store.startOver()
+        await store.flushProposal()
+        await store.flushPersistence()
+        #expect(domain.performed.proposals.isEmpty)
+
+        await store.openThread(try #require(store.history.first))
+        let reopened = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: reopened) == .failed(nil, canRetry: true))
+        store.confirmProposal(reopened)
+        await store.flushProposal()
+        #expect(domain.performed.proposals == [Self.lendBook])
+    }
+
+    @Test func theDomainCarriesAProposalOutOffTheMainActor() async throws {
+        // A plain `nonisolated async` perform runs where it is called from,
+        // and a host's slow one on the main actor would hitch the screen.
+        let domain = UIDomain()
+        let (store, turn) = try await offeringStore(domain: domain)
+        store.confirmProposal(turn)
+        await store.flushProposal()
+        #expect(domain.performed.ranOnTheMainThread.withLock { $0 } == [false])
     }
 
     @Test func theCardsOwnYesWaitsOnTheOutcomeForTheFocusAndAQuestionDropsIt() async throws {
@@ -3014,6 +3231,98 @@ import Testing
         await relaunched.restoreIfNeeded()
         #expect(relaunched.history.map(\.title) == ["Anything from 1969?"])
         #expect(relaunched.turns.map(\.question) == ["Which is the oldest?"])
+    }
+
+    @Test func anEarlierChatAskedForAsNewChatEndsOpensOnlyOnceNewChatHasSettled() async throws {
+        // New Chat's writes run on the write queue, after the tap. A chat
+        // opened behind it would find the thread's place free before those
+        // writes held it for the chat they couldn't file or move, and open
+        // over that chat's last copy.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: folder.thread, archiveDirectory: folder.archive)
+        #expect(await archive.archive([earlierEntry("Anything from 1970?")]) != nil)
+        await store.restoreIfNeeded()
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+        let earlier = try #require(store.history.first)
+        let written = try Data(contentsOf: folder.thread)
+        try setMode(0o500, folder.archive)
+        try setMode(0o500, folder.folder)
+
+        store.startOver()
+        await store.openThread(earlier)
+        #expect(store.turns.isEmpty, "an earlier chat opened over a chat New Chat could neither file nor move")
+        await store.flushPersistence()
+        #expect(try Data(contentsOf: folder.thread) == written)
+    }
+
+    @Test func turnsAskedWhileAChatNewChatCouldNotFileHoldsThePlaceAreKeptAsAChatOfTheirOwn() async throws {
+        // Written nowhere, they would go with an app quit before the place
+        // came free, as the turns asked beside a thread that couldn't be read
+        // don't.
+        let folder = try privateFolder()
+        let archiveDirectory = temporaryLocation("askkit-unfiled-archive")
+        try FileManager.default.createDirectory(at: archiveDirectory, withIntermediateDirectories: true)
+        defer {
+            makeWritable(archiveDirectory, folder.folder)
+            try? FileManager.default.removeItem(at: folder.folder)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: folder.thread, archiveDirectory: archiveDirectory)
+        await store.restoreIfNeeded()
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+        try setMode(0o500, archiveDirectory)
+        try setMode(0o500, folder.folder)
+        store.startOver()
+        await store.flushPersistence()
+
+        try setMode(0o755, archiveDirectory)
+        store.ask("Which is the oldest?")
+        await settle(store)
+        await store.flushPersistence()
+        #expect(await archive.summaries().map(\.title) == ["Which is the oldest?"], "a turn was written nowhere")
+        #expect(store.history.isEmpty, "the chat on screen is listed as an earlier one")
+
+        // Once the place is free, they are the thread, and their filing goes.
+        try setMode(0o755, folder.folder)
+        await store.refresh()
+        await store.flushPersistence()
+        #expect(await entriesOnDisk(folder.thread) == ["Which is the oldest?"])
+        #expect(await archive.summaries().map(\.title) == ["Anything from 1969?"])
+    }
+
+    @Test func aPerLaunchChatsAttachmentsTheDiskKeptAreRemovedOnceTheyCanBe() async throws {
+        // A `.perLaunch` domain keeps no thread, but its verdicts keep
+        // attachments, and one a New Chat couldn't remove is owed like any
+        // other.
+        let attachments = temporaryLocation("askkit-owed-perlaunch")
+        try FileManager.default.createDirectory(at: attachments, withIntermediateDirectories: true)
+        defer {
+            makeWritable(attachments)
+            try? FileManager.default.removeItem(at: attachments)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Rumours.", tiles: [UIRow("Rumours")]))]))
+        let store = makeStore(asker: asker, attachmentsDirectory: attachments)
+        let kept = AskFeedbackAttachments(appDirectory: "unused", directory: attachments)
+        await store.restoreIfNeeded()
+        store.ask("Which records do I own?")
+        await settle(store)
+        store.rate(try #require(store.turns.last), .positive)
+        await store.flushFeedback()
+        #expect(await kept.urls().count == 1)
+        try setMode(0o500, attachments)
+        store.startOver()
+        await store.flushFeedback()
+        #expect(await kept.urls().count == 1, "the folder refused the removal")
+
+        try setMode(0o755, attachments)
+        await store.refresh()
+        await store.flushPersistence()
+        #expect(await kept.urls().isEmpty, "a transcript outlived its chat")
     }
 
     @Test func newChatNeverDeletesAThreadThatCouldNotBeReadEvenWhenItWontMove() async throws {
@@ -4077,10 +4386,10 @@ import Testing
 
     @Test func aRelaunchKeepsWhatOnlyTheFilingANewChatLeftSettled() async throws {
         // The reader confirmed the card's offer and rated the answer, and the
-        // disk refused both saves. New Chat filed the chat with them and
-        // couldn't delete the thread, and the app quit. The thread's copy of
-        // the turn has neither: shown as it is, the card would offer the
-        // action again.
+        // disk refused the saves of what came of the offer and of the rating.
+        // New Chat filed the chat with them and couldn't delete the thread,
+        // and the app quit. The thread's copy of the turn has only the yes:
+        // shown as it is, the card would say nobody knows what came of it.
         let folder = try privateFolder()
         defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
         var domain = UIDomain()
@@ -4095,9 +4404,13 @@ import Testing
         await settle(store)
         await store.flushPersistence()
         try FileManager.default.createDirectory(at: folder.archive, withIntermediateDirectories: true)
-        try setMode(0o500, folder.folder)
+        // The yes is saved first, or nothing is carried out.
+        domain.performed.parks.withLock { $0 = true }
         let turn = try #require(store.turns.last)
         store.confirmProposal(turn)
+        await domain.performed.isParked()
+        try setMode(0o500, folder.folder)
+        domain.performed.release()
         await store.flushProposal()
         store.rate(turn, .positive)
         await store.flushFeedback()
@@ -4332,6 +4645,35 @@ import Testing
 
         await expectAnsweredAlone("Anything from 1969?", in: store, threadURL: folder.thread)
         #expect(await archive.summaries().map(\.title) == ["On screen last time"])
+    }
+
+    @Test func aQuestionStoppedWhileANewChatOpensComesBackWithItsScopeAndPhoto() async throws {
+        // Waiting for the engine's reset, it has no turn on either chat.
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Answer."))]))
+        let store = makeStore(asker: asker)
+        store.ask("q")
+        await settle(store)
+        asker.parksReset.withLock { $0 = true }
+        store.startOver()
+        await asker.resetIsParked()
+
+        store.prefill("Which are on vinyl?", scope: "records")
+        store.attachPhoto(onePixel(), label: "A shelf")
+        store.ask(store.draft)
+        #expect(store.isThinking)
+        store.stop(byReader: true)
+        #expect(!store.isThinking)
+        #expect(store.draft == "Which are on vinyl?")
+        #expect(store.pendingPhoto?.photo.label == "A shelf")
+
+        asker.parksReset.withLock { $0 = false }
+        asker.releaseReset()
+        store.ask(store.draft)
+        await eventually { asker.questions.withLock { $0 }.count == 2 }
+        await settle(store)
+        #expect(store.turns.map(\.question) == ["Which are on vinyl?"])
+        #expect(asker.scopes.withLock { $0 }.last == "records")
+        #expect(asker.imageLabels.withLock { $0 }.last == ["A shelf"])
     }
 
     @Test func aQuestionAskedRightAfterNewChatBeforeTheThreadIsReadIsAnsweredOnTheNewChat() async throws {

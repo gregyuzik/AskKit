@@ -365,6 +365,9 @@ nonisolated struct UIDomain: AskDomain {
     /// "tiles, else what the prose named" would.
     var extraReferents: [String] = []
     var starterTexts: [String] = ["What do I own?", "Anything from 1970?", "Which are on vinyl?"]
+    /// The ids the starters take, in order, as a host's slugs: empty for
+    /// starters whose id is their text.
+    var starterIDs: [String] = []
     /// What the nothing-to-ask screen says, or nil for a brand with no words
     /// for it.
     var nothingToAskCopy: String? = "nothing"
@@ -405,7 +408,9 @@ nonisolated struct UIDomain: AskDomain {
     func search(_ arguments: UISearchArguments, context: AskToolContext<UIRow>) async throws -> String { "" }
 
     func starters(overview: AskOverview, window: Int) -> [AskStarter] {
-        starterTexts.prefix(window).map { AskStarter(text: $0) }
+        starterTexts.prefix(window).enumerated().map { index, text in
+            AskStarter(id: starterIDs.indices.contains(index) ? starterIDs[index] : nil, text: text)
+        }
     }
 
     func referent(from answer: AskAnswer<UIRow>) -> [String] { answer.tiles.map(\.displayTitle) + extraReferents }
@@ -478,8 +483,20 @@ nonisolated final class PerformLog: Sendable {
     /// call, for a test to change the chat while it runs.
     let parks = Mutex(false)
     private let parked = Mutex<[CheckedContinuation<Void, Never>]>([])
+    /// Whether each perform ran on the main thread, in order.
+    let ranOnTheMainThread = Mutex<[Bool]>([])
+    /// The thread file to read as each perform begins, or nil for none.
+    let watchedThread = Mutex<URL?>(nil)
+    /// What the watched thread's newest turn held for its proposal as each
+    /// perform began: the yes, if it was saved first.
+    let outcomesOnDiskAtEntry = Mutex<[AskProposalOutcome?]>([])
 
     func record(_ proposal: AskProposal) async {
+        ranOnTheMainThread.withLock { $0.append(pthread_main_np() != 0) }
+        if let url = watchedThread.withLock({ $0 }) {
+            let onDisk = await AskThreadStore<UIRow>(appDirectory: "unused", url: url).load().entries.last?.proposalOutcome
+            outcomesOnDiskAtEntry.withLock { $0.append(onDisk) }
+        }
         log.withLock { $0.append(proposal) }
         guard parks.withLock({ $0 }) else { return }
         await withCheckedContinuation { continuation in
