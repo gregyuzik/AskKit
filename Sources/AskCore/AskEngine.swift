@@ -631,26 +631,26 @@ public actor AskEngine<Domain: AskDomain> {
             throw AskError.couldNotAnswer
         }
         let servable = askServableTiers(from: states)
-        guard let tier = servable.first else {
-            // No transport failure is noted here, held or not: nothing was
-            // asked, and a cooldown noted again at every Try Again would
-            // start over each time and never lift.
+        // With nothing servable, a Private Cloud Compute held off only by a
+        // cooldown, such as the one an outage with nowhere to hand down
+        // leaves, or by a spent quota is asked all the same: that outage was
+        // the turn's error, which Try Again retries (house rule 1), and a
+        // tier that is back answers. One still out fails the turn as it did,
+        // retryably, and not with the on-device tier's reason, which offers
+        // no Try Again. The mirror names the same tier as the next one.
+        let held = servable.isEmpty ? askHeldTier(from: states) : nil
+        guard let tier = servable.first ?? held else {
             refreshStatusAside()
-            // A Private Cloud Compute held off only by a cooldown, such as the
-            // one an outage with nowhere to hand down left, or by a spent
-            // quota fails the turn as that outage would have, which Try Again
-            // retries (house rule 1), and not with the on-device tier's
-            // reason, which offers no Try Again.
-            if let held = askHeldOutage(from: states) {
-                log.routing("no tier can serve — privateCloud is held: \(AskTriage.tag(for: held))")
-                throw held
-            }
             let why = askUnavailability(from: states)
             log.routing("no tier can serve — \(why.rawValue)")
             throw AskError.modelUnavailable(why)
         }
         continuation.yield(.tier(tier))
-        log.routing("\(tier.rawValue) chosen (servable: \(servable.map(\.rawValue).joined(separator: ", ")))")
+        if held != nil {
+            log.routing("\(tier.rawValue) chosen though it is held, with no tier below that can serve")
+        } else {
+            log.routing("\(tier.rawValue) chosen (servable: \(servable.map(\.rawValue).joined(separator: ", ")))")
+        }
 
         let fallback = servable.dropFirst().first
         // What the thread has said, as this turn found it. Taken here because

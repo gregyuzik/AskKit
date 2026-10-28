@@ -1148,10 +1148,11 @@ private extension Trait where Self == ConditionTrait {
     /// House rule 1: with nowhere to hand it, an outage is the turn's error,
     /// which Try Again retries. The outage cools Private Cloud Compute, and a
     /// Try Again while the cooldown runs, with nothing below able to serve,
-    /// is told the tier couldn't be reached, which offers Try Again, and not
-    /// the on-device tier's reason, which offers none.
-    @Test func tryAgainOnACooledTierWithNothingBelowIsStillRetryable() async {
-        let (engine, seam, _) = makeEngine(states: [
+    /// asks Private Cloud Compute again: back, it answers, rather than the
+    /// turn failing with the on-device tier's reason, which offers no Try
+    /// Again.
+    @Test func tryAgainOnACooledTierWithNothingBelowAsksItAgain() async {
+        let (engine, seam, log) = makeEngine(states: [
             .serving(.privateCloud), .down(.onDevice, .modelNotReady)
         ])
         let session = seam.session(for: .privateCloud)
@@ -1164,39 +1165,59 @@ private extension Trait where Self == ConditionTrait {
             AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true),
             .down(.onDevice, .modelNotReady)
         ])
+        session.script(grounded("Back again."))
         let again = await record(engine.ask("q"))
-        #expect(again.askError == .privateCloudUnreachable)
-        #expect(again.askError?.isRetryable == true)
-        // No tier was asked, so no caption names one.
-        #expect(again.tiers.isEmpty)
-        #expect(session.prompts.withLock { $0 }.count == 1)
-        // And no second failure is noted: noted on every Try Again, the
-        // cooldown would start over each time and never lift.
-        await eventually { seam.refreshes.withLock { $0 } >= 2 }
+        #expect(again.tiers == [.privateCloud])
+        #expect(again.answer?.text == "Back again.")
+        #expect(log.routings.withLock { $0 }.contains(
+            "privateCloud chosen though it is held, with no tier below that can serve"
+        ))
+    }
+
+    /// A Try Again on a tier that is still out fails as the outage did,
+    /// retryably, and cools the tier again: it was asked, and it failed.
+    @Test func tryAgainOnACooledTierThatIsStillOutFailsRetryably() async {
+        let (engine, seam, _) = makeEngine(states: [
+            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true),
+            .down(.onDevice, .modelNotReady)
+        ])
+        seam.session(for: .privateCloud).script(FakeSession.Script(error: AskError.privateCloudUnreachable))
+        let recording = await record(engine.ask("q"))
+        #expect(recording.tiers == [.privateCloud])
+        #expect(recording.askError == .privateCloudUnreachable)
+        #expect(recording.askError?.isRetryable == true)
+        #expect(recording.restarts.isEmpty)
+        await eventually { seam.transportFailures.withLock { $0 } == [.privateCloud] }
         #expect(seam.transportFailures.withLock { $0 } == [.privateCloud])
     }
 
-    /// A spent quota with nothing below it is the quota's error, retryable,
-    /// beside the banner that says when it resets: not the on-device tier's
-    /// reason. A quota both spent and cooled reads as the quota, the longer
-    /// of the two holds.
-    @Test func aSpentQuotaWithNothingBelowIsTheTurnsRetryableError() async {
+    /// A spent quota with nothing below it is asked as a cooled tier is, and
+    /// a quota still spent is the turn's error, retryable, beside the banner
+    /// that says when it resets: not the on-device tier's reason. A quota
+    /// both spent and cooled is asked the same way.
+    @Test func aSpentQuotaWithNothingBelowIsAskedAndFailsRetryably() async {
         for cooled in [false, true] {
             let (engine, seam, _) = makeEngine(states: [
                 AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, quotaReached: true, isCooled: cooled),
                 .down(.onDevice, .modelNotReady)
             ])
+            let session = seam.session(for: .privateCloud)
+            session.script(FakeSession.Script(error: AskError.quotaReached(resetDate: nil)))
             let recording = await record(engine.ask("q"))
+            #expect(recording.tiers == [.privateCloud])
             #expect(recording.askError == .quotaReached(resetDate: nil))
             #expect(recording.askError?.isRetryable == true)
-            #expect(seam.session(for: .privateCloud).prompts.withLock { $0 }.isEmpty)
+            #expect(session.prompts.withLock { $0 }.count == 1)
+            // A spent quota is no network fault, and cools nothing.
+            await eventually { seam.refreshes.withLock { $0 } >= 1 }
+            #expect(seam.transportFailures.withLock { $0 }.isEmpty)
         }
     }
 
-    /// A hold reads as the turn's error only on a tier that would otherwise
-    /// serve. One that is down anyway, or that doesn't speak the app's
-    /// language, leaves the reason as it was; and with a tier below that
-    /// serves, the hold sends the turn there.
+    /// Only a tier that would otherwise serve is asked through its hold. One
+    /// that is down anyway, or that doesn't speak the app's language, leaves
+    /// the reason as it was; and with a tier below that serves, the hold
+    /// sends the turn there.
     @Test func aHoldOnATierThatCouldNotServeAnywayChangesNothing() async {
         let (down, _, _) = makeEngine(states: [
             AskTierState(tier: .privateCloud, isAvailable: false, speaksLanguage: true, isCooled: true, unavailability: .offline),
@@ -1219,6 +1240,34 @@ private extension Trait where Self == ConditionTrait {
         #expect(recording.tiers == [.onDevice])
         #expect(recording.answer?.text == "From the device.")
     }
+
+    #if !os(watchOS)
+    /// The tier a turn runs on is the one the mirror names as next
+    /// (`AppleModelSeam.snapshot(from:)`), in every state the tiers can be
+    /// in, a held Private Cloud Compute included: the caption and the first
+    /// screen say what the next question will do.
+    @Test func aTurnRunsOnTheTierTheMirrorNamesAsNext() async {
+        for flags in 0..<16 {
+            for onDevice in [AskTierState.serving(.onDevice), .down(.onDevice, .modelNotReady)] {
+                let isAvailable = flags & 1 != 0
+                let cloud = AskTierState(
+                    tier: .privateCloud, isAvailable: isAvailable, speaksLanguage: flags & 2 != 0,
+                    quotaReached: flags & 4 != 0, isCooled: flags & 8 != 0,
+                    unavailability: isAvailable ? nil : .offline
+                )
+                let states = [cloud, onDevice]
+                let (engine, seam, _) = makeEngine(states: states)
+                seam.session(for: .privateCloud).script(grounded("From the cloud."))
+                seam.session(for: .onDevice).script(grounded("From the device."))
+                let recording = await record(engine.ask("q"))
+                #expect(
+                    recording.tiers.first == AppleModelSeam.snapshot(from: states).nextTier,
+                    "\(states)"
+                )
+            }
+        }
+    }
+    #endif
 
     // MARK: - Follow-ups
 
