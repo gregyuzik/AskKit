@@ -26,7 +26,8 @@ public struct AskComposerAccessory {
     /// The SF Symbol the button shows, drawn bare: in the secondary style
     /// where that holds 3:1 on the composer's tint, and in the primary style
     /// where it doesn't, as on the default accent's capsule in light mode, and
-    /// under Increase Contrast.
+    /// under Increase Contrast. visionOS keeps the secondary style but under
+    /// Increase Contrast.
     public let systemImage: String
     /// What VoiceOver calls it: the host's own words, from the host's own
     /// catalog, because the glyph's name isn't a label.
