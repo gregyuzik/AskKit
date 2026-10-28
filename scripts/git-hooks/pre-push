@@ -26,11 +26,14 @@
 #   2. ci.sh checks          (shellcheck, swiftlint, both String Catalog checks,
 #                             the README sample's, the project file's)
 #   3. ci.sh test            (`swift test`, cold, with a minimum pass count)
-#   4. ci.sh builds          (the package for eight destinations)
-#   5. ci.sh demo            (the demo's three apps and its UI tests)
-# A cache may skip 3 to 5, never the checks. A change to THIS file reaches no
+#   4. ci.sh api             (the public API against the newest release tag)
+#   5. ci.sh builds          (the package for eight destinations)
+#   6. ci.sh demo            (the demo's three apps and its UI tests)
+# A cache may skip 3 to 6, never the checks. A change to THIS file reaches no
 # compiler, but it decides what passing means, so a cache has to count it as a
-# change to the tree.
+# change to the tree. The release tag `api` compares with is no part of the
+# tree, so a tree that passed stays passed when a new tag is cut; CI, which has
+# no cache, still compares it with the new one.
 #
 # Bypass with `git push --no-verify` (sparingly — fix the underlying issue).
 
@@ -50,9 +53,14 @@ cd "$(git rev-parse --show-toplevel)" || exit 1
 # a source, a resource or an "unhandled file" warning that fails the build, and
 # the demo's folders hold its sources and its project
 # (Demo/AskKitDemo.xcodeproj/). Demo/'s own top level is no source folder.
+#
+# Nor is the API allowlist, though it sits under .github/: `ci.sh api` reads
+# it, so emptying it, with nothing else changed, can fail that step, and a
+# cache that left it out of the key would skip the step on the strength of the
+# list before.
 gate_irrelevant() {
   case "$1" in
-    Sources/*|Tests/*|Demo/*/*) return 1 ;;
+    Sources/*|Tests/*|Demo/*/*|.github/api-breakage-allowlist.txt) return 1 ;;
     docs/*|.claude/*|.github/*|scripts/git-hooks/*|*.md|.gitignore) return 0 ;;
   esac
   return 1
@@ -191,6 +199,7 @@ if gate_proven; then
 fi
 
 ./scripts/ci.sh test || exit 1
+./scripts/ci.sh api || exit 1
 ./scripts/ci.sh builds || exit 1
 ./scripts/ci.sh demo || exit 1
 

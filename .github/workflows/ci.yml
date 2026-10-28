@@ -107,6 +107,23 @@ jobs:
       - uses: ./.github/actions/setup
       - run: scripts/ci.sh test
 
+  # The public API against the newest release tag, which ci.sh finds with
+  # `git describe`: that needs the history and the tags, which a depth-1
+  # checkout leaves out. It builds and doesn't run anything, so a runner under
+  # the package's macOS floor does.
+  api:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - run: scripts/ci.sh api
+
   # The build matrix is ci.sh's own list, which the push gate builds too, so a
   # destination added there is built by both. Read on Linux: it needs no Xcode,
   # and a macOS minute costs ten of these.
@@ -163,7 +180,7 @@ jobs:
   # `changes`, which would otherwise read as everything skipped.
   ci-passed:
     name: CI passed
-    needs: [changes, checks, test, destinations, build, demo]
+    needs: [changes, checks, test, api, destinations, build, demo]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
