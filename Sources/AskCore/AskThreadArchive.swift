@@ -95,6 +95,17 @@ nonisolated struct AskThreadIndex: Codable, Sendable, Equatable {
         threads = try container.decodeIfPresent([AskThreadSummary].self, forKey: .threads) ?? []
         deleted = try container.decodeIfPresent([UUID].self, forKey: .deleted) ?? []
     }
+
+    /// The deletions an index carries, from bytes that don't decode as a
+    /// whole one, such as a later build's with a summary this build can't
+    /// read: none where they don't decode either.
+    static func deletions(in data: Data) -> [UUID] {
+        (try? JSONDecoder().decode(Deletions.self, from: data))?.deleted ?? []
+    }
+
+    nonisolated private struct Deletions: Decodable {
+        let deleted: [UUID]?
+    }
 }
 
 /// What `AskThreadArchive.merge(_:filingIfNew:at:)` did.
@@ -132,8 +143,10 @@ nonisolated enum AskArchiveMerge: Equatable, Sendable {
 /// chat deleted whose file wouldn't go: remembered as deleted, and its file
 /// retried, so it doesn't come back.
 ///
-/// Written the way the thread is: off the main actor, atomically, under complete
-/// file protection where it exists, excluded from backup.
+/// Written the way the thread is (`AskStoredFile`): off the main actor,
+/// atomically, under complete file protection except on a Mac, excluded from
+/// backup, and never past `AskStoredFile.maxBytes`. `threads/`, which is the
+/// archive's own, is made the same way.
 ///
 /// Behind no platform gate, like `AskThreadStore`: Foundation alone.
 public actor AskThreadArchive<Row: AskRow> {
@@ -212,31 +225,36 @@ public actor AskThreadArchive<Row: AskRow> {
     /// (`archive(_:at:)`).
     public func entries(for id: UUID) -> AskThreadRead<Row> {
         guard !pendingDeletions.contains(id), let url = url(for: id) else { return .empty }
-        let (read, failure) = contents(of: url)
+        let (read, failure, droppedRows) = contents(of: url)
         if let failure {
             logger.error("an earlier chat \(failure, privacy: .public)")
+        }
+        if droppedRows > 0 {
+            // As the thread's read logs them (`AskThreadStore.load()`).
+            logger.error("\(droppedRows, privacy: .public) row(s) in an earlier chat no longer decode, and are left out of their answers")
         }
         return read
     }
 
-    /// A chat file's entries, and why it could not be read when it could not.
-    private func contents(of url: URL) -> (read: AskThreadRead<Row>, failure: String?) {
+    /// A chat file's entries, why it could not be read when it could not, and
+    /// how many rows its answers left out (`AskDroppedRows`).
+    private func contents(of url: URL) -> (read: AskThreadRead<Row>, failure: String?, droppedRows: Int) {
         let data: Data
         do {
-            data = try Data(contentsOf: url)
+            data = try AskStoredFile.contents(of: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return (.empty, nil)
+            return (.empty, nil, 0)
         } catch {
-            return (.unreadable, "could not be read: \(error.localizedDescription)")
+            return (.unreadable, "could not be read: \(AskStoredFile.tag(for: error))", 0)
         }
         do {
-            let (entries, dropped) = try AskThreadStore<Row>.decodeEntries(from: data)
+            let (entries, dropped, droppedRows) = try AskThreadStore<Row>.decodeEntries(from: data)
             guard !entries.isEmpty || dropped == 0 else {
-                return (.unreadable, "has no turn this build can decode")
+                return (.unreadable, "has no turn this build can decode", 0)
             }
-            return (.thread(entries, dropped: dropped), nil)
+            return (.thread(entries, dropped: dropped), nil, droppedRows)
         } catch {
-            return (.unreadable, "on disk is not a chat: \(error.localizedDescription)")
+            return (.unreadable, "on disk is not a chat: \(AskStoredFile.tag(for: error))", 0)
         }
     }
 
@@ -330,15 +348,16 @@ public actor AskThreadArchive<Row: AskRow> {
         return summary
     }
 
-    /// Fold turns kept aside back into the filing of the chat they belong to,
-    /// keeping every turn either holds but a failure Try Again replaced
-    /// (`AskThreadEntry.merging`). Without a filing of that chat, they are filed as a chat of their own when
-    /// `filingIfNew`, and left alone when not.
+    /// Put turns kept aside back into the filing of the chat they belong to,
+    /// joined with it: every turn either holds but a failure Try Again
+    /// replaced (`AskThreadEntry.merging`). Without a filing of that chat,
+    /// they are filed as a chat of their own when `filingIfNew`, and left
+    /// alone when not.
     ///
     /// How `AskThreadStore.recoverSetAside` puts a thread back: filed over its
     /// chat's filing instead, a thread kept aside would cost the turns asked
     /// since, or the filing would cost the turns only it holds. Never into a
-    /// filing that doesn't read whole: merged into what decoded, the rest
+    /// filing that doesn't read whole: joined with what decoded, the rest
     /// would be written over.
     func merge(_ entries: [AskThreadEntry<Row>], filingIfNew: Bool, at now: Date = .now) -> AskArchiveMerge {
         guard !entries.isEmpty else { return .notFiled }
@@ -403,7 +422,6 @@ public actor AskThreadArchive<Row: AskRow> {
     /// back from what decoded, it would lose the rest.
     @discardableResult
     package func settleProposal(asked question: String, at askedAt: Date, with outcome: AskProposalOutcome) -> Bool {
-        guard let directory else { return false }
         var settledAny = false
         // Every filing, not only those whose listed dates span the turn: a
         // list written before its chat's last filing names older dates, and a
@@ -415,10 +433,10 @@ public actor AskThreadArchive<Row: AskRow> {
                   let settled = AskThreadEntry.settlingProposal(asked: question, at: askedAt, with: outcome, in: entries)
             else { continue }
             do {
-                try write(JSONEncoder().encode(settled), to: url, in: directory)
+                try write(JSONEncoder().encode(settled), to: url)
                 settledAny = true
             } catch {
-                logger.error("a proposal's outcome could not be written to its chat: \(error.localizedDescription, privacy: .public)")
+                logger.error("a proposal's outcome could not be written to its chat: \(AskStoredFile.tag(for: error), privacy: .public)")
             }
         }
         return settledAny
@@ -441,12 +459,12 @@ public actor AskThreadArchive<Row: AskRow> {
         absorbing absorbed: UUID? = nil
     ) -> AskThreadSummary? {
         let kept = Array(entries.suffix(AskThreadStore<Row>.maxPersistedTurns))
-        guard let directory, let url = url(for: id),
+        guard let url = url(for: id),
               let summary = AskThreadSummary.of(kept, id: id, fallbackDate: now) else { return nil }
         do {
-            try write(JSONEncoder().encode(kept), to: url, in: directory)
+            try write(JSONEncoder().encode(kept), to: url)
         } catch {
-            logger.error("an earlier chat could not be written: \(error.localizedDescription, privacy: .public)")
+            logger.error("an earlier chat could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return nil
         }
         // Filed, so a removal of this id that hadn't taken is over. Left
@@ -487,15 +505,16 @@ public actor AskThreadArchive<Row: AskRow> {
         let fileGone = removeFile(for: id)
         if !fileGone { pendingDeletions.insert(id) }
         let (index, named) = loadIndex()
-        // Nothing to write when the index never named the chat and its file
-        // is gone: no read will list it.
-        guard named.contains(id) || !fileGone else { return true }
+        // Nothing to write when the index on disk is known not to name the
+        // chat and its file is gone: no read will list it. An index there
+        // that won't read may name it, and would list it once it reads.
+        if fileGone, let named, !named.contains(id) { return true }
         var listed = index
         listed.threads.removeAll { $0.id == id }
         let indexWritten = writeIndex(listed)
-        // An index on disk that still names the chat would list it on the
-        // next read, file or no file.
-        if !indexWritten && named.contains(id) { pendingDeletions.insert(id) }
+        // An index on disk that still names the chat, or may, would list it
+        // on the next read, file or no file.
+        if !indexWritten && named?.contains(id) != false { pendingDeletions.insert(id) }
         return fileGone && indexWritten
     }
 
@@ -513,11 +532,20 @@ public actor AskThreadArchive<Row: AskRow> {
     /// filing makes the folder afresh if it went.
     ///
     /// On false, every chat left is remembered as deleted, as `remove(_:)`
-    /// remembers one, and stays off the list.
+    /// remembers one, and stays off the list. False too for a folder that
+    /// won't list, which names no chat file: read as empty, the index would
+    /// go and every chat be reported gone while their files stayed, to come
+    /// back once the folder lists. The index stays, as the record of which
+    /// chats were there.
     @discardableResult
     public func removeAll() -> Bool {
         guard let directory else { return true }
-        let stranded = chatFileIDs(in: directory).filter { !removeFile(for: $0) }
+        guard let chatFiles = chatFileIDs(in: directory) else {
+            logger.error("the chat folder could not be listed, so every chat is remembered as deleted")
+            oweEveryChat(in: directory)
+            return false
+        }
+        let stranded = chatFiles.filter { !removeFile(for: $0) }
         let indexGone: Bool
         do {
             try FileManager.default.removeItem(at: directory.appending(path: Self.indexName))
@@ -526,16 +554,11 @@ public actor AskThreadArchive<Row: AskRow> {
             // Nothing was ever filed, or the index went with an earlier try.
             indexGone = true
         } catch {
-            logger.error("the chat index could not be deleted: \(error.localizedDescription, privacy: .public)")
+            logger.error("the chat index could not be deleted: \(AskStoredFile.tag(for: error), privacy: .public)")
             indexGone = false
         }
         guard stranded.isEmpty, indexGone else {
-            let (index, named) = loadIndex()
-            pendingDeletions.formUnion(named)
-            pendingDeletions.formUnion(index.threads.map(\.id))
-            pendingDeletions.formUnion(chatFileIDs(in: directory))
-            writeIndex(AskThreadIndex())
-            provisional = nil
+            oweEveryChat(in: directory)
             return false
         }
         removeFolderIfEmpty(directory)
@@ -544,17 +567,29 @@ public actor AskThreadArchive<Row: AskRow> {
         return true
     }
 
+    /// What Delete All Chats does where it couldn't delete every chat:
+    /// remember each one it knows of as deleted, those the index names or
+    /// lists and those whose files the folder lists, and write an index that
+    /// lists none of them and carries them all.
+    private func oweEveryChat(in directory: URL) {
+        let (index, named) = loadIndex()
+        pendingDeletions.formUnion(named ?? [])
+        pendingDeletions.formUnion(index.threads.map(\.id))
+        pendingDeletions.formUnion(chatFileIDs(in: directory) ?? [])
+        writeIndex(AskThreadIndex())
+        provisional = nil
+    }
+
     /// Delete the folder when nothing is left in it: the archive's own files
     /// are gone, and a file of anyone else's keeps it.
     private func removeFolderIfEmpty(_ directory: URL) {
-        let path = directory.path(percentEncoded: false)
-        guard let left = try? FileManager.default.contentsOfDirectory(atPath: path), left.isEmpty else { return }
+        guard AskStoredFile.names(in: directory)?.isEmpty == true else { return }
         do {
             try FileManager.default.removeItem(at: directory)
         } catch let error as CocoaError where error.code == .fileNoSuchFile {
             // Already gone.
         } catch {
-            logger.error("the empty chat folder could not be deleted: \(error.localizedDescription, privacy: .public)")
+            logger.error("the empty chat folder could not be deleted: \(AskStoredFile.tag(for: error), privacy: .public)")
         }
     }
 
@@ -568,27 +603,45 @@ public actor AskThreadArchive<Row: AskRow> {
         loadIndex().index
     }
 
-    /// The list as a read gives it, and the chats the index on disk names.
-    private func loadIndex() -> (index: AskThreadIndex, named: Set<UUID>) {
+    /// The list as a read gives it, and the chats the index on disk names:
+    /// none where there is no index, and nil where there is one that won't
+    /// read, which may name any chat.
+    ///
+    /// **An index that won't read is not no index.** No index (260) is a
+    /// fresh install, or one lost between two writes. One that is there and
+    /// won't read, locked, damaged, past the ceiling or written by a later
+    /// build, is rebuilt from the chat files too, but taken for none it would
+    /// close every deletion whose file is gone while it may still name the
+    /// chat, and lose the deletions it carries.
+    private func loadIndex() -> (index: AskThreadIndex, named: Set<UUID>?) {
         guard let directory else { return (AskThreadIndex(), []) }
-        var index: AskThreadIndex
+        var index = AskThreadIndex()
+        var named: Set<UUID>?
         do {
-            let data = try Data(contentsOf: directory.appending(path: Self.indexName))
-            index = try JSONDecoder().decode(AskThreadIndex.self, from: data)
+            let data = try AskStoredFile.contents(of: directory.appending(path: Self.indexName))
+            do {
+                index = try JSONDecoder().decode(AskThreadIndex.self, from: data)
+                named = Set(index.threads.map(\.id))
+            } catch {
+                logger.error("the chat index on disk is not one, rebuilding it: \(AskStoredFile.tag(for: error), privacy: .public)")
+                // Its deletions where they still decode: rebuilt without
+                // them, a chat whose file wouldn't go would be listed again,
+                // and the next index written would name it for good.
+                pendingDeletions.formUnion(AskThreadIndex.deletions(in: data))
+            }
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
             // No index and no chats is a fresh install. No index beside chat
             // files is an index lost between two writes, and the chat files
             // list themselves below.
-            index = AskThreadIndex()
+            named = []
         } catch {
-            logger.error("the chat index could not be read, rebuilding it: \(error.localizedDescription, privacy: .public)")
-            index = AskThreadIndex()
+            logger.error("the chat index could not be read, rebuilding it: \(AskStoredFile.tag(for: error), privacy: .public)")
         }
-        let named = Set(index.threads.map(\.id))
         // A deletion is done once its file is gone and no index on disk names
-        // the chat. Until then the chat stays off the list.
+        // the chat, which an index that won't read may. Until then the chat
+        // stays off the list, and its file is tried again.
         pendingDeletions.formUnion(index.deleted)
-        for id in pendingDeletions where removeFile(for: id, logging: false) && !named.contains(id) {
+        for id in pendingDeletions where removeFile(for: id, logging: false) && named?.contains(id) == false {
             pendingDeletions.remove(id)
         }
         index.threads.removeAll { pendingDeletions.contains($0.id) }
@@ -600,16 +653,14 @@ public actor AskThreadArchive<Row: AskRow> {
     /// won't read is left off, and read again next time, and so is a chat
     /// deleted whose file is still there.
     private func withUnlistedChats(_ index: AskThreadIndex, in directory: URL) -> AskThreadIndex {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false)) else {
-            return index
-        }
+        guard let names = AskStoredFile.names(in: directory) else { return index }
         let listed = Set(index.threads.map(\.id))
         var threads = index.threads
         for name in names where name.hasSuffix(".json") && name != Self.indexName {
             guard let id = UUID(uuidString: String(name.dropLast(".json".count))),
                   !listed.contains(id), !pendingDeletions.contains(id) else { continue }
             let file = directory.appending(path: name)
-            let (read, failure) = contents(of: file)
+            let (read, failure, _) = contents(of: file)
             guard case .thread(let entries, _) = read else {
                 if let failure, unlistedFailures.insert(id).inserted {
                     logger.error("an earlier chat the list doesn't name \(failure, privacy: .public)")
@@ -631,10 +682,10 @@ public actor AskThreadArchive<Row: AskRow> {
         return rebuilt
     }
 
-    /// The chats whose files are in `directory`, listed or not.
-    private func chatFileIDs(in directory: URL) -> [UUID] {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path(percentEncoded: false))) ?? []
-        return names.compactMap { name in
+    /// The chats whose files are in `directory`, listed or not, or nil for a
+    /// folder that won't list (`AskStoredFile.names(in:)`).
+    private func chatFileIDs(in directory: URL) -> [UUID]? {
+        AskStoredFile.names(in: directory)?.compactMap { name in
             guard name.hasSuffix(".json") else { return nil }
             return UUID(uuidString: String(name.dropLast(".json".count)))
         }
@@ -648,10 +699,10 @@ public actor AskThreadArchive<Row: AskRow> {
         var index = index
         index.deleted = pendingDeletions.sorted { $0.uuidString < $1.uuidString }
         do {
-            try write(JSONEncoder().encode(index), to: directory.appending(path: Self.indexName), in: directory)
+            try write(JSONEncoder().encode(index), to: directory.appending(path: Self.indexName))
             return true
         } catch {
-            logger.error("the chat index could not be written: \(error.localizedDescription, privacy: .public)")
+            logger.error("the chat index could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return false
         }
     }
@@ -667,34 +718,18 @@ public actor AskThreadArchive<Row: AskRow> {
             // Already gone.
         } catch {
             if logging {
-                logger.error("an earlier chat could not be deleted: \(error.localizedDescription, privacy: .public)")
+                logger.error("an earlier chat could not be deleted: \(AskStoredFile.tag(for: error), privacy: .public)")
             }
             return false
         }
         return true
     }
 
-    /// The thread store's write, for the reasons its `save` gives: complete
-    /// protection is an iOS-family feature and fails the write on macOS, and
-    /// the backup exclusion is its own step, so a failure there is logged
-    /// rather than taking the write with it. The folder is made every time,
-    /// so a folder removed while the app runs, or by Delete All Chats, costs
-    /// no write after it.
-    private func write(_ data: Data, to url: URL, in directory: URL) throws {
-        #if os(macOS)
-        let options: Data.WritingOptions = [.atomic]
-        #else
-        let options: Data.WritingOptions = [.atomic, .completeFileProtection]
-        #endif
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try data.write(to: url, options: options)
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var marked = url
-        do {
-            try marked.setResourceValues(values)
-        } catch {
-            logger.error("an archive file could not be excluded from backup: \(error.localizedDescription, privacy: .public)")
-        }
+    /// Every file the archive writes, as the thread's are (`AskStoredFile`),
+    /// in `threads/`, its own folder. Made on every write, so a folder
+    /// removed while the app runs, or by Delete All Chats, costs no write
+    /// after it.
+    private func write(_ data: Data, to url: URL) throws {
+        try AskStoredFile.write(data, to: url, ownFolder: true, logger: logger)
     }
 }

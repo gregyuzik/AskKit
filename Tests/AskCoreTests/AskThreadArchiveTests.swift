@@ -660,6 +660,163 @@ import Testing
         #expect(await archive.summaries().map(\.title) == ["after"])
     }
 
+    @Test func deletingEveryChatFromAFolderThatWontListKeepsThemDeleted() async throws {
+        // A folder that won't list names no chat file. Read as empty, Delete
+        // All Chats would delete the list, report every chat gone and forget
+        // them, and each would come back from its file once the folder lists.
+        let (archive, directory) = makeArchive()
+        defer {
+            try? setPermissions(0o755, of: directory)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let older = try #require(await archive.archive(chat(["older"])))
+        let newer = try #require(await archive.archive(chat(["newer"], from: Date(timeIntervalSince1970: 2_000_000))))
+        // Searchable and writable, and not readable: it lists nothing.
+        try setPermissions(0o300, of: directory)
+
+        #expect(await !archive.removeAll())
+        try setPermissions(0o755, of: directory)
+        #expect(await archive.summaries().isEmpty)
+        for id in [older.id, newer.id] {
+            #expect(!FileManager.default.fileExists(atPath: file(for: id, in: directory).path(percentEncoded: false)))
+        }
+        let relaunched = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        #expect(await relaunched.summaries().isEmpty)
+    }
+
+    @Test func aRemovalWhileTheIndexWontReadWritesTheIndexOrStaysOwed() async throws {
+        // An index on disk that won't read may still name the chat, and lists
+        // it again once it reads. Taken for no index, the removal would say
+        // the chat is gone without writing one.
+        let (archive, directory) = makeArchive()
+        let index = directory.appending(path: "index.json")
+        defer {
+            try? setImmutable(false, index)
+            try? setPermissions(0o644, of: index)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let kept = try #require(await archive.archive(chat(["kept"])))
+        let removed = try #require(await archive.archive(chat(["removed"], from: Date(timeIntervalSince1970: 2_000_000))))
+        // Neither read nor written over.
+        try setPermissions(0o000, of: index)
+        try setImmutable(true, index)
+
+        #expect(await !archive.remove(removed.id))
+        try setImmutable(false, index)
+        try setPermissions(0o644, of: index)
+        #expect(await archive.summaries().map(\.id) == [kept.id])
+        // The next index written leaves it off, for a relaunch.
+        let next = try #require(await archive.archive(chat(["next"], from: Date(timeIntervalSince1970: 3_000_000))))
+        let relaunched = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        #expect(await relaunched.summaries().map(\.id) == [next.id, kept.id])
+    }
+
+    @Test func aRemovalWhileTheIndexWontReadWritesAnIndexThatLeavesTheChatOff() async throws {
+        // An index that can't be read can still be written over, and the
+        // index written then is the one a relaunch reads.
+        let (archive, directory) = makeArchive()
+        let index = directory.appending(path: "index.json")
+        defer {
+            try? setPermissions(0o644, of: index)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let kept = try #require(await archive.archive(chat(["kept"])))
+        let removed = try #require(await archive.archive(chat(["removed"], from: Date(timeIntervalSince1970: 2_000_000))))
+        try setPermissions(0o000, of: index)
+
+        // Whether it says so is another matter: the atomic write keeps the
+        // old file's mode, which then refuses the backup exclusion, and a
+        // file not excluded is a write that didn't take.
+        await archive.remove(removed.id)
+        // Readable again, as a lock lifts.
+        try setPermissions(0o644, of: index)
+        let relaunched = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        #expect(await relaunched.summaries().map(\.id) == [kept.id])
+    }
+
+    @Test func anIndexThatWontDecodeKeepsTheDeletionsItCarries() async throws {
+        // A later build's list, or a damaged one, is rebuilt from the chat
+        // files. Rebuilt with no deletions, a chat whose file wouldn't go
+        // would come back, and the next list written would name it for good.
+        let (archive, directory) = makeArchive()
+        let index = directory.appending(path: "index.json")
+        let kept = try #require(await archive.archive(chat(["kept"])))
+        let removed = try #require(await archive.archive(chat(["removed"], from: Date(timeIntervalSince1970: 2_000_000))))
+        let lingering = file(for: removed.id, in: directory)
+        defer {
+            try? setImmutable(false, lingering)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        try setImmutable(true, lingering)
+        #expect(await !archive.remove(removed.id))
+        var list = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [String: Any])
+        #expect(list["deleted"] as? [String] == [removed.id.uuidString])
+        list["threads"] = [["title": "A summary with no id"]]
+        try JSONSerialization.data(withJSONObject: list).write(to: index)
+
+        let relaunched = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        #expect(await relaunched.summaries().map(\.id) == [kept.id])
+        let next = try #require(await relaunched.archive(chat(["next"], from: Date(timeIntervalSince1970: 3_000_000))))
+        let again = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        #expect(await again.summaries().map(\.id) == [next.id, kept.id])
+    }
+
+    @Test func aChatFilePastTheCeilingIsNeverRead() async throws {
+        // Decoded whole in memory, a file grown past any bound would end the
+        // app as the chat opened. It reads as a chat this build can't read,
+        // and stays filed.
+        let (archive, directory) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let filed = try #require(await archive.archive(chat(["filed"])))
+        let url = file(for: filed.id, in: directory)
+        var bytes = try Data(contentsOf: url)
+        bytes.append(Data(repeating: UInt8(ascii: " "), count: AskStoredFile.maxBytes))
+        try bytes.write(to: url)
+
+        guard case .unreadable = await archive.entries(for: filed.id) else {
+            Issue.record("a chat file past the ceiling was read")
+            return
+        }
+        #expect(await archive.summaries().map(\.id) == [filed.id])
+    }
+
+    /// `threads/` is the archive's own: made under its files' protection and
+    /// excluded from backup, so a file in it is covered from the moment it is
+    /// there. The app's folder above it is the host's too, and stays bare.
+    @Test func theFolderTheArchiveMakesIsExcludedFromBackupAndTheAppsIsNot() async throws {
+        let app = FileManager.default.temporaryDirectory
+            .appending(path: "askkit-app-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: app) }
+        let directory = app.appending(path: "threads", directoryHint: .isDirectory)
+        let archive = AskThreadArchive<Row>(appDirectory: "unused", directory: directory)
+        let filed = try #require(await archive.archive(chat(["filed"])))
+
+        #expect(try isExcludedFromBackup(directory))
+        #expect(try !isExcludedFromBackup(app))
+        #expect(try isExcludedFromBackup(file(for: filed.id, in: directory)))
+        #expect(try isExcludedFromBackup(directory.appending(path: "index.json")))
+    }
+
+    /// A folder that was there before the archive wrote to it may be a
+    /// host's, and keeps what the host gave it.
+    @Test func aFolderTheArchiveIsGivenIsLeftAsItWas() async throws {
+        let (archive, directory) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let filed = try #require(await archive.archive(chat(["filed"])))
+
+        #expect(try !isExcludedFromBackup(directory))
+        #expect(try isExcludedFromBackup(file(for: filed.id, in: directory)))
+    }
+
+    /// Read from a URL of its own, so no value cached in another is read.
+    private func isExcludedFromBackup(_ url: URL) throws -> Bool {
+        let fresh = URL(filePath: url.path(percentEncoded: false))
+        let excluded = try fresh.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup
+        try #require(excluded != nil)
+        return excluded == true
+    }
+
     @Test func removingSaysWhetherTheChatIsGone() async throws {
         let (archive, directory) = makeArchive()
         defer { try? FileManager.default.removeItem(at: directory) }

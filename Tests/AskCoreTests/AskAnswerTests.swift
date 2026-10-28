@@ -157,6 +157,15 @@ import Testing
         #expect(Answer.mention(of: "Go", in: "おすすめはGoです。") != nil)
     }
 
+    @Test func aShortTitleBesideTheNewestHanIsStillAWord() {
+        // CJK Extensions H (U+31350–U+323AF) and J (U+323B0–U+3347F) are
+        // Han, written without spaces like the rest, past the end of the
+        // table's Extensions B to G.
+        #expect(Answer.mention(of: "Go", in: "Go\u{31350}") != nil)
+        #expect(Answer.mention(of: "Go", in: "\u{323AF}Go") != nil)
+        #expect(Answer.mention(of: "Go", in: "Go\u{323B0}") != nil)
+    }
+
     @Test func aShortTitleStillNeedsAWordBoundaryWhereWordsAreSpaced() {
         // The spaced scripts keep the rule: a neighbouring letter there is the
         // same word.
@@ -347,6 +356,25 @@ import Testing
         #expect(answer.text == "Rumours and Go.")
         #expect(answer.matches.map(\.displayTitle) == ["Rumours", "Go"])
         #expect(answer.tiles.map(\.displayTitle) == ["Rumours"])
+    }
+
+    @Test func aReadCountsTheRowsThatNoLongerDecode() throws {
+        // A row that no longer decodes costs only itself, so nothing else
+        // says it went: a host's row migration gone wrong would take every
+        // saved tile, and the next save would write the answers back without
+        // them. The read counts them, for the store's log.
+        let json = #"""
+        [{"question":"Which records?","answer":{"text":"Rumours and Go.",
+          "matches":[{"id":"r","displayTitle":"Rumours"},{"id":"broken"},{"id":"g","displayTitle":"Go"}],
+          "tiles":[{"displayTitle":"no id"},{"id":"r","displayTitle":"Rumours"}]}},
+         {"question":"And the rest?","answer":{"text":"None.","matches":[{"id":"r","displayTitle":"Rumours"}]}}]
+        """#
+        let read = try AskThreadStore<FakeRow>.decodeEntries(from: Data(json.utf8))
+        #expect(read.entries.map(\.question) == ["Which records?", "And the rest?"])
+        #expect(read.entries.first?.answer?.matches.map(\.displayTitle) == ["Rumours", "Go"])
+        #expect(read.dropped == 0)
+        #expect(read.droppedRows == 2)
+        #expect(try AskThreadStore<FakeRow>.decodeEntries(from: Data(#"[{"question":"q"}]"#.utf8)).droppedRows == 0)
     }
 
     @Test func rowListsOfAnotherShapeDecodeAsNone() throws {

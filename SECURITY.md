@@ -29,9 +29,12 @@ AskKit is at 0.x, and fixes land in the newest minor version only.
   sees them, so what is sent is what was shown. Text that reaches the model from either without showing
   in the composer or on the chip is a vulnerability.
 - **What AskKit keeps on disk.** The thread, the earlier chats and the feedback attachments live in the
-  app's Application Support folder. They're written atomically, with complete file protection everywhere
-  except macOS, where that option fails the write, and they're excluded from backup. Anything that
-  weakens that is in scope.
+  app's Application Support folder. They're written atomically and excluded from backup, and a write
+  whose exclusion is refused counts as one that failed. They take complete file protection on iPhone,
+  iPad, Apple Vision Pro, Apple TV and Apple Watch. On a Mac they go without it, whether the app runs
+  natively, under Mac Catalyst or as an iPhone or iPad app: the posture AskKit's Mac build has always
+  had, so an app on a Mac is never kept with less. No file is read or written past 64 MiB. Anything
+  that weakens that is in scope.
 
 ## Out of scope
 

@@ -505,6 +505,74 @@ import Testing
         #expect(await store.removeSetAside(named: left).isEmpty)
     }
 
+    @Test func deletingTheThreadsSetAsideFromAFolderThatWontListOwesThemAll() async throws {
+        // A folder that won't list names no file. Read as empty, Delete All
+        // Chats would report every file beside the thread gone while each
+        // stayed, and nothing would try again. Owed whole, the retry lists
+        // them once it can, and spares a chat New Chat set aside since.
+        let (folder, url) = try temporaryFolder()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path(percentEncoded: false))
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let owed = try setAside(Data("{not a thread".utf8), in: folder)
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        // Searchable and writable, and not readable: it lists nothing.
+        try FileManager.default.setAttributes([.posixPermissions: 0o300], ofItemAtPath: folder.path(percentEncoded: false))
+        let left = await store.removeEverySetAside()
+        #expect(!left.isEmpty)
+        // Still owed while it won't list.
+        #expect(await store.removeSetAside(named: left) == left)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path(percentEncoded: false))
+        #expect(await store.save([entry("Anything from 1969?")]))
+        #expect(await store.setAside())
+        let since = try #require(setAsideFiles(in: folder).first { $0 != owed })
+        #expect(await store.removeSetAside(named: left).isEmpty)
+        #expect(setAsideFiles(in: folder) == [since], "the retry removed a file set aside after Delete All")
+    }
+
+    // MARK: - Files past the ceiling
+
+    @Test func aThreadPastTheCeilingIsNeverReadAndIsSetAsideWhole() async throws {
+        // Decoded whole in memory at every launch, a file grown past any
+        // bound would end the app as it opened, every time. Past the ceiling
+        // it reads as a thread this build can't read, never as none, and goes
+        // aside whole so the next answer has its place.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var bytes = Data(#"[{"question":"first","text":"a"}]"#.utf8)
+        bytes.append(Data(repeating: UInt8(ascii: " "), count: AskStoredFile.maxBytes))
+        try bytes.write(to: url)
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+
+        guard case .unreadable = await store.load() else {
+            Issue.record("a thread past the ceiling was read")
+            return
+        }
+        #expect(await store.setAsideIfNotAThread())
+        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
+        let aside = try #require(setAsideFiles(in: folder).first)
+        let size = try FileManager.default.attributesOfItem(atPath: aside.path(percentEncoded: false))[.size] as? NSNumber
+        #expect(size?.intValue == bytes.count)
+        // Nor is it filed: it stays for a build that reads it.
+        #expect(await store.recoverSetAside(into: archive(in: folder)) == 0)
+        #expect(setAsideFiles(in: folder) == [aside])
+    }
+
+    @Test func aThreadPastTheCeilingIsNotWrittenAndTheOneOnDiskStays() async throws {
+        // Written, it would never read back: the next launch would find a
+        // thread it can't read in place of the one it could.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.save([entry("one")]))
+        let huge = Entry(question: "two", text: String(repeating: "a", count: AskStoredFile.maxBytes), answer: nil)
+
+        #expect(await !store.save([entry("one"), huge]))
+        #expect(await store.load().entries.map(\.question) == ["one"])
+    }
+
     @Test func aFileThatIsNotAThreadIsSetAsideWhole() async throws {
         // The next answer needs the thread's place, and this build can make
         // nothing of what is there. Moved, not deleted: a later build may.
