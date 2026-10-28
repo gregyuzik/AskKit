@@ -109,8 +109,8 @@ jobs:
 
   # The public API against the newest release tag, which ci.sh finds with
   # `git describe`: that needs the history and the tags, which a depth-1
-  # checkout leaves out. It builds and doesn't run anything, so a runner under
-  # the package's macOS floor does.
+  # checkout leaves out. It runs nothing it builds, so a runner under the
+  # package's macOS floor can run it.
   api:
     needs: changes
     if: needs.changes.outputs.code == 'true'
