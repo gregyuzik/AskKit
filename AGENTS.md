@@ -45,7 +45,8 @@ Deeper notes: `.claude/references/`.
 - **Two gates, one set of steps.** CI (`.github/workflows/ci.yml`) runs on every PR and push to main
   (a change only to docs other than `README.md` skips it), on the image's newest Xcode release or
   release candidate, 27.2 or later (a beta, with a warning, only when neither exists), and fails at
-  setup with none. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
+  setup with none. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
+  tests without running them, with a warning. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
   runs them in order; both scripts stay mode `100755`, since a hook dispatcher skips a non-executable
   hook silently. The push gate refuses an untracked file under `Sources/`, `Tests/` or `Demo/` or at
   `Package.swift`, which SwiftPM would compile into the tree it proves.
