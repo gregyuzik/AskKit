@@ -10,37 +10,40 @@ extension EnvironmentValues {
     @Entry var askComposerRestsInSlot = false
     /// Whether an item is pushed over the Ask screen under a host's slot
     /// (`AskComposerSlotCover`), which the screen reports as it comes and
-    /// goes. Each slot hands down its own, and only while the Ask tab is up.
+    /// goes. Each slot sets its own in the environment, and only while the
+    /// Ask tab is up.
     /// Nil where there is no slot, and on the way out of the tab.
     @Entry var askComposerSlotCover: Binding<AskComposerSlotCover>?
     /// Whether the tab bar over a host's slot runs along the bottom, which the
     /// Ask screen reads from inside its tab (`tabBarPlacement`) and reports,
     /// since the slot sits on the tab view, outside the tabs that hear it.
-    /// Each slot hands down its own. Nil where there is no slot.
+    /// Each slot sets its own in the environment. Nil where there is no slot.
     @Entry var askComposerSlotTabBar: Binding<Bool?>?
     /// Whether the Ask screen holds its own composer up for a reader typing
     /// with no keyboard on screen (`AskScreen.composerHeldUp`), which the slot
     /// empties for (`AskComposerSlotPolicy.showsFace`). The screen reports it.
-    /// Each slot hands down its own, and only while the Ask tab is up. Nil
-    /// where there is no slot, and on the way out of the tab.
+    /// Each slot sets its own in the environment, and only while the Ask tab
+    /// is up. Nil where there is no slot, and on the way out of the tab.
     @Entry var askComposerSlotHeldUp: Binding<Bool>?
     /// What the face in a host's slot draws with, the Ask screen's accent,
     /// spectrum and accessory button (`AskComposerFaceStyle`), which the
-    /// screen writes as it appears and whenever one changes. Each slot hands
-    /// down its own,
-    /// so a window's face draws its own screen's, and its accessory button
-    /// opens that window's picker. Nil where there is no slot.
+    /// screen writes as it appears and whenever one changes. Each slot sets
+    /// its own in the environment, so a window's face draws its own screen's,
+    /// and its accessory button opens that window's picker. Nil where there
+    /// is no slot.
     @Entry var askComposerSlotFaceStyle: AskComposerFaceStyle?
     /// Whether the Ask screen has its own composer up over the keyboard, or
     /// held up where none came, which the screen reports: the face is under
-    /// it then, and keeps out of VoiceOver's way. Each slot hands down its
-    /// own, so a reader typing in one window hides only that window's face.
+    /// it then, and keeps out of VoiceOver's way. Each slot sets its own in
+    /// the environment, so a reader typing in one window hides only that
+    /// window's face.
     /// Nil where there is no slot.
     @Entry var askComposerSlotRaised: Binding<Bool>?
     /// A tap on the face in a host's slot, asking the Ask screen under it to
     /// put the reader in its composer: a new token for each tap, which the
-    /// screen answers by focusing its field. Each slot hands down its own, so
-    /// the face in one window raises that window's composer and no other's.
+    /// screen answers by focusing its field. Each slot sets its own in the
+    /// environment, so the face in one window raises that window's composer
+    /// and no other's.
     /// The store's `composerFocusRequest` is the host's, which goes to the
     /// screen in whichever window appears active, and a window tapped while
     /// another does comes to the front only after the tap's action has run
