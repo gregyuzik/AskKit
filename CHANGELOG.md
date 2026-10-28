@@ -9,6 +9,11 @@ change, allowed in a 0.x minor version, because it stops a host's exhaustive `sw
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
+A privacy manifest for AskCore, and a plainer composer that no longer needs Xcode's Metal Toolchain to
+build. The public API is unchanged.
+
 ### Added
 
 - **A privacy manifest for AskCore.** `AskCore`'s resource bundle carries a `PrivacyInfo.xcprivacy`, so
@@ -92,5 +97,6 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/gregyuzik/AskKit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/gregyuzik/AskKit/releases/tag/v0.1.0

@@ -49,14 +49,14 @@ To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xco
 
 ```swift
 platforms: [.iOS("27.2"), .macOS("27.2"), .visionOS("27.2")],
-dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.1.0")],
+dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.2.0")],
 // and in the target that shows the screen:
 dependencies: [.product(name: "AskCore", package: "AskKit"), .product(name: "AskUI", package: "AskKit")]
 ```
 
 Those are lines of a `Package.swift` of yours: a shared package that also builds for tvOS or watchOS adds `.tvOS("27.2")` and `.watchOS("27.2")`, and an app's project sets its deployment target itself. Or, in Xcode, File > Add Package Dependencies with the same URL. Add the `AskUI` and `AskCore` products to the targets that show the screen; a target that needs only the engine, or a type such as `AskLink`, takes `AskCore` alone. `AskUI` doesn't re-export `AskCore`, so a file that uses both imports both. The module names are generic, so check that nothing else in your build is called `AskCore` or `AskUI`. AskKit has no dependencies of its own.
 
-**Versions.** AskKit is at 0.x, and a minor version may break the API. A new case in a public enum is a breaking change, allowed in a 0.x minor version, because it stops an exhaustive `switch` compiling: a new minor version can mean adding a case to a `switch` of yours over one of AskKit's enums. `from: "0.1.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.1.0")` holds you to 0.1.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
+**Versions.** AskKit is at 0.x, and a minor version may break the API. A new case in a public enum is a breaking change, allowed in a 0.x minor version, because it stops an exhaustive `switch` compiling: a new minor version can mean adding a case to a `switch` of yours over one of AskKit's enums. `from: "0.2.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.2.0")` holds you to 0.2.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
 
 ## Adopt with a coding assistant
 
@@ -66,7 +66,7 @@ To adopt AskKit with a coding assistant, such as Claude Code, Xcode's coding int
 Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
 data in their own words.
 
-1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.1.0" to the app target, and
+1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.2.0" to the app target, and
    link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
    imports both.
 2. Before writing code, read README.md and docs/ARCHITECTURE.md in that repository, and use only the
