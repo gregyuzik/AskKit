@@ -44,7 +44,9 @@ struct AskThinkingRow<Mark: View>: View {
     ///     caller.
     ///   - takesFocus: Whether the row takes VoiceOver's focus as it appears:
     ///     on a turn started from a control that went as it started, such as
-    ///     Try Again (`AskThreadList.waitRowFocus`).
+    ///     Try Again (`AskThreadList.waitRowFocus`), or as it comes back in
+    ///     place of prose that had the focus when the turn restarted
+    ///     (`AskWaitRowHandoff.returning(proseHadFocus:to:)`).
     ///   - onFocusTaken: Called once the row has taken it.
     ///   - onStop: Stops the turn: VoiceOver's Magic Tap on the row.
     init(
