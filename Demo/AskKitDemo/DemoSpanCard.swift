@@ -10,10 +10,19 @@ import SwiftUI
 /// one family. A turn that recorded nothing draws nothing, and neither does a
 /// payload that no longer decodes.
 struct DemoSpanCard: View {
-    let turn: AskTurn<DemoRow>
+    /// The payload, decoded once where the row makes the card rather than on
+    /// each pass of `body`. A plain value is one SwiftUI compares as it is,
+    /// so `body` runs again when the span changes, and not when something
+    /// else about the turn does, such as the reader's feedback or a
+    /// proposal's outcome.
+    private let span: DemoYearSpan?
+
+    init(turn: AskTurn<DemoRow>) {
+        span = turn.answer?.payload(as: DemoYearSpan.self)
+    }
 
     var body: some View {
-        if let span = turn.answer?.payload(as: DemoYearSpan.self) {
+        if let span {
             AskAnswerCard {
                 // One line while both pieces fit on it. Side by side at the
                 // largest text sizes each had half a phone's column, less

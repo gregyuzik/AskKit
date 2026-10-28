@@ -131,7 +131,8 @@ nonisolated struct Book: AskRow {
     static let shelf = [
         Book(id: "b1", title: "The Dispossessed", author: "Ursula K. Le Guin"),
         Book(id: "b2", title: "Housekeeping", author: "Marilynne Robinson"),
-        Book(id: "b3", title: "A Pattern Language", author: "Christopher Alexander")
+        Book(id: "b3", title: "A Pattern Language", author: "Christopher Alexander"),
+        Book(id: "b4", title: "1984", author: "George Orwell")
     ]
 }
 
@@ -153,23 +154,31 @@ nonisolated struct SearchBooks: Tool {
     @concurrent func call(arguments: BookQuery) async throws -> String {
         // Notes the call, finishes it however the lookup ends, then reports what it read.
         await context.withToolCall(.searching(scope: nil)) { collector in
-            let words = arguments.words.split(whereSeparator: { !$0.isLetter }).map(String.init)
-            let found = Book.shelf.filter { book in
-                // Ignores case and accents, so "garcia marquez" finds "García Márquez".
-                let text = "\(book.title) \(book.author)"
-                return words.contains { text.localizedStandardContains($0) }
-            }
+            // A one-letter word, such as "a" or "I", names nothing to look for.
+            let asked = Self.words(arguments.words).filter { $0.count > 1 }
+            let matches = Book.shelf.filter { !Self.words("\($0.title) \($0.author)").isDisjoint(with: asked) }
+            // Nothing matched, as for "How many books do I own?": the whole shelf, to count or look through.
+            let found = matches.isEmpty ? Book.shelf : matches
             let shown = Array(found.prefix(context.rowLimit))
             // An answer's tiles resolve only against recorded rows.
             await collector.record(rows: shown)
-            return (Self.render(shown, of: found.count), report: .reading(shown: shown.count, total: found.count, scope: nil))
+            let reply = Self.render(shown, of: found.count, matched: !matches.isEmpty)
+            return (reply, report: .reading(shown: shown.count, total: found.count, scope: nil))
         }
     }
 
+    // Whole words of letters or digits, ignoring case and accents: "garcia marquez" finds
+    // "García Márquez", "1984" is a word, and "le" isn't found inside "Alexander".
+    private static func words(_ text: String) -> Set<String> {
+        let words = text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        return Set(words.map { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) })
+    }
+
     // Every field clamped, so none can spell a tag to the model, and no fence of its own.
-    private static func render(_ shown: [Book], of total: Int) -> String {
-        guard !shown.isEmpty else { return "No matches." }
-        var lines = shown.map { "\(AskPrompt.clamp($0.title, AskPrompt.shortClamp)) | \(AskPrompt.clamp($0.author, AskPrompt.shortClamp))" }
+    private static func render(_ shown: [Book], of total: Int, matched: Bool) -> String {
+        guard !shown.isEmpty else { return "The shelf is empty." }
+        var lines = matched ? [] : ["No book matched, so this is the whole shelf."]
+        lines += shown.map { "\(AskPrompt.clamp($0.title, AskPrompt.shortClamp)) | \(AskPrompt.clamp($0.author, AskPrompt.shortClamp))" }
         if total > shown.count { lines.append("(+\(total - shown.count) more not shown)") }
         return lines.joined(separator: "\n")
     }

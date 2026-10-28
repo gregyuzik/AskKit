@@ -231,7 +231,8 @@ nonisolated struct DemoAssistantDomain: AskDomain {
         return context.isConversation ? [convert, DemoReminderTool(context: context)] : [convert]
     }
 
-    /// Three sentences, short as house rule 3 asks, naming only the tools the
+    /// Three sentences, a fourth in a conversation and one more with an answer
+    /// language: short, as house rule 3 asks, and naming only the tools the
     /// session holds. The units live in the converter's `@Guide`s.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
         var text = """
@@ -266,6 +267,15 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     }
 
     /// What the card offers, in the app's words around the reminder's own.
+    ///
+    /// **The model's words only as the reminder it would keep.** A reminder
+    /// has no row of the app's to be written from, so its text and its time
+    /// are the model's reading of the request, clamped (`DemoReminder`), and
+    /// the card shows the reminder as it will be kept, as `AskProposal` asks
+    /// of a proposal with no row behind it. Everything else is the app's:
+    /// the words around them, the sentence after, and the action label, a
+    /// fixed "Add Reminder", so the button the reader taps never says what
+    /// the model wrote.
     static func proposal(for reminder: DemoReminder) -> AskProposal {
         AskProposal(
             id: reminder.id,
