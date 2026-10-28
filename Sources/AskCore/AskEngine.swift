@@ -1320,8 +1320,12 @@ public actor AskEngine<Domain: AskDomain> {
         // Without it this generation is judged by the collector alone, and
         // the race below, with no time left, ends it at once.
         let callsBefore = await collector.toolCallCount
+        // Logged only for a read that had time to start: one entered with
+        // none left, as after a search that took the whole deadline, is the
+        // discard's to say.
+        let hadTime = ContinuousClock().now < deadline
         let sessionCallsBefore = await Self.read(until: deadline) { await session.toolCallCount() }
-        if sessionCallsBefore == nil, !Task.isCancelled {
+        if sessionCallsBefore == nil, hadTime, !Task.isCancelled {
             log.routing("ran out of time reading \(tier.rawValue)'s tool calls")
         }
 
