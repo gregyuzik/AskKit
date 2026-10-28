@@ -13,6 +13,12 @@ name: CI
 # listed. A `.md` under Sources/ or Tests/ is a file SwiftPM reports as
 # unhandled in its target, a warning the build checks fail on, so a change that
 # adds only one has to run them too.
+#
+# A push to main skips those files with paths-ignore. A pull request can't:
+# main requires `CI passed`, and a workflow paths-ignore skips reports no check
+# at all, which would hold a docs-only pull request open for good. There the
+# `changes` job reads the same list, the jobs skip themselves, and `CI passed`
+# reports a pass for them. Keep the two lists the same.
 on:
   push:
     branches: [main]
@@ -29,18 +35,6 @@ on:
       - ".github/PULL_REQUEST_TEMPLATE.md"
       - ".github/CODEOWNERS"
   pull_request:
-    paths-ignore:
-      - "AGENTS.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "SECURITY.md"
-      - "TRANSLATION.md"
-      - "docs/**"
-      - ".claude/**"
-      - "LICENSE"
-      - ".github/ISSUE_TEMPLATE/**"
-      - ".github/PULL_REQUEST_TEMPLATE.md"
-      - ".github/CODEOWNERS"
 
 permissions:
   contents: read
@@ -50,7 +44,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether this run touches anything but the files a push to main skips. A
+  # push is already filtered, so it always does. A pull request is checked out
+  # as GitHub's merge commit, whose first parent is the base it merges into, so
+  # the diff from that parent is the pull request's own change. --no-renames
+  # lists both ends of a move, so moving a source file under docs/ still runs CI.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          code=false
+          if [ "$EVENT" != pull_request ]; then
+            code=true
+          else
+            while IFS= read -r f; do
+              case "$f" in
+                AGENTS.md|CHANGELOG.md|CONTRIBUTING.md|SECURITY.md|TRANSLATION.md|LICENSE) ;;
+                docs/*|.claude/*|.github/ISSUE_TEMPLATE/*) ;;
+                .github/PULL_REQUEST_TEMPLATE.md|.github/CODEOWNERS) ;;
+                *) code=true; break ;;
+              esac
+            done < <(git diff --no-renames --name-only HEAD^1 HEAD)
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Runs the build jobs: $code"
+
   checks:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
@@ -63,6 +95,8 @@ jobs:
       - run: scripts/ci.sh checks
 
   test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
@@ -76,6 +110,8 @@ jobs:
   # destination added there is built by both. Read on Linux: it needs no Xcode,
   # and a macOS minute costs ten of these.
   destinations:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -109,6 +145,8 @@ jobs:
           DESTINATION: ${{ matrix.destination }}
 
   demo:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
@@ -117,3 +155,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: scripts/ci.sh demo
+
+  # The one check main requires (the protect-main ruleset), so a job added here
+  # joins `needs` and nothing else changes. It passes when every job passed or
+  # skipped itself, and fails on a failed or cancelled one, or a failed
+  # `changes`, which would otherwise read as everything skipped.
+  ci-passed:
+    name: CI passed
+    needs: [changes, checks, test, destinations, build, demo]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.result)"'
+          echo "$NEEDS" | jq -e '.changes.result == "success" and all(.[]; .result == "success" or .result == "skipped")' >/dev/null
