@@ -632,21 +632,34 @@ public actor AskEngine<Domain: AskDomain> {
         }
         let servable = askServableTiers(from: states)
         // With nothing servable, a Private Cloud Compute held off only by a
-        // cooldown, such as the one an outage with nowhere to hand down
-        // leaves, or by a spent quota is asked all the same: that outage was
-        // the turn's error, which Try Again retries (house rule 1), and a
-        // tier that is back answers. One still out fails the turn as it did,
-        // retryably, and not with the on-device tier's reason, which offers
-        // no Try Again. The mirror names the same tier as the next one.
+        // cooldown or a spent quota takes the turn (`askHeldTier(from:)`),
+        // the tier the mirror names as the next one: an outage with nowhere
+        // to hand down was the turn's error, which Try Again retries (house
+        // rule 1), and the turn fails, if it fails, retryably and not with
+        // the on-device tier's reason, which offers no Try Again.
         let held = servable.isEmpty ? askHeldTier(from: states) : nil
-        guard let tier = servable.first ?? held else {
+        guard let tier = servable.first ?? held?.tier else {
             refreshStatusAside()
             let why = askUnavailability(from: states)
             log.routing("no tier can serve — \(why.rawValue)")
             throw AskError.modelUnavailable(why)
         }
         continuation.yield(.tier(tier))
+        if let held, held.quotaReached {
+            // A spent quota is asked nothing: until its reset every request
+            // could only fail as the quota, and each would spend one. A
+            // cooldown on top changes nothing, since lifting it leaves the
+            // quota spent. The turn is still the tier's, as the caption says,
+            // and fails as its quota, with the reset the mirror's banner shows
+            // beside it. The mirror is refreshed for that banner.
+            log.routing("\(tier.rawValue) is out of quota, with no tier below that can serve — asking nothing until its reset")
+            refreshStatusAside()
+            throw AskError.quotaReached(resetDate: await status.resetDate)
+        }
         if held != nil {
+            // A cooldown is asked through: the network that went out may be
+            // back, and a tier that is back answers. One still out fails the
+            // turn as unreachable, and cools the tier again.
             log.routing("\(tier.rawValue) chosen though it is held, with no tier below that can serve")
         } else {
             log.routing("\(tier.rawValue) chosen (servable: \(servable.map(\.rawValue).joined(separator: ", ")))")
@@ -1760,10 +1773,11 @@ public actor AskEngine<Domain: AskDomain> {
     /// report.
     ///
     /// Returns the attachment, or nil when no kept session's transcript ends
-    /// at that answer: a restored thread with nothing asked on it yet, a
-    /// stopped turn, an older turn or an answer the domain gave without a model
-    /// (the caller says those through `isLatestTurn`), and a verdict that
-    /// arrives once the next question is already running.
+    /// at that answer, or none is wanted: a restored thread with nothing
+    /// asked on it yet, a stopped turn, an older turn, an answer the domain
+    /// gave without a model or a caller where no attachment is kept (the
+    /// caller says those last three through `isLatestTurn`), and a verdict
+    /// that arrives once the next question is already running.
     public func recordFeedback(_ feedback: AskFeedback, isLatestTurn: Bool) async -> Data? {
         log.feedback(feedback)
         guard isLatestTurn, inFlight == nil, let conversation else { return nil }

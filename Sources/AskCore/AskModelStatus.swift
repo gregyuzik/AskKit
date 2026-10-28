@@ -48,7 +48,8 @@ nonisolated public struct AskTierState: Sendable, Equatable {
     /// mid-turn is an outage the turn is handed down from.
     ///
     /// A tier held off only by a cooldown or a spent quota isn't servable,
-    /// and still takes a turn that nothing servable can (`askHeldTier(from:)`).
+    /// and still takes a turn that nothing servable can (`askHeldTier(from:)`):
+    /// a cooled one is asked, and a spent one fails it at once as its quota.
     public var isServable: Bool {
         isAvailable && speaksLanguage && !quotaReached && !isCooled
     }
@@ -60,8 +61,8 @@ nonisolated public struct AskTierState: Sendable, Equatable {
 /// tier holding a kept session is still the *first* servable one, and a kept
 /// on-device conversation must be dropped the moment Private Cloud Compute is
 /// back, with a recap, on the better model. `first` is what a turn runs on;
-/// the next is what an outage hands the turn down to. With none, a turn runs
-/// on the held tier, if there is one (`askHeldTier(from:)`).
+/// the next is what an outage hands the turn down to. With none, a turn goes
+/// to the held tier, if there is one (`askHeldTier(from:)`).
 nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTier] {
     states.filter(\.isServable).map(\.tier)
 }
@@ -89,25 +90,34 @@ nonisolated package func askUnavailability(from states: [AskTierState]) -> AskUn
     return tier?.unavailability ?? .unknown
 }
 
-/// Private Cloud Compute, when it is up and speaks the app's language and
-/// only a cooldown or a spent quota keeps it out: the tier a turn runs on
-/// when nothing is servable. Nil when it is down anyway, doesn't speak the
-/// language, or isn't held.
+/// Private Cloud Compute's state, when the tier is up and speaks the app's
+/// language and only a cooldown or a spent quota keeps it out: the tier a
+/// turn goes to when nothing is servable. Nil when it is down anyway, doesn't
+/// speak the language, or isn't held. Only this one test decides it: the
+/// engine reads it for the turn, and `AppleModelSeam.snapshot(from:)` for the
+/// mirror's next tier (`AskModelStatus.nextTier`), so the caption and the
+/// first screen agree with what the next question does.
 ///
 /// **A hold is the tier saying "not now", not "can't".** House rule 1: an
 /// outage with nowhere to hand down is the turn's error, which Try Again
-/// retries. So Try Again asks the tier again rather than fail on the hold the
-/// outage left, and a tier that is back answers. One that is still out fails
-/// the turn as it did, retryably, rather than with the on-device tier's
-/// reason (`askUnavailability(from:)`), which offers no Try Again.
+/// retries. So a turn after the hold fails, if it fails, as that outage did,
+/// retryably, and not with the on-device tier's reason
+/// (`askUnavailability(from:)`), which offers no Try Again. Nor does the
+/// mirror name a reason, which would put up the can't-serve first screen
+/// after New Chat, in the on-device tier's words, for a hold that lifts in a
+/// minute or at the quota's reset.
 ///
-/// `AppleModelSeam` names the same tier as the mirror's next one
-/// (`AskModelStatus.nextTier`), by the same test, so the caption and the
-/// first screen agree with the turn.
-nonisolated func askHeldTier(from states: [AskTierState]) -> AskTier? {
+/// - A **cooldown** is asked through: a network that went out may be back,
+///   and a tier that is back answers. One still out fails the turn as
+///   unreachable.
+/// - A **spent quota** is asked nothing: until its reset every request could
+///   only fail as the quota, and each would spend one. The turn fails at once
+///   as `.quotaReached`, beside the banner that says when it resets, and a
+///   spent quota that is cooled as well is the same.
+nonisolated func askHeldTier(from states: [AskTierState]) -> AskTierState? {
     guard let cloud = states.first(where: { $0.tier == .privateCloud }),
           cloud.isAvailable, cloud.speaksLanguage, cloud.isCooled || cloud.quotaReached else { return nil }
-    return .privateCloud
+    return cloud
 }
 
 /// Whether a triaged failure says the *tier* can't serve right now, as
@@ -151,10 +161,12 @@ public final class AskModelStatus {
     ///
     /// With nothing servable, a Private Cloud Compute held off only by a
     /// cooldown or a spent quota is still the next tier, since the next
-    /// question is asked of it: an outage with nowhere to hand down is the
-    /// turn's error, which Try Again retries (house rule 1), and a hold that
-    /// lifts in a minute, or at the quota's reset, is no reason nothing can
-    /// serve. `quotaReached` says the quota is spent beside it.
+    /// question goes to it (`askHeldTier(from:)`): an outage with nowhere to
+    /// hand down is the turn's error, which Try Again retries (house rule 1),
+    /// and a hold that lifts in a minute, or at the quota's reset, is no
+    /// reason nothing can serve. A cooled tier is asked again. A spent one is
+    /// asked nothing until its reset: the question fails at once as its
+    /// quota, retryably, and `quotaReached` says the quota is spent beside it.
     public private(set) var nextTier: AskTier?
     /// Why, when `nextTier` is nil. Always nil while `nextTier` is set
     /// (`apply(_:)`).
@@ -174,7 +186,8 @@ public final class AskModelStatus {
     public private(set) var quotaApproaching = false
     /// The daily Private Cloud Compute quota is spent, or held until its
     /// reset after a failure said so. The screen shows a banner, and until the
-    /// reset, questions go to the on-device model when it can serve.
+    /// reset, questions go to the on-device model when it can serve, and fail
+    /// at once as the quota, with `resetDate`, when it can't.
     public private(set) var quotaReached = false
     /// When the quota resets, when that is known.
     public private(set) var resetDate: Date?
