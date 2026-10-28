@@ -19,6 +19,11 @@ name: CI
 # at all, which would hold a docs-only pull request open for good. There the
 # `changes` job reads the same list, the jobs skip themselves, and `CI passed`
 # reports a pass for them. Keep the two lists the same.
+#
+# Every Monday it runs on main too, and on demand (`gh workflow run ci.yml`).
+# The setup action takes the image's newest Xcode rather than a pinned one, so
+# an image update can break the build while nothing is pushed, and the weekly
+# run finds that before the next pull request does.
 on:
   push:
     branches: [main]
@@ -36,17 +41,25 @@ on:
       - ".github/PULL_REQUEST_TEMPLATE.md"
       - ".github/CODEOWNERS"
   pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A pull request's new push cancels its run on the push before. Every other run
+# gets a group of its own and finishes: in a shared group a third run cancels
+# the second while it waits, not only while it runs, so two merges in quick
+# succession would leave the first with no result on main.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   # Whether this run touches anything but the files a push to main skips. A
-  # push is already filtered, so it always does. A pull request is checked out
+  # push is already filtered, and a scheduled or manual run checks the whole
+  # tree, so either always does. A pull request is checked out
   # as GitHub's merge commit, whose first parent is the base it merges into, so
   # the diff from that parent is the pull request's own change. --no-renames
   # lists both ends of a move, so moving a source file under docs/ still runs CI.
@@ -92,7 +105,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
-          tools: swiftlint shellcheck
+          tools: swiftlint shellcheck actionlint zizmor
       - run: scripts/ci.sh checks
 
   test:

@@ -6,6 +6,11 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # A release has to be a week old before Dependabot proposes it. A hijacked
+    # action is usually found and pulled within days, and a SHA pin protects
+    # nothing once Dependabot has moved it to the hijacked release's commit.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     groups:
       all:

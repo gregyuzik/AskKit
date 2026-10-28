@@ -23,8 +23,9 @@
 # after twelve xcodebuilds:
 #   1. the dirty-tree check  (what a step reads must be committed, and no
 #                             untracked file may sit where a build reads)
-#   2. ci.sh checks          (shellcheck, swiftlint, both String Catalog checks,
-#                             the README sample's, the project file's)
+#   2. ci.sh checks          (shellcheck, actionlint and zizmor, swiftlint, both
+#                             String Catalog checks, the README sample's, the
+#                             project file's)
 #   3. ci.sh test            (`swift test`, cold, with a minimum pass count)
 #   4. ci.sh api             (the public API against the newest release tag)
 #   5. ci.sh builds          (the package for eight destinations)
@@ -74,12 +75,16 @@ gate_irrelevant() {
 # - scripts/git-hooks/*, which git runs from the working tree and check-shell.sh
 #   lints there;
 # - a tracked `*.sh` anywhere, which check-shell.sh lints, and a `*.swift`
-#   anywhere but .claude/, which swiftlint lints.
+#   anywhere but .claude/, which swiftlint lints;
+# - the workflows, the setup action, Dependabot's config and the two linters'
+#   configs, which actionlint and zizmor read.
 # Not by widening `gate_irrelevant`: it keys the cache too, and every README
 # edit would then cost the full build.
 gate_reads() {
   case "$1" in
     README.md|scripts/git-hooks/*|*.sh) return 0 ;;
+    .github/workflows/*|.github/actions/*|.github/dependabot.yml) return 0 ;;
+    .github/actionlint.yaml|.github/zizmor.yml) return 0 ;;
     .claude/*) return 1 ;;
     *.swift) return 0 ;;
   esac

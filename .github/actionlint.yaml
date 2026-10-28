@@ -1,0 +1,6 @@
+# `xcode-27` is a GitHub-hosted image label, newer than actionlint's list of
+# them, which otherwise rejects it as unknown. Listed here as actionlint's
+# config takes a label it doesn't know: as a self-hosted runner's.
+self-hosted-runner:
+  labels:
+    - xcode-27
