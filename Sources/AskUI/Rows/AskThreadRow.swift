@@ -362,10 +362,13 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
             }
             if let failure = turn.failure {
                 // **Try Again and the coaching only on the newest turn**, as
-                // the follow-ups are. Try Again on an older failure would take
-                // that turn out of the middle of the thread, with whatever
-                // prose it had, and stop the turn streaming below it. The line
-                // saying what went wrong stays on every turn.
+                // the follow-ups are. Try Again on an older failure would stop
+                // the turn streaming below it, and either take that turn out
+                // of the middle of the thread, if it drew nothing, or ask its
+                // question again at the thread's foot, far below the prose it
+                // drew and kept. The store does nothing for one
+                // (`AskConversationStore.retry`). The line saying what went
+                // wrong stays on every turn.
                 AskFailureRow(
                     message: failure.message,
                     readerStopped: turn.isReadersStopBeforeAWord,

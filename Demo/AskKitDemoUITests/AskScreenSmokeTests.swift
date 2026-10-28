@@ -1932,14 +1932,16 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// and "Not now" on its gray, and every other check on the thread around
     /// them, in a call of their own (`auditTheThread`).
     ///
-    /// **White on the accent is the audit's "nearly passed", and that is the
-    /// decision.** The system's prominent buttons draw white on the accent, and
-    /// the demo's accent, the system blue, holds white at 3.52:1 in light and
-    /// 3.23:1 in dark, under the audit's bar for words (`AskOnAccentLabel`). So
-    /// the confirm button's "nearly passed" is let through, and only that
-    /// verdict on only that element: a "failed" on it, say from a label that
-    /// stopped being white or an accent that dropped further, still fails the
-    /// test. "Not now" is held to the audit as it is.
+    /// **The confirm button's words are black on the demo's accent**, the
+    /// system blue, where white falls under text's 4.5:1: 3.52:1 in light and
+    /// 3.23:1 in dark, to black's 5.97:1 and 6.49:1 (`AskOnAccentLabel`). The
+    /// audit read white there as "nearly passed". Black in a flat
+    /// `.borderedProminent` fill was measured passing in light
+    /// (`auditTheNothingToAskButton`), but not on this card, and not in dark.
+    /// So a "nearly passed" on the confirm button is still let through, only
+    /// that verdict on only that element, until a run shows the card passing
+    /// without it: a "failed" on it still fails the test, and "Not now" is
+    /// held to the audit as it is.
     @MainActor
     private func auditTheConfirmationCard(in appearance: XCUIDevice.Appearance) throws {
         continueAfterFailure = false
@@ -1982,20 +1984,23 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// which needs a model to show (`launch()` skips without one: with none
     /// the first screen says why instead).
     ///
-    /// **The button's words are white on the accent, as the system's prominent
-    /// buttons draw them**, which is the audit's "nearly passed" on the
-    /// system blue (`AskOnAccentLabel`). In dark that is all the audit says, and
-    /// it is let through, that verdict on that element alone.
+    /// **The button's words are black on the demo's accent**, the system blue,
+    /// where white falls under text's 4.5:1 (`AskOnAccentLabel`). In dark the
+    /// audit read white, 3.23:1 on the accent's #0091FF, as "nearly passed",
+    /// and said nothing more. Black, 6.49:1 on that accent, hasn't been
+    /// audited on the glass capsule, so in dark a "nearly passed" on this
+    /// element is still let through, that verdict on that element alone,
+    /// until a run shows the button passing without it.
     ///
-    /// **In light it says "failed", and that verdict doesn't read the label.**
-    /// The button is a glass capsule, and its element screenshot has the label
-    /// white on a fill of #0087FD, 3.57:1, about the confirmation card's flat
-    /// button's 3.52:1, which "nearly passes". The same button with a black
-    /// label, 5.97:1 on that fill in the screenshot's own pixels, fails too,
-    /// while in a flat `.borderedProminent` fill, white corners and all, white
-    /// nearly passes and black passes. So what fails is the glass's shaded
-    /// fill and rim, not what a reader sees, and the light verdict on this one
-    /// element is let through whatever it says.
+    /// **In light the audit says "failed", and that verdict doesn't read the
+    /// label.** The button is a glass capsule, and its element screenshot had
+    /// the label white on a fill of #0087FD, 3.57:1, about the confirmation
+    /// card's flat button's 3.52:1, which "nearly passed". The same button with
+    /// the black label it draws now, 5.97:1 on that fill in the screenshot's
+    /// own pixels, failed too, while in a flat `.borderedProminent` fill, white
+    /// corners and all, white nearly passed and black passed. So what fails is
+    /// the glass's shaded fill and rim, not what a reader sees, and the light
+    /// verdict on this one element is let through whatever it says.
     @MainActor
     private func auditTheNothingToAskButton(in appearance: XCUIDevice.Appearance) throws {
         use(appearance)

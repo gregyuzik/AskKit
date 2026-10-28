@@ -224,9 +224,9 @@ struct AskConfirmationCard: View {
                             .controlSize(.small)
                     }
                 }
-                // The style's white, or black where the host's accent is too
-                // light to hold white at 3:1, the spinner with it
-                // (`AskOnAccentLabel`).
+                // The style's white, or black where white falls under 4.5:1
+                // on the host's accent, as it does on the system blue, the
+                // spinner with it (`AskOnAccentLabel`).
                 .modifier(AskOnAccentLabel(accent: accent))
         }
         .buttonStyle(.borderedProminent)

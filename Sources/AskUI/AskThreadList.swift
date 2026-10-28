@@ -46,15 +46,18 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
 
     /// Where the turn a control under the last turn starts goes, set as the
     /// reader presses it, so that turn's wait row takes VoiceOver's focus.
-    /// Try Again goes with its failed turn, and a follow-up, a coaching
-    /// starter or Another pick with its bank, and VoiceOver's focus went with
-    /// each, to wherever the system put it. Cleared once the wait row has it.
+    /// Try Again goes as its turn starts, with the failed turn or from under
+    /// it, and a follow-up, a coaching starter or Another pick with its bank,
+    /// and VoiceOver's focus went with each, to wherever the system put it.
+    /// Cleared once the wait row has it.
     ///
     /// **By the turn before it, not by its id**, which doesn't exist yet when
-    /// the control is pressed: Try Again's turn takes the failed one's place,
-    /// after the same turn, and a chip's comes after the turn it was under. A
-    /// turn asked later comes after another, so a press whose turn never
-    /// showed a wait row hands its focus to nothing.
+    /// the control is pressed: Try Again's turn comes after a failed turn
+    /// that drew prose, which keeps it, and in the place of one that drew
+    /// nothing, after the turn before it (`AskWaitRowFocus.retrying`); a
+    /// chip's comes after the turn it was under. A turn asked later comes
+    /// after another, so a press whose turn never showed a wait row hands its
+    /// focus to nothing.
     @State private var waitRowFocus: AskWaitRowFocus?
 
     var body: some View {
@@ -110,8 +113,11 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                     waitRowFocus = AskWaitRowFocus(after: pair.turn.id)
                     store.rerollPick(pair.turn)
                 },
+                // The turn as the row was last built with it, which is the
+                // turn as it stands: the row compares its text and its
+                // failure, so a turn that changes is a row built again.
                 onRetry: {
-                    waitRowFocus = AskWaitRowFocus(after: pair.previous?.id)
+                    waitRowFocus = AskWaitRowFocus.retrying(pair.turn, after: pair.previous)
                     store.retry(pair.turn)
                 },
                 onStop: { store.stop(byReader: true) },
@@ -227,6 +233,26 @@ struct AskWaitRowFocus: Equatable {
         if previous == nil, firstTurn { return true }
         guard let request else { return false }
         return request.after == previous
+    }
+
+    /// What Try Again under `failed` asks for, `previous` being the turn
+    /// before it: the turn it comes after once the store has asked the
+    /// question again (`AskConversationStore.retry`), which keeps a failed
+    /// turn that drew prose and gives the place of one that drew nothing to
+    /// the re-ask.
+    ///
+    /// **`failed` itself where it drew prose**, since the question is asked
+    /// again below it. Named by the turn before it, the request would wait
+    /// for a turn after that one, which never comes, and the focus would go
+    /// with Try Again to wherever the system put it.
+    ///
+    /// **Every press asks**: Try Again shows only where `retry` asks, and not
+    /// while a question waits (`AskTurn.offersRetry(isNewest:whileThinking:)`).
+    /// A press that asked nothing would leave a request naming the kept turn,
+    /// and the next question typed below it would take the focus from the
+    /// field it was typed in.
+    static func retrying<Row: AskRow>(_ failed: AskTurn<Row>, after previous: AskTurn<Row>?) -> AskWaitRowFocus {
+        AskWaitRowFocus(after: failed.hasContent ? failed.id : previous?.id)
     }
 }
 
