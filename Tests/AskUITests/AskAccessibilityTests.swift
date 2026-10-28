@@ -74,8 +74,9 @@ import Testing
 }
 
 /// Text and glyphs on glass at the contrast their size needs
-/// (`AskGlassForeground`), and glyphs and words on the host's accent, white
-/// until it falls under 3:1 (`AskOnAccent`, `AskOnAccentLabel`). WCAG 2's
+/// (`AskGlassForeground`), and a glyph on the host's accent, white until white
+/// falls under 3:1 (`AskOnAccent`). Words on the accent are held to 4.5:1
+/// instead, and pinned on their own (`AskOnAccentLabelTests`). WCAG 2's
 /// arithmetic, on grounds AskUI estimates rather than measures.
 @Suite(.timeLimit(.minutes(1))) struct AskContrastTests {
     private let systemBlue = AskContrast.RGB(red: 0, green: 136 / 255, blue: 1)
@@ -117,72 +118,31 @@ import Testing
     }
 
     /// **White on the accent until it falls under 3:1, then black.** The
-    /// system blue keeps its white arrow; a yellow or a mint accent takes a
-    /// black one.
+    /// system blue keeps its white arrow, at 3.52:1 in light and 3.23:1 on dark
+    /// mode's #0091FF, and so do #007AFF and a dark accent such as navy; a
+    /// yellow or a mint accent takes a black one. The threshold sits between
+    /// the grays #949494, where white is 3.03:1, and #959595, where it is
+    /// 2.995:1.
     @Test func aGlyphOnTheAccentIsBlackOnlyWhereWhiteFails() {
         let glyph = AskGlassForeground.glyph
+        let darkBlue = AskContrast.RGB(red: 0, green: 145 / 255, blue: 1)
+        let navy = AskContrast.RGB(red: 26 / 255, green: 35 / 255, blue: 126 / 255)
+        #expect(abs(AskContrast.ratio(.white, darkBlue) - 3.23) < 0.01)
         #expect(!AskContrast.prefersBlack(on: systemBlue, minimum: glyph))
+        #expect(!AskContrast.prefersBlack(on: darkBlue, minimum: glyph))
         #expect(!AskContrast.prefersBlack(on: AskContrast.RGB(red: 0, green: 122 / 255, blue: 1), minimum: glyph))
+        #expect(!AskContrast.prefersBlack(on: navy, minimum: glyph))
         #expect(!AskContrast.prefersBlack(on: .black, minimum: glyph))
         #expect(AskContrast.prefersBlack(on: AskContrast.RGB(red: 1, green: 204 / 255, blue: 0), minimum: glyph))
         #expect(AskContrast.prefersBlack(on: AskContrast.RGB(red: 0, green: 199 / 255, blue: 190 / 255), minimum: glyph))
         #expect(AskContrast.prefersBlack(on: .white, minimum: glyph))
-    }
 
-    /// **Words on the accent are white, as the system's prominent buttons draw
-    /// them, until white falls under 3:1.** White is 3.52:1 on the system blue,
-    /// 3.23:1 on its dark #0091FF and 4.02:1 on #007AFF, where black would be
-    /// 5.97:1, 6.49:1 and 5.23:1, and all three labels stay white; yellow and
-    /// mint, where white is under 3:1, take black. The bar is a glyph's, not
-    /// text on glass's 4.5:1.
-    @Test func wordsOnTheAccentAreWhiteWhereWhiteHoldsThreeToOne() {
-        let bar = AskContrast.whiteLabelMinimum
-        let blue = AskContrast.RGB(red: 0, green: 122 / 255, blue: 1)
-        let darkBlue = AskContrast.RGB(red: 0, green: 145 / 255, blue: 1)
-        let navy = AskContrast.RGB(red: 26 / 255, green: 35 / 255, blue: 126 / 255)
-        let yellow = AskContrast.RGB(red: 1, green: 204 / 255, blue: 0)
-        let mint = AskContrast.RGB(red: 0, green: 199 / 255, blue: 190 / 255)
-        #expect(bar == 3)
-        #expect(bar == AskGlassForeground.glyph)
-        #expect(bar < AskGlassForeground.text)
-        #expect(abs(AskContrast.ratio(.white, systemBlue) - 3.52) < 0.01)
-        #expect(abs(AskContrast.ratio(.black, systemBlue) - 5.97) < 0.01)
-        #expect(abs(AskContrast.ratio(.white, darkBlue) - 3.23) < 0.01)
-        #expect(abs(AskContrast.ratio(.white, blue) - 4.02) < 0.01)
-        #expect(abs(AskContrast.ratio(.black, blue) - 5.23) < 0.01)
-        #expect(!AskContrast.prefersBlack(on: systemBlue, minimum: bar))
-        #expect(!AskContrast.prefersBlack(on: blue, minimum: bar))
-        #expect(!AskContrast.prefersBlack(on: darkBlue, minimum: bar))
-        #expect(!AskContrast.prefersBlack(on: navy, minimum: bar))
-        #expect(!AskContrast.prefersBlack(on: .black, minimum: bar))
-        #expect(AskContrast.prefersBlack(on: yellow, minimum: bar))
-        #expect(AskContrast.prefersBlack(on: mint, minimum: bar))
-        #expect(AskContrast.prefersBlack(on: .white, minimum: bar))
-        // A glyph and a label take the same color on every accent here.
-        #expect(AskContrast.prefersBlack(on: yellow, minimum: AskGlassForeground.glyph))
-        #expect(!AskContrast.prefersBlack(on: systemBlue, minimum: AskGlassForeground.glyph))
-    }
-
-    /// **The threshold sits at white's 3:1**, between the grays #949494, where
-    /// white is 3.03:1, and #959595, where it is 2.995:1; and on every gray the
-    /// label is white exactly where white holds the bar and holds the bar
-    /// itself, black being over 7:1 wherever white is under 3:1.
-    @Test func theLabelTurnsBlackAtWhiteThreeToOne() {
-        let bar = AskContrast.whiteLabelMinimum
         let at148 = AskContrast.RGB(red: 148 / 255, green: 148 / 255, blue: 148 / 255)
         let at149 = AskContrast.RGB(red: 149 / 255, green: 149 / 255, blue: 149 / 255)
         #expect(abs(AskContrast.ratio(.white, at148) - 3.03) < 0.01)
         #expect(abs(AskContrast.ratio(.white, at149) - 2.995) < 0.001)
-        #expect(!AskContrast.prefersBlack(on: at148, minimum: bar))
-        #expect(AskContrast.prefersBlack(on: at149, minimum: bar))
-
-        for step in 0...255 {
-            let value = Double(step) / 255
-            let accent = AskContrast.RGB(red: value, green: value, blue: value)
-            let label: AskContrast.RGB = AskContrast.prefersBlack(on: accent, minimum: bar) ? .black : .white
-            #expect(AskContrast.ratio(label, accent) >= bar, "gray \(step)")
-            #expect((label == .white) == (AskContrast.ratio(.white, accent) >= bar), "gray \(step)")
-        }
+        #expect(!AskContrast.prefersBlack(on: at148, minimum: glyph))
+        #expect(AskContrast.prefersBlack(on: at149, minimum: glyph))
     }
 
     /// **The light deemphasized gray is pinned**: iOS's secondary label hue at
@@ -520,8 +480,10 @@ import Testing
         #expect(AskWaitRowFocus.takes(AskWaitRowFocus(after: turn), firstTurn: false, after: turn))
         #expect(!AskWaitRowFocus.takes(AskWaitRowFocus(after: turn), firstTurn: false, after: UUID()))
         #expect(!AskWaitRowFocus.takes(AskWaitRowFocus(after: turn), firstTurn: false, after: nil))
-        // Try Again on the thread's first turn: its turn takes the failed
-        // one's place, after nothing.
+        // Try Again on the thread's first turn where it drew nothing: its
+        // turn takes the failed one's place, after nothing. One that drew
+        // prose keeps its place, and the turn comes after it
+        // (`AskTryAgainFocusTests`).
         #expect(AskWaitRowFocus.takes(AskWaitRowFocus(after: nil), firstTurn: false, after: nil))
     }
 }

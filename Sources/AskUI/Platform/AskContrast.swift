@@ -348,11 +348,6 @@ nonisolated enum AskContrast {
         return Double(hundredths) / 100
     }
 
-    /// A glyph's bar for white on the accent, 3:1, the one `AskOnAccent` and
-    /// `AskSendGlyph` hold white to before a glyph turns black. Words on the
-    /// accent are held to text's 4.5:1 instead (`AskOnAccentLabel.isBlack(on:)`).
-    static let whiteLabelMinimum = AskGlassForeground.glyph
-
     /// Whether what is drawn on `accent` is black: where white falls under
     /// `minimum` on it and black does better.
     static func prefersBlack(on accent: RGB, minimum: Double) -> Bool {
