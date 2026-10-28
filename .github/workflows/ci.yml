@@ -47,7 +47,8 @@ jobs:
   # Whether this run touches anything but the files a push to main skips. A
   # push is already filtered, so it always does. A pull request is checked out
   # as GitHub's merge commit, whose first parent is the base it merges into, so
-  # the diff from that parent is the pull request's own change.
+  # the diff from that parent is the pull request's own change. --no-renames
+  # lists both ends of a move, so moving a source file under docs/ still runs CI.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -74,7 +75,7 @@ jobs:
                 .github/PULL_REQUEST_TEMPLATE.md|.github/CODEOWNERS) ;;
                 *) code=true; break ;;
               esac
-            done < <(git diff --name-only HEAD^1 HEAD)
+            done < <(git diff --no-renames --name-only HEAD^1 HEAD)
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "Runs the build jobs: $code"
