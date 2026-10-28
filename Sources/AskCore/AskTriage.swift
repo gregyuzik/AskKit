@@ -28,12 +28,33 @@ nonisolated public enum AskTriage {
 
     /// The `AskError` a raw failure reads as.
     ///
+    /// An `AskError` reads as itself and a `CancellationError` as `.stopped`,
+    /// and so do either of them a tool threw, inside the session's
+    /// `ToolCallError`: anything else a tool threw is the tool's failure,
+    /// `.model(tag:)`, whatever tier it ran on. A timeout is the tier's on
+    /// Private Cloud Compute, and an outage there, as a rate limit is.
+    ///
     /// - Parameters:
     ///   - error: the failure as the framework, a session or a tool threw it.
     ///     Read by its type, case, domain and code, never its description.
     ///   - tier: which tier raised it, so a Private Cloud Compute transport
     ///     fault can be told from an on-device one.
     public static func askError(from error: any Error, tier: AskTier) -> AskError {
+        // AskKit's own: an `AskError` as it is, and a stop as one.
+        if let ask = error as? AskError { return ask }
+        if error is CancellationError { return .stopped }
+        // What a tool threw is the tool's failure, tagged inside its wrapper
+        // below, and never a tier's: a host's `URLError` in there is its own
+        // network, not Private Cloud Compute's. Two things a tool throws say
+        // more, and read as themselves: an `AskError` the domain chose, as
+        // one its search throws is passed on, and a stop. `#if !os(watchOS)`
+        // because the SDK marks `ToolCallError` unavailable there.
+        #if !os(watchOS)
+        if let toolCall = error as? LanguageModelSession.ToolCallError {
+            if let ask = toolCall.underlyingError as? AskError { return ask }
+            if toolCall.underlyingError is CancellationError { return .stopped }
+        }
+        #endif
         // Private Cloud Compute transport and quota.
         if let pcc = error as? PrivateCloudComputeLanguageModel.Error {
             switch pcc {
@@ -78,7 +99,12 @@ nonisolated public enum AskTriage {
                 // The tier saying "not now": the one below is unaffected.
                 return tier == .privateCloud ? .privateCloudUnreachable : .model(tag: tag(for: model))
             case .timeout:
-                return .couldNotAnswer
+                // On Private Cloud Compute the tier not answering in time, as
+                // a timed-out connection to it is (`isOffline`): an outage the
+                // turn is handed down from, so a tier that keeps timing out
+                // doesn't fail every turn while the on-device model could
+                // answer. On device there is nothing below.
+                return tier == .privateCloud ? .privateCloudUnreachable : .couldNotAnswer
             default:
                 return readsAsContextGate(model, on: tier) ? .privateCloudUnreachable : .model(tag: tag(for: model))
             }

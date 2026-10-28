@@ -105,8 +105,9 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     /// or a hand-down. (A follow-up that outgrew its window starts over too,
     /// and no scenario is a follow-up.)
     public var restarts = 0
-    /// What the turn failed with: the `AskError`, or a tag for any other
-    /// error. Nil when it answered.
+    /// What the turn failed with: the `AskError`, a tag for any other error,
+    /// or "no answer" for a turn whose stream ended with neither, as one let
+    /// go before its answer does. Nil when it answered.
     public var failure: String?
     /// The turn failed as ungrounded.
     public var isUngrounded = false
@@ -223,6 +224,7 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
         // after the first would run as a follow-up of the one before it.
         await engine.reset()
         let started = ContinuousClock().now
+        var answered = false
         do {
             // Typed, with the scope the app would send it with: a shelf's
             // question is left in the composer, and the reader sends it.
@@ -233,6 +235,7 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
                 case .restarted:
                     outcome.restarts += 1
                 case .answer(let answer):
+                    answered = true
                     outcome.text = answer.text
                     outcome.rowsRead = answer.matches.count
                     outcome.tiles = answer.tiles.count
@@ -266,6 +269,9 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
         } catch {
             outcome.failure = AskTriage.tag(for: error)
         }
+        // A stream that ends with neither an answer nor an error, as one let
+        // go before its answer does, answered nothing, and is no "ok".
+        if !answered, outcome.failure == nil { outcome.failure = "no answer" }
         outcome.milliseconds = AskEngine<Domain>.ms(ContinuousClock().now - started)
         // The engine's count, not the tools' activity: a tool says what it is
         // doing however its domain likes, and counting `.searching` would read

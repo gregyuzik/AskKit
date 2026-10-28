@@ -125,7 +125,9 @@ public actor AskEngine<Domain: AskDomain> {
     /// doesn't implement `deterministicAnswer(for:)`, one that needs owned
     /// rows from a brand with no `nothingToAskCopy`, a domain with no search
     /// arguments under the grounded retry, and one that doesn't retrieve
-    /// under a first-screen policy that needs owned rows.
+    /// under a first-screen policy that needs owned rows. Each is a fault
+    /// under that subsystem, whatever `log` is, and a `routing` line to a
+    /// `log` passed here as well.
     public init(domain: Domain, seam: any AskModelSeam, log: (any AskLogSink)? = nil) {
         self.init(domain: domain, seam: seam, log: log) { ContinuousClock().now }
     }
@@ -142,15 +144,25 @@ public actor AskEngine<Domain: AskDomain> {
         self.grounding = domain.grounding
         self.replyShape = domain.replyShape
         self.seam = seam
-        self.log = log ?? AskOSLogSink(subsystem: domain.brand.logSubsystem)
+        let osLog = AskOSLogSink(subsystem: domain.brand.logSubsystem)
+        self.log = log ?? osLog
         self.clock = clock
+        // A mistake in the domain is a bug in the host's code, logged once,
+        // here: a fault under the brand's subsystem, which the log store
+        // keeps and Console and Xcode set apart, and a routing line to a
+        // sink of the host's, which bridges the engine's lines into its own
+        // log. With no sink of the host's, the fault is the one line.
+        func mistake(_ line: String) {
+            osLog.domainMistake(line)
+            log?.routing(line)
+        }
         // Once, at construction. A kind the shared vocabulary doesn't contain
         // is a typo, and its cost is silent: `normalizedKind` maps the model's
         // correct answer to `other`, so the kind no longer decides whether a
         // count shows tiles (house rule 7), and nothing else says so.
         let strangers = AskQuestionKind.unrecognized(in: domain.questionKinds)
         if !strangers.isEmpty {
-            self.log.routing("questionKinds not in the schema vocabulary: \(strangers.joined(separator: ", "))")
+            mistake("questionKinds not in the schema vocabulary: \(strangers.joined(separator: ", "))")
         }
         // The same silence for "Another pick". An answer's kind is one of
         // `questionKinds`, a superlative read as a pick where only `pick` is
@@ -158,7 +170,7 @@ public actor AskEngine<Domain: AskDomain> {
         // kind that isn't among them, or a typo of one, is never offered it.
         let unreachable = domain.rerollableKinds.subtracting(domain.questionKinds + [AskQuestionKind.other])
         if !unreachable.isEmpty {
-            self.log.routing(
+            mistake(
                 "rerollableKinds not in questionKinds, never offered Another pick: \(unreachable.sorted().joined(separator: ", "))"
             )
         }
@@ -166,7 +178,7 @@ public actor AskEngine<Domain: AskDomain> {
         // writes with no kind of its own and no tiles, and "Another pick" is
         // offered only for tiles.
         if replyShape == .prose, !domain.rerollableKinds.isEmpty {
-            self.log.routing(
+            mistake(
                 "rerollableKinds under replyShape .prose — no answer the model writes has a question kind or tiles, so none offers Another pick"
             )
         }
@@ -176,22 +188,22 @@ public actor AskEngine<Domain: AskDomain> {
         // domain claiming the first without implementing the second gets a
         // first screen whose chips fail.
         if domain.firstScreenPolicy.answersWithoutModel, !domain.implementsDeterministicAnswer {
-            self.log.routing("firstScreenPolicy.answersWithoutModel is set and deterministicAnswer(for:) is not implemented — the first screen's chips will fail")
+            mistake("firstScreenPolicy.answersWithoutModel is set and deterministicAnswer(for:) is not implemented — the first screen's chips will fail")
         }
         // The same for the nothing-to-ask screen, which needs the host's
         // words: with none, AskUI shows the ready first screen for an empty
         // overview, and a domain that asked for the other one never sees it.
         if domain.firstScreenPolicy.needsOwnedRows, domain.brand.nothingToAskCopy == nil {
-            self.log.routing("firstScreenPolicy.needsOwnedRows is set and brand.nothingToAskCopy is nil — an empty overview shows the ready first screen")
+            mistake("firstScreenPolicy.needsOwnedRows is set and brand.nothingToAskCopy is nil — an empty overview shows the ready first screen")
         }
         // And a domain with no search under the grounded retry, which a
         // domain that retrieves has: it plans `SearchArguments` and runs
-        // `search`. With `AskNoSearchArguments` the planner has nothing to
-        // choose, and the default search throws, so a first answer that calls
-        // no tool spends the planner's generation and still fails. Under the
-        // other policies there is no retry to spend it on.
+        // `search`. With `AskNoSearchArguments` there is nothing to plan, so no
+        // planner is asked, and the default search throws, so a first answer
+        // that calls no tool fails all the same, as under `.toolCall`. Under
+        // the other policies there is no retry to reach it.
         if grounding == .retrieval, Domain.SearchArguments.self == AskNoSearchArguments.self {
-            self.log.routing("SearchArguments is AskNoSearchArguments under the grounded retry — a first answer that calls no tool has no search to plan, and the default search(_:context:) fails it as ungrounded")
+            mistake("SearchArguments is AskNoSearchArguments under the grounded retry — a first answer that calls no tool has no search to plan, and the default search(_:context:) fails it as ungrounded")
         }
         // And a domain that doesn't retrieve under a first screen that reads
         // an empty overview as nothing to ask about: the default policy for
@@ -199,7 +211,7 @@ public actor AskEngine<Domain: AskDomain> {
         // behind from `.retrieval`. With the default overview, `.empty`, every
         // reader would get the nothing-to-ask screen.
         if grounding != .retrieval, domain.firstScreenPolicy.needsOwnedRows {
-            self.log.routing("firstScreenPolicy.needsOwnedRows is set and grounding is \(grounding.rawValue) — an empty overview shows the nothing-to-ask first screen to a domain that doesn't retrieve")
+            mistake("firstScreenPolicy.needsOwnedRows is set and grounding is \(grounding.rawValue) — an empty overview shows the nothing-to-ask first screen to a domain that doesn't retrieve")
         }
     }
 
@@ -249,9 +261,10 @@ public actor AskEngine<Domain: AskDomain> {
     /// thrown away. So this does nothing while a conversation is kept.
     ///
     /// **Held to the domain's `turnDeadline`**, counted from the call, though
-    /// no reader waits on it: a read of the tiers or a build that never
-    /// returned would leave a warm forever being made, and every later call
-    /// would find it so and do nothing.
+    /// no reader waits on it: a read of the tiers, a build or the session's
+    /// own `prewarm(promptPrefix:)` that never returned would leave a warm
+    /// forever being made, and every later call would find it so and do
+    /// nothing. A warm given up on isn't kept.
     public func prewarm() async {
         guard conversation == nil else { return }
         // Wanted from here, even when what serves it is a warm already being
@@ -289,7 +302,16 @@ public actor AskEngine<Domain: AskDomain> {
             return
         }
         guard let box = made else { return }
-        await box.session.prewarm(promptPrefix: domain.promptPrefix)
+        // The session's own warm, inside the same deadline: a host session
+        // whose `prewarm` never returns would leave this warm forever being
+        // made. One given up on is no warm to hand the next question, which
+        // builds its own.
+        let session = box.session
+        let prefix = domain.promptPrefix
+        guard await Self.read(until: deadline, { await session.prewarm(promptPrefix: prefix) }) != nil else {
+            if !Task.isCancelled { log.routing("prewarm ran out of time warming its \(tier.rawValue) session") }
+            return
+        }
         // **Asked again, now that it is built.** A question sent while this
         // was being made, such as a short one typed and sent quickly, found
         // no warm and built a session of its own, and the conversation that
@@ -397,6 +419,12 @@ public actor AskEngine<Domain: AskDomain> {
     /// flight before it starts. So a caller that catches only `AskError`
     /// misses a stop. A reader that lets the stream go stops the turn too, and
     /// hears nothing more.
+    ///
+    /// **The question is asked as the reader saw it**: what a reader can't
+    /// see, such as tag characters and bidi controls, is dropped, and what is
+    /// left is trimmed and clamped to 500 characters. A question with nothing
+    /// left, empty or only whitespace, throws `AskError.couldNotAnswer`
+    /// before any tier is asked, with no event before it.
     ///
     /// A `.standalone` turn stands apart: it doesn't stop the turn in flight,
     /// and `stop()`, `reset()` and a newer question don't stop it. Only
@@ -517,7 +545,9 @@ public actor AskEngine<Domain: AskDomain> {
     /// Throws the turn's `AskError` when it fails. Cancelling the caller's task
     /// stops the turn, and this throws `CancellationError`; a stop from
     /// anywhere else, such as the framework's, is no cancellation of the
-    /// caller's, and throws `AskError.couldNotAnswer`.
+    /// caller's, and throws `AskError.couldNotAnswer`. So does a question
+    /// with nothing in it once `ask(_:origin:)` has dropped what the reader
+    /// can't see and trimmed it, before any tier is asked.
     public func answerOnce(_ question: String) async throws -> AskAnswer<Row> {
         var answer: AskAnswer<Row>?
         let stream = ask(question, origin: .standalone)
@@ -560,7 +590,13 @@ public actor AskEngine<Domain: AskDomain> {
         // turn in flight past any deadline and any Stop, and every question
         // after it waits for that turn to end.
         let deadline = started + domain.turnDeadline
-        let question = AskPrompt.clampQuestion(rawQuestion)
+        // Only what the reader could see, then clamped: a tag character draws
+        // nothing and spells ASCII to a model that reads it, and a bidi
+        // control draws the question in another order than it is sent, so
+        // neither is the reader's question. Dropped first, so the clamp
+        // counts what is left. Everything after this, the prompts, the
+        // planner, the tail a recap is made from, takes this question.
+        let question = AskPrompt.clampQuestion(AskPrompt.droppingInvisibles(rawQuestion))
         guard !question.isEmpty else { throw AskError.couldNotAnswer }
 
         // 1. An answer the app can give without a model. Small talk, and the
@@ -574,10 +610,13 @@ public actor AskEngine<Domain: AskDomain> {
         }
         if let deterministic {
             // Held to what every answer is: no more tiles than a bank lays
-            // out, and one chip per text, since a chip's text is its id in the
-            // chip row. Then explained like any answer that shows tiles: the
-            // domain's basis, unless the answer arrived with its own.
-            let held = deterministic.cappingTiles()
+            // out, one chip per text, since a chip's text is its id in the
+            // chip row, and no more payload, proposal or rows than a tool
+            // could have recorded. Then explained like any answer that shows
+            // tiles: the domain's basis, unless the answer arrived with its
+            // own.
+            let held = heldToTheCollectorsLimits(deterministic, from: "the domain's answer without a model")
+                .cappingTiles()
                 .replacing(followUps: AskAnswer<Row>.dedupedFollowUps(deterministic.followUps))
             continuation.yield(.answer(held.replacing(basis: held.basis ?? basis(for: held))))
             return
@@ -592,14 +631,26 @@ public actor AskEngine<Domain: AskDomain> {
             throw AskError.couldNotAnswer
         }
         let servable = askServableTiers(from: states)
-        guard let tier = servable.first else {
-            let why = askUnavailability(from: states)
+        // With nothing servable, a Private Cloud Compute held off only by a
+        // cooldown, such as the one an outage with nowhere to hand down
+        // leaves, or by a spent quota is asked all the same: that outage was
+        // the turn's error, which Try Again retries (house rule 1), and a
+        // tier that is back answers. One still out fails the turn as it did,
+        // retryably, and not with the on-device tier's reason, which offers
+        // no Try Again. The mirror names the same tier as the next one.
+        let held = servable.isEmpty ? askHeldTier(from: states) : nil
+        guard let tier = servable.first ?? held else {
             refreshStatusAside()
+            let why = askUnavailability(from: states)
             log.routing("no tier can serve — \(why.rawValue)")
             throw AskError.modelUnavailable(why)
         }
         continuation.yield(.tier(tier))
-        log.routing("\(tier.rawValue) chosen (servable: \(servable.map(\.rawValue).joined(separator: ", ")))")
+        if held != nil {
+            log.routing("\(tier.rawValue) chosen though it is held, with no tier below that can serve")
+        } else {
+            log.routing("\(tier.rawValue) chosen (servable: \(servable.map(\.rawValue).joined(separator: ", ")))")
+        }
 
         let fallback = servable.dropFirst().first
         // What the thread has said, as this turn found it. Taken here because
@@ -630,13 +681,19 @@ public actor AskEngine<Domain: AskDomain> {
             throw CancellationError()
         } catch let raw {
             // Everything that is not already an `AskError` is triaged here, not
-            // thrown on: session construction, the planner and the domain's own
-            // search all reach this catch raw, and an untriaged error would skip
-            // the hand-down below and put an SDK string on the screen.
+            // thrown on: session construction reaches this catch raw, and an
+            // untriaged error would skip the hand-down below and put an SDK
+            // string on the screen. By the tier asked for, since there is no
+            // session yet to say which tier it would have run on.
             //
-            // The stream's own failures are triaged a layer down, in `stream`,
-            // because a follow-up's overflow has to be a typed `.contextTooLarge`
-            // before `attempt` can roll it over.
+            // What a session's own generations throw is triaged a layer down,
+            // by the tier that session runs on (`AskSessionBox.tier`): the
+            // stream's in `stream`, because a follow-up's overflow has to be a
+            // typed `.contextTooLarge` before `attempt` can roll it over, and
+            // the grounded retry's planner in `plannedPrompt`. A router's
+            // on-device session answering for Private Cloud Compute fails as
+            // the on-device model, and cools nothing. The domain's search
+            // fails as an `AskError` of its own.
             let error = triaged(raw, on: tier)
 
             // An announced outage hands the turn down once. The caption the
@@ -776,15 +833,46 @@ public actor AskEngine<Domain: AskDomain> {
         return (AskThreadTail(question: question, answer: prose, rowTitles: []), domain.referent(from: answer))
     }
 
+    /// What a session on `tier` is sent of the question's photos: a line in
+    /// the prompt for each, and each with its label as the seam hands it to
+    /// the model. All of them on a tier that reads photos, and none on one
+    /// that doesn't (`AskTier.readsPhotos`).
+    ///
+    /// `tier` is the one the session runs on (`AskSessionBox.tier`), not the
+    /// one the turn asked for: a router's on-device session answering a
+    /// request for Private Cloud Compute reads no photo, and a prompt that
+    /// mentioned one would have it answer as though it had seen it.
+    private func photos(
+        _ images: [AskImageAttachment], for tier: AskTier
+    ) -> (lines: [String], sent: [AskImageAttachment]) {
+        let photos = tier.readsPhotos ? images : []
+        // Never the label in the log line: it is the app's words for the
+        // picture, and they can be the reader's.
+        if !images.isEmpty {
+            log.routing(photos.isEmpty ? "photo held back — \(tier.rawValue) reads no photos" : "photo sent to \(tier.rawValue)")
+        }
+        // What the seam is sent beside each picture, which it hands the model
+        // as the picture's label, gets what the prompt's line gives it, the
+        // clamp and the redaction: the host's words, which can be the
+        // reader's (house rule 3).
+        let sent = photos.map {
+            AskImageAttachment(
+                label: AskPrompt.sanitizeForFence(AskPrompt.clamp($0.label, AskPrompt.shortClamp)), image: $0.image
+            )
+        }
+        return (photos.map { AskPrompt.photoLine(label: $0.label) }, sent)
+    }
+
     /// The least of the turn's deadline a hand-down or a rollover needs left
     /// before it takes back prose already drawn: ten seconds.
     ///
-    /// **Not a measured time to first word**, which no tier has one of yet:
-    /// Private Cloud Compute was measured at 5 to 20 s to its first word, and
-    /// an on-device answer at about 13 s whole, its first words coming after
-    /// its tool call. Below ten seconds a fresh attempt is likelier to draw
-    /// nothing than something, and a turn that draws nothing ends with no
-    /// text at all, where the failure would have rendered under the prose.
+    /// **A judgement, not a measured time to first word**, which no tier has
+    /// one steady enough to set it by: Private Cloud Compute was measured at
+    /// 5 to 20 s to its first word, and an on-device answer at about 13 s
+    /// whole, its first words coming after its tool call. Below ten seconds a
+    /// fresh attempt is likelier to draw nothing than something, and a turn
+    /// that draws nothing ends with no text at all, where the failure would
+    /// have rendered under the prose.
     static var restartFloor: Duration { .seconds(10) }
 
     /// A failed attempt's error as the reader may be shown it: an `AskError` as
@@ -815,23 +903,6 @@ public actor AskEngine<Domain: AskDomain> {
         drawn: AskDrawn<Row>,
         continuation: AsyncThrowingStream<Event, any Error>.Continuation
     ) async throws {
-        // What this tier is sent of the question's photos: all of them, or none
-        // on a tier that reads no photos. Never the label in the log line — it
-        // is the app's words for the picture, and they can be the reader's.
-        let photos = tier.readsPhotos ? images : []
-        if !images.isEmpty {
-            log.routing(photos.isEmpty ? "photo held back — \(tier.rawValue) reads no photos" : "photo sent to \(tier.rawValue)")
-        }
-        let photoLines = photos.map { AskPrompt.photoLine(label: $0.label) }
-        // And what the seam is sent beside each picture, which it hands the
-        // model as the picture's label: the host's words, which can be the
-        // reader's, so they get what the prompt's line gives them, the clamp
-        // and the redaction (house rule 3).
-        let sentPhotos = photos.map {
-            AskImageAttachment(
-                label: AskPrompt.sanitizeForFence(AskPrompt.clamp($0.label, AskPrompt.shortClamp)), image: $0.image
-            )
-        }
         let scopeLine = scope.flatMap { domain.scopeLine(for: $0) }
 
         // A standalone turn always builds its own session.
@@ -844,10 +915,11 @@ public actor AskEngine<Domain: AskDomain> {
                maxTurns: domain.maxTurns(for: tier),
                needsFreshSession: kept.needsFreshSession
            ),
-           !(await shouldRollOver(kept)) {
+           !(await shouldRollOver(kept, deadline: deadline)) {
             // The caption names the model the kept session runs on, as the
-            // turn that built it did.
+            // turn that built it did, and its photos go by that model too.
             if kept.box.tier != tier { continuation.yield(.tier(kept.box.tier)) }
+            let (photoLines, sentPhotos) = photos(images, for: kept.box.tier)
             var prompt = AskContinuation.followUpPrompt(
                 question: question, referentTitles: kept.lastReferent
             )
@@ -955,6 +1027,7 @@ public actor AskEngine<Domain: AskDomain> {
         // the swap).
         let served = box.tier
         if served != tier { continuation.yield(.tier(served)) }
+        let (photoLines, sentPhotos) = photos(images, for: served)
 
         // **Read here, not at the top of `attempt`.** A follow-up's prompt is
         // its question and its referent and never reads the overview, so it
@@ -1009,10 +1082,12 @@ public actor AskEngine<Domain: AskDomain> {
             // and no second generation; under `.notRequired` the stream never
             // throws it.
             //
-            // Two generations, and the first cannot be skipped: a tool is an
-            // offer, a response schema is the shape of the reply, so the plan
-            // step asks for the domain's search arguments as structured output
-            // and the model has no move that returns nothing.
+            // Two generations, and the first cannot be skipped while there is
+            // something to plan: a tool is an offer, a response schema is the
+            // shape of the reply, so the plan step asks for the domain's
+            // search arguments as structured output and the model has no move
+            // that returns nothing. A domain with no arguments has nothing to
+            // plan, and `plannedPrompt` asks no planner.
             log.routing("\(served.rawValue) answered without retrieving — searching for it")
             drawn.restart()
             continuation.yield(.restarted(served))
@@ -1057,10 +1132,11 @@ public actor AskEngine<Domain: AskDomain> {
     }
 
     /// The prompt for the second half of a grounded retry: the planner picks
-    /// the search arguments, the app runs the search through the domain's own
-    /// code path, and the rows go into the prompt as data. Inside what is left
-    /// of the turn's deadline, with the wait row hearing the search the way it
-    /// hears a tool the model calls.
+    /// the search arguments, or none is asked when the domain's are
+    /// `AskNoSearchArguments`, the app runs the search through the domain's
+    /// own code path, and the rows go into the prompt as data. Inside what is
+    /// left of the turn's deadline, with the wait row hearing the search the
+    /// way it hears a tool the model calls.
     ///
     /// `domainLines` are the attempt's own `promptLines`, and its scope's line
     /// when it has one, before the recap, the steer and the photo lines were
@@ -1112,16 +1188,45 @@ public actor AskEngine<Domain: AskDomain> {
             defer { await relay.end() }
             await relay.begin { continuation.yield(.activity($0)) }
             rows = try await AskDeadline.run(until: deadline) {
-                // Through the generation gate like any other generation. It is
-                // a second on-device generation inside one turn, and the
-                // generation gate is the only thing keeping it from landing
-                // beside a host's own summary or classifier on the same runtime.
-                let arguments = try await seam.withGeneration(onDevice: tier != .privateCloud) {
-                    try await session.plan(
-                        Domain.SearchArguments.self,
-                        instructions: planInstructions,
-                        prompt: planPrompt
-                    )
+                let arguments: Domain.SearchArguments
+                if let none = AskNoSearchArguments() as? Domain.SearchArguments {
+                    // **No planner for a domain with no arguments to plan.**
+                    // Its schema has nothing to choose, and asking would
+                    // spend a generation, a request of the reader's Private
+                    // Cloud Compute quota or an on-device turn, choosing
+                    // nothing. The domain's search is run all the same: the
+                    // default one fails the turn as ungrounded, and one the
+                    // domain wrote, which needs no arguments, searches.
+                    arguments = none
+                } else {
+                    // Through the generation gate like any other generation.
+                    // It is a second on-device generation inside one turn,
+                    // and the generation gate is the only thing keeping it
+                    // from landing beside a host's own summary or classifier
+                    // on the same runtime.
+                    do {
+                        arguments = try await seam.withGeneration(onDevice: tier != .privateCloud) {
+                            try await session.plan(
+                                Domain.SearchArguments.self,
+                                instructions: planInstructions,
+                                prompt: planPrompt
+                            )
+                        }
+                    } catch let error as AskError {
+                        throw error
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        // Triaged here, by the tier the session runs on,
+                        // which is what `tier` is: on a router's on-device
+                        // session answering for Private Cloud Compute, the
+                        // planner's rate limit is the on-device model's, and
+                        // read as Private Cloud Compute's it would cool that
+                        // tier and hand the turn down to the model that just
+                        // failed.
+                        log.routing("the grounded retry's planner failed on \(tier.rawValue): \(AskTriage.tag(for: error))")
+                        throw AskTriage.askError(from: error, tier: tier)
+                    }
                 }
                 // The rows this records ARE this turn's, and they are recorded
                 // before the prompt that carries them exists — so `stream` is
@@ -1199,6 +1304,7 @@ public actor AskEngine<Domain: AskDomain> {
         // The tier the box's session runs on, which is the one it generates
         // on, whatever tier was asked for.
         let tier = box.tier
+        let session = box.session
         if !rowsAlreadyRecorded { await collector.beginTurn() }
         // Two counters, and the session's is the authority.
         //
@@ -1208,8 +1314,20 @@ public actor AskEngine<Domain: AskDomain> {
         // retrieve. The transcript counts what the MODEL did, which is the fact
         // the grounding rule is about; the collector is the faster read that
         // usually agrees.
+        //
+        // The transcript's count is the session's to give, inside the turn's
+        // deadline like everything else the turn waits on (`read(until:_:)`).
+        // Without it this generation is judged by the collector alone, and
+        // the race below, with no time left, ends it at once.
         let callsBefore = await collector.toolCallCount
-        let sessionCallsBefore = await box.session.toolCallCount()
+        // Logged only for a read that had time to start: one entered with
+        // none left, as after a search that took the whole deadline, is the
+        // discard's to say.
+        let hadTime = ContinuousClock().now < deadline
+        let sessionCallsBefore = await Self.read(until: deadline) { await session.toolCallCount() }
+        if sessionCallsBefore == nil, hadTime, !Task.isCancelled {
+            log.routing("ran out of time reading \(tier.rawValue)'s tool calls")
+        }
 
         var stats = AskTurnStats(tier: tier)
         stats.retried = retried
@@ -1262,7 +1380,11 @@ public actor AskEngine<Domain: AskDomain> {
         // has been watching arrive are exactly what a truncated answer is made
         // of.
         let streamed = Mutex(AskReplySnapshot())
-        let session = box.session
+        // The transcript's count as the latch last read it, kept outside the
+        // raced closure for `streamed`'s reason: on the ceiling the deadline
+        // leaves no time to read it again, and a truncated answer only the
+        // transcript grounds is still grounded.
+        let transcribed = Mutex<Int?>(nil)
         let shape = replyShape
         let isPCC = tier == .privateCloud
         // Where the latch below starts: grounded already when the app
@@ -1353,11 +1475,17 @@ public actor AskEngine<Domain: AskDomain> {
                         }
                         if !grounded {
                             let recorded = await collector.toolCallCount > callsBefore
-                            let transcribed = await session.toolCallCount() > sessionCallsBefore
+                            var called = false
+                            if let sessionCallsBefore {
+                                let count = await session.toolCallCount()
+                                transcribed.withLock { $0 = count }
+                                called = count > sessionCallsBefore
+                            }
                             // The follow-up half is the verdict's own test —
-                            // `isGrounded`, below — asked of the partial.
-                            grounded = recorded || transcribed
-                                || (isFollowUp && (!rows.isEmpty || Self.namesAThreadRow(
+                            // `isGrounded`, below — asked of the partial, by
+                            // a mention the rest of the stream can't unmake.
+                            grounded = recorded || called
+                                || (isFollowUp && (!rows.isEmpty || Self.partialNamesAThreadRow(
                                     snapshot.answer.map(AskPrompt.partialText), rows: threadRows
                                 )))
                         }
@@ -1388,9 +1516,13 @@ public actor AskEngine<Domain: AskDomain> {
             throw ask
         }
 
+        // Read again in what is left of the deadline, or, once it has passed,
+        // as the latch last read it.
+        let sessionCallsAfter = await Self.read(until: deadline) { await session.toolCallCount() }
+            ?? transcribed.withLock { $0 }
         let calls = max(
             await collector.toolCallCount - callsBefore,
-            await box.session.toolCallCount() - sessionCallsBefore
+            sessionCallsBefore.flatMap { before in sessionCallsAfter.map { $0 - before } } ?? 0
         )
         let rows = await collector.groundingRows
         let turnRows = await collector.turnRows
@@ -1418,7 +1550,10 @@ public actor AskEngine<Domain: AskDomain> {
         stats.grounding = appRetrieved
             ? .appRetrieved
             : (calls > 0 ? .toolCall : (isFollowUp && isGrounded ? .followUp : .nothing))
-        if let usage = await session.usage() {
+        // Inside the deadline too, and once it has passed not read at all: a
+        // truncated answer goes out without its `[usage]` line rather than
+        // waiting on a session that may never say.
+        if let usage = await Self.read(until: deadline, { await session.usage() }) ?? nil {
             stats.inputTokens = usage.inputTokens
             stats.cachedTokens = usage.cachedTokens
             stats.outputTokens = usage.outputTokens
@@ -1551,6 +1686,11 @@ public actor AskEngine<Domain: AskDomain> {
                 // whatever it now shows. Its follow-ups are cleaned as the first pass's
                 // were: a pass that writes its own hands back model output.
                 // Its tiles are cut to what a bank lays out, as every answer's.
+                //
+                // Held to the collector's limits first, so a payload or a
+                // proposal past them is one it did not carry, and the first
+                // answer's, which a tool recorded within them, stands.
+                let refined = heldToTheCollectorsLimits(refined, from: "the domain's refine pass")
                 var kept = refined.payload == nil ? refined.replacing(payload: answer.payload) : refined
                 if kept.proposal == nil { kept = kept.replacing(proposal: answer.proposal) }
                 if kept.grounding == nil { kept = kept.replacing(grounding: answer.grounding) }
@@ -1653,6 +1793,45 @@ public actor AskEngine<Domain: AskDomain> {
         return domain.basis(for: answer)
     }
 
+    /// An answer the domain built itself, held to what a tool could have
+    /// recorded for one the model wrote: a payload past
+    /// `AskCollector.maxPayloadBytes` goes, as does a proposal whose payload
+    /// is past `AskProposal.maxPayloadBytes`, and its rows stop at
+    /// `AskCollector.maxThreadRows`. `source` names it in the line that says
+    /// what went.
+    ///
+    /// The answer rides into the thread file with every turn kept, and the
+    /// file is rewritten after every turn: a 1 MB payload a turn would make
+    /// that tens of megabytes. A card missing is the smaller failure, as it
+    /// is when the collector refuses a tool. The rows stop at the thread's
+    /// cap, not the turn's: a follow-up that read nothing stands on the
+    /// thread's rows, and a refine pass built from it carries them on.
+    private func heldToTheCollectorsLimits(_ answer: AskAnswer<Row>, from source: String) -> AskAnswer<Row> {
+        var dropped: [String] = []
+        var payload = answer.payload
+        if let size = payload?.count, size > AskCollector<Row>.maxPayloadBytes {
+            payload = nil
+            dropped.append("its \(size)-byte payload dropped")
+        }
+        var proposal = answer.proposal
+        if let size = proposal?.payload.count, size > AskProposal.maxPayloadBytes {
+            proposal = nil
+            dropped.append("its proposal, with a \(size)-byte payload, dropped")
+        }
+        var matches = answer.matches
+        if matches.count > AskCollector<Row>.maxThreadRows {
+            dropped.append("its \(matches.count) rows cut to \(AskCollector<Row>.maxThreadRows)")
+            matches = Array(matches.prefix(AskCollector<Row>.maxThreadRows))
+        }
+        guard !dropped.isEmpty else { return answer }
+        log.routing("\(source) was held to what a tool can record: \(dropped.joined(separator: ", "))")
+        return AskAnswer(
+            text: answer.text, matches: matches, tiles: answer.tiles, followUps: answer.followUps,
+            questionKind: answer.questionKind, isTruncated: answer.isTruncated, basis: answer.basis,
+            payload: payload, proposal: proposal, grounding: answer.grounding
+        )
+    }
+
     /// A session for `tier` with the domain's tools built around
     /// `collector` and `relay`, built inside what is left of `deadline`: the
     /// answer language can wait on Private Cloud Compute's locale probe, a
@@ -1704,23 +1883,68 @@ public actor AskEngine<Domain: AskDomain> {
     /// weaker of the two ways a follow-up can be grounded, and the one that
     /// lets "which of those is on vinyl?" pass without a second search.
     ///
-    /// Asked of every streamed snapshot until one passes, as well as of the
-    /// finished answer, so the prose that draws and the prose that is kept are
-    /// judged by one rule. `nonisolated static` because the snapshot loop runs
-    /// inside the seam's generation closure, and an actor hop per snapshot to
-    /// evaluate a pure function is a cost with nothing behind it.
+    /// Asked of the finished answer, and of every streamed snapshot until one
+    /// passes (`partialNamesAThreadRow(_:rows:)`), so the prose that draws and
+    /// the prose that is kept are judged by one rule. `nonisolated static`
+    /// because the snapshot loop runs inside the seam's generation closure,
+    /// and an actor hop per snapshot to evaluate a pure function is a cost
+    /// with nothing behind it.
     nonisolated private static func namesAThreadRow(_ text: String?, rows: [Row]) -> Bool {
         guard let text, !text.isEmpty else { return false }
         return !AskAnswer<Row>.mentioned(in: text, among: rows).isEmpty
+    }
+
+    /// `namesAThreadRow(_:rows:)` asked of a streamed partial, counting only
+    /// a mention no later snapshot can unmake.
+    ///
+    /// A title shorter than `AskAnswer.wholeWordBelow` is a mention only as a
+    /// whole word, and a partial's end is not yet the end of a word: "Go"
+    /// ends "You might like Go", and a snapshot later it is inside "Gothic",
+    /// where the verdict on the finished answer finds nothing. Latched on the
+    /// first, the prose would draw and then fail as ungrounded under it
+    /// (house rule 2). So the partial is read twice, as it stands and with a
+    /// letter after it, and a row counts only when both reads name it: a
+    /// mention the letter unmakes is one the next snapshot can, and one the
+    /// letter completes is in the second read alone. Every other mention
+    /// has both its neighbours already, and keeps them.
+    nonisolated private static func partialNamesAThreadRow(_ partial: String?, rows: [Row]) -> Bool {
+        guard let partial, !partial.isEmpty else { return false }
+        let named = AskAnswer<Row>.mentioned(in: partial, among: rows)
+        // Nothing named as it stands, nothing to settle: the second read is
+        // spent only on a partial that might latch.
+        guard !named.isEmpty else { return false }
+        let settled = Set(AskAnswer<Row>.mentioned(in: partial + "x", among: rows).map(\.id))
+        return named.contains { settled.contains($0.id) }
+    }
+
+    /// One of a session's own reads, such as its transcript's tool calls,
+    /// its usage or its window, inside the turn's deadline: nil once the
+    /// deadline has passed, or when the caller lets go.
+    ///
+    /// The session is the host's when its seam builds its own, and a read
+    /// that never returns would otherwise hold the turn in flight past any
+    /// deadline and any Stop, and every question after it.
+    nonisolated private static func read<T: Sendable>(
+        until deadline: ContinuousClock.Instant,
+        _ read: @escaping @Sendable () async -> T
+    ) async -> T? {
+        try? await AskDeadline.run(until: deadline, read)
     }
 
     /// Whether the next turn should roll this conversation over rather than
     /// waiting for the overflow: the last response's input and output — the
     /// transcript the next request starts from — against the window, by the
     /// kept tier's rule (`AskContinuation.shouldRollOver(usedTokens:contextSize:tier:)`).
-    private func shouldRollOver(_ kept: AskConversation<Row>) async -> Bool {
-        let usage = await kept.box.session.usage()
-        let size = await kept.box.session.contextSize()
+    ///
+    /// Both are read inside the turn's deadline. One that runs out of it
+    /// reads as a tier that couldn't say, and the turn count decides alone,
+    /// as `shouldRollOver(usedTokens:contextSize:tier:)` says: with the
+    /// deadline gone there is no time to start a session over either, and
+    /// the follow-up fails at once, leaving the session to be started fresh.
+    private func shouldRollOver(_ kept: AskConversation<Row>, deadline: ContinuousClock.Instant) async -> Bool {
+        let session = kept.box.session
+        let usage = await Self.read(until: deadline) { await session.usage() } ?? nil
+        let size = await Self.read(until: deadline) { await session.contextSize() } ?? nil
         // The window rule of the model the session runs on.
         return AskContinuation.shouldRollOver(
             usedTokens: usage.flatMap { ($0.inputTokens ?? 0) + ($0.outputTokens ?? 0) },

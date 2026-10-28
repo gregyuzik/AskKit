@@ -46,6 +46,9 @@ nonisolated public struct AskTierState: Sendable, Equatable {
     /// **An approaching quota never demotes anything.** Only a reached one
     /// excludes Private Cloud Compute at a turn's start, and a limit hit
     /// mid-turn is an outage the turn is handed down from.
+    ///
+    /// A tier held off only by a cooldown or a spent quota isn't servable,
+    /// and still takes a turn that nothing servable can (`askHeldTier(from:)`).
     public var isServable: Bool {
         isAvailable && speaksLanguage && !quotaReached && !isCooled
     }
@@ -57,7 +60,8 @@ nonisolated public struct AskTierState: Sendable, Equatable {
 /// tier holding a kept session is still the *first* servable one, and a kept
 /// on-device conversation must be dropped the moment Private Cloud Compute is
 /// back, with a recap, on the better model. `first` is what a turn runs on;
-/// the next is what an outage hands the turn down to.
+/// the next is what an outage hands the turn down to. With none, a turn runs
+/// on the held tier, if there is one (`askHeldTier(from:)`).
 nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTier] {
     states.filter(\.isServable).map(\.tier)
 }
@@ -74,10 +78,36 @@ nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTi
 /// matters (off, ineligible, still downloading), where Private Cloud Compute
 /// can be out for reasons of its own that say nothing about whether Ask could
 /// work at all.
+///
+/// **Never asked while Private Cloud Compute is only held.** A tier held off
+/// by a cooldown or a spent quota takes the turn (`askHeldTier(from:)`), and
+/// the mirror names it: its reason would tell the reader to wait for a
+/// download, or that nothing can be done, with no Try Again.
 nonisolated package func askUnavailability(from states: [AskTierState]) -> AskUnavailability {
     if states.contains(where: { $0.isAvailable && !$0.speaksLanguage }) { return .languageNotSupported }
     let tier = states.first { $0.tier == .onDevice } ?? states.first
     return tier?.unavailability ?? .unknown
+}
+
+/// Private Cloud Compute, when it is up and speaks the app's language and
+/// only a cooldown or a spent quota keeps it out: the tier a turn runs on
+/// when nothing is servable. Nil when it is down anyway, doesn't speak the
+/// language, or isn't held.
+///
+/// **A hold is the tier saying "not now", not "can't".** House rule 1: an
+/// outage with nowhere to hand down is the turn's error, which Try Again
+/// retries. So Try Again asks the tier again rather than fail on the hold the
+/// outage left, and a tier that is back answers. One that is still out fails
+/// the turn as it did, retryably, rather than with the on-device tier's
+/// reason (`askUnavailability(from:)`), which offers no Try Again.
+///
+/// `AppleModelSeam` names the same tier as the mirror's next one
+/// (`AskModelStatus.nextTier`), by the same test, so the caption and the
+/// first screen agree with the turn.
+nonisolated func askHeldTier(from states: [AskTierState]) -> AskTier? {
+    guard let cloud = states.first(where: { $0.tier == .privateCloud }),
+          cloud.isAvailable, cloud.speaksLanguage, cloud.isCooled || cloud.quotaReached else { return nil }
+    return .privateCloud
 }
 
 /// Whether a triaged failure says the *tier* can't serve right now, as
@@ -118,6 +148,13 @@ public final class AskModelStatus {
     /// On an empty thread, the first screen then says why, and the composer
     /// is disabled unless the domain answers without a model
     /// (`AskFirstScreenPolicy.answersWithoutModel`).
+    ///
+    /// With nothing servable, a Private Cloud Compute held off only by a
+    /// cooldown or a spent quota is still the next tier, since the next
+    /// question is asked of it: an outage with nowhere to hand down is the
+    /// turn's error, which Try Again retries (house rule 1), and a hold that
+    /// lifts in a minute, or at the quota's reset, is no reason nothing can
+    /// serve. `quotaReached` says the quota is spent beside it.
     public private(set) var nextTier: AskTier?
     /// Why, when `nextTier` is nil. Always nil while `nextTier` is set
     /// (`apply(_:)`).

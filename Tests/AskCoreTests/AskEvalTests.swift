@@ -58,6 +58,24 @@ import Testing
         #expect(outcome.text.isEmpty)
     }
 
+    /// A run let go before its answer ends its stream with neither an answer
+    /// nor an error, and that is no answer: never "ok", and never good.
+    @Test func aRunLetGoBeforeItsAnswerIsNoAnswer() async {
+        let (eval, seam) = makeEval()
+        let session = seam.session(for: .privateCloud)
+        var script = grounded("Rumours.")
+        script.holdsAfterSnapshots = true
+        session.script(script)
+        let run = Task { await eval.run(AskScenario(id: "let go", question: "q")) }
+        await session.generationIsHeld()
+        run.cancel()
+        let outcome = await run.value
+        session.releaseGeneration()
+        #expect(outcome.failure != nil)
+        #expect(!outcome.isGood)
+        #expect(outcome.verdict != "ok")
+    }
+
     @Test func inventedIsScopedToTheScenariosOwnExpectedTitles() async {
         // Not *any* title the answer named that the turn never read: the scan
         // runs over `scenario.expectedTitles` only, so an invention the
