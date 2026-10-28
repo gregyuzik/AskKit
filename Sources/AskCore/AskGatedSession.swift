@@ -126,7 +126,12 @@ nonisolated struct AskGatedSession: AskSession {
 
     /// A generation's snapshots, begun once the generation gate lets it
     /// through, and ended before it lets the next one in. A reader that
-    /// lets the stream go ends the generation with it.
+    /// lets the stream go ends the generation with it, and the generation
+    /// gate waits for the generation, not only the reader: an
+    /// `AppleAskSession` hands the task running `streamResponse` to the
+    /// holder (`AskGenerationProducers`). A host's own session that streams
+    /// from a task it keeps to itself is waited for only until its stream
+    /// ends.
     private func gated(
         _ generation: @escaping @Sendable () -> AsyncThrowingStream<AskReplySnapshot, any Error>
     ) -> AsyncThrowingStream<AskReplySnapshot, any Error> {

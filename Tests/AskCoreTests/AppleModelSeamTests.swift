@@ -111,35 +111,94 @@ import Synchronization
         }
     }
 
+    // MARK: - A tier out for a while
+
+    @Test func aTierOutOnlyForAWhileStaysTheNextTierWhenNothingBelowServes() {
+        // A cooldown or a spent quota with nowhere to hand down to is the
+        // turn's error, which Try Again retries: the mirror names the tier,
+        // so New Chat doesn't put up the can't-serve first screen in the
+        // on-device tier's words.
+        let device = state(.onDevice, available: false, why: .modelNotReady)
+        for cloud in [
+            state(.privateCloud, available: true, cooled: true),
+            state(.privateCloud, available: true, quota: true),
+            state(.privateCloud, available: true, quota: true, cooled: true)
+        ] {
+            let snapshot = AppleModelSeam.snapshot(from: [cloud, device])
+            #expect(snapshot.nextTier == .privateCloud)
+            #expect(snapshot.unavailability == nil)
+            #expect(snapshot.privateCloudUnavailability == nil)
+        }
+        // While the device serves, it serves.
+        let handedDown = AppleModelSeam.snapshot(from: [
+            state(.privateCloud, available: true, cooled: true), state(.onDevice, available: true)
+        ])
+        #expect(handedDown.nextTier == .onDevice)
+    }
+
+    @Test func aHoldOnATierThatCannotServeAnywayNamesNothing() {
+        let device = state(.onDevice, available: false, why: .appleIntelligenceOff)
+        let down = AppleModelSeam.snapshot(from: [
+            state(.privateCloud, available: false, why: .offline, cooled: true), device
+        ])
+        #expect(down.nextTier == nil)
+        #expect(down.unavailability == .appleIntelligenceOff)
+        let wrongLanguage = AppleModelSeam.snapshot(from: [
+            state(.privateCloud, available: true, speaks: false, quota: true), device
+        ])
+        #expect(wrongLanguage.nextTier == nil)
+        #expect(wrongLanguage.unavailability == .languageNotSupported)
+    }
+
     // MARK: - Holding the tier until Apple says
 
-    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private let wallNow = Date(timeIntervalSince1970: 1_800_000_000)
+    private let start = ContinuousClock.now
 
     @Test func aHoldRunsToTheDateTheTierGave() {
-        let reset = now.addingTimeInterval(3_600)
-        #expect(AppleModelSeam.extendedHold(nil, to: reset, now: now) == reset)
+        let reset = AppleModelSeam.holdEnd(until: wallNow.addingTimeInterval(3_600), wallNow: wallNow, now: start)
+        #expect(reset == start + .seconds(3_600))
+        #expect(AppleModelSeam.extendedHold(nil, to: reset, now: start) == reset)
+        // And the quota banner's date is the one the tier gave.
+        #expect(AppleModelSeam.wallDate(of: start + .seconds(3_600), wallNow: wallNow, now: start)
+                == wallNow.addingTimeInterval(3_600))
     }
 
     @Test func aHoldNeverShortensOneAlreadyRunning() {
         // A rate limit that said an hour, followed by the engine's ordinary
         // one-minute transport cooldown for the same failure: the hour stands.
-        let hour = now.addingTimeInterval(3_600)
-        let minute = now.addingTimeInterval(60)
-        #expect(AppleModelSeam.extendedHold(hour, to: minute, now: now) == hour)
-        #expect(AppleModelSeam.extendedHold(minute, to: hour, now: now) == hour)
+        let hour = start + .seconds(3_600)
+        let minute = start + .seconds(60)
+        #expect(AppleModelSeam.extendedHold(hour, to: minute, now: start) == hour)
+        #expect(AppleModelSeam.extendedHold(minute, to: hour, now: start) == hour)
     }
 
     @Test func aDateAlreadyPastHoldsNothingNew() {
-        let past = now.addingTimeInterval(-10)
-        #expect(AppleModelSeam.extendedHold(nil, to: past, now: now) == nil)
-        #expect(AppleModelSeam.extendedHold(nil, to: nil, now: now) == nil)
-        let running = now.addingTimeInterval(30)
-        #expect(AppleModelSeam.extendedHold(running, to: past, now: now) == running)
+        #expect(AppleModelSeam.holdEnd(until: wallNow.addingTimeInterval(-10), wallNow: wallNow, now: start) == nil)
+        #expect(AppleModelSeam.holdEnd(until: nil, wallNow: wallNow, now: start) == nil)
+        let past = start - .seconds(10)
+        #expect(AppleModelSeam.extendedHold(nil, to: past, now: start) == nil)
+        #expect(AppleModelSeam.extendedHold(nil, to: nil, now: start) == nil)
+        let running = start + .seconds(30)
+        #expect(AppleModelSeam.extendedHold(running, to: past, now: start) == running)
+    }
+
+    @Test func aResetFarOffOrNoNumberHoldsNoLongerThanADay() {
+        // A date a day off at most is the daily quota's; one further is a
+        // clock or a server gone wrong, and an infinite one would trap the
+        // moment it became a `Duration`.
+        let day = start + AppleModelSeam.longestHold
+        #expect(AppleModelSeam.longestHold == .seconds(86_400))
+        #expect(AppleModelSeam.holdEnd(until: .distantFuture, wallNow: wallNow, now: start) == day)
+        let infinite = Date(timeIntervalSinceReferenceDate: .infinity)
+        #expect(AppleModelSeam.holdEnd(until: infinite, wallNow: wallNow, now: start) == day)
+        let noNumber = Date(timeIntervalSinceReferenceDate: .nan)
+        #expect(AppleModelSeam.holdEnd(until: noNumber, wallNow: wallNow, now: start) == nil)
     }
 
     @Test func theQuotaHoldTakesTheErrorsDateFirstAndTheQuotaUsagesSecond() {
-        let fromError = now.addingTimeInterval(7_200)
-        let fromUsage = now.addingTimeInterval(9_000)
+        let fromError = wallNow.addingTimeInterval(7_200)
+        let fromUsage = wallNow.addingTimeInterval(9_000)
         #expect(AppleModelSeam.quotaReset(fromError: fromError, fromUsage: fromUsage) == fromError)
         #expect(AppleModelSeam.quotaReset(fromError: nil, fromUsage: fromUsage) == fromUsage)
         #expect(AppleModelSeam.quotaReset(fromError: nil, fromUsage: nil) == nil)
@@ -282,6 +341,179 @@ import Synchronization
         let next = census.arrive()
         #expect(!first && !next)
         #expect(census.alive == 1)
+    }
+
+    // MARK: - A seam with a scripted on-device model and a clock
+
+    /// A clock a test moves by hand.
+    nonisolated private final class SeamClock: Sendable {
+        private let instant = Mutex(ContinuousClock.now)
+        var now: ContinuousClock.Instant { instant.withLock { $0 } }
+        func advance(_ duration: Duration) { instant.withLock { $0 += duration } }
+    }
+
+    /// The on-device model as a test scripts it: its availability and
+    /// whether it writes the language, each changed when the test says, and
+    /// an availability read the test can hold.
+    nonisolated private final class ScriptedOnDevice: Sendable {
+        private struct State {
+            var availability: SystemLanguageModel.Availability
+            var writes: Bool
+            var localeReads = 0
+            var heldRead: GateTestHold?
+        }
+        private let state: Mutex<State>
+
+        init(_ availability: SystemLanguageModel.Availability, writes: Bool) {
+            state = Mutex(State(availability: availability, writes: writes))
+        }
+
+        func set(_ availability: SystemLanguageModel.Availability, writes: Bool) {
+            state.withLock { $0.availability = availability; $0.writes = writes }
+        }
+
+        /// How many times the seam asked whether the model writes a locale.
+        var localeReads: Int { state.withLock { $0.localeReads } }
+
+        /// Hold the next availability read at `hold`, answering what the
+        /// model said when the read began.
+        func holdNextRead(at hold: GateTestHold) {
+            state.withLock { $0.heldRead = hold }
+        }
+
+        func availability() async -> SystemLanguageModel.Availability {
+            let (answer, hold) = state.withLock { state in
+                defer { state.heldRead = nil }
+                return (state.availability, state.heldRead)
+            }
+            await hold?.hold()
+            return answer
+        }
+
+        func supportsLocale() -> Bool {
+            state.withLock { state in
+                state.localeReads += 1
+                return state.writes
+            }
+        }
+    }
+
+    /// A seam on `device` and `clock`, with no Private Cloud Compute to
+    /// reach.
+    private func seam(
+        _ device: ScriptedOnDevice, clock: SeamClock = SeamClock(), status: AskModelStatus = AskModelStatus()
+    ) -> AppleModelSeam {
+        AppleModelSeam(
+            status: status, privateCloudCompute: .undeclared, gate: AskGenerationGate(), logSubsystem: nil,
+            onDeviceAvailability: { await device.availability() },
+            onDeviceSupportsLocale: { _ in device.supportsLocale() },
+            now: { clock.now }
+        )
+    }
+
+    private func onDevice(_ seam: AppleModelSeam) async throws -> AskTierState {
+        try #require(await seam.tierStates().first { $0.tier == .onDevice })
+    }
+
+    // MARK: - The on-device model's languages
+
+    @Test func aNoFromAModelThatIsNotReadyIsAskedAgain() async throws {
+        // A model still downloading can say no to a language it will write
+        // once its assets are in. Kept, that no read as "language not
+        // supported", which no Try Again gets past, until a relaunch.
+        let device = ScriptedOnDevice(.unavailable(.modelNotReady), writes: false)
+        let seam = seam(device)
+        #expect(try await onDevice(seam).unavailability == .languageNotSupported)
+        device.set(.unavailable(.modelNotReady), writes: true)
+        #expect(try await onDevice(seam).unavailability == .modelNotReady)
+        device.set(.available, writes: true)
+        #expect(try await onDevice(seam).isServable)
+    }
+
+    @Test func aLanguageReadIsKeptOnlyWhileTheModelsAvailabilityHolds() async throws {
+        // An available model's no is its answer, as on the Mac under a Hebrew
+        // locale, and is read once.
+        let device = ScriptedOnDevice(.available, writes: false)
+        let seam = seam(device)
+        #expect(try await !onDevice(seam).speaksLanguage)
+        #expect(try await !onDevice(seam).speaksLanguage)
+        #expect(device.localeReads == 1)
+        // Until the model's availability changes, as when it downloads the
+        // assets of a language: then it is read again.
+        device.set(.unavailable(.modelNotReady), writes: true)
+        #expect(try await onDevice(seam).unavailability == .modelNotReady)
+        device.set(.available, writes: true)
+        #expect(try await onDevice(seam).isServable)
+    }
+
+    // MARK: - The holds' clock
+
+    @Test func theHoldsAreTimedOnTheMonotonicClock() async {
+        // The seam's own clock, moved by hand while the wall clock stands
+        // still: a hold read off the wall clock would never lift here, and
+        // one set back would hold the tier for as long again.
+        let clock = SeamClock()
+        let seam = seam(ScriptedOnDevice(.available, writes: true), clock: clock)
+        await seam.noteTransportFailure(on: .privateCloud)
+        #expect(await seam.holds.isCooled)
+        clock.advance(.seconds(59))
+        #expect(await seam.holds.isCooled)
+        clock.advance(.seconds(2))
+        #expect(await !seam.holds.isCooled)
+
+        await seam.noteFailure(LanguageModelError.rateLimited(
+            .init(resetDate: Date.now.addingTimeInterval(600), debugDescription: "slow down")
+        ))
+        clock.advance(.seconds(598))
+        #expect(await seam.holds.isCooled)
+        clock.advance(.seconds(3))
+        #expect(await !seam.holds.isCooled)
+
+        await seam.noteFailure(PrivateCloudComputeLanguageModel.Error.quotaLimitReached(
+            .init(resetDate: Date.now.addingTimeInterval(3_600), debugDescription: "spent")
+        ))
+        clock.advance(.seconds(3_598))
+        #expect(await seam.holds.isQuotaHeld)
+        clock.advance(.seconds(3))
+        #expect(await !seam.holds.isQuotaHeld)
+    }
+
+    @Test func aResetFarOffLiftsADayLater() async {
+        let clock = SeamClock()
+        let seam = seam(ScriptedOnDevice(.available, writes: true), clock: clock)
+        await seam.noteFailure(LanguageModelError.rateLimited(.init(resetDate: .distantFuture, debugDescription: "")))
+        await seam.noteFailure(PrivateCloudComputeLanguageModel.Error.quotaLimitReached(
+            .init(resetDate: .distantFuture, debugDescription: "")
+        ))
+        clock.advance(AppleModelSeam.longestHold - .seconds(1))
+        #expect(await seam.holds == (isCooled: true, isQuotaHeld: true))
+        clock.advance(.seconds(2))
+        #expect(await seam.holds == (isCooled: false, isQuotaHeld: false))
+    }
+
+    // MARK: - Refreshes that overlap
+
+    @Test func anOlderRefreshThatFinishesLastLeavesTheNewerReading() async throws {
+        // A refresh begun before the model went away, finishing after one
+        // begun since: its reading would name a tier that can't serve.
+        let device = ScriptedOnDevice(.available, writes: true)
+        let status = AskModelStatus()
+        let seam = seam(device, status: status)
+        let held = GateTestHold()
+        device.holdNextRead(at: held)
+        let older = Task { await seam.refreshStatus() }
+        for _ in 0..<4_000 where !held.hasArrived {
+            try await Task.sleep(for: .microseconds(500))
+        }
+        try #require(held.hasArrived)
+        device.set(.unavailable(.appleIntelligenceNotEnabled), writes: true)
+        await seam.refreshStatus()
+        #expect(status.nextTier == nil)
+        #expect(status.unavailability == .appleIntelligenceOff)
+        held.release()
+        await older.value
+        #expect(status.nextTier == nil)
+        #expect(status.unavailability == .appleIntelligenceOff)
     }
 
     @Test func englishNeverAsksPrivateCloudComputeWhichLanguagesItWrites() {
