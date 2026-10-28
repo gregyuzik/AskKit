@@ -5,10 +5,10 @@ import Testing
 
 @testable import AskUI
 
-/// Who takes VoiceOver's focus from a wait row that had it as it went
-/// (`AskWaitRowHandoff`). The focus itself isn't reachable from a test: these
-/// pin which element is asked, and when, and the views take the request once
-/// they are in the accessibility tree.
+/// Who takes VoiceOver's focus from a wait row that had it as it went, and from
+/// the prose a restart takes away (`AskWaitRowHandoff`). The focus itself isn't
+/// reachable from a test: these pin which element is asked, and when, and the
+/// views take the request once they are in the accessibility tree.
 @Suite(.timeLimit(.minutes(1))) struct AskWaitRowHandoffTests {
     private func waiting() -> AskTurn<UIRow> {
         AskTurn<UIRow>(question: "What's the oldest?", origin: .typed)
@@ -79,6 +79,73 @@ import Testing
         var wordless = waiting()
         wordless.settle(AskAnswer(text: "", matches: []), at: 0)
         #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: wordless) == nil)
+    }
+
+    // MARK: A restart
+
+    /// What `.restarted` does to the turn: the words go, and the turn is
+    /// still in flight.
+    private func restarted() -> AskTurn<UIRow> {
+        var turn = written()
+        turn.write("", at: 1)
+        return turn
+    }
+
+    /// **A restart takes the prose away and brings the wait row back**, so the
+    /// reader on the prose is handed to the wait row. Without it they were
+    /// left wherever the system put the focus, and heard nothing until the new
+    /// attempt ended.
+    @Test func aRestartHandsTheProsesFocusBackToTheWaitRow() {
+        let turn = restarted()
+        #expect(turn.showsWaitRow)
+        #expect(AskWaitRowHandoff.returning(proseHadFocus: true, to: turn) == .waitRow)
+    }
+
+    /// A reader who wasn't on the prose keeps their place, as one who wasn't
+    /// on the wait row does when it goes.
+    @Test func aRestartUnderAReaderElsewhereHandsOverNothing() {
+        #expect(AskWaitRowHandoff.returning(proseHadFocus: false, to: restarted()) == nil)
+    }
+
+    /// No wait row, no one to take the focus: a turn still writing, or one
+    /// that has ended.
+    @Test func noWaitRowTakesNothingBack() {
+        #expect(AskWaitRowHandoff.returning(proseHadFocus: true, to: written()) == nil)
+        #expect(AskWaitRowHandoff.returning(proseHadFocus: true, to: failedBeforeAWord()) == nil)
+    }
+
+    /// **The hand-off runs both ways for as long as the turn does**: the wait
+    /// row the focus came back to hands it on again at the new attempt's first
+    /// words, or to the failure line where the new attempt fails before one.
+    @Test func theWaitRowTheFocusCameBackToHandsItOnAgain() {
+        var again = restarted()
+        again.write("From the device,", at: 2)
+        #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: again) == .prose)
+
+        var failed = restarted()
+        failed.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: failed) == .failure)
+    }
+
+    /// Through the store: Private Cloud Compute wrote, went out, and the
+    /// device took the turn over. The prose goes and the wait row is back,
+    /// which is what the thread row reads the hand-back from.
+    @MainActor
+    @Test func aHandDownBringsTheWaitRowBackInThePlaceOfTheProse() async {
+        let asker = ScriptedAsker(.init(
+            events: [
+                .tier(.privateCloud), .partial("Words from the attempt that failed"),
+                .restarted(.onDevice), .tier(.onDevice)
+            ],
+            hangs: true
+        ))
+        let store = makeStore(asker: asker)
+        store.ask("q")
+        await yieldUntil { store.turns.last?.tier == .onDevice }
+        let turn = store.turns.last
+        #expect(turn?.showsWaitRow == true)
+        #expect(turn.flatMap { AskWaitRowHandoff.returning(proseHadFocus: true, to: $0) } == .waitRow)
+        store.stop()
     }
 }
 

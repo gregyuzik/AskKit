@@ -18,7 +18,9 @@ import SwiftUI
 ///
 /// **It takes VoiceOver's focus from a wait row that had it as it went**, so a
 /// reader who was on the wait row isn't left to wherever the system puts the
-/// focus when the first word replaces it (`AskWaitRowHandoff`).
+/// focus when the first word replaces it (`AskWaitRowHandoff`). The focus on it
+/// is held by the thread row, which outlives it, so the wait row that comes
+/// back when a turn restarts can take the focus the prose had as it went.
 struct AskAnswerProse: View {
     private let attributed: AttributedString
     private let chunks: [AskRevealChunk]
@@ -30,13 +32,18 @@ struct AskAnswerProse: View {
     private let onStop: () -> Void
     private let onCopy: () -> Void
 
-    @AccessibilityFocusState private var isFocused: Bool
+    /// VoiceOver's focus on the prose. Held by `AskThreadRow`, which outlives
+    /// it, so it can tell whether the prose had the focus as it went
+    /// (`AskWaitRowHandoff`).
+    @AccessibilityFocusState.Binding private var isFocused: Bool
     /// Under Increase Contrast the caret is the accent's, spectrum or not
     /// (`AskSpectrumLook`).
     @Environment(\.colorSchemeContrast) private var contrast
 
     /// - Parameters:
     ///   - spectrum: The host's spectrum, which the caret is drawn in.
+    ///   - hasVoiceOver: Whether VoiceOver's focus is on the prose, held by
+    ///     the caller.
     ///   - takesFocus: Whether the prose takes VoiceOver's focus now that it
     ///     is there: the wait row had it as the first word replaced it.
     ///   - onFocusTaken: Called once the prose has taken it.
@@ -50,6 +57,7 @@ struct AskAnswerProse: View {
         isComplete: Bool,
         accent: Color,
         spectrum: AskSpectrum? = nil,
+        hasVoiceOver: AccessibilityFocusState<Bool>.Binding,
         takesFocus: Bool = false,
         onFocusTaken: @escaping () -> Void = {},
         onStop: @escaping () -> Void = {},
@@ -60,6 +68,7 @@ struct AskAnswerProse: View {
         self.isComplete = isComplete
         self.accent = accent
         self.spectrum = spectrum
+        _isFocused = hasVoiceOver
         self.takesFocus = takesFocus
         self.onFocusTaken = onFocusTaken
         self.onStop = onStop

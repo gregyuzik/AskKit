@@ -74,6 +74,7 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 turn: pair.turn,
                 previous: pair.previous,
                 isLast: isLast,
+                offersRetry: pair.turn.offersRetry(isNewest: isLast, whileThinking: store.isThinking),
                 showsChips: isLast && !store.isThinking
                     && (!store.followUps.isEmpty || store.offersAnotherPick),
                 // Empty on every turn but the newest, so the follow-ups
@@ -118,9 +119,8 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                     waitRowFocus = nil
                     firstWaitRowFocus = false
                 },
-                // Claimed for the failure line, which VoiceOver reads as the
-                // focus lands, before any screen claims the ending to
-                // announce it (`AskSpeechLedger`).
+                // Claimed for the failure line as VoiceOver's focus lands on
+                // it, which is when VoiceOver reads it (`AskSpeechLedger`).
                 onFailureTakesFocus: { _ = AskSpeech.ledger.claim(.ending(pair.turn.id)) },
                 onRate: { store.rate(pair.turn, $0) },
                 onCopy: onCopy,
@@ -133,7 +133,14 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 onConfirmProposal: { store.confirmProposal(pair.turn, awaitingTheOutcome: true) },
                 onHandOffProposal: { store.handOffProposal(pair.turn) },
                 onDeclineProposal: { store.declineProposal(pair.turn, awaitingTheOutcome: true) },
-                onProposalOutcomeFocused: { store.proposalOutcomeFocused(pair.turn.id) }
+                onProposalOutcomeFocused: { store.proposalOutcomeFocused(pair.turn.id) },
+                // Claimed as VoiceOver's focus lands on the outcome line, as
+                // the failure line's ending is, where the line says what the
+                // store's newest announcement says.
+                onProposalOutcomeHeard: { line in
+                    guard let heard = AskSpeechLedger.Line.proposalOutcome(heard: line, newest: store.proposalAnnouncement) else { return }
+                    _ = AskSpeech.ledger.claim(heard)
+                }
             )
                 .equatable()
                 .id(pair.turn.id)

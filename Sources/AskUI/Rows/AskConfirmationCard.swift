@@ -86,6 +86,9 @@ struct AskConfirmationCard: View {
     /// The outcome line has been asked to take the focus `awaitsOutcome`
     /// waited for, so the store can let the request go.
     let onOutcomeFocused: () -> Void
+    /// VoiceOver's focus has landed on the outcome line, which VoiceOver
+    /// reads then, handed the line's words (`AskSpeechLedger`).
+    let onOutcomeHeard: (String) -> Void
 
     /// Where a hand-off goes. Nil in a host that wired none, which disables
     /// the action rather than dropping the reader's tap.
@@ -151,7 +154,9 @@ struct AskConfirmationCard: View {
         // inserted in this same update, and a focus set on an element that
         // isn't in the accessibility tree yet goes nowhere. The screen
         // doesn't announce the outcome, so a focus that missed would leave the
-        // reader never hearing whether their tap took.
+        // reader never hearing whether their tap took. So the line says when
+        // the focus has landed on it, and claims the outcome only then
+        // (`AskSpeechLedger.Line.proposalOutcome`).
         //
         // **Initial too**, for a card rebuilt while the app worked, such as a
         // lazy row the thread made again: it appears with the outcome already
@@ -206,6 +211,12 @@ struct AskConfirmationCard: View {
     private var confirmButton: some View {
         Button(action: confirm) {
             Text(verbatim: proposal.actionLabel)
+                // **Room to wrap**, as Try Again's label has it
+                // (`AskFailureRow`): the app's own words, which at an
+                // accessibility size can be wider than the column, where a
+                // button can hold its label to one line.
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .opacity(phase == .performing ? 0 : 1)
                 .overlay {
                     if phase == .performing {
@@ -227,6 +238,8 @@ struct AskConfirmationCard: View {
     private var declineButton: some View {
         Button(action: onDecline) {
             Text("Not now", bundle: #bundle, comment: "Button on the card under an Ask answer that offers to do something: leaves it undone.")
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .buttonStyle(.bordered)
         // The label is the tint: the style draws it so and ignores a foreground
@@ -289,6 +302,12 @@ struct AskConfirmationCard: View {
             guard focusesOutcome else { return }
             outcomeIsFocused = true
             focusesOutcome = false
+        }
+        // The focus landing, not the ask: the state reads true only once an
+        // assistive technology has moved its focus here (`AskFailureRow`
+        // says how that was measured).
+        .onChange(of: outcomeIsFocused) { _, focused in
+            if focused { onOutcomeHeard(line) }
         }
     }
 }

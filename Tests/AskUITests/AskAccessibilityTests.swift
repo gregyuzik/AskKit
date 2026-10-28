@@ -419,13 +419,14 @@ import Testing
         #expect(another)
     }
 
-    /// **A failure line taking VoiceOver's focus speaks the ending itself.**
-    /// The wait row claims it in the update that ends the turn, so the screen,
-    /// a main-actor turn later, says nothing over the line being read.
+    /// **A failure line VoiceOver's focus lands on speaks the ending itself.**
+    /// The line claims it as the focus lands (`AskFailureRow`'s
+    /// `onLineFocused`), so a screen claiming after it says nothing over the
+    /// line being read.
     @Test func aFailureLineTakingTheFocusSilencesTheAnnouncement() {
         var ledger = AskSpeechLedger()
         let ending = UUID()
-        // The row's hand-off, `AskThreadRow`'s `onFailureTakesFocus`.
+        // The line's claim, `AskThreadRow`'s `onFailureTakesFocus`.
         _ = ledger.claim(.ending(ending))
         // The screen's announcement, after it.
         let announced = ledger.claim(.ending(ending))
@@ -446,6 +447,42 @@ import Testing
         ledger.forget(.quotaReached)
         let spentAgain = ledger.claim(.quotaReached)
         #expect(spentAgain)
+    }
+
+    /// **An outcome line VoiceOver's focus lands on claims the store's newest
+    /// announcement**, where the line says its words: what a screen would
+    /// otherwise post over the line being read.
+    @Test func anOutcomeLineHeardClaimsTheNewestAnnouncementOfItsWords() throws {
+        let newest = AskProposalAnnouncement(line: "That's done")
+        let heard = try #require(AskSpeechLedger.Line.proposalOutcome(heard: "That's done", newest: newest))
+        #expect(heard == .proposalOutcome(newest.id))
+
+        var ledger = AskSpeechLedger()
+        _ = ledger.claim(heard)
+        let announced = ledger.claim(.proposalOutcome(newest.id))
+        #expect(!announced)
+    }
+
+    /// An older card's line the reader passes, saying other words, claims
+    /// nothing, and with no announcement there is nothing to claim.
+    @Test func anOutcomeLineOfOtherWordsClaimsNothing() {
+        let newest = AskProposalAnnouncement(line: "That's done")
+        #expect(AskSpeechLedger.Line.proposalOutcome(heard: "Not done", newest: newest) == nil)
+        #expect(AskSpeechLedger.Line.proposalOutcome(heard: "Not done", newest: nil) == nil)
+    }
+
+    /// **Each outcome is a line of its own**, a failure retried on the same
+    /// card included: the second "That didn't work" is heard as the first was.
+    @Test func eachOutcomeIsALineOfItsOwnThoughTheWordsRepeat() throws {
+        let first = AskProposalAnnouncement(line: "That didn't work")
+        let second = AskProposalAnnouncement(line: "That didn't work")
+        var ledger = AskSpeechLedger()
+        let firstHeard = try #require(AskSpeechLedger.Line.proposalOutcome(heard: first.line, newest: first))
+        let firstClaimed = ledger.claim(firstHeard)
+        #expect(firstClaimed)
+        let secondHeard = try #require(AskSpeechLedger.Line.proposalOutcome(heard: second.line, newest: second))
+        let secondClaimed = ledger.claim(secondHeard)
+        #expect(secondClaimed)
     }
 
     /// It remembers a bounded number of lines, the oldest let go first.

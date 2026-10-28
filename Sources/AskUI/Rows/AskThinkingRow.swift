@@ -44,7 +44,9 @@ struct AskThinkingRow<Mark: View>: View {
     ///     caller.
     ///   - takesFocus: Whether the row takes VoiceOver's focus as it appears:
     ///     on a turn started from a control that went as it started, such as
-    ///     Try Again (`AskThreadList.waitRowFocus`).
+    ///     Try Again (`AskThreadList.waitRowFocus`), or as it comes back in
+    ///     place of prose that had the focus when the turn restarted
+    ///     (`AskWaitRowHandoff.returning(proseHadFocus:to:)`).
     ///   - onFocusTaken: Called once the row has taken it.
     ///   - onStop: Stops the turn: VoiceOver's Magic Tap on the row.
     init(
@@ -143,9 +145,11 @@ struct AskThinkingRow<Mark: View>: View {
     /// **`verbatim` because the phrase is already localized:** either
     /// `AskActivityPhrase` resolved it or the domain wrote it.
     ///
-    /// **0.45 is a trail, and Increase Contrast takes it back to full.** On the
-    /// boosted hue `askDeemphasizedText` uses, 0.45 lands around 2.4:1, which is
-    /// under the bar for text a reader has to read. Don't "fix" it to full for
+    /// **0.45 is a trail, and Increase Contrast takes it back to full.** It
+    /// multiplies the alpha `askDeemphasizedText` already draws in, so on
+    /// iOS the line lands at about 1.9:1 on white (the gray at 0.76, by 0.45)
+    /// and 2.0:1 on a phone's black (`.secondary`'s 0.6, by 0.45), well under
+    /// the bar for text a reader has to read. Don't "fix" it to full for
     /// everyone: this line is superseded, it is `accessibilityHidden`, and the
     /// reader who asked for contrast already gets it at full strength. Two
     /// steps rather than one, exactly as `AskDeemphasizedText` itself reasons.
@@ -166,8 +170,7 @@ struct AskThinkingRow<Mark: View>: View {
     /// The live line as drawn: the phrase, and how many items the turn has
     /// read once it has read any.
     private var shownLine: String {
-        guard let read else { return phrase }
-        return "\(phrase) · \(read)"
+        AskWaitRowLine.joining(phrase, read: read)
     }
 
     /// How many items the turn has read, or nil before it has read any.
@@ -177,6 +180,21 @@ struct AskThinkingRow<Mark: View>: View {
             localized: "\(rowsRead) read",
             bundle: #bundle,
             comment: "Appended to the Ask wait row: how many of the reader's own items the turn has read so far."
+        )
+    }
+}
+
+/// The wait row's live line as drawn, apart from the view so it can be tested.
+nonisolated enum AskWaitRowLine {
+    /// `phrase`, and `read` after it where there is a count to show, joined as
+    /// the reader's language joins two parts of one line: the separator is the
+    /// catalog's, so a locale with a mark of its own uses it.
+    static func joining(_ phrase: String, read: String?) -> String {
+        guard let read else { return phrase }
+        return String(
+            localized: "\(phrase) · \(read)",
+            bundle: #bundle,
+            comment: "The Ask wait row's live line: what the turn is doing, such as \"Searching your records\", then how many of the reader's own items it has read so far, such as \"12 read\". The middle dot only separates the two; use the separator your language puts between two short parts of one line."
         )
     }
 }

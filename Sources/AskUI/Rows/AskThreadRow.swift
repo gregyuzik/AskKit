@@ -22,10 +22,10 @@ import SwiftUI
 /// and left out of the comparison doesn't make a slow row: it makes a row that
 /// draws the wrong thing and goes on drawing it. `turn` carries the same
 /// obligation one level down, through `AskTurn ==`. The exception is the state
-/// the row owns, VoiceOver's focus on the wait row and the hand-off from it
-/// (`waitRowHasVoiceOver`, `waitRowHandoff`): SwiftUI draws the row again for
-/// a change to either, whatever `==` says, and nothing outside the row sets
-/// them.
+/// the row owns, VoiceOver's focus on the wait row and on the prose and the
+/// hand-off between them (`waitRowHasVoiceOver`, `proseHasVoiceOver`,
+/// `waitRowHandoff`): SwiftUI draws the row again for a change to any of them,
+/// whatever `==` says, and nothing outside the row sets them.
 ///
 /// Nothing reaches back into the store for a value either: `AskThreadList`
 /// reads each one once and hands it over, because a read through `@Observable`
@@ -49,6 +49,9 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     /// Whether this is the newest turn: only its question can have been a chip
     /// a moment ago, and only its failure offers Try Again and the coaching.
     let isLast: Bool
+    /// Whether the turn's failure offers Try Again
+    /// (`AskTurn.offersRetry(isNewest:whileThinking:)`).
+    var offersRetry = false
     /// Whether the answer's follow-ups are showing under it: the stream has
     /// ended and there is something to offer.
     let showsChips: Bool
@@ -103,9 +106,10 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     let onStop: () -> Void
     /// The wait row has taken the focus `focusesWaitRow` asked for.
     let onWaitRowFocused: () -> Void
-    /// The wait row, going as the turn ended before a word, is handing
-    /// VoiceOver's focus to the failure line, which VoiceOver reads as the
-    /// focus lands, so the screen announces nothing more (`AskSpeechLedger`).
+    /// VoiceOver's focus has landed on the failure line, which VoiceOver
+    /// reads as it lands, so the screen announces nothing more
+    /// (`AskSpeechLedger`): from the wait row, going as the turn ended before
+    /// a word, or the reader's own swipe.
     let onFailureTakesFocus: () -> Void
     let onRate: (AskFeedback.Sentiment) -> Void
     let onCopy: (String) -> Void
@@ -124,9 +128,12 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     let onConfirmProposal: () -> Void
     let onHandOffProposal: () -> Void
     let onDeclineProposal: () -> Void
-    /// The proposal's outcome line has taken the focus
+    /// The proposal's outcome line has asked for the focus
     /// `awaitsProposalOutcome` waited for.
     let onProposalOutcomeFocused: () -> Void
+    /// VoiceOver's focus has landed on the proposal's outcome line, handed
+    /// the words it read there (`AskSpeechLedger.Line.proposalOutcome`).
+    var onProposalOutcomeHeard: (String) -> Void = { _ in }
 
     // MARK: - What it owns
 
@@ -134,8 +141,12 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     /// the row is gone when it would be asked whether it had the focus
     /// (`waitRowHandoff`).
     @AccessibilityFocusState private var waitRowHasVoiceOver: Bool
-    /// Who takes VoiceOver's focus from a wait row that had it as it went,
-    /// until they have (`AskWaitRowHandoff`).
+    /// VoiceOver's focus on the prose, held here for the same reason: a turn
+    /// that restarts takes its prose away, and the wait row that comes back
+    /// takes the focus the prose had.
+    @AccessibilityFocusState private var proseHasVoiceOver: Bool
+    /// Who takes VoiceOver's focus from the wait row or the prose that had it
+    /// as it went, until they have (`AskWaitRowHandoff`).
     @State private var waitRowHandoff: AskWaitRowHandoff?
 
     /// The values, and nothing else. The callbacks are left out because
@@ -150,6 +161,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
         lhs.turn == rhs.turn
             && lhs.previous?.id == rhs.previous?.id
             && lhs.isLast == rhs.isLast
+            && lhs.offersRetry == rhs.offersRetry
             && lhs.showsChips == rhs.showsChips
             && lhs.followUps == rhs.followUps
             && lhs.offersAnotherPick == rhs.offersAnotherPick
@@ -174,13 +186,15 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
         VStack(alignment: .leading, spacing: AskScrollFollow.turnSpacing) {
             turnBody
             if showsChips {
-                // "Another pick" leads the bank, in its glass group, when the
-                // answer chose something.
+                // "Another pick" leads the bank when the answer chose
+                // something. A fill, not glass, as everything in the thread
+                // is (`AskChipRow.Surface`).
                 AskChipRow(
                     starters: followUps, kind: .followUp,
                     identifier: AskAccessibility.followUps,
                     morph: morph,
-                    leading: offersAnotherPick ? anotherPick : nil
+                    leading: offersAnotherPick ? anotherPick : nil,
+                    surface: .fill
                 ) {
                     onFollowUp($0)
                 } onDecline: {
@@ -236,7 +250,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                     morph: AskChipMorph.matches(turn, isNewest: isLast) ? morph : nil,
                     photo: turn.photo,
                     photoImage: turn.photoImage,
-                    photoThumbnail: { [domain] photo in await domain.photoThumbnail(for: photo) },
+                    photoThumbnail: AskQuestionThumbnail.loader(for: domain),
                     // Not until there is prose to copy, which keeps the item out
                     // of the menu on a turn still waiting for its first words
                     // or one that failed before writing anything.
@@ -279,8 +293,13 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                     rowsRead: turn.rowsRead.count,
                     accent: accent,
                     hasVoiceOver: $waitRowHasVoiceOver,
-                    takesFocus: focusesWaitRow,
-                    onFocusTaken: onWaitRowFocused,
+                    // Asked for by the control that started the turn, or by
+                    // the prose it comes back in place of.
+                    takesFocus: focusesWaitRow || waitRowHandoff == .waitRow,
+                    onFocusTaken: {
+                        if waitRowHandoff == .waitRow { waitRowHandoff = nil }
+                        onWaitRowFocused()
+                    },
                     onStop: onStop,
                     mark: { mark(true) }
                 )
@@ -292,6 +311,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                     isComplete: turn.isComplete,
                     accent: accent,
                     spectrum: spectrum,
+                    hasVoiceOver: $proseHasVoiceOver,
                     takesFocus: waitRowHandoff == .prose,
                     onFocusTaken: { waitRowHandoff = nil },
                     onStop: onStop,
@@ -349,12 +369,13 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                 AskFailureRow(
                     message: failure.message,
                     readerStopped: turn.isReadersStopBeforeAWord,
-                    retryable: failure.retryable && isLast,
+                    retryable: offersRetry,
                     coaching: isLast ? failure.coaching : [],
                     takesFocus: waitRowHandoff == .failure,
                     onRetry: onRetry,
                     onCoaching: onCoaching,
-                    onFocusTaken: { waitRowHandoff = nil }
+                    onFocusTaken: { waitRowHandoff = nil },
+                    onLineFocused: onFailureTakesFocus
                 )
                 .askArrival(evidenceStep + 1, as: .line)
             }
@@ -379,7 +400,8 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                     onConfirm: onConfirmProposal,
                     onHandOff: onHandOffProposal,
                     onDecline: onDeclineProposal,
-                    onOutcomeFocused: onProposalOutcomeFocused
+                    onOutcomeFocused: onProposalOutcomeFocused,
+                    onOutcomeHeard: onProposalOutcomeHeard
                 )
                 .askArrival(evidenceStep + 3)
             }
@@ -388,19 +410,19 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
         // what replaces it**: the prose, or the failure where the turn ended
         // before a word. Otherwise the focus goes to wherever the system puts
         // it, and a reader waiting on the wait row loses their place on the
-        // thread at the first word. Read here, in the update that removes the
-        // row, and not from the row, which is gone by the time it could be
-        // asked. A request, not a focus set: the replacement is inserted in
-        // this same update and takes the focus once it is in the
-        // accessibility tree (`AskWaitRowHandoff`). Not watched under
-        // VoiceOver: no simulator runs it.
-        //
-        // A hand-off to the failure line is told to the screen here, in the
-        // update that ends the turn, so it announces nothing more: VoiceOver
-        // reads the line as the focus lands (`AskSpeechLedger`).
+        // thread at the first word. **And the prose hands it back** where the
+        // turn restarts, a hand-down or a rollover, which takes the prose
+        // away and brings the wait row back (`AskTurnEvent.restarted`).
+        // Read here, in the update that removes the one that had it, and not
+        // from it, which is gone by the time it could be asked. A request, not
+        // a focus set: the replacement is inserted in this same update and
+        // takes the focus once it is in the accessibility tree
+        // (`AskWaitRowHandoff`). Not watched under VoiceOver: no simulator
+        // runs it.
         .onChange(of: turn.showsWaitRow) { _, shows in
-            waitRowHandoff = shows ? nil : AskWaitRowHandoff.successor(hadFocus: waitRowHasVoiceOver, leaving: turn)
-            if waitRowHandoff == .failure { onFailureTakesFocus() }
+            waitRowHandoff = shows
+                ? AskWaitRowHandoff.returning(proseHadFocus: proseHasVoiceOver, to: turn)
+                : AskWaitRowHandoff.successor(hadFocus: waitRowHasVoiceOver, leaving: turn)
         }
     }
 
@@ -464,22 +486,42 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
 extension AskTurn {
     /// Whether the thread draws the wait row for this turn: it has said
     /// nothing and not ended. The frame the first words land, or the turn
-    /// ends, it gives way (`AskWaitRowHandoff`).
+    /// ends, it gives way, and it comes back where a restart takes the words
+    /// away (`AskWaitRowHandoff`).
     nonisolated var showsWaitRow: Bool {
         !isComplete && text.isEmpty
     }
+
+    /// Whether this turn's failure offers Try Again: one that can be asked
+    /// again, on the newest turn, while the store isn't thinking.
+    ///
+    /// **Not while a question waits to be asked**, for the saved thread to be
+    /// read or for the chat to change. It has no turn yet, so the failed turn
+    /// is still the newest, and `AskConversationStore.retry` does nothing
+    /// until the question has been asked: a Try Again shown then would take
+    /// the reader's tap and do nothing with it. A failure stops the store
+    /// thinking in the update that writes it, so a turn that has just failed
+    /// offers it at once.
+    nonisolated func offersRetry(isNewest: Bool, whileThinking isThinking: Bool) -> Bool {
+        failure?.retryable == true && isNewest && !isThinking
+    }
 }
 
-/// Who takes VoiceOver's focus from a wait row that had it as it went
-/// (`AskThreadRow.waitRowHandoff`), apart from the view so it can be tested.
+/// Who takes VoiceOver's focus from a wait row that had it as it went, or
+/// from the prose a restart takes away (`AskThreadRow.waitRowHandoff`), apart
+/// from the view so it can be tested.
 ///
-/// **The element that replaces the wait row, in reading order.** The first
-/// word's prose, or, for a turn that ended before one (a failure, or the
-/// reader's stop), the failure line. Where a snapshot brings both, the prose:
-/// it is first, and the failure is announced anyway (house rule 8).
+/// **The element that replaces the one that went, in reading order.** For the
+/// wait row, the first word's prose, or, for a turn that ended before one (a
+/// failure, or the reader's stop), the failure line. Where a snapshot brings
+/// both, the prose: it is first, and the failure is announced anyway (house
+/// rule 8). For the prose, the wait row that comes back in its place.
 nonisolated enum AskWaitRowHandoff: Equatable {
     case prose
     case failure
+    /// The wait row, back on a turn that restarted, which took away the prose
+    /// that had the focus.
+    case waitRow
 
     /// Who takes the focus when the wait row leaves `turn`, or nil when no
     /// one does.
@@ -492,6 +534,20 @@ nonisolated enum AskWaitRowHandoff: Equatable {
         guard hadFocus else { return nil }
         if !turn.text.isEmpty { return .prose }
         return turn.failure == nil ? nil : .failure
+    }
+
+    /// Who takes the focus when the wait row comes back to `turn`, as a
+    /// restart takes its prose away: the wait row, where the prose had it,
+    /// or nil.
+    ///
+    /// **The wait row, so the reader isn't stranded.** A reader on the prose
+    /// as Private Cloud Compute drops, or the conversation rolls over, would
+    /// otherwise be left wherever the system put the focus, with nothing
+    /// spoken until the new attempt ends. On the wait row they hear the turn
+    /// start again, and it hands them on at the new attempt's first words.
+    /// Nil when the prose didn't have it, for the reason `successor` gives.
+    static func returning<Row: AskRow>(proseHadFocus: Bool, to turn: AskTurn<Row>) -> Self? {
+        proseHadFocus && turn.showsWaitRow ? .waitRow : nil
     }
 }
 
