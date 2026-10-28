@@ -437,9 +437,9 @@ public actor AppleModelSeam: AskModelSeam {
     /// model still downloading its assets can say no to a language it will
     /// write once they are in, and kept, that no would read as
     /// `.languageNotSupported`, which no Try Again gets past, until the app
-    /// relaunched. A "yes", and a "no" from a model that is available (the
-    /// Mac under a Hebrew locale), are kept. So is nothing, past a change in
-    /// the model's availability (`keepLocaleReads(under:)`).
+    /// relaunched. A "yes" is kept, and so is a "no" from a model that is
+    /// available (the Mac under a Hebrew locale), until the model's
+    /// availability changes (`keepLocaleReads(under:)`).
     private func onDeviceSpeaks(_ locale: Locale) async -> Bool {
         if let kept = onDeviceLocaleSupport[locale.identifier] { return kept }
         let readUnder = onDeviceLocaleReadsUnder
