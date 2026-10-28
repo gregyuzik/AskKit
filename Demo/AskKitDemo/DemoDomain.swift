@@ -226,13 +226,17 @@ nonisolated struct DemoSearchTool: Tool {
         // the order `AskToolContext` gives.
         return await context.withToolCall(.searching(scope: scope)) { collector in
             let rows = DemoSearch.rows(query: arguments.query, kind: arguments.kind)
-            await collector.record(rows: rows)
+            // Only the rows the model is shown. An answer's tiles and the
+            // count under it resolve against what is recorded, so a row past
+            // the limit would be a tile the model never read.
+            let shown = Array(rows.prefix(context.rowLimit))
+            await collector.record(rows: shown)
             // What the search also knew, for the card under the answer. The
             // model never sees it; the answer carries it out of the turn.
             if let span = DemoYearSpan(rows)?.encoded { await collector.record(payload: span) }
             return (
                 DemoSearch.render(rows, limit: context.rowLimit),
-                report: .reading(shown: min(rows.count, context.rowLimit), total: rows.count, scope: scope)
+                report: .reading(shown: shown.count, total: rows.count, scope: scope)
             )
         }
     }
@@ -455,12 +459,12 @@ nonisolated struct DemoDomain: AskDomain {
         [DemoSearchTool(context: context)]
     }
 
-    /// Three sentences, short as house rule 3 asks
-    /// (`AskDomain.instructions(tier:isConversation:answerLanguage:)` has the
-    /// measurement). Every category and activity mapping that would have
-    /// gone here lives in the tool's `@Guide`s instead. `isConversation` is
-    /// unused here: the demo registers one tool and registers it always, so
-    /// there is nothing for a one-shot to narrow.
+    /// Three sentences, and a fourth with an answer language: short, as house
+    /// rule 3 asks (`AskDomain.instructions(tier:isConversation:answerLanguage:)`
+    /// has the measurement). Every category and activity mapping that would
+    /// have gone here lives in the tool's `@Guide`s instead. `isConversation`
+    /// is unused here: the demo registers one tool and registers it always,
+    /// so there is nothing for a one-shot to narrow.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
         var text = """
             You answer questions about the things one person owns, and about nothing else.
@@ -490,20 +494,12 @@ nonisolated struct DemoDomain: AskDomain {
         """
     }
 
-    /// The tool's call in the tool's shape (`DemoSearchTool`), through
-    /// `withToolCall`, so the grounded retry's wait row hears what it hears
-    /// from the tool: the search, the finish, then what it read.
+    /// The tool's own call (`DemoSearchTool`), so the grounded retry records
+    /// what the tool would have, and its wait row hears what it hears from
+    /// the tool: the search, the finish, then what it read. One body, not a
+    /// copy of it, so the two can't drift on what they record.
     func search(_ arguments: DemoSearchArguments, context: AskToolContext<DemoRow>) async throws -> String {
-        let scope = DemoRow.Kind(rawValue: (arguments.kind ?? "").lowercased())?.scope
-        return await context.withToolCall(.searching(scope: scope)) { collector in
-            let rows = DemoSearch.rows(query: arguments.query, kind: arguments.kind)
-            await collector.record(rows: rows)
-            if let span = DemoYearSpan(rows)?.encoded { await collector.record(payload: span) }
-            return (
-                DemoSearch.render(rows, limit: context.rowLimit),
-                report: .reading(shown: min(rows.count, context.rowLimit), total: rows.count, scope: scope)
-            )
-        }
+        try await DemoSearchTool(context: context).call(arguments: arguments)
     }
 
     /// Named from what the reader actually owns, largest shelf first — a

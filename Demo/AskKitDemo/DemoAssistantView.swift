@@ -87,7 +87,7 @@ struct DemoReminderSheet: View {
             List {
                 if list.reminders.isEmpty {
                     Text(verbatim: "None yet. Ask to be reminded of something, and add it with the card under the answer.")
-                        .foregroundStyle(.secondary)
+                        .askDeemphasizedText()
                 } else {
                     ForEach(list.reminders) { reminder in
                         VStack(alignment: .leading, spacing: 2) {
@@ -95,7 +95,7 @@ struct DemoReminderSheet: View {
                             if let when = reminder.when {
                                 Text(verbatim: when)
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .askDeemphasizedText()
                             }
                         }
                         .accessibilityElement(children: .combine)
@@ -105,8 +105,9 @@ struct DemoReminderSheet: View {
             }
             .navigationTitle(Text(verbatim: "Reminders"))
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                // The system's close button, as `DemoRowDetail` says.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close) { dismiss() }
                 }
             }
         }

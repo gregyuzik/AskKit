@@ -272,7 +272,7 @@ struct ContentView: View {
                 Tab(value: DemoTab.library) {
                     NavigationStack {
                         Text(verbatim: "A second tab, so the bar has more than Ask in it.")
-                            .foregroundStyle(.secondary)
+                            .askDeemphasizedText()
                             .navigationTitle(Text(verbatim: "Library"))
                     }
                 } label: {
@@ -483,8 +483,11 @@ struct DemoRowDetail: View {
         NavigationStack {
             DemoRowPage(row: row)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button { dismiss() } label: { Text(verbatim: "Done") }
+                    // The system's own close button, labelled in the reader's
+                    // language, as AskKit's History sheet has it: the sheet
+                    // has nothing to confirm.
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(role: .close) { dismiss() }
                     }
                 }
         }
@@ -505,13 +508,22 @@ struct DemoRowPage: View {
                 // which is what says the id survived the erasure
                 // `AskItemOpenAction` needs to exist at all.
                 .accessibilityIdentifier(DemoAccessibility.rowDetailTitle)
-            Text(verbatim: "\(row.kind.scope) · \(row.year.formatted(.number.grouping(.never)))")
-                .foregroundStyle(.secondary)
+            Text(verbatim: "\(row.kind.scope) · \(year)")
+                .askDeemphasizedText()
+                // A pause where the eye has a middle dot, as on the tile
+                // (`DemoTiles`): VoiceOver with punctuation on would say
+                // "middle dot".
+                .accessibilityLabel(Text(verbatim: "\(row.kind.scope), \(year)"))
             Text(row.note)
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
+    }
+
+    /// The year as a year, with no grouping separator.
+    private var year: String {
+        row.year.formatted(.number.grouping(.never))
     }
 }
 
@@ -537,8 +549,9 @@ struct DemoSettings<Domain: AskDomain>: View {
             }
             .navigationTitle(Text(verbatim: "Settings"))
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: { Text(verbatim: "Done") }
+                // The system's close button, as `DemoRowDetail` says.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .close) { dismiss() }
                 }
             }
             .task { await ask.seam.refreshStatus() }
@@ -546,19 +559,26 @@ struct DemoSettings<Domain: AskDomain>: View {
     }
 }
 
+/// The one Ask this file's previews share. The canvas runs them in one
+/// process, which holds one model seam as the app does (`DemoHost`): an Ask
+/// apiece would make a second seam, which is logged as a fault, and each
+/// would read the same folder. Every preview shows the one store, as every
+/// Mac window does.
+private let previewAsk = DemoAsk<DemoDomain>()
+
 #Preview {
-    ContentView(ask: DemoAsk())
+    ContentView(ask: previewAsk)
 }
 
 // iPhone Duo's two arrangements, on whatever the canvas is set to. On the
 // iPhone Duo destination with the canvas's Display set to the inner one, the
 // stand-in fold supplies the region a preview doesn't have.
 #Preview("Held like a book") {
-    ContentView(ask: DemoAsk())
+    ContentView(ask: previewAsk)
         .askSimulatedFold(.book())
 }
 
 #Preview("Upright") {
-    ContentView(ask: DemoAsk())
+    ContentView(ask: previewAsk)
         .askSimulatedFold(.upright())
 }

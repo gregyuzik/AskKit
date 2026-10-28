@@ -20,7 +20,8 @@ nonisolated struct Book: AskRow {
     static let shelf = [
         Book(id: "b1", title: "The Dispossessed", author: "Ursula K. Le Guin"),
         Book(id: "b2", title: "Housekeeping", author: "Marilynne Robinson"),
-        Book(id: "b3", title: "A Pattern Language", author: "Christopher Alexander")
+        Book(id: "b3", title: "A Pattern Language", author: "Christopher Alexander"),
+        Book(id: "b4", title: "1984", author: "George Orwell")
     ]
 }
 
@@ -42,23 +43,31 @@ nonisolated struct SearchBooks: Tool {
     @concurrent func call(arguments: BookQuery) async throws -> String {
         // Notes the call, finishes it however the lookup ends, then reports what it read.
         await context.withToolCall(.searching(scope: nil)) { collector in
-            let words = arguments.words.split(whereSeparator: { !$0.isLetter }).map(String.init)
-            let found = Book.shelf.filter { book in
-                // Ignores case and accents, so "garcia marquez" finds "García Márquez".
-                let text = "\(book.title) \(book.author)"
-                return words.contains { text.localizedStandardContains($0) }
-            }
+            // A one-letter word, such as "a" or "I", names nothing to look for.
+            let asked = Self.words(arguments.words).filter { $0.count > 1 }
+            let matches = Book.shelf.filter { !Self.words("\($0.title) \($0.author)").isDisjoint(with: asked) }
+            // Nothing matched, as for "How many books do I own?": the whole shelf, to count or look through.
+            let found = matches.isEmpty ? Book.shelf : matches
             let shown = Array(found.prefix(context.rowLimit))
             // An answer's tiles resolve only against recorded rows.
             await collector.record(rows: shown)
-            return (Self.render(shown, of: found.count), report: .reading(shown: shown.count, total: found.count, scope: nil))
+            let reply = Self.render(shown, of: found.count, matched: !matches.isEmpty)
+            return (reply, report: .reading(shown: shown.count, total: found.count, scope: nil))
         }
     }
 
+    // Whole words of letters or digits, ignoring case and accents: "garcia marquez" finds
+    // "García Márquez", "1984" is a word, and "le" isn't found inside "Alexander".
+    private static func words(_ text: String) -> Set<String> {
+        let words = text.split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        return Set(words.map { $0.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) })
+    }
+
     // Every field clamped, so none can spell a tag to the model, and no fence of its own.
-    private static func render(_ shown: [Book], of total: Int) -> String {
-        guard !shown.isEmpty else { return "No matches." }
-        var lines = shown.map { "\(AskPrompt.clamp($0.title, AskPrompt.shortClamp)) | \(AskPrompt.clamp($0.author, AskPrompt.shortClamp))" }
+    private static func render(_ shown: [Book], of total: Int, matched: Bool) -> String {
+        guard !shown.isEmpty else { return "The shelf is empty." }
+        var lines = matched ? [] : ["No book matched, so this is the whole shelf."]
+        lines += shown.map { "\(AskPrompt.clamp($0.title, AskPrompt.shortClamp)) | \(AskPrompt.clamp($0.author, AskPrompt.shortClamp))" }
         if total > shown.count { lines.append("(+\(total - shown.count) more not shown)") }
         return lines.joined(separator: "\n")
     }
@@ -163,7 +172,7 @@ import Testing
     @Test func theReadmesDomainAnswersWhatTheEngineAsksOfIt() async throws {
         let domain = LibraryDomain()
         let overview = await domain.overview()
-        #expect(overview.total == 3)
+        #expect(overview.total == 4)
         #expect(domain.starters(overview: overview, window: 3).count == 2)
         let instructions = domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: "French")
         #expect(instructions.contains("search_books"))
@@ -183,7 +192,6 @@ import Testing
         #expect(await collector.toolCallCount == 1)
 
         // A limit under the matches says so, and records only what it shows.
-        // A miss says that.
         let capped = AskCollector<Book>()
         let cappedContext = AskToolContext(
             collector: capped, relay: AskActivityRelay(),
@@ -192,10 +200,58 @@ import Testing
         let some = try await domain.search(BookQuery(words: "the language ursula"), context: cappedContext)
         #expect(some == "The Dispossessed | Ursula K. Le Guin\n(+1 more not shown)")
         #expect(await capped.rows == [Book.shelf[0]])
-        #expect(try await domain.search(BookQuery(words: "xyzzy"), context: cappedContext) == "No matches.")
 
         // The words match whatever their case and accents.
         #expect(try await domain.search(BookQuery(words: "GUÍN"), context: cappedContext) == "The Dispossessed | Ursula K. Le Guin")
+    }
+
+    /// The search an adopter copies, asked what its starters ask. A question
+    /// no word of narrows, such as "How many books do I own?", reads the whole
+    /// shelf and says so, so the answer can count it rather than call the
+    /// shelf empty. A word matches only a whole word of a title or an author,
+    /// so neither "K" nor "Le" is found inside "Housekeeping" or "Alexander";
+    /// a one-letter word, such as the "A" of "A Pattern Language", matches
+    /// nothing; and digits make a word, so "1984" finds it.
+    @MainActor
+    @Test func theReadmesSearchListsTheShelfWhenNoWordNarrowsIt() async throws {
+        let domain = LibraryDomain()
+        let collector = AskCollector<Book>()
+        let context = AskToolContext(
+            collector: collector, relay: AskActivityRelay(),
+            rowLimit: 12, tier: .onDevice, isConversation: true
+        )
+        let shelf = """
+            No book matched, so this is the whole shelf.
+            The Dispossessed | Ursula K. Le Guin
+            Housekeeping | Marilynne Robinson
+            A Pattern Language | Christopher Alexander
+            1984 | George Orwell
+            """
+        #expect(try await domain.search(BookQuery(words: "How many books do I own?"), context: context) == shelf)
+        #expect(await collector.rows == Book.shelf)
+        #expect(try await domain.search(BookQuery(words: ""), context: context) == shelf)
+        #expect(try await domain.search(BookQuery(words: "xyzzy"), context: context) == shelf)
+        #expect(try await domain.search(BookQuery(words: "a"), context: context) == shelf)
+
+        let author = AskCollector<Book>()
+        let authorContext = AskToolContext(
+            collector: author, relay: AskActivityRelay(),
+            rowLimit: 12, tier: .onDevice, isConversation: true
+        )
+        #expect(try await domain.search(BookQuery(words: "Ursula K. Le Guin"), context: authorContext) == "The Dispossessed | Ursula K. Le Guin")
+        #expect(await author.rows == [Book.shelf[0]])
+        #expect(try await domain.search(BookQuery(words: "1984"), context: context) == "1984 | George Orwell")
+
+        // The whole shelf under a limit shows the limit's worth, says how
+        // many more, and records only what it shows.
+        let capped = AskCollector<Book>()
+        let cappedContext = AskToolContext(
+            collector: capped, relay: AskActivityRelay(),
+            rowLimit: 1, tier: .onDevice, isConversation: true
+        )
+        let some = try await domain.search(BookQuery(words: "anything by Dickens"), context: cappedContext)
+        #expect(some == "No book matched, so this is the whole shelf.\nThe Dispossessed | Ursula K. Le Guin\n(+3 more not shown)")
+        #expect(await capped.rows == [Book.shelf[0]])
     }
 }
 
