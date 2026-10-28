@@ -50,11 +50,15 @@ public actor AppleModelSeam: AskModelSeam {
     /// Whether the host declared the entitlement.
     private let privateCloudCompute: AskPrivateCloudCompute
     private var cachedModel: PrivateCloudComputeLanguageModel?
-    private var probe: (at: Date, available: Bool, terminal: Bool, reason: AskUnavailability?)?
-    private var cooledUntil: Date?
+    /// Every time below is on `now`, a monotonic clock, so a wall clock set
+    /// back can't stretch a hold or keep a probe answer past its interval.
+    /// A date the tier gives is turned into an instant once, when it is
+    /// noted (`holdEnd(until:wallNow:now:)`).
+    private var probe: (at: ContinuousClock.Instant, available: Bool, terminal: Bool, reason: AskUnavailability?)?
+    private var cooledUntil: ContinuousClock.Instant?
     /// The day's quota, spent: held until the reset the failure (or the
     /// model's quota usage) named, so no turn is spent learning it again.
-    private var quotaHeldUntil: Date?
+    private var quotaHeldUntil: ContinuousClock.Instant?
     private var hasLoggedRefusal = false
     private var hasLoggedPark = false
     /// Private Cloud Compute's locale probe, by locale. See
@@ -63,8 +67,27 @@ public actor AppleModelSeam: AskModelSeam {
     /// Private Cloud Compute's context window. See `privateCloudWindow(of:)`.
     private let windowRead: AskSharedRead<AskTier, Int>
     /// Whether the on-device model writes a locale, by locale: a local read,
-    /// so never more than kept.
+    /// so never more than kept, and kept only while it can't go stale
+    /// (`onDeviceSpeaks(_:)`).
     private var onDeviceLocaleSupport: [String: Bool] = [:]
+    /// The on-device model's availability when `onDeviceLocaleSupport` was
+    /// read, or nil before the first read of it.
+    private var onDeviceLocaleReadsUnder: SystemLanguageModel.Availability?
+    /// The on-device model's availability, read off the seam's actor
+    /// (`systemAvailability()`), unless a test scripts it.
+    private let onDeviceAvailability: @Sendable () async -> SystemLanguageModel.Availability
+    /// Whether the on-device model writes a locale, read off the seam's actor
+    /// (`systemSupportsLocale(_:)`), unless a test scripts it.
+    private let onDeviceSupportsLocale: @Sendable (Locale) async -> Bool
+    /// The monotonic clock the seam's holds and probe are timed on.
+    private let now: @Sendable () -> ContinuousClock.Instant
+    /// The refreshes begun, and the newest whose reading the mirror took. A
+    /// refresh reads the tiers over several awaits, so two that overlap can
+    /// finish in either order, and the older one's reading must not land
+    /// over the newer's (`refreshStatus()`). The second is read and written
+    /// only on the main actor, beside the mirror.
+    private var refreshesBegun: UInt64 = 0
+    private let newestRefreshApplied = Mutex<UInt64>(0)
     private let gate: AskGenerationGate
     private let monitor = NetworkReachability()
 
@@ -106,9 +129,31 @@ public actor AppleModelSeam: AskModelSeam {
         gate: AskGenerationGate = .shared,
         logSubsystem: String? = nil
     ) {
+        self.init(
+            status: status, privateCloudCompute: privateCloudCompute, gate: gate, logSubsystem: logSubsystem,
+            onDeviceAvailability: { await Self.systemAvailability() },
+            onDeviceSupportsLocale: { await Self.systemSupportsLocale($0) },
+            now: { .now }
+        )
+    }
+
+    /// A seam whose on-device reads and clock are given: the system's in the
+    /// public initializer, a test's script here.
+    init(
+        status: AskModelStatus,
+        privateCloudCompute: AskPrivateCloudCompute,
+        gate: AskGenerationGate,
+        logSubsystem: String?,
+        onDeviceAvailability: @escaping @Sendable () async -> SystemLanguageModel.Availability,
+        onDeviceSupportsLocale: @escaping @Sendable (Locale) async -> Bool,
+        now: @escaping @Sendable () -> ContinuousClock.Instant
+    ) {
         self.status = status
         self.privateCloudCompute = privateCloudCompute
         self.gate = gate
+        self.onDeviceAvailability = onDeviceAvailability
+        self.onDeviceSupportsLocale = onDeviceSupportsLocale
+        self.now = now
         let logger = Logger(subsystem: AskBrand.subsystem(logSubsystem), category: "seam")
         self.logger = logger
         let memory = Duration.seconds(Self.reprobeInterval)
@@ -173,7 +218,7 @@ public actor AppleModelSeam: AskModelSeam {
             isAvailable: available,
             speaksLanguage: available ? Self.speaksLanguage(probed: await speaksAppLanguage(.privateCloud)) : true,
             quotaReached: quotaReached,
-            isCooled: (cooledUntil.map { $0 > .now }) ?? false,
+            isCooled: isHeld(cooledUntil),
             unavailability: available ? nil : (probe?.reason ?? .unknown)
         )
     }
@@ -211,12 +256,26 @@ public actor AppleModelSeam: AskModelSeam {
     }
 
     private var isQuotaHeld: Bool {
-        (quotaHeldUntil.map { $0 > .now }) ?? false
+        isHeld(quotaHeldUntil)
+    }
+
+    /// Whether a hold lifting at `until` is still on.
+    private func isHeld(_ until: ContinuousClock.Instant?) -> Bool {
+        (until.map { $0 > now() }) ?? false
+    }
+
+    /// Whether Private Cloud Compute is cooling down, and whether its spent
+    /// quota is held. Test-facing: the tier's state reads both only where the
+    /// tier may be reached, which no test process may.
+    var holds: (isCooled: Bool, isQuotaHeld: Bool) {
+        (isHeld(cooledUntil), isQuotaHeld)
     }
 
     private func onDeviceState() async -> AskTierState {
         let locale = Self.appLocale
-        switch await Self.onDeviceAvailability() {
+        let availability = await onDeviceAvailability()
+        keepLocaleReads(under: availability)
+        switch availability {
         case .available:
             return AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: await onDeviceSpeaks(locale))
         case .unavailable(let why):
@@ -245,7 +304,7 @@ public actor AppleModelSeam: AskModelSeam {
     /// first read can load a manifest, and the seam's other callers needn't
     /// wait on it. `@concurrent` rather than a detached task, so the read keeps
     /// its caller's priority and cancellation.
-    @concurrent nonisolated private static func onDeviceAvailability() async -> SystemLanguageModel.Availability {
+    @concurrent nonisolated private static func systemAvailability() async -> SystemLanguageModel.Availability {
         SystemLanguageModel.default.availability
     }
 
@@ -288,11 +347,11 @@ public actor AppleModelSeam: AskModelSeam {
     /// change while the process runs. Everything else is re-probed after
     /// `reprobeInterval`.
     private func probeAvailability() -> Bool {
-        if let probe, probe.terminal || Date.now.timeIntervalSince(probe.at) < Self.reprobeInterval {
+        if let probe, probe.terminal || now() - probe.at < .seconds(Self.reprobeInterval) {
             return probe.available
         }
         guard let model = model() else {
-            probe = (.now, false, true, .notEntitled)
+            probe = (now(), false, true, .notEntitled)
             return false
         }
         let available: Bool
@@ -311,7 +370,7 @@ public actor AppleModelSeam: AskModelSeam {
                 (available, terminal, reason) = (false, false, .unknown)
             }
         }
-        probe = (.now, available, terminal, reason)
+        probe = (now(), available, terminal, reason)
         // "available" for no reason, so a healthy process's one line doesn't
         // read as the `unknown` an unnamed reason logs.
         logger.info("private cloud availability: \(reason.map { String(describing: $0) } ?? "available", privacy: .public)")
@@ -370,13 +429,36 @@ public actor AppleModelSeam: AskModelSeam {
         }
     }
 
-    /// Whether the on-device model writes `locale`, read once per locale. A
-    /// local read, but off the seam's actor (`onDeviceSupportsLocale(_:)`).
+    /// Whether the on-device model writes `locale`: a local read, but off the
+    /// seam's actor (`systemSupportsLocale(_:)`), kept while it can't go
+    /// stale.
+    ///
+    /// **A "no" read while the model isn't available is read again.** A
+    /// model still downloading its assets can say no to a language it will
+    /// write once they are in, and kept, that no would read as
+    /// `.languageNotSupported`, which no Try Again gets past, until the app
+    /// relaunched. A "yes", and a "no" from a model that is available (the
+    /// Mac under a Hebrew locale), are kept. So is nothing, past a change in
+    /// the model's availability (`keepLocaleReads(under:)`).
     private func onDeviceSpeaks(_ locale: Locale) async -> Bool {
         if let kept = onDeviceLocaleSupport[locale.identifier] { return kept }
-        let supported = await Self.onDeviceSupportsLocale(locale)
-        onDeviceLocaleSupport[locale.identifier] = supported
+        let readUnder = onDeviceLocaleReadsUnder
+        let supported = await onDeviceSupportsLocale(locale)
+        // Unless the availability changed while the read ran: then the read
+        // belongs to neither.
+        if onDeviceLocaleReadsUnder == readUnder, supported || readUnder == .available {
+            onDeviceLocaleSupport[locale.identifier] = supported
+        }
         return supported
+    }
+
+    /// Drop the locale reads kept when the on-device model's availability is
+    /// no longer the one they were read under: a download that finished, or
+    /// one that began, can change which languages the model writes.
+    private func keepLocaleReads(under availability: SystemLanguageModel.Availability) {
+        guard onDeviceLocaleReadsUnder != availability else { return }
+        onDeviceLocaleReadsUnder = availability
+        onDeviceLocaleSupport = [:]
     }
 
     /// Private Cloud Compute's locale probe, run off the seam's actor.
@@ -389,7 +471,7 @@ public actor AppleModelSeam: AskModelSeam {
     /// The on-device model's locale read, off the seam's actor, where its
     /// availability read is too: the first read of the model's languages can
     /// load a manifest.
-    @concurrent nonisolated private static func onDeviceSupportsLocale(_ locale: Locale) async -> Bool {
+    @concurrent nonisolated private static func systemSupportsLocale(_ locale: Locale) async -> Bool {
         SystemLanguageModel.default.supportsLocale(locale)
     }
 
@@ -598,15 +680,15 @@ public actor AppleModelSeam: AskModelSeam {
     /// transport to cool.
     public func noteTransportFailure(on tier: AskTier) async {
         guard tier == .privateCloud else { return }
-        let now = Date.now
+        let now = now()
         // Never shorter than a hold already running: the engine reports a rate
         // limit here too, after the session has already held the tier until
         // the reset the limit named (`noteFailure(_:)`).
-        cooledUntil = Self.extendedHold(cooledUntil, to: now.addingTimeInterval(Self.transportCooldown), now: now)
-        let seconds = (cooledUntil ?? now).timeIntervalSince(now)
-        logger.notice("transport failure — cooling private cloud for \(Int(seconds), privacy: .public)s")
+        cooledUntil = Self.extendedHold(cooledUntil, to: now + .seconds(Self.transportCooldown), now: now)
+        let held = (cooledUntil ?? now) - now
+        logger.notice("transport failure — cooling private cloud for \(held.components.seconds, privacy: .public)s")
         await refreshStatus()
-        refreshWhenHoldLifts(after: seconds)
+        refreshWhenHoldLifts(at: cooledUntil)
     }
 
     /// A Private Cloud Compute failure that says when the tier can be tried
@@ -618,18 +700,24 @@ public actor AppleModelSeam: AskModelSeam {
     /// own, and every turn after it would otherwise try Private Cloud Compute
     /// first and learn it again. A rate limit that named its reset cools the
     /// tier until then rather than for the minute an unannounced fault gets.
-    /// Neither ever shortens a hold already running.
+    /// Neither ever shortens a hold already running, nor runs past
+    /// `longestHold`.
     func noteFailure(_ error: any Error) async {
         guard let retry = AskTriage.retryAfter(from: error) else { return }
-        let now = Date.now
-        let lifts: Date?
+        let now = now()
+        let wallNow = Date.now
+        let lifts: ContinuousClock.Instant?
         if retry.isQuota {
             let reset = Self.quotaReset(fromError: retry.date, fromUsage: model()?.quotaUsage.resetDate)
-            quotaHeldUntil = Self.extendedHold(quotaHeldUntil, to: reset, now: now)
+            quotaHeldUntil = Self.extendedHold(
+                quotaHeldUntil, to: Self.holdEnd(until: reset, wallNow: wallNow, now: now), now: now
+            )
             lifts = quotaHeldUntil
             logger.notice("quota reached — holding private cloud until its reset")
         } else {
-            cooledUntil = Self.extendedHold(cooledUntil, to: retry.date, now: now)
+            cooledUntil = Self.extendedHold(
+                cooledUntil, to: Self.holdEnd(until: retry.date, wallNow: wallNow, now: now), now: now
+            )
             lifts = cooledUntil
             logger.notice("rate limited — cooling private cloud until the reset it named")
         }
@@ -638,25 +726,63 @@ public actor AppleModelSeam: AskModelSeam {
         // Compute's probes and the hand-down shouldn't. The engine chose the
         // fallback from the turn's first read of the tiers.
         Task { [weak self] in await self?.refreshStatus() }
-        if let lifts { refreshWhenHoldLifts(after: lifts.timeIntervalSince(now)) }
+        refreshWhenHoldLifts(at: lifts)
     }
 
     /// Republish the mirror when a hold lifts, so the tier caption comes back
     /// on its own rather than waiting for the next question.
-    private func refreshWhenHoldLifts(after seconds: TimeInterval) {
-        guard seconds > 0 else { return }
+    private func refreshWhenHoldLifts(at lifts: ContinuousClock.Instant?) {
+        guard let lifts else { return }
+        let wait = lifts - now()
+        guard wait > .zero else { return }
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(seconds))
+            try? await Task.sleep(for: wait)
             await self?.refreshStatus()
         }
     }
 
-    /// The later of a hold already running and a proposed one. A proposed date
+    /// The later of a hold already running and a proposed one. A proposed end
     /// already past holds nothing; a running hold is never shortened.
-    nonisolated static func extendedHold(_ current: Date?, to proposed: Date?, now: Date) -> Date? {
+    nonisolated static func extendedHold(
+        _ current: ContinuousClock.Instant?, to proposed: ContinuousClock.Instant?, now: ContinuousClock.Instant
+    ) -> ContinuousClock.Instant? {
         guard let proposed, proposed > now else { return current }
         guard let current, current > proposed else { return proposed }
         return current
+    }
+
+    /// The longest a hold runs, whatever date the tier gave: a day, the span
+    /// of the daily quota a hold exists for. A date further off is a clock or
+    /// a server gone wrong, and held to it, Private Cloud Compute would sit
+    /// out the life of the process. Past it, a quota still spent is still
+    /// excluded by the model's own quota usage.
+    nonisolated static let longestHold: Duration = .seconds(24 * 60 * 60)
+
+    /// When a hold to `date` lifts, on the monotonic clock: `date`'s distance
+    /// from the wall clock now, counted from `now`, and no further than
+    /// `longestHold`. Nil for no date, a date already past, and one that is
+    /// no number.
+    nonisolated static func holdEnd(
+        until date: Date?, wallNow: Date, now: ContinuousClock.Instant
+    ) -> ContinuousClock.Instant? {
+        guard let date else { return nil }
+        let seconds = date.timeIntervalSince(wallNow)
+        guard !seconds.isNaN, seconds > 0 else { return nil }
+        // Compared as seconds before any `Duration` is made of them: one made
+        // of an infinite or vast number traps.
+        guard seconds < Double(longestHold.components.seconds) else { return now + longestHold }
+        return now + .seconds(seconds)
+    }
+
+    /// The wall-clock date a hold lifts at, which the quota banner shows: the
+    /// hold's distance on the monotonic clock, from the wall clock now.
+    nonisolated static func wallDate(
+        of instant: ContinuousClock.Instant, wallNow: Date, now: ContinuousClock.Instant
+    ) -> Date {
+        let left = instant - now
+        return wallNow.addingTimeInterval(
+            Double(left.components.seconds) + Double(left.components.attoseconds) * 1e-18
+        )
     }
 
     /// When a spent quota comes back: the failure's own date, else the one the
@@ -678,7 +804,18 @@ public actor AppleModelSeam: AskModelSeam {
 
     /// Reads every tier's state and Private Cloud Compute's quota, and
     /// publishes them to `status`.
+    ///
+    /// **The newest reading wins, not the last to finish.** The read awaits
+    /// the tiers' probes, so a refresh begun before a cooldown can finish
+    /// after one begun since, and its reading would name a tier the cooldown
+    /// had just excluded until the next refresh. So each refresh takes a
+    /// number before it reads, and the mirror takes a reading only when no
+    /// newer refresh's has landed: checked on the main actor, in the same
+    /// step as the apply, since the two hops there can land in either order
+    /// too.
     public func refreshStatus() async {
+        refreshesBegun &+= 1
+        let refresh = refreshesBegun
         let states = await tierStates()
         var snapshot = Self.snapshot(from: states)
         // `model()` is nil in a parked or unentitled process, so a development
@@ -688,11 +825,20 @@ public actor AppleModelSeam: AskModelSeam {
             let held = isQuotaHeld
             snapshot.quotaReached = quota.isLimitReached || held
             if !held, case .belowLimit(let info) = quota.status { snapshot.quotaApproaching = info.isApproachingLimit }
-            snapshot.resetDate = quota.resetDate ?? (held ? quotaHeldUntil : nil)
+            let heldUntil = held ? quotaHeldUntil.map { Self.wallDate(of: $0, wallNow: .now, now: now()) } : nil
+            snapshot.resetDate = quota.resetDate ?? heldUntil
             snapshot.hasLimitIncreaseSuggestion = quota.limitIncreaseSuggestion != nil
         }
         let published = snapshot
-        await status.apply(published)
+        let status = self.status
+        await MainActor.run {
+            let isNewest = newestRefreshApplied.withLock { newest in
+                guard refresh > newest else { return false }
+                newest = refresh
+                return true
+            }
+            if isNewest { status.apply(published) }
+        }
     }
 
     /// The tier states, as the mirror the settings card reads.
@@ -703,7 +849,7 @@ public actor AppleModelSeam: AskModelSeam {
     /// except the quota's, is derived here. The quota half stays in
     /// `refreshStatus`, which reads the real model.
     nonisolated static func snapshot(from states: [AskTierState]) -> AskModelStatus.Snapshot {
-        let next = askServableTiers(from: states).first
+        let next = askServableTiers(from: states).first ?? heldTier(in: states)
         var snapshot = AskModelStatus.Snapshot(
             nextTier: next,
             unavailability: next == nil ? askUnavailability(from: states) : nil
@@ -719,6 +865,22 @@ public actor AppleModelSeam: AskModelSeam {
                 : (cloud.unavailability ?? .unknown)
         }
         return snapshot
+    }
+
+    /// Private Cloud Compute, when nothing can serve and the tier is out only
+    /// for a while: it is up and writes the language, and only a cooldown or
+    /// a spent quota excludes it.
+    ///
+    /// **A hold is the tier saying "not now", not "can't".** With nowhere to
+    /// hand down to, a question is the turn's error, which Try Again retries
+    /// (house rule 1), so the mirror names the tier rather than a reason. A
+    /// reason would put up the can't-serve first screen after New Chat, in
+    /// the on-device tier's words, for an outage that lifts in a minute or at
+    /// the quota's reset.
+    nonisolated static func heldTier(in states: [AskTierState]) -> AskTier? {
+        guard let cloud = states.first(where: { $0.tier == .privateCloud }),
+              cloud.isAvailable, cloud.speaksLanguage, cloud.isCooled || cloud.quotaReached else { return nil }
+        return .privateCloud
     }
 
     /// Shows Private Cloud Compute's limit-increase suggestion, when the quota
