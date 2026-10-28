@@ -353,7 +353,8 @@ import Testing
     /// Nor does the keyboard's flag move anything of its own: these columns
     /// animate on it and lay nothing out by it, so with it up and no fold
     /// each is the picture it is with it down. `AskScreen` ends an
-    /// arrangement while its keyboard is up by handing no split down.
+    /// arrangement while its keyboard is up by setting no split in the
+    /// environment.
     @Test func lyingFlatOrTypingTheScreensWithNoHalvesAreTheColumnTheyAreWithNoFold() async throws {
         let screens = [
             nothing(),

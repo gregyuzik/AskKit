@@ -117,6 +117,13 @@ extension View {
     /// A button that reads as glass: `.glass` on iOS and macOS, and
     /// `.bordered` on visionOS, where the style doesn't exist and a bordered
     /// button already reads as glass.
+    ///
+    /// **Prominent is a fill of the tint everywhere but visionOS.**
+    /// `.glassProminent` fills with the environment's tint, so a label drawn
+    /// on it is judged on that color (`AskOnAccentLabel`) and the button is
+    /// tinted with the color its label is judged on. visionOS's is the same
+    /// `.bordered` platter, with no fill of the accent, and its label keeps
+    /// the style's own color. Not yet looked at on the visionOS simulator.
     @ViewBuilder
     func askGlassButton(prominent: Bool = false) -> some View {
         #if os(visionOS)
