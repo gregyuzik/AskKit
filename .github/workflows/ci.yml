@@ -25,6 +25,7 @@ on:
     paths-ignore:
       - "AGENTS.md"
       - "CHANGELOG.md"
+      - "CODE_OF_CONDUCT.md"
       - "CONTRIBUTING.md"
       - "SECURITY.md"
       - "TRANSLATION.md"
@@ -70,7 +71,7 @@ jobs:
           else
             while IFS= read -r f; do
               case "$f" in
-                AGENTS.md|CHANGELOG.md|CONTRIBUTING.md|SECURITY.md|TRANSLATION.md|LICENSE) ;;
+                AGENTS.md|CHANGELOG.md|CODE_OF_CONDUCT.md|CONTRIBUTING.md|SECURITY.md|TRANSLATION.md|LICENSE) ;;
                 docs/*|.claude/*|.github/ISSUE_TEMPLATE/*) ;;
                 .github/PULL_REQUEST_TEMPLATE.md|.github/CODEOWNERS) ;;
                 *) code=true; break ;;

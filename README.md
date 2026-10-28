@@ -496,6 +496,7 @@ The screen ships in 25 languages: `en ar cs da de es es-MX fr he id it ja ko nb 
 
 - **Contributing.** [CONTRIBUTING.md](CONTRIBUTING.md) covers the toolchain, the checks, strings and pull requests.
 - **Security.** Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes, rather than in an issue.
+- **Conduct.** Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md), the Contributor Covenant.
 - **License.** MIT: see [LICENSE](LICENSE).
 - **Research.** [docs/DESIGN-RESEARCH.md](docs/DESIGN-RESEARCH.md) is the research on Apple's guidance and on chat interfaces that the screen's design draws on.
 - **Credits.** [Klosyt](https://apps.apple.com/app/id6758277603), a wardrobe, [Kabynyt](https://apps.apple.com/app/id6771412493), a collection, and [vultyr](https://apps.apple.com/app/id6761264004), a service-status monitor, are built on AskKit.
