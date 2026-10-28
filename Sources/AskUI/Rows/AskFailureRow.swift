@@ -20,7 +20,13 @@ import SwiftUI
 /// so it draws no warning glyph (`glyph(readerStopped:)`).
 ///
 /// **The line takes VoiceOver's focus from a wait row that had it as it went**,
-/// when the turn ends before its first word (`AskWaitRowHandoff`).
+/// when the turn ends before its first word (`AskWaitRowHandoff`), and says
+/// when the focus has landed on it, which is when VoiceOver reads it
+/// (`AskSpeechLedger`).
+///
+/// **Try Again and the coaching are a fill, not glass**, on iOS and the Mac,
+/// as the question bubble is: they scroll under the glass bar and behind the
+/// glass composer, and glass can't sample glass (`AskQuestionBubble`).
 struct AskFailureRow: View {
     private let message: String
     /// Whether the line is the reader's own stop, before the turn had a word
@@ -32,6 +38,7 @@ struct AskFailureRow: View {
     private let onRetry: () -> Void
     private let onCoaching: (AskStarter) -> Void
     private let onFocusTaken: () -> Void
+    private let onLineFocused: () -> Void
 
     /// VoiceOver's focus on the line.
     @AccessibilityFocusState private var lineIsFocused: Bool
@@ -39,7 +46,10 @@ struct AskFailureRow: View {
     /// - Parameters:
     ///   - takesFocus: Whether the line takes VoiceOver's focus now that it is
     ///     there: the wait row had it as the turn ended.
-    ///   - onFocusTaken: Called once the line has taken it.
+    ///   - onFocusTaken: Called once the line has asked for it.
+    ///   - onLineFocused: Called as VoiceOver's focus lands on the line, from
+    ///     the wait row or the reader's own swipe: VoiceOver reads the line
+    ///     then.
     init(
         message: String,
         readerStopped: Bool = false,
@@ -48,7 +58,8 @@ struct AskFailureRow: View {
         takesFocus: Bool = false,
         onRetry: @escaping () -> Void,
         onCoaching: @escaping (AskStarter) -> Void = { _ in },
-        onFocusTaken: @escaping () -> Void = {}
+        onFocusTaken: @escaping () -> Void = {},
+        onLineFocused: @escaping () -> Void = {}
     ) {
         self.message = message
         self.readerStopped = readerStopped
@@ -58,6 +69,7 @@ struct AskFailureRow: View {
         self.onRetry = onRetry
         self.onCoaching = onCoaching
         self.onFocusTaken = onFocusTaken
+        self.onLineFocused = onLineFocused
     }
 
     var body: some View {
@@ -82,18 +94,38 @@ struct AskFailureRow: View {
             if retryable {
                 Button(action: onRetry) {
                     Text("Try Again", bundle: #bundle, comment: "Button under a failed Ask answer that asks the same question again.")
+                        // **Room to wrap.** At the largest text sizes
+                        // "Erneut versuchen" is wider than a phone's column,
+                        // and a button can hold its label to one line.
+                        // Spelled out with room to wrap, as the nothing-to-ask
+                        // button's label is (`AskFirstScreen`), the button
+                        // grows instead.
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         // The way forward a retryable failure offers, so its
                         // label holds a touch target at any control size: 44
                         // pt, and 60 on visionOS (`AskGrowth.touchTarget`).
                         .frame(minHeight: AskGrowth.touchTarget)
                 }
+                // A fill and not glass (the type's note says why). On its
+                // gray the label is `.primary`, as the card's Not now is
+                // (`AskConfirmationCard`): the style draws its words in the
+                // tint, and the system blue there falls under 4.5:1. visionOS
+                // has no glass on content to keep off, and its
+                // `askGlassButton` is `.bordered` already.
+                #if os(visionOS)
                 .askGlassButton()
+                #else
+                .buttonStyle(.bordered)
+                .tint(.primary)
+                #endif
                 .accessibilityIdentifier(AskAccessibility.retry)
             }
             if !coaching.isEmpty {
                 AskChipRow(
                     starters: coaching, kind: .starter,
-                    identifier: AskAccessibility.coaching, onTap: onCoaching
+                    identifier: AskAccessibility.coaching,
+                    surface: .fill, onTap: onCoaching
                 )
             }
         }
@@ -110,6 +142,14 @@ struct AskFailureRow: View {
             guard takesFocus else { return }
             lineIsFocused = true
             onFocusTaken()
+        }
+        // **The focus landing, not the ask.** Written true above, the state
+        // reads true only once an assistive technology has moved its focus
+        // there: measured in an `NSHostingView` with none running, the write
+        // reads back false and this never fires. So a move that misses claims
+        // nothing, and the screen is left to say the ending.
+        .onChange(of: lineIsFocused) { _, focused in
+            if focused { onLineFocused() }
         }
     }
 

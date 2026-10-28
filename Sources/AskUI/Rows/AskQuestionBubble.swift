@@ -240,6 +240,27 @@ struct AskQuestionBubble: View {
     }
 }
 
+/// The host's thumbnail for a photo a thread read back from disk no longer has
+/// the pixels of (`AskDomain.photoThumbnail(for:)`), asked off every actor.
+///
+/// **A read of the reader's own photo, so never on the main actor.** A plain
+/// `nonisolated async` requirement runs where it is called from, and the
+/// bubble awaits it from its view's task, on the main actor, so a host that
+/// left its read unmarked would decode a photo there and hitch the thread as
+/// it scrolled. `@concurrent` takes it off, whatever the host's own build
+/// settings, as the store's read of the overview is.
+nonisolated enum AskQuestionThumbnail {
+    /// What the bubble awaits for a photo's thumbnail: `domain`'s, read off
+    /// every actor.
+    static func loader<Domain: AskDomain>(for domain: Domain) -> @Sendable (AskQuestionPhoto) async -> CGImage? {
+        { photo in await thumbnail(of: photo, from: domain) }
+    }
+
+    @concurrent static func thumbnail<Domain: AskDomain>(of photo: AskQuestionPhoto, from domain: Domain) async -> CGImage? {
+        await domain.photoThumbnail(for: photo)
+    }
+}
+
 /// The photo above a question: content, so a clipped image and no glass.
 ///
 /// Its own VoiceOver stop, beside the question's rather than combined with it,
@@ -260,6 +281,11 @@ private struct AskQuestionPhotoView: View {
             Image(decorative: shown, scale: 1)
                 .resizable()
                 .scaledToFill()
+                // **A photo keeps its colors under Smart Invert**, as the
+                // system keeps a photo's elsewhere: inverted, the reader's
+                // own photo reads as a negative of itself. The glyph drawn in
+                // its place is not a photo, and inverts with the screen.
+                .accessibilityIgnoresInvertColors()
         } placeholder: {
             Image(systemName: "photo")
                 .font(.title2)

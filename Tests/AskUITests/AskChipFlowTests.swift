@@ -1,6 +1,7 @@
 #if os(macOS)
 
 import AppKit
+import AskCore
 import SwiftUI
 import Testing
 
@@ -83,6 +84,53 @@ import Testing
         let image = try #require(render(chips().environment(\.layoutDirection, .rightToLeft), proposing: column))
         #expect(leftmostChip(in: image, row: 10) == 42)
         #expect(leftmostChip(in: image, row: 38) == 150)
+    }
+
+    // MARK: What a bank in the thread sits on
+
+    /// Whether `view`, on white, draws a fill: a run of one light gray at
+    /// least 12 pixels long. The edges of words are grays too, but never
+    /// that many of them side by side.
+    private func drawsAFill(_ view: some View) throws -> Bool {
+        let image = try #require(render(
+            view.padding(20).background(Color.white).environment(\.colorScheme, .light),
+            proposing: ProposedViewSize(width: 300, height: nil)
+        ))
+        for y in stride(from: 0, to: image.pixelsHigh, by: 2) {
+            var run = 0
+            var shade = 0.0
+            for x in 0..<image.pixelsWide {
+                guard let red = image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)?.redComponent,
+                      red > 0.85, red < 0.99
+                else {
+                    run = 0
+                    continue
+                }
+                run = run > 0 && abs(red - shade) < 0.01 ? run + 1 : 1
+                shade = red
+                if run >= 12 { return true }
+            }
+        }
+        return false
+    }
+
+    /// **A bank in the thread is a fill**, which the thread's content can
+    /// scroll under the glass bar with, where glass under glass can't sample
+    /// it. The renderer draws no glass at all, so a bank on glass draws
+    /// nothing here, and the first screen's starters stay on it.
+    @Test func aBankInTheThreadSitsOnAFillAndTheFirstScreensOnGlass() throws {
+        let starters = [AskStarter(text: "What else is on vinyl?")]
+        #expect(try drawsAFill(AskChipRow(starters: starters, kind: .followUp, surface: .fill, onTap: { _ in })))
+        #expect(try !drawsAFill(AskChipRow(starters: starters, kind: .starter, onTap: { _ in })))
+    }
+
+    /// The coaching under a failure is a bank in the thread too.
+    @Test func theCoachingUnderAFailureSitsOnAFill() throws {
+        let failure = AskFailureRow(
+            message: "Couldn't answer that.", retryable: false,
+            coaching: [AskStarter(text: "What do I own?")], onRetry: {}
+        )
+        #expect(try drawsAFill(failure))
     }
 }
 

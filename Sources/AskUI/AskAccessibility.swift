@@ -280,12 +280,17 @@ nonisolated public struct AskProposalAnnouncement: Equatable, Sendable {
 /// VoiceOver said each line twice or cut the first off. The first screen to
 /// claim an ending speaks it, and the rest find it claimed.
 ///
-/// **A failure line taking VoiceOver's focus claims its ending first.** A wait
-/// row that goes while it has the focus hands it to the failure line
-/// (`AskWaitRowHandoff`), and VoiceOver reads the line as the focus lands, so
-/// an announcement of the same words was heard twice, or cut into that
-/// reading. The row decides in the update that ends the turn, and the screens
-/// claim a main-actor turn after it, so the hand-off is always first.
+/// **A line VoiceOver reads as its focus lands claims what it says then, and
+/// not when the move is asked for.** A wait row that goes while it has the
+/// focus hands it to the failure line (`AskWaitRowHandoff`), and the card moves
+/// it to its outcome line after the reader's yes or not now
+/// (`AskConfirmationCard`). VoiceOver reads each line as the focus lands, so an
+/// announcement of the same words would be heard twice, or cut into that
+/// reading. Claimed when the move was asked for, a move that missed left the
+/// ending claimed and never spoken (house rule 8). Claimed as it lands, it
+/// comes after the screen's claim, a main-actor turn after the turn ends, so
+/// until the screen waits longer than a move takes before it claims, a failure
+/// line that takes the focus is announced and then read.
 nonisolated struct AskSpeechLedger {
     /// Something VoiceOver is told once.
     enum Line: Hashable {
@@ -293,6 +298,20 @@ nonisolated struct AskSpeechLedger {
         case ending(UUID)
         /// The quota banner's line, once each time the quota is spent.
         case quotaReached
+        /// What came of a proposal, by its announcement
+        /// (`AskConversationStore.proposalAnnouncement`), which is new for each
+        /// outcome: a failure retried on the same card is a line of its own.
+        case proposalOutcome(UUID)
+
+        /// What an outcome line VoiceOver's focus has landed on claims: the
+        /// store's newest announcement, where it says the words the line said,
+        /// or nothing. Matched on the words, so an older card's line the reader
+        /// passes claims the newest outcome only where it says the same thing,
+        /// which they have then heard.
+        static func proposalOutcome(heard line: String, newest: AskProposalAnnouncement?) -> Line? {
+            guard let newest, newest.line == line else { return nil }
+            return .proposalOutcome(newest.id)
+        }
     }
 
     /// How many lines it remembers: enough for every screen to have claimed a

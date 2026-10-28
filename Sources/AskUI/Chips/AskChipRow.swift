@@ -10,11 +10,17 @@ import SwiftUI
 /// Chips wrap onto as many lines as they need (`AskChipFlow`), which is why
 /// this is a row only in the sense that the bank is one thing.
 ///
-/// **One glass group per bank (`AskGlassGroup`), and nothing else grouped.**
-/// Inside one group the capsules blend and morph as a set. A group wrapping
-/// the whole screen would make every glass surface on it a candidate for
-/// blending with every other, which is how a composer ends up bleeding into a
-/// toolbar.
+/// **One glass group per bank on glass (`AskGlassGroup`), and nothing else
+/// grouped.** Inside one group the capsules blend and morph as a set. A group
+/// wrapping the whole screen would make every glass surface on it a candidate
+/// for blending with every other, which is how a composer ends up bleeding
+/// into a toolbar.
+///
+/// **A bank in the thread is a fill, not glass** (`Surface`), on iOS and the
+/// Mac: it scrolls under the glass bar and behind the glass composer, and glass
+/// can't sample glass, the reason the question bubble is a fill
+/// (`AskQuestionBubble`). The first screen's starters, and a host's own bank,
+/// stay glass.
 public struct AskChipRow: View {
 
     /// Which bank a chip came from. It decides the hint VoiceOver reads on the
@@ -77,6 +83,7 @@ public struct AskChipRow: View {
     private let leading: Action?
     private let onTap: (AskStarter) -> Void
     private let onDecline: ((AskStarter) -> Void)?
+    private let surface: Surface
 
     @Namespace private var glass
 
@@ -119,110 +126,153 @@ public struct AskChipRow: View {
         onTap: @escaping (AskStarter) -> Void,
         onDecline: ((AskStarter) -> Void)? = nil
     ) {
+        self.init(
+            starters: starters, kind: kind, identifier: identifier, alignment: alignment,
+            morph: morph, leading: leading, surface: .glass, onTap: onTap, onDecline: onDecline
+        )
+    }
+
+    /// A bank on `surface`: the thread's own, on a fill.
+    init(
+        starters: [AskStarter],
+        kind: Kind,
+        identifier: String = AskAccessibility.starters,
+        alignment: HorizontalAlignment = .leading,
+        morph: Namespace.ID? = nil,
+        leading: Action? = nil,
+        surface: Surface,
+        onTap: @escaping (AskStarter) -> Void,
+        onDecline: ((AskStarter) -> Void)? = nil
+    ) {
         self.starters = starters
         self.kind = kind
         self.identifier = identifier
         self.alignment = alignment
         self.morph = morph
         self.leading = leading
+        self.surface = surface
         self.onTap = onTap
         self.onDecline = onDecline
     }
 
+    /// What a bank's chips sit on.
+    enum Surface: Equatable {
+        /// Interactive glass, in a glass group of the bank's own: the first
+        /// screen's starters, over nothing that is glass.
+        case glass
+        /// A fill: the thread's banks, on content that scrolls under the
+        /// glass bar and behind the glass composer. On visionOS the same as
+        /// glass, whose `askGlass` is already a fill on the window's glass.
+        case fill
+    }
+
     public var body: some View {
-        AskGlassGroup(spacing: 10) {
-            AskChipFlow(alignment: alignment) {
-                if let leading {
-                    actionChip(leading)
-                }
-                ForEach(starters.enumerated(), id: \.element.id) { position, starter in
-                    Button {
-                        onTap(starter)
-                    } label: {
-                        Text(starter.text)
-                            .font(.subheadline)
-                            // **Wraps rather than truncates.** A starter is a
-                            // whole question. Held to one line, it would put
-                            // the ellipsis back where the flow layout removes
-                            // it: at an accessibility text size every starter
-                            // is wider than any phone's column, so a one-line
-                            // chip would cut every question mid-word for the
-                            // readers least able to guess the rest.
-                            // `AskChipFlow` measures each chip against the
-                            // full column and takes the tallest in a line, so
-                            // a chip that needs two lines simply gets them,
-                            // and its outline keeps a one-line chip's corners
-                            // (`AskChipOutline`).
-                            .multilineTextAlignment(textAlignment)
-                            .fixedSize(horizontal: false, vertical: true)
-                            // Under the turn that has just ended, each
-                            // question comes up out of a blur, as an answer's
-                            // words do, a step behind the chip before it.
-                            // Anywhere else, simply drawn.
-                            //
-                            // **The words and not the capsule, and the capsule
-                            // is in first.** The glass is drawn by the bank's
-                            // group and materializes on the Stage's own
-                            // transaction, which carries no delay of its own,
-                            // so an empty capsule is there first and the
-                            // question comes up on it.
-                            .askArrival(position + (leading == nil ? 0 : 1), as: .line)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: AskChipOutline.minimumHeight)
-                            // **Without this the chip answers only where its
-                            // glyphs are.** A `.plain` button takes its hit
-                            // region from what the label draws, and neither
-                            // the 14 pt at each end nor the slack a
-                            // `minHeight` opens above and below one line of
-                            // subheadline draws anything, so the capsule the
-                            // reader aims at would be mostly dead. A finger is
-                            // broad enough to find the words anyway, and a
-                            // pointer isn't: on the Mac, a click beside the
-                            // words would do nothing. `AskEvidenceLine`
-                            // carries the same line for the same reason, and
-                            // the glass capsule is applied outside the button,
-                            // so it is a backdrop and never a target.
-                            .contentShape(outline)
-                    }
-                    .buttonStyle(.plain)
-                    // **Inside the glass, not outside it.** Interactive glass
-                    // takes the touches under it for its own press effect, so
-                    // a menu attached outside the capsule never sees the long
-                    // press: pressed in the smoke suite, the starter was
-                    // asked instead of offering to turn it down.
-                    .modifier(AskChipDeclineMenu(starter: starter, outline: outline, onDecline: onDecline))
-                    .askGlass(.interactive, in: outline)
-                    // The glass takes the chip's id in this bank's own
-                    // namespace, so it stays the chip's own as the chips
-                    // around it change. No two banks share a namespace: a
-                    // starter never morphs into a follow-up.
-                    .askGlassID(starter.id, in: glass)
-                    .askGlassMaterialize()
-                    // **Outside the glass, not inside it.** The two effects
-                    // answer different questions: `askGlassID` morphs a
-                    // capsule into the next capsule *within this bank*, and
-                    // this carries the whole chip to a question bubble in
-                    // another part of the thread. Applied under the glass,
-                    // the capsule stays put while its label flies off it.
-                    .askChipMorph(starter.text, in: morph)
-                    .accessibilityHint(hint)
-                }
-            }
-            // Breathing room for the glass, which draws slightly outside the
-            // capsule it is on.
-            .padding(.horizontal, 2)
+        bank
+            // **A container, said outright.** The smoke suite reaches a chip
+            // as `ask.starters`'s first button, so the identifier has to name
+            // an element that holds the chips. Left alone, the glass group
+            // surfaces as such an element only by accident, and a tap gesture
+            // on the scroll content behind it (`AskScreen`'s keyboard
+            // dismissal) is enough to stop it: the identifier then lands on
+            // each chip, and `ask.starters` resolves to the first chip, which
+            // has no buttons inside it. `.contain` pins the shape the
+            // identifier promises, and VoiceOver still walks the chips one by
+            // one.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(identifier)
+    }
+
+    /// The chips, in a glass group where they are glass, and in none on a
+    /// fill, where nothing blends.
+    @ViewBuilder
+    private var bank: some View {
+        switch surface {
+        case .glass:
+            AskGlassGroup(spacing: 10) { flow }
+        case .fill:
+            flow
         }
-        // **A container, said outright.** The smoke suite reaches a chip as
-        // `ask.starters`'s first button, so the identifier has to name an
-        // element that holds the chips. Left alone, the glass group surfaces
-        // as such an element only by accident, and a tap gesture on the
-        // scroll content behind it (`AskScreen`'s keyboard dismissal) is
-        // enough to stop it: the identifier then lands on each chip, and
-        // `ask.starters` resolves to the first chip, which has no buttons
-        // inside it. `.contain` pins the shape the identifier promises, and
-        // VoiceOver still walks the chips one by one.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(identifier)
+    }
+
+    private var flow: some View {
+        AskChipFlow(alignment: alignment) {
+            if let leading {
+                actionChip(leading)
+            }
+            ForEach(starters.enumerated(), id: \.element.id) { position, starter in
+                Button {
+                    onTap(starter)
+                } label: {
+                    Text(starter.text)
+                        .font(.subheadline)
+                        // **Wraps rather than truncates.** A starter is a
+                        // whole question. Held to one line, it would put
+                        // the ellipsis back where the flow layout removes
+                        // it: at an accessibility text size every starter
+                        // is wider than any phone's column, so a one-line
+                        // chip would cut every question mid-word for the
+                        // readers least able to guess the rest.
+                        // `AskChipFlow` measures each chip against the
+                        // full column and takes the tallest in a line, so
+                        // a chip that needs two lines simply gets them,
+                        // and its outline keeps a one-line chip's corners
+                        // (`AskChipOutline`).
+                        .multilineTextAlignment(textAlignment)
+                        .fixedSize(horizontal: false, vertical: true)
+                        // Under the turn that has just ended, each
+                        // question comes up out of a blur, as an answer's
+                        // words do, a step behind the chip before it.
+                        // Anywhere else, simply drawn.
+                        //
+                        // **The words and not the capsule, and the capsule
+                        // is in first.** Glass is drawn by the bank's group
+                        // and materializes on the Stage's own transaction,
+                        // and a fill is drawn with the chip; neither
+                        // carries a delay of its own, so an empty capsule
+                        // is there first and the question comes up on it.
+                        .askArrival(position + (leading == nil ? 0 : 1), as: .line)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: AskChipOutline.minimumHeight)
+                        // **Without this the chip answers only where its
+                        // glyphs are.** A `.plain` button takes its hit
+                        // region from what the label draws, and neither
+                        // the 14 pt at each end nor the slack a
+                        // `minHeight` opens above and below one line of
+                        // subheadline draws anything, so the capsule the
+                        // reader aims at would be mostly dead. A finger is
+                        // broad enough to find the words anyway, and a
+                        // pointer isn't: on the Mac, a click beside the
+                        // words would do nothing. `AskEvidenceLine`
+                        // carries the same line for the same reason, and
+                        // the capsule's surface is applied outside the
+                        // button, so it is a backdrop and never a target.
+                        .contentShape(outline)
+                }
+                .buttonStyle(.plain)
+                // **Inside the surface, not outside it.** Interactive
+                // glass takes the touches under it for its own press
+                // effect, so a menu attached outside the capsule never
+                // sees the long press: pressed in the smoke suite, the
+                // starter was asked instead of offering to turn it down.
+                .modifier(AskChipDeclineMenu(starter: starter, outline: outline, onDecline: onDecline))
+                // Glass takes the chip's id in this bank's own namespace,
+                // so it stays the chip's own as the chips around it
+                // change. No two banks share a namespace: a starter never
+                // morphs into a follow-up.
+                .modifier(AskChipSurface(surface: surface, outline: outline, id: starter.id, in: glass))
+                // **Outside the surface, not inside it.** The two effects
+                // answer different questions: `askGlassID` morphs a
+                // capsule into the next capsule *within this bank*, and
+                // this carries the whole chip to a question bubble in
+                // another part of the thread. Applied under the glass,
+                // the capsule stays put while its label flies off it.
+                .askChipMorph(starter.text, in: morph)
+                .accessibilityHint(hint)
+            }
+        }
+        // Breathing room for the glass, which draws slightly outside the
+        // capsule it is on.
+        .padding(.horizontal, 2)
     }
 
     /// The same capsule as a question chip, with a glyph ahead of its words so
@@ -244,9 +294,7 @@ public struct AskChipRow: View {
             .contentShape(outline)
         }
         .buttonStyle(.plain)
-        .askGlass(.interactive, in: outline)
-        .askGlassID("ask.chip.action", in: glass)
-        .askGlassMaterialize()
+        .modifier(AskChipSurface(surface: surface, outline: outline, id: "ask.chip.action", in: glass))
         .accessibilityHint(action.hint)
         .accessibilityIdentifier(action.identifier)
     }
@@ -303,6 +351,45 @@ nonisolated enum AskChipOutline {
     /// and the chip is the same capsule.
     static func radius(line scaled: CGFloat) -> CGFloat {
         max(minimumHeight, scaled) / 2
+    }
+}
+
+/// What a chip sits on (`AskChipRow.Surface`): interactive glass that
+/// materializes and morphs within its bank, or a fill.
+///
+/// **The fill is the system's tertiary fill**, which is what `askGlass` draws
+/// for plain glass on visionOS, so a bank in the thread reads the same there
+/// and here. The chip's words stay `.primary`, which holds far more than 4.5:1
+/// on it in either appearance. A `.plain` button on a fill has no press effect
+/// beyond the label's own dimming, where interactive glass flexes under the
+/// finger.
+private struct AskChipSurface<ID: Hashable & Sendable>: ViewModifier {
+    let surface: AskChipRow.Surface
+    let outline: RoundedRectangle
+    let id: ID
+    let namespace: Namespace.ID
+
+    init(surface: AskChipRow.Surface, outline: RoundedRectangle, id: ID, in namespace: Namespace.ID) {
+        self.surface = surface
+        self.outline = outline
+        self.id = id
+        self.namespace = namespace
+    }
+
+    func body(content: Content) -> some View {
+        switch surface {
+        case .glass:
+            content
+                .askGlass(.interactive, in: outline)
+                .askGlassID(id, in: namespace)
+                .askGlassMaterialize()
+        case .fill:
+            #if os(visionOS)
+            content.askGlass(.interactive, in: outline)
+            #else
+            content.background(.fill.tertiary, in: outline)
+            #endif
+        }
     }
 }
 
