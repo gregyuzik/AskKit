@@ -238,9 +238,30 @@ project_files() {
 # Cold, on a scratch path of its own, every time, for the incremental-build
 # reason `warnings_in` gives. It takes about 20 seconds while the package has no
 # dependencies.
+#
+# A CI runner image can carry an Xcode newer than its macOS. There the test
+# bundles build for the package's macOS floor and then can't load ("built for
+# macOS 27.2 which is newer than running OS"), so on GitHub Actions alone, on a
+# macOS under the floor, the tests are built and their warnings scanned but not
+# run, and the job says so in a warning. The push gate runs them. Anywhere else
+# an old macOS fails as it always did.
 step_test() {
-  local scratch="$work/coldtest" log="$logs/swift-test.log" ran skipped
+  local scratch="$work/coldtest" log="$logs/swift-test.log" ran skipped floor host
   rm -rf "$scratch"
+  floor=$(sed -nE 's/.*\.macOS\("([0-9.]+)"\).*/\1/p' Package.swift | head -n 1)
+  host=$(sw_vers -productVersion)
+  if [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "$floor" ] && [ "$host" != "$floor" ] &&
+    [ "$(printf '%s\n%s\n' "$host" "$floor" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)" = "$host" ]; then
+    say "swift build --build-tests (cold): this runner's macOS $host is under the package's macOS $floor, where the tests can't load"
+    if ! logged "$log" swift build --build-tests --scratch-path "$scratch"; then
+      say "the package tests didn't build — $log"
+      { grep -E 'error:' "$log" || true; } | head -20 >&2
+      exit 1
+    fi
+    no_warnings "$log" "from swift build --build-tests" || exit 1
+    echo "::warning title=Package tests built, not run::This runner's macOS $host is under AskKit's macOS $floor floor, so the test bundles can't load. The push gate runs them; CI does once the runner image reaches macOS $floor."
+    return 0
+  fi
   say "swift test (cold)"
   if ! logged "$log" swift test --scratch-path "$scratch"; then
     say "the package tests failed — $log"
