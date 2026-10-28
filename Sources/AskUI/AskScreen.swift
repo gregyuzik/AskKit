@@ -185,10 +185,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// screen.
     @State private var keyboardObservations: [NotificationCenter.ObservationToken] = []
     /// The window this screen is in, which the keyboard's change lays out
-    /// (`AskKeyboard.change(_:to:duration:curve:in:)`) and the screen puts its
-    /// keyboard away in (`putKeyboardAway()`): this screen's and not the key
-    /// window, which with two scenes up can be another's. Found by the probe
-    /// that reads `windowHeight`.
+    /// (`AskKeyboard.change(_:to:duration:curve:in:)`) and the screen and its
+    /// composer's chevron put the keyboard away in (`putKeyboardAway()`,
+    /// `askScreenWindow`): this screen's and not the key window, which with
+    /// two scenes up can be another's. Found by the probe that reads
+    /// `windowHeight`.
     @State private var screenWindow = AskScreenWindow()
     #endif
     /// The height of the window this screen is in, for the first screen to
@@ -565,6 +566,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 }
             )
         }
+        // Under the title beside iPhone Duo's bar strip as well, where the
+        // title stands over the content, so it needs no `barsAreInStrip`
+        // (`AskTierCaption` has what was seen).
         .askTierCaption(store.captionTier)
         .task {
             await store.restoreIfNeeded()
@@ -836,23 +840,29 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         // Keyed on which turn ended, not on what the line says: two grounded
         // answers in a row produce the same string, and `onChange` on the
         // string alone would announce the first and go silent for the second.
-        // House rule 8 wants every terminal state spoken.
+        // House rule 8 wants every terminal state spoken. The line is
+        // `AskAnnouncement`'s for the turn the store says ended, looked up by
+        // its id rather than taken from `turns.last`.
         //
         // **Once for the app, and not over a failure line VoiceOver is
-        // reading** (`AskSpeechLedger`): a main-actor turn later, so a wait
-        // row handing its focus to the failure line in this same update has
-        // claimed the ending first, and a second window's screen finds it
-        // claimed too.
+        // reading** (`AskSpeechLedger`): a failure a beat later, and only if
+        // its line hasn't claimed it as VoiceOver's focus landed there from
+        // the wait row, and every other ending a main-actor turn later
+        // (`AskUnclaimedEnding`). A second window's screen finds it claimed.
         .onChange(of: store.lastTerminalTurn) { _, ended in
-            guard let ended, let line = terminalAnnouncement(for: ended) else { return }
+            guard let ended, let turn = store.turns.first(where: { $0.id == ended }),
+                  let line = AskAnnouncement.terminal(for: turn) else { return }
             Task { @MainActor in
-                guard AskSpeech.ledger.claim(.ending(ended)) else { return }
-                // `.high`, and an `AttributedString` because that is the only
-                // shape the priority can ride on. At default priority
-                // VoiceOver speaks the refocused send button over this — the
-                // announcement house rule 8 asks for, lost to the focus change
-                // that follows it.
-                Self.announce(line, priority: .high)
+                await AskUnclaimedEnding.speak(
+                    .ending(ended), after: AskUnclaimedEnding.wait(before: turn),
+                    stands: { store.turns.contains { $0.id == ended } },
+                    // `.high`, and an `AttributedString` because that is the
+                    // only shape the priority can ride on. At default priority
+                    // VoiceOver speaks the refocused send button over this —
+                    // the announcement house rule 8 asks for, lost to the
+                    // focus change that follows it.
+                    announce: { Self.announce(line, priority: .high) }
+                )
             }
         }
         // **The quota banner says its line once as it arrives**, at low
@@ -865,16 +875,38 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             guard AskSpeech.ledger.claim(.quotaReached) else { return }
             Self.announce(AskQuotaBanner.line(resetDate: store.status.resetDate), priority: .low)
         }
-        // **What came of a proposal is spoken once, by the card, and not
-        // announced here as well.** A yes or a not now on the card moves
-        // VoiceOver's focus to the line where the buttons were
-        // (`AskConfirmationCard`), and focus landing reads that line, which
-        // is the line `proposalAnnouncement` holds: announced too, the reader
-        // heard it twice, or the announcement cut into the focus's reading of
-        // it. A hand-off speaks nothing here either: the host's editor opens
-        // over the thread and takes the focus, and what the reader hears is
-        // the editor. `proposalAnnouncement` stays for a host whose own
-        // control confirms or declines, which no card is waiting on.
+        // **What came of a proposal the reader waited on is spoken once: by
+        // the card, or here a beat later where the card's line didn't take
+        // the focus.** A yes or a not now on the card moves VoiceOver's focus
+        // to the line where the buttons were (`AskConfirmationCard`), and
+        // focus landing reads that line, which is the line
+        // `proposalAnnouncement` holds, and claims it. Announced at once as
+        // well, the reader heard it twice, or the announcement cut into the
+        // focus's reading of it; left to the card alone, a move that missed
+        // left the reader never hearing whether their tap took
+        // (`AskUnclaimedEnding`). A hand-off speaks nothing here: the host's
+        // editor opens over the thread and takes the focus, and what the
+        // reader hears is the editor. Nor does an outcome no card waited on,
+        // a host's own control's, which the host speaks from
+        // `proposalAnnouncement` itself.
+        .onChange(
+            of: AskUnclaimedEnding.ProposalWatch(
+                announcement: store.proposalAnnouncement, awaitedTurn: store.proposalOutcomeFocus
+            )
+        ) { old, new in
+            guard let outcome = AskUnclaimedEnding.outcomeToSpeak(from: old, to: new) else { return }
+            Task { @MainActor in
+                await AskUnclaimedEnding.speak(
+                    .proposalOutcome(outcome.id), after: AskUnclaimedEnding.beat,
+                    // Still on a card on the thread: New Chat, or another
+                    // chat opening, takes the line away.
+                    stands: { store.turns.contains { $0.proposalOutcome.flatMap(AskAnnouncement.proposal) == outcome.line } },
+                    // `.high`, as an ending is: the focus the line missed went
+                    // somewhere VoiceOver is reading.
+                    announce: { Self.announce(outcome.line, priority: .high) }
+                )
+            }
+        }
     }
 
     /// Over the thread, not in it: the quota is a fact about the next question,
@@ -1149,6 +1181,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         .environment(\.askFirstScreenKeyboardIsUp, firstScreenMakesRoom)
         // The headline takes VoiceOver's focus after New Chat.
         .environment(\.askVoiceOverTarget, $voiceOverTarget)
+        // The nothing-to-ask button is filled with the host's accent, and its
+        // label judged on it (`AskFirstScreen.actionAccent`).
+        .environment(\.askFirstScreenAccent, accent)
     }
 
     /// The lead over the first screen's column: 24 pt, 12 in compact height,
@@ -1649,7 +1684,8 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// Puts this screen's keyboard away (`AskKeyboard.putAway`): a turn
     /// starting, Done, or a tap on the thread or the first screen. On iOS in
     /// this screen's own window (`screenWindow`), so a put-away in one window
-    /// never resigns a field in another.
+    /// never resigns a field in another. The composer's chevron goes there
+    /// too, handed the window in the environment (`askScreenWindow`).
     private func putKeyboardAway() {
         #if os(iOS)
         AskKeyboard.putAway($isComposerFocused, in: screenWindow)
@@ -1772,6 +1808,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             .environment(\.askVoiceOverTarget, composerRests ? nil : $voiceOverTarget)
             // Its buttons hide by name while it rests (`askComposerRests`).
             .environment(\.askComposerRests, composerRests)
+            #if os(iOS)
+            // The chevron puts the keyboard away in this screen's window, as
+            // the screen's own ways out do (`putKeyboardAway()`).
+            .environment(\.askScreenWindow, screenWindow)
+            #endif
             // Resting in the slot: no height, so the bar adds nothing to the
             // inset the slot already takes, and nothing to see or touch.
             .opacity(composerRests ? 0 : 1)
@@ -2011,15 +2052,6 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
 
     // MARK: - Accessibility
 
-    /// The line VoiceOver hears when a turn reaches a terminal state:
-    /// `AskAnnouncement` owns the choice, so it can be tested.
-    ///
-    /// Looked up by the id the store published rather than taken from
-    /// `turns.last`, so it describes the turn that actually ended.
-    private func terminalAnnouncement(for id: UUID) -> String? {
-        AskAnnouncement.terminal(for: store.turns.first { $0.id == id })
-    }
-
     /// Posts `line` for VoiceOver at `priority`, which rides only on an
     /// `AttributedString`.
     private static func announce(
@@ -2230,8 +2262,8 @@ where Mark == AskDefaultMark, Tiles == AskDefaultTiles<Domain.Row>, Disclosure =
     ///     and not by a view (`AskConversationStore` says why).
     ///   - accent: The color the screen tints its own surfaces with: the
     ///     composer, the question bubbles, the reveal's caret, the wait row, a
-    ///     proposal's card, and the face in a host's slot. The app's accent
-    ///     color by default.
+    ///     proposal's card, the nothing-to-ask screen's button, and the face in
+    ///     a host's slot. The app's accent color by default.
     ///   - spectrum: A run of colors for the spectrum look (`AskSpectrum`),
     ///     such as `.aurora`: the send circle and the reveal's caret in a
     ///     gradient of it in place of the accent, the send circle on the face
@@ -2247,9 +2279,13 @@ where Mark == AskDefaultMark, Tiles == AskDefaultTiles<Domain.Row>, Disclosure =
     ///     `AskConversationStore.attachPhoto(_:label:reference:)`. The button
     ///     shows only when this is set, the domain accepts photos
     ///     (`acceptsPhotoAttachments`) and there is no `composerAccessory`.
+    ///     Unused while `composerAccessory` is set.
     ///   - composerAccessory: The accessory button before the composer's field,
     ///     such as a scan, in place of the photo button. The face in a host's
-    ///     slot draws it too.
+    ///     slot draws it too. It shows whatever the domain accepts, so the
+    ///     photo button passed here (`AskComposerAccessory.photo(_:)`) shows for
+    ///     a domain that takes no photos too: pass `onAttach` instead for one
+    ///     that shows only where the domain takes them.
     public init(
         store: AskConversationStore<Domain>,
         accent: Color = .accentColor,
@@ -2284,10 +2320,11 @@ extension AskScreen {
     /// mark in a square, 56 pt on a first screen and 26 pt in the wait row, both
     /// scaled with Dynamic Type. Without one, the screen draws `AskDefaultMark`.
     ///
-    /// The mark decorates, so hide it from VoiceOver, as `AskDefaultMark` is
-    /// hidden: `.accessibilityHidden(true)`, or an `Image(decorative:)`. Left
-    /// in, VoiceOver lands on it above the first screen's headline and reads
-    /// "image", or the name of its symbol.
+    /// The mark decorates, and VoiceOver passes over it: the first screens
+    /// hide it themselves, so VoiceOver doesn't land on it above the headline
+    /// and read "image" or the name of its symbol, and the wait row is read as
+    /// its line alone, whatever the mark beside it would say. A mark needs
+    /// nothing of its own for VoiceOver.
     ///
     /// - Parameter mark: The host's mark, handed whether it is lit.
     /// - Returns: The same screen, drawing this mark.

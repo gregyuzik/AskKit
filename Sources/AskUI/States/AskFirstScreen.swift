@@ -237,9 +237,9 @@ public struct AskFirstScreen<Mark: View>: View {
     }
 
     /// What the nothing-to-ask button is filled with, and what its label's
-    /// color is judged on: the app's accent, which is also `AskScreen`'s
-    /// default accent. An accent a host hands `AskScreen` doesn't reach this
-    /// view, which takes none.
+    /// color is judged on: the accent the host handed `AskScreen`, which sets
+    /// it in the environment (`askFirstScreenAccent`), or the app's accent
+    /// where a host draws this view on its own.
     ///
     /// **One color for both, set on the button.** `.glassProminent` fills
     /// with the environment's tint, which a host can set around the screen,
@@ -254,7 +254,7 @@ public struct AskFirstScreen<Mark: View>: View {
     /// visionOS sets no tint: there the button is a platter with no fill of
     /// the accent (`askGlassButton`), and its label keeps the style's own
     /// color.
-    private var actionAccent: Color { .accentColor }
+    @Environment(\.askFirstScreenAccent) private var actionAccent
 
     /// Creates the first screen.
     ///
@@ -671,6 +671,12 @@ extension EnvironmentValues {
     /// make room to animate on (`AskFirstScreen.onKeyboard`). False everywhere
     /// else.
     @Entry var askFirstScreenKeyboardIsUp = false
+
+    /// The accent `AskScreen` was handed, which it sets in the environment for
+    /// the nothing-to-ask button to be filled with and judged on
+    /// (`AskFirstScreen.actionAccent`). The app's accent everywhere else, as
+    /// it is `AskScreen`'s by default.
+    @Entry var askFirstScreenAccent: Color = .accentColor
 }
 
 #endif

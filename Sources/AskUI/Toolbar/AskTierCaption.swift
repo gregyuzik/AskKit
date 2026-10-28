@@ -17,6 +17,15 @@ import SwiftUI
 /// goes back under the title. Both modifiers stay applied either way, so
 /// moving the caption never rebuilds the screen.
 ///
+/// **Beside iPhone Duo's bar strip it is the subtitle, as on any iPhone.** The
+/// strip at the side of the display takes the bar's items and the tab bar,
+/// and the title stands over the content beside it, with the subtitle under
+/// it. Seen on the Duo simulator (iOS 27.2) in every pose that puts the bars
+/// in the strip, closed upright and on its side and open on its side, in a
+/// navigation stack alone and in a tab view, and closed on its side with the
+/// keyboard up: "On device" under the title each time. A tab bar in the strip
+/// isn't at the top, so the caption doesn't lead the bar there.
+///
 /// **The line is always applied, even when there is nothing to say.** A
 /// subtitle that appears when the tier resolves changes the navigation bar's
 /// height mid-turn, and the whole thread jumps. `Text(verbatim: "")` reserves
