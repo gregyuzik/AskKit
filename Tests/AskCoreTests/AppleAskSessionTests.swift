@@ -230,6 +230,147 @@ struct AppleAskSessionTests {
         #expect(full?.tiles == [])
         #expect(prose == AskReplySnapshot(answer: "Scripted.", followUps: ["Which is older?", "What else?"]))
     }
+
+    // MARK: - The generation gate waits for the generation
+
+    /// A session whose every request fails at once, and whose failure hook
+    /// holds the task that runs the generation at `unwinding`: a generation
+    /// still running after its reader let it go.
+    private func makeUnwindingSession(_ unwinding: GateTestHold) -> AppleAskSession {
+        let model = FailingModel()
+        return AppleAskSession(
+            session: LanguageModelSession(model: model, instructions: "Answer."),
+            contextSize: 4096,
+            noteFailure: { _ in await unwinding.hold() },
+            makePlanner: { instructions in LanguageModelSession(model: model, instructions: instructions) }
+        )
+    }
+
+    private func spin(_ what: String, until condition: @Sendable () async -> Bool) async throws {
+        for _ in 0..<4_000 {
+            if await condition() { return }
+            await Task.yield()
+            try await Task.sleep(for: .microseconds(500))
+        }
+        Issue.record("timed out waiting for \(what)")
+    }
+
+    /// A turn stopped mid-stream: the engine's loop ends the moment its task
+    /// is cancelled, and the task running `streamResponse` goes on. The next
+    /// on-device generation waits for that task, not for the loop.
+    @Test func aStoppedStreamHoldsTheGenerationGateUntilItsGenerationReturns() async throws {
+        let gate = AskGenerationGate()
+        let seam = AppleModelSeam(status: AskModelStatus(), privateCloudCompute: .undeclared, gate: gate)
+        let unwinding = GateTestHold()
+        let session = makeUnwindingSession(unwinding)
+        let readerStopped = Mutex(false)
+        let turn = Task {
+            try await seam.withGeneration(onDevice: true) {
+                for try await _ in session.stream(
+                    prompt: "one", temperature: 0, reasoningLevel: nil, includeSchemaInPrompt: true
+                ) {}
+                readerStopped.withLock { $0 = true }
+            }
+        }
+        try await spin("the generation to fail") { unwinding.hasArrived }
+        // Whether the generation had returned when the next one went in.
+        let entered = Mutex<[Bool]>([])
+        let next = Task {
+            try await seam.withGeneration(onDevice: true) { entered.withLock { $0.append(unwinding.hasLeft) } }
+        }
+        try await spin("the next generation to queue") { await gate.queueDepth == 1 }
+        turn.cancel()
+        try await spin("the stopped turn's reader to stop") { readerStopped.withLock { $0 } }
+        // Room for a release that must not happen.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(entered.withLock { $0 }.isEmpty)
+        unwinding.release()
+        try await next.value
+        _ = await turn.result
+        #expect(entered.withLock { $0 } == [true])
+    }
+
+    /// The refine pass's streams go through `AskGatedSession`, whose own task
+    /// holds the generation gate: a pass abandoned at the turn's deadline
+    /// holds it until the generation underneath has returned.
+    @Test func anAbandonedRefinePassHoldsTheGenerationGateUntilItsGenerationReturns() async throws {
+        let gate = AskGenerationGate()
+        let seam = AppleModelSeam(status: AskModelStatus(), privateCloudCompute: .undeclared, gate: gate)
+        let unwinding = GateTestHold()
+        let pass = AskGatedSession(base: makeUnwindingSession(unwinding), seam: seam, onDevice: true) {}
+        let reader = Task {
+            for try await _ in pass.stream(
+                prompt: "Refine.", temperature: 0, reasoningLevel: nil, includeSchemaInPrompt: false
+            ) {}
+        }
+        try await spin("the pass's generation to fail") { unwinding.hasArrived }
+        let entered = Mutex<[Bool]>([])
+        let next = Task {
+            try await seam.withGeneration(onDevice: true) { entered.withLock { $0.append(unwinding.hasLeft) } }
+        }
+        try await spin("the next generation to queue") { await gate.queueDepth == 1 }
+        reader.cancel()
+        _ = await reader.result
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(entered.withLock { $0 }.isEmpty)
+        unwinding.release()
+        try await next.value
+        #expect(entered.withLock { $0 } == [true])
+    }
+
+    /// Private Cloud Compute contends for none of the on-device runtime, so a
+    /// stopped generation there holds nothing, and its caller returns at once.
+    @Test func aStoppedPrivateCloudStreamWaitsForNothing() async throws {
+        let seam = AppleModelSeam(
+            status: AskModelStatus(), privateCloudCompute: .undeclared, gate: AskGenerationGate()
+        )
+        let unwinding = GateTestHold()
+        let session = makeUnwindingSession(unwinding)
+        let turn = Task {
+            try await seam.withGeneration(onDevice: false) {
+                for try await _ in session.stream(
+                    prompt: "one", temperature: 0, reasoningLevel: nil, includeSchemaInPrompt: true
+                ) {}
+            }
+        }
+        try await spin("the generation to fail") { unwinding.hasArrived }
+        turn.cancel()
+        _ = await turn.result
+        #expect(!unwinding.hasLeft)
+        unwinding.release()
+    }
+}
+
+// MARK: - A model that fails
+
+/// Fails every request at once.
+nonisolated private struct FailingModel: LanguageModel {
+    typealias Executor = FailingExecutor
+
+    var capabilities: LanguageModelCapabilities {
+        LanguageModelCapabilities([.guidedGeneration, .toolCalling])
+    }
+
+    var executorConfiguration: FailingExecutor.Configuration { .init() }
+}
+
+nonisolated private final class FailingExecutor: LanguageModelExecutor {
+    struct Configuration: Hashable, Sendable {}
+    typealias Model = FailingModel
+
+    struct Failure: Error {}
+
+    init(configuration: Configuration) throws {}
+
+    func prewarm(model: FailingModel, transcript: Transcript) {}
+
+    func respond(
+        to request: LanguageModelExecutorGenerationRequest,
+        model: FailingModel,
+        streamingInto channel: LanguageModelExecutorGenerationChannel
+    ) async throws {
+        throw Failure()
+    }
 }
 
 // MARK: - A scripted model

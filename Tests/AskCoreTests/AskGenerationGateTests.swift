@@ -141,6 +141,67 @@ import Testing
         wedged.cancel()
     }
 
+    // MARK: - A holder's producers
+
+    /// A stopped turn's generation, still unwinding: the reader has let the
+    /// stream go, and the task that runs `streamResponse` hasn't returned.
+    @Test func aStoppedHoldersProducerKeepsTheNextCallerWaitingUntilItReturns() async throws {
+        let gate = AskGenerationGate()
+        let unwinding = GateTestHold()
+        let bodyReturned = Mutex(false)
+        let order = Mutex<[String]>([])
+        let holder = Task {
+            try await AskGenerationGate.run(gate: gate) {
+                // The task a session's stream runs its generation in, deaf to
+                // the cancellation that stops its reader.
+                let producer = Task {
+                    await unwinding.hold()
+                    order.withLock { $0.append("producer returned") }
+                }
+                AskGenerationProducers.current?.adopt(producer)
+                // The reader, which stops when its task is cancelled, as the
+                // engine's loop does when a turn is stopped or abandoned at
+                // its deadline.
+                while !Task.isCancelled { try? await Task.sleep(for: .milliseconds(1)) }
+                bodyReturned.withLock { $0 = true }
+            }
+        }
+        try await spin("the producer to start") { unwinding.hasArrived }
+        let next = Task {
+            try await AskGenerationGate.run(gate: gate) { order.withLock { $0.append("next entered") } }
+        }
+        try await waitForQueue(gate, depth: 1)
+        holder.cancel()
+        try await spin("the holder's body to return") { bodyReturned.withLock { $0 } }
+        // A release once the body returned would let the next caller in
+        // within a few actor hops: this is room for one that must not happen.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(order.withLock { $0 }.isEmpty)
+        unwinding.release()
+        try await next.value
+        try await holder.value
+        #expect(order.withLock { $0 } == ["producer returned", "next entered"])
+    }
+
+    @Test func aProducerThatNeverReturnsIsMovedPastAtTheHoldersDeadline() async throws {
+        // A producer stuck on a hung framework call holds neither the next
+        // caller nor its own past the deadline.
+        let gate = AskGenerationGate()
+        let wedged = GateTestHold()
+        let holder = Task {
+            try await AskGenerationGate.run(gate: gate, deadline: .milliseconds(100)) {
+                let producer = Task { await wedged.hold() }
+                AskGenerationProducers.current?.adopt(producer)
+            }
+        }
+        try await spin("the producer to start") { wedged.hasArrived }
+        let value = try await AskGenerationGate.run(gate: gate) { "through" }
+        #expect(value == "through")
+        try await holder.value
+        #expect(!wedged.hasLeft)
+        wedged.release()
+    }
+
     @Test func theQueueEmptiesWhenEveryoneHasRun() async throws {
         let gate = AskGenerationGate()
         await withTaskGroup(of: Void.self) { group in
@@ -149,5 +210,44 @@ import Testing
             }
         }
         #expect(await gate.queueDepth == 0)
+    }
+}
+
+/// A point a test holds a task at until it says so, deaf to cancellation, as
+/// a framework call that is still unwinding is.
+nonisolated final class GateTestHold: Sendable {
+    private struct State {
+        var arrived = false
+        var left = false
+        var released = false
+        var held: CheckedContinuation<Void, Never>?
+    }
+    private let state = Mutex(State())
+
+    /// A task has reached `hold()`.
+    var hasArrived: Bool { state.withLock { $0.arrived } }
+    /// A task has gone on past `hold()`.
+    var hasLeft: Bool { state.withLock { $0.left } }
+
+    /// Wait here until `release()`, whatever happens to the task meanwhile.
+    func hold() async {
+        await withCheckedContinuation { continuation in
+            let released = state.withLock { state in
+                state.arrived = true
+                if !state.released { state.held = continuation }
+                return state.released
+            }
+            if released { continuation.resume() }
+        }
+        state.withLock { $0.left = true }
+    }
+
+    func release() {
+        let held = state.withLock { state in
+            state.released = true
+            defer { state.held = nil }
+            return state.held
+        }
+        held?.resume()
     }
 }

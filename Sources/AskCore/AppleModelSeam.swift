@@ -871,7 +871,9 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
     /// `AskProseReply`, with `images` after the prompt's words, capped at
     /// `answerCap` tokens. The snapshots update `usage()` as they arrive, and
     /// a failure goes to `noteFailure` before the stream throws it. Letting
-    /// the stream go cancels the generation.
+    /// the stream go cancels the generation. Read inside
+    /// `AskGenerationGate.run`, the generation gate moves on only once the
+    /// generation has returned, not when the reader lets go.
     public func stream(
         prompt: String,
         images: [AskImageAttachment],
@@ -915,7 +917,10 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
         includeSchemaInPrompt: Bool,
         snapshot: @escaping @Sendable (Reply.PartiallyGenerated) -> AskReplySnapshot
     ) -> AsyncThrowingStream<AskReplySnapshot, any Error> {
-        AsyncThrowingStream { continuation in
+        // The generation gate's holder this stream is read under, if any:
+        // read here, in the reader's task, where the holder bound it.
+        let producers = AskGenerationProducers.current
+        return AsyncThrowingStream { continuation in
             let task = Task { [session, answerCap, self] in
                 do {
                     let options = GenerationOptions(temperature: temperature, maximumResponseTokens: answerCap)
@@ -964,6 +969,11 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+            // Letting the stream go only cancels this task, and the reader's
+            // loop ends at once while `streamResponse` is still unwinding. So
+            // the holder waits for the task itself before the generation gate
+            // lets the next generation in (`AskGenerationProducers`).
+            producers?.adopt(task)
             continuation.onTermination = { _ in task.cancel() }
         }
     }
