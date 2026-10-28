@@ -39,21 +39,45 @@ import UIKit
 /// decide. Resigning through UIKit in place animated from an update after the
 /// hide's animation block rather than inside it.
 ///
+/// **In the screen's own window** (`AskScreenWindow`), by `endEditing(true)`
+/// on it, which resigns the first responder in that window and no other. The
+/// action sent to no target that this replaces went to the first responder of
+/// the app's key window, and with two windows up, on an iPad or iPhone Duo's
+/// inner display, that needn't be this screen's: a turn starting here could
+/// take the keyboard from a field the reader was typing in elsewhere, and
+/// Done tapped in the window at the back, which comes to the front only after
+/// the tap's action has run (`AskHostFocusHandOver`), could resign the field
+/// in front. Read from UIKit's documented behavior, not seen on a device.
+/// Where the caller has no window, as the composer's chevron doesn't, or
+/// before the probe has joined one, the action still goes to the key
+/// window's first responder.
+///
+/// The recordings above were of that action, sent from
+/// `DispatchQueue.main.async`. A main-actor `Task` is queued on the same main
+/// queue, and `endEditing(true)` resigns the same field; neither has been
+/// recorded.
+///
 /// Focus follows the responder: SwiftUI clears the binding once the field has
 /// resigned. On iOS alone: visionOS keeps the binding write, since nothing
 /// here was measured on it, and the Mac has no software keyboard to put away.
 enum AskKeyboard {
-    static func putAway(_ isFocused: FocusState<Bool>.Binding) {
-        #if os(iOS)
-        DispatchQueue.main.async {
-            UIApplication.shared.sendAction(
-                #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
-            )
+    #if os(iOS)
+    static func putAway(_ isFocused: FocusState<Bool>.Binding, in screenWindow: AskScreenWindow? = nil) {
+        Task {
+            if let window = screenWindow?.window {
+                window.endEditing(true)
+            } else {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                )
+            }
         }
-        #else
-        isFocused.wrappedValue = false
-        #endif
     }
+    #else
+    static func putAway(_ isFocused: FocusState<Bool>.Binding) {
+        isFocused.wrappedValue = false
+    }
+    #endif
 
     #if os(iOS)
     /// Changes `flag` inside the animation the keyboard is running, over the

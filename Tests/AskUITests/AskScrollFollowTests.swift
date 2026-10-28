@@ -328,6 +328,49 @@ import Testing
         #expect(!follow.showsJumpPill)
     }
 
+    // MARK: - A thread that appears mid-stream
+
+    @Test func aThreadBuiltMidStreamFollowsTheAnswerPastTheOwnGrowthWindow() {
+        // **A second window, or a split view's detail rebuilt, while an answer
+        // streams.** The screen's follow is new and has heard no stream start:
+        // told only that the thread was sent to its end, it followed for
+        // `ownGrowthWindow` and then let the answer write itself below the
+        // composer, with no pill, until the turn ended.
+        let follow = AskScrollFollow()
+        follow.threadAppeared(streaming: true, at: 100)
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
+        follow.lastTurnHeightChanged(Self.readable + 400, at: 105)
+        #expect(follow.followsGrowth(at: 105))
+
+        // The reader scrolls up mid-stream: the way back down is offered at
+        // the follow boundary, as on any stream.
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace + 250), at: 106)
+        #expect(!follow.followsGrowth(at: 106))
+        #expect(follow.showsJumpPill)
+        follow.lastTurnHeightChanged(Self.readable + 600, at: 107)
+        #expect(follow.hasUnseenGrowth)
+    }
+
+    @Test func aThreadBuiltWithNothingStreamingKeepsOnlyTheOwnGrowthWindow() {
+        // A thread read back from disk or opened from the chats lands through
+        // its first measurements, and what grows after that is the reader's.
+        let follow = AskScrollFollow()
+        follow.threadAppeared(streaming: false, at: 100)
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
+        follow.lastTurnHeightChanged(Self.readable + 400, at: 100.3)
+        #expect(follow.followsGrowth(at: 100.3))
+        #expect(!follow.followsGrowth(at: 100 + AskScrollFollow.ownGrowthWindow))
+    }
+
+    @Test func aThreadThatAppearsAfterItsStreamEndedFollowsNoStream() {
+        // The appearance says what is streaming now, both ways, so a stream
+        // the follow last heard of doesn't outlive the turn it belonged to.
+        let follow = onAPhone(at: 100)
+        follow.streamingChanged(true, at: 100)
+        follow.threadAppeared(streaming: false, at: 110)
+        #expect(!follow.followsGrowth(at: 110 + AskScrollFollow.ownGrowthWindow))
+    }
+
     // MARK: - The way back down
 
     @Test func aFinishedThreadOffersTheWayBackButOnlyFromAWayOff() {

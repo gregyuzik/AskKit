@@ -133,7 +133,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// `AskFirstScreen` how.
     ///
     /// **Changed by the keyboard's own notifications, inside its animation,
-    /// and not mirrored from focus.** Handed down inside `withAnimation` on a
+    /// and not mirrored from focus.** Mirrored inside `withAnimation` on a
     /// focus flip, the column's change animated while the keyboard moved the
     /// scroll view under it, and the two fought: recorded at 120 fps in a host
     /// with a 24 fps `TimelineView` behind the screen, the column rose 55 pt past
@@ -185,9 +185,10 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// screen.
     @State private var keyboardObservations: [NotificationCenter.ObservationToken] = []
     /// The window this screen is in, which the keyboard's change lays out
-    /// (`AskKeyboard.change(_:to:duration:curve:in:)`): this screen's and not
-    /// the key window, which with two scenes up can be another's. Found by
-    /// the probe that reads `windowHeight`.
+    /// (`AskKeyboard.change(_:to:duration:curve:in:)`) and the screen puts its
+    /// keyboard away in (`putKeyboardAway()`): this screen's and not the key
+    /// window, which with two scenes up can be another's. Found by the probe
+    /// that reads `windowHeight`.
     @State private var screenWindow = AskScreenWindow()
     #endif
     /// The height of the window this screen is in, for the first screen to
@@ -249,7 +250,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     @Environment(\.askComposerRestsInSlot) private var composerRestsInSlot
     /// Whether an item is pushed over this screen, for a host's slot to put
     /// its face away (`AskComposerSlotCover`). This screen reports it, and the
-    /// slot hands it down only while the Ask tab is up.
+    /// slot sets it in the environment only while the Ask tab is up.
     @Environment(\.askComposerSlotCover) private var slotCover
     /// Where a host's slot hears this screen's accent, spectrum and accessory
     /// button, for its face to draw with (`askComposerSlotFaceStyle`).
@@ -297,8 +298,8 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// (`AskComposerSlotPolicy.tabBarRunsAlongBottom`).
     @Environment(\.askComposerSlotTabBar) private var slotTabBar
     /// Where a host's slot hears that this screen holds its composer up with
-    /// no keyboard on screen (`composerHeldUp`), handed down only while the
-    /// Ask tab is up.
+    /// no keyboard on screen (`composerHeldUp`), set in the environment only
+    /// while the Ask tab is up.
     @Environment(\.askComposerSlotHeldUp) private var slotHeldUp
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // Compact height is a phone on its side, where the first screen never
@@ -413,10 +414,14 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// iPhone Duo's fold this is the trailing pane (`AskFoldPanes`), which is
     /// why the composer's bar and the pill ride on it and not on the screen:
     /// on the screen, the bar would inset the chats too.
+    ///
+    /// The banners scroll in half the height at the accessibility sizes,
+    /// where they would otherwise take the thread's (`AskScreenBanners`).
     private var conversation: some View {
-        VStack(spacing: 0) {
+        AskScreenBanners {
             quotaBanner
             unreadableThreadBanner
+        } content: {
             content
         }
         // The root identifier goes here, on the thread, and not on the whole
@@ -731,11 +736,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             // sight for a tenth of a second until the keyboard uncovered it.
             // Put away from the next turn of the main queue, it rode the
             // keyboard down, as it did under a question typed and sent from the
-            // thread. Only while the composer has focus, because the resign is
-            // app-wide: a turn started while another field is being typed into
-            // must not take that field's keyboard.
+            // thread. Only while the composer has focus, because the resign
+            // takes whatever field has focus in this screen's window: a turn
+            // started while a host's field there is being typed into must not
+            // take that field's keyboard.
             #if os(iOS) || os(visionOS)
-            if thinking, isComposerFocused { AskKeyboard.putAway($isComposerFocused) }
+            if thinking, isComposerFocused { putKeyboardAway() }
             #endif
         }
         .onChange(of: isComposerFocused) { _, focused in
@@ -1008,7 +1014,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // (`firstScreenSpaceUnder`).
                 Color.clear.frame(height: firstScreenSpaceUnder)
             }
-            .askDismissesKeyboardOnTap($isComposerFocused)
+            .askDismissesKeyboardOnTap { putKeyboardAway() }
         }
         #if os(iOS)
         // A fold across the scroll view, read from the scroll view and not
@@ -1061,21 +1067,14 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         #else
         .scrollBounceBehavior(.basedOnSize)
         #endif
-        // The first screen sits under the same bar and passes under it the
-        // moment the keyboard makes it scrollable. Each platform treats it as
-        // it treats the thread: iOS takes the SDK's automatic edge effect and
-        // the Mac hides the effect, and `threadScroll` says why.
-        #if os(macOS)
-        .scrollEdgeEffectHidden(true, for: .top)
-        #endif
-        // The composer sits under this screen too, so the keyboard can be up
-        // here just as over the thread. Same mode, same platform gate and the
-        // same ways out as `threadScroll`, which says why. A first screen
-        // scrolled to its end under an up keyboard is one of the two places
-        // `.interactively` stranded the keyboard.
-        #if !os(visionOS)
-        .scrollDismissesKeyboard(.immediately)
-        #endif
+        // The edge effect under the bar and the keyboard on a drag, as the
+        // thread takes them (`askScreenScrollChrome()`): the first screen
+        // passes under the same bar the moment the keyboard makes it
+        // scrollable, and the composer sits under it too, so the keyboard can
+        // be up here just as over the thread. A first screen scrolled to its
+        // end under an up keyboard is one of the two places `.interactively`
+        // stranded the keyboard.
+        .askScreenScrollChrome()
     }
 
     /// Whether the first screen makes room for the keyboard: on the ready
@@ -1237,7 +1236,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                     .padding(.top, firstScreenLead)
                 Color.clear.frame(height: firstScreenSpaceUnder)
             }
-            .askDismissesKeyboardOnTap($isComposerFocused)
+            .askDismissesKeyboardOnTap { putKeyboardAway() }
         }
         .defaultScrollAnchor(.top, for: .initialOffset)
         .defaultScrollAnchor(.center, for: .alignment)
@@ -1389,9 +1388,18 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // It also runs on the thread's first appearance, which is
                 // right: arriving at a restored conversation should show its
                 // end.
+                //
+                // **With whatever is streaming as it runs**, since this screen
+                // may be built mid-answer, in a second window or a rebuilt
+                // split view's detail, where `onChange(of: store.isThinking)`
+                // has nothing to report (`AskScrollFollow.threadAppeared`).
+                // Not by giving that closure `initial: true`, which on every
+                // screen built mid-stream would clear VoiceOver's next stop
+                // and put the keyboard away, racing a host's request for the
+                // composer.
                 .task(id: store.lastTurnID) {
                     guard store.lastTurnID != nil else { return }
-                    follow.jumped()
+                    follow.threadAppeared(streaming: store.isThinking)
                     // **The end of the thread, whatever brought us here.** One
                     // target and one anchor: a question the reader just sent
                     // is at the end, and so is the answer they came back to on
@@ -1536,30 +1544,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             // the thread (backgrounding, screen sharing, an app lock) has
             // nothing to reach for and has to blur the whole screen.
             .privacySensitive()
-            .askDismissesKeyboardOnTap($isComposerFocused)
+            .askDismissesKeyboardOnTap { putKeyboardAway() }
         }
-        // **Nothing on iOS: the thread takes SDK 27's automatic edge effect,**
-        // which is what a native bar wants for content passing under it. Why
-        // not `.hard`: ARCHITECTURE.md, Rejected designs.
-        //
-        // **On the Mac the effect is hidden.** A Mac window's toolbar is
-        // already a glass surface with its own separator, and the thread's top
-        // inset there is the toolbar's, 52 pt on the demo once the window's
-        // opening animation has ended. So a `.hard` effect paints a block over
-        // exactly that band and rules a second line across the content under
-        // it: the line under an iOS navigation bar, on a platform with no
-        // navigation bar. Hidden rather than left to `.automatic`, whose look
-        // under a Mac toolbar wasn't measured, since the toolbar's own glass is
-        // already the separation.
-        //
-        // Nothing on visionOS, for a different reason: the modifier is
-        // unavailable there, as `scrollDismissesKeyboard` and
-        // `ToolbarItemVisibilityPriority.high` are, since a spatial window has
-        // no bar for content to pass under. The push gate's visionOS build
-        // fails on any of them left outside a platform gate.
-        #if os(macOS)
-        .scrollEdgeEffectHidden(true, for: .top)
-        #endif
+        // The edge effect under the bar and the keyboard on a drag, each
+        // platform's own (`askScreenScrollChrome()`).
+        .askScreenScrollChrome()
         // `.alignment` puts a thread too short to fill the screen at the top
         // rather than floating it in the middle.
         //
@@ -1569,18 +1558,6 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         // and what to reproduce before reinstating it: ARCHITECTURE.md,
         // Rejected designs.
         .defaultScrollAnchor(.top, for: .alignment)
-        // `.immediately`: a drag puts the keyboard away the instant it begins,
-        // on the keyboard's own animation. It serves the reader who tapped the
-        // field and changed their mind; a turn starting already drops focus (see
-        // `onChange(of: store.isThinking)`), so no answer is read behind a
-        // keyboard. Why not `.interactively`: ARCHITECTURE.md, Rejected
-        // designs.
-        //
-        // Not on visionOS, where the modifier is unavailable: the tap on the
-        // content is what visionOS has instead.
-        #if !os(visionOS)
-        .scrollDismissesKeyboard(.immediately)
-        #endif
         // **All five numbers, raw**, because two consecutive samples are what
         // say whether the reader moved or the thread grew away from them:
         // `AskThreadGeometry` does the arithmetic and carries the trace for
@@ -1660,14 +1637,25 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// on: the field here lets its focus go, or this window would keep a
     /// focused field and a Done with the keyboard in another.
     ///
-    /// **The binding, not `AskKeyboard.putAway`**, whose resign goes to
-    /// whichever first responder UIKit sends it to, app-wide: that can be the
-    /// field the other window has just focused. The keyboard is the other
-    /// window's now, so there's no hide here for the write to fall outside of.
+    /// **The binding, not `putKeyboardAway()`.** The keyboard is the other
+    /// window's now, so there's no hide here for the write to fall outside
+    /// of, which is all a resign on the next turn is for.
     private func letHandedOverFocusGo() {
         hostFocusHandedOver = false
         guard isComposerFocused, !windowAppearsActive else { return }
         isComposerFocused = false
+    }
+
+    /// Puts this screen's keyboard away (`AskKeyboard.putAway`): a turn
+    /// starting, Done, or a tap on the thread or the first screen. On iOS in
+    /// this screen's own window (`screenWindow`), so a put-away in one window
+    /// never resigns a field in another.
+    private func putKeyboardAway() {
+        #if os(iOS)
+        AskKeyboard.putAway($isComposerFocused, in: screenWindow)
+        #else
+        AskKeyboard.putAway($isComposerFocused)
+        #endif
     }
 
     // MARK: - Chrome
@@ -1737,18 +1725,32 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     private static var photoChipGap: CGFloat { 6 }
 
     private var composerBar: some View {
-        VStack(spacing: Self.photoChipGap) {
+        VStack(spacing: 0) {
             // The photo waiting for the next question, over the field it goes
-            // with. No animation of its own: it arrives when the host hands it
-            // over, and the bar animates only on `stage` and on the composer
-            // rising out of a host's slot.
-            if let pending = store.pendingPhoto {
-                AskPhotoChip(
-                    pending: pending,
-                    isHeldBack: store.status.nextTier.map { !$0.readsPhotos } ?? false,
-                    onRemove: { store.removePhoto() }
-                )
+            // with: glass that comes and goes on its own, so it materializes,
+            // in a glass group of its own that holds nothing while it's away
+            // (`askGlassTransition`). The gap under it is its own, so the
+            // empty group adds nothing to the bar.
+            //
+            // **Animated on whether it shows, on the group alone**, as the
+            // banners are (`quotaBanner`): it arrives when the host hands it
+            // over, in an update with no animation of its own, so the glass
+            // would have no transaction to materialize in. The bar grows up
+            // from the composer, which stays where it is, and the thread's
+            // inset changes in place as it did (house rule 4). Not watched on
+            // a simulator.
+            AskGlassGroup {
+                if let pending = store.pendingPhoto {
+                    AskPhotoChip(
+                        pending: pending,
+                        isHeldBack: store.status.nextTier.map { !$0.readsPhotos } ?? false,
+                        onRemove: { store.removePhoto() }
+                    )
+                    .padding(.bottom, Self.photoChipGap)
+                    .askGlassTransition(reduceMotion: reduceMotion)
+                }
             }
+            .animation(reduceMotion ? .none : AskStage.animation, value: store.pendingPhoto != nil)
             AskComposer(
                 draft: $store.draft,
                 isFocused: $isComposerFocused,
@@ -1942,7 +1944,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         if showsDoneItem {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
-                    AskKeyboard.putAway($isComposerFocused)
+                    putKeyboardAway()
                 } label: {
                     Label {
                         Text("Done", bundle: #bundle, comment: "Navigation bar button that puts the keyboard away while the reader is typing an Ask question. Apple's own term for this button in each language.")
@@ -2081,12 +2083,53 @@ extension View {
     /// as the content and not as nothing.
     ///
     /// The keyboard goes through `AskKeyboard`, as it does for the chevron and
-    /// Done, and not through the binding.
+    /// Done, and not through the binding: `putAway` is the screen's
+    /// `putKeyboardAway()`.
     @ViewBuilder
-    fileprivate func askDismissesKeyboardOnTap(_ isFocused: FocusState<Bool>.Binding) -> some View {
+    fileprivate func askDismissesKeyboardOnTap(_ putAway: @escaping @MainActor () -> Void) -> some View {
         #if os(iOS) || os(visionOS)
         contentShape(.rect)
-            .simultaneousGesture(TapGesture().onEnded { AskKeyboard.putAway(isFocused) })
+            .simultaneousGesture(TapGesture().onEnded { putAway() })
+        #else
+        self
+        #endif
+    }
+
+    /// What the thread's scroll view and the first screen's take alike, each
+    /// platform's own: the edge effect under the bar, and the keyboard on a
+    /// drag.
+    ///
+    /// **The edge effect: nothing on iOS**, where both take SDK 27's
+    /// automatic one, which is what a native bar wants for content passing
+    /// under it. Why not `.hard`: ARCHITECTURE.md, Rejected designs. **Hidden
+    /// on the Mac.** A Mac window's toolbar is already a glass surface with
+    /// its own separator, and the thread's top inset there is the toolbar's,
+    /// 52 pt on the demo once the window's opening animation has ended. So a
+    /// `.hard` effect paints a block over exactly that band and rules a second
+    /// line across the content under it: the line under an iOS navigation
+    /// bar, on a platform with no navigation bar. Hidden rather than left to
+    /// `.automatic`, whose look under a Mac toolbar wasn't measured, since the
+    /// toolbar's own glass is already the separation.
+    ///
+    /// **The keyboard: `.immediately`**, so a drag puts it away the instant it
+    /// begins, on the keyboard's own animation. It serves the reader who
+    /// tapped the field and changed their mind; a turn starting already drops
+    /// focus (see `onChange(of: store.isThinking)`), so no answer is read
+    /// behind a keyboard. Why not `.interactively`: ARCHITECTURE.md, Rejected
+    /// designs.
+    ///
+    /// **Neither on visionOS**, where both modifiers are unavailable, as
+    /// `ToolbarItemVisibilityPriority.high` is, since a spatial window has no
+    /// bar for content to pass under; the tap on the content is what visionOS
+    /// has instead of the drag (`askDismissesKeyboardOnTap(_:)`). The push
+    /// gate's visionOS build fails on either left outside a platform gate.
+    @ViewBuilder
+    fileprivate func askScreenScrollChrome() -> some View {
+        #if os(macOS)
+        scrollEdgeEffectHidden(true, for: .top)
+            .scrollDismissesKeyboard(.immediately)
+        #elseif os(iOS)
+        scrollDismissesKeyboard(.immediately)
         #else
         self
         #endif
