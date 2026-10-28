@@ -9,6 +9,8 @@
 #                 samples against ReadmeDomain.swift and ReadmeAssistantDomain.swift,
 #                 and the project file's
 #   test          `swift test`, cold, with a minimum pass count and a warning check
+#   api           the public API against the newest release tag, less the
+#                 breaks .github/api-breakage-allowlist.txt lists
 #   test-ios      the package's tests on an iPhone 18 Pro simulator
 #   ui-smoke [T]  the demo's UI tests on an iPhone 18 Pro simulator, or only
 #                 test T, such as AskScreenSmokeTests/<test>
@@ -16,12 +18,12 @@
 #   builds        the package for all eight destinations
 #   destinations  those eight, one per line: CI's build matrix reads them
 #   demo          the demo's three apps and its UI-test bundle
-#   all           checks, test, builds and demo: what the push gate runs, and
-#                 the default. CI runs each of them as a job.
+#   all           checks, test, api, builds and demo: what the push gate runs,
+#                 and the default. CI runs each of them as a job.
 #
 # Needs Xcode 27.2 or later and Python 3, plus `brew install swiftlint shellcheck`.
 #
-# Logs, the cold test's scratch and DerivedData go under $ASKKIT_CI_WORK: by
+# Logs, the cold builds' scratch and DerivedData go under $ASKKIT_CI_WORK: by
 # default $RUNNER_TEMP/askkit-ci on CI and ${TMPDIR}askkit-ci elsewhere. A step
 # that fails names the log to read.
 set -euo pipefail
@@ -290,6 +292,71 @@ step_test() {
   no_warnings "$log" "from swift test" || exit 1
 }
 
+# The public API of AskCore and AskUI against the newest release, so a change to
+# what a host compiles against fails here rather than in the host's next bump.
+# `swift package diagnose-api-breaking-changes` builds the release tag in a
+# checkout of its own and builds the working tree, dumps each library module's
+# public API, and fails on what was removed, renamed or changed, not on what was
+# added.
+#
+# AskKit is at 0.x, where a minor release may break the API (CHANGELOG.md), so
+# the check makes a break deliberate rather than forbidden: an intended one is
+# listed in the allowlist in the pull request that makes it, with its CHANGELOG
+# entry, and the list is emptied after each release, whose tag becomes the new
+# baseline.
+#
+# The baseline is the newest `v*` tag in HEAD's history, so the history and the
+# tags have to be there: CI checks out with fetch-depth 0.
+#
+# The digester builds for this Mac, so it compares the API the macOS build
+# declares. A public declaration only another platform compiles isn't compared:
+# today that is `askComposerSlot`'s iOS pair alone, whose signatures the Mac's
+# do-nothing pair repeats.
+#
+# Its warnings aren't scanned: `test` scans the working tree's, and the
+# baseline's belong to a released tree built with a newer Xcode, so they aren't
+# this change's to fix (v0.1.0's AskGlassRod.metal is one). Cold, because the
+# digester keeps the baseline it dumped for a tag in its scratch and reuses it,
+# and one an older Xcode dumped isn't the next one's to compare with. It takes
+# about 30 seconds.
+step_api() {
+  local allowlist=.github/api-breakage-allowlist.txt scratch="$work/api" log="$logs/api.log"
+  local bad baseline breaks
+  [ -f "$allowlist" ] ||
+    fail "$allowlist is missing: the API check reads it, and it stays, with only its comments, while no break is intended"
+  # The digester runs the list through the C preprocessor before reading it, and
+  # when that fails, as it does on a `#` line it takes for a directive, it reads
+  # the list as empty and reports every break listed there. A line it reads has
+  # to be a whole message, `API breakage: ` included, or it matches nothing.
+  bad=$(grep -nvE '^[[:space:]]*($|//|API breakage: )' "$allowlist" || true)
+  if [ -n "$bad" ]; then
+    printf '%s\n' "$bad" >&2
+    fail "$allowlist: a line has to be blank, a // comment, or a whole 'API breakage: …' message as this check prints it (above)"
+  fi
+  baseline=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null) ||
+    fail "no release tag (v*) in HEAD's history to compare the API with: fetch the tags (git fetch --tags), and the history, which a shallow clone lacks (on CI, fetch-depth: 0)"
+  rm -rf "$scratch"
+  say "public API against $baseline"
+  if logged "$log" swift package --scratch-path "$scratch" diagnose-api-breaking-changes "$baseline" \
+      --breakage-allowlist-path "$PWD/$allowlist"; then
+    return 0
+  fi
+  # The summary's lines, `  💔 API breakage: …`, without the indent and the
+  # emoji: the message as the allowlist takes it.
+  breaks=$(sed -nE 's/^[[:space:]]+([^[:space:]]+ )?(API breakage: .*)$/\2/p' "$log")
+  if [ -z "$breaks" ]; then
+    say "the API check failed before it compared anything — $log"
+    { grep -E 'error:' "$log" || true; } | head -20 >&2
+    exit 1
+  fi
+  say "the public API breaks against $baseline — $log"
+  printf '%s\n' "$breaks" | sed 's/^/  /' >&2
+  if [ "${GITHUB_ACTIONS:-}" = true ]; then
+    printf '%s\n' "$breaks" | sed -e 's/%/%25/g' -e "s/^/::error title=API break against $baseline::/"
+  fi
+  fail "a break you intend: add each line above, as it stands, to $allowlist, and give the break a CHANGELOG entry. Otherwise put the API back."
+}
+
 # The package's tests on the iOS simulator, where every `os(iOS)` leg that
 # `swift test` on the Mac never compiles runs. A local run: not in the push
 # gate, since a simulator holds one test run at a time and the gate builds
@@ -407,7 +474,7 @@ demo_build() { # scheme destination
 # `scripts/ci.sh test ios` fails instead of running the Mac's tests.
 step=${1:-all}
 case "$step" in
-  checks|test|test-ios|builds|demo|all)
+  checks|test|api|test-ios|builds|demo|all)
     [ "$#" -le 1 ] || fail "usage: scripts/ci.sh $step" ;;
   ui-smoke)
     [ "$#" -le 2 ] || fail "usage: scripts/ci.sh ui-smoke [TEST]" ;;
@@ -417,12 +484,13 @@ esac
 case "$step" in
   checks) step_checks ;;
   test) step_test ;;
+  api) step_api ;;
   test-ios) step_test_ios ;;
   ui-smoke) step_ui_smoke "${2:-}" ;;
   build) step_build "$2" || exit 1 ;;
   builds) step_builds ;;
   demo) step_demo ;;
-  all) step_checks; step_test; step_builds; step_demo ;;
+  all) step_checks; step_test; step_api; step_builds; step_demo ;;
   *) say "unknown step '$step'"; usage >&2; exit 2 ;;
 esac
 say "$step: ok"

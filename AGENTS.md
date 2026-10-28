@@ -54,6 +54,14 @@ Deeper notes: `.claude/references/`.
   - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, `swiftlint lint` (`trailing_comma`
     is on, `Package.swift` included), both catalog checks, the README sample's check and the demo
     project file's checks.
+  - `scripts/ci.sh api` runs `swift package diagnose-api-breaking-changes` against the newest `v*`
+    tag in HEAD's history (CI's job checks out with `fetch-depth: 0` for it), on the macOS build's
+    public API, in about 30 seconds, and fails on a removal, a rename, a changed signature or a new
+    enum case. A break you mean goes in `.github/api-breakage-allowlist.txt` in the same PR, each
+    line the check printed as it stands (`API breakage: …`), with its CHANGELOG entry; the list is
+    emptied after each release. Comments there start with `//`: the digester runs the file through
+    the C preprocessor, and a `#` line empties the list, so the step refuses one. The push gate runs
+    it after `test`, and counts the allowlist as part of the tree.
   - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in neither: run them by hand
     after changing an `os(iOS)` leg or the screen. CI's virtual Mac draws views too slowly for the
     suite's deadlines.

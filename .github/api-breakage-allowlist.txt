@@ -1,0 +1,12 @@
+// The breaks of AskKit's public API that are meant, which `scripts/ci.sh api`
+// lets through. The check compares AskCore and AskUI with the newest release
+// tag and fails on any other break.
+//
+// A break you mean goes here in the pull request that makes it, with its entry
+// in CHANGELOG.md: each line the check printed, as it stands, from
+// `API breakage: ` on, one to a line. The list is emptied after each release,
+// whose tag becomes the new baseline.
+//
+// A comment starts with //. The digester reads this file through the C
+// preprocessor, and a line starting with # makes it read the whole list as
+// empty, so `ci.sh api` refuses one.
