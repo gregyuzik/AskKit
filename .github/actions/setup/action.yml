@@ -17,16 +17,20 @@ description: Selects the image's newest Xcode release or release candidate, 27.2
 
 inputs:
   tools:
-    description: Either or both of swiftlint and shellcheck, separated by a space.
+    description: Any of swiftlint, shellcheck, actionlint and zizmor, separated by spaces.
     required: false
     default: ""
 
 runs:
   using: composite
   steps:
+    # Both steps write an environment file, which zizmor flags because a value
+    # someone else controls could set a variable later steps run with. Here the
+    # values are paths on the image, an Xcode's folder and the tools' own, and
+    # CI runs on push and pull_request only, with a read-only token.
     - name: Select the newest Xcode
       shell: bash
-      run: |
+      run: | # zizmor: ignore[github-env] DEVELOPER_DIR is an Xcode folder on the image
         set -euo pipefail
         shopt -s nullglob
         tab=$(printf '\t')
@@ -85,7 +89,7 @@ runs:
       shell: bash
       env:
         TOOLS: ${{ inputs.tools }}
-      run: |
+      run: | # zizmor: ignore[github-env] the PATH entry is the tools' folder under RUNNER_TEMP
         set -euo pipefail
         mkdir -p "$RUNNER_TEMP/tools/bin"
         cd "$RUNNER_TEMP/tools"
@@ -108,6 +112,18 @@ runs:
               tar -xJf shellcheck.tar.xz
               mv shellcheck-v0.11.0/shellcheck bin/
               bin/shellcheck --version
+              ;;
+            actionlint)
+              fetch https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_darwin_arm64.tar.gz \
+                aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f actionlint.tar.gz
+              tar -xzf actionlint.tar.gz -C bin actionlint
+              bin/actionlint -version
+              ;;
+            zizmor)
+              fetch https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-aarch64-apple-darwin.tar.gz \
+                ad5aa633cd56215b11e6c51d51f90c7e6b22904a75047d1215abbd422f61d698 zizmor.tar.gz
+              tar -xzf zizmor.tar.gz -C bin zizmor
+              bin/zizmor --version
               ;;
             *)
               echo "::error::unknown tool $tool"

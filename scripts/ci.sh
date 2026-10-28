@@ -5,9 +5,9 @@
 # gates can't drift apart.
 #
 # usage: scripts/ci.sh [step]
-#   checks        shellcheck, swiftlint, both String Catalog checks, README's
-#                 samples against ReadmeDomain.swift and ReadmeAssistantDomain.swift,
-#                 and the project file's
+#   checks        shellcheck, actionlint and zizmor, swiftlint, both String
+#                 Catalog checks, README's samples against ReadmeDomain.swift and
+#                 ReadmeAssistantDomain.swift, and the project file's
 #   test          `swift test`, cold, with a minimum pass count and a warning check
 #   api           the public API against the newest release tag, less the
 #                 breaks .github/api-breakage-allowlist.txt lists
@@ -21,7 +21,8 @@
 #   all           checks, test, api, builds and demo: what the push gate runs,
 #                 and the default. CI runs each of them as a job.
 #
-# Needs Xcode 27.2 or later and Python 3, plus `brew install swiftlint shellcheck`.
+# Needs Xcode 27.2 or later and Python 3, plus
+# `brew install swiftlint shellcheck actionlint zizmor`.
 #
 # Logs, the cold builds' scratch and DerivedData go under $ASKKIT_CI_WORK: by
 # default $RUNNER_TEMP/askkit-ci on CI and ${TMPDIR}askkit-ci elsewhere. A step
@@ -173,6 +174,7 @@ step_checks() {
   # Shellcheck first: a gate with a broken conditional doesn't error, it stops
   # gating.
   ./scripts/check-shell.sh
+  workflows
   command -v swiftlint >/dev/null 2>&1 || fail "swiftlint isn't installed (brew install swiftlint)"
   # `.swiftlint.yml` disables the size and judgment rules this codebase breaks
   # on purpose, so a clean tree prints nothing and any output is a new
@@ -199,6 +201,24 @@ step_checks() {
   python3 -I scripts/check-readme-sample.py ||
     fail "README.md's Adopt code isn't Tests/AskCrossPostureTests/ReadmeDomain.swift and ReadmeAssistantDomain.swift word for word (above)"
   project_files
+}
+
+# The workflows, the setup action and Dependabot's config: they decide what CI
+# proves, and a pull request's code runs inside them. actionlint checks the
+# workflows' syntax and expressions, and ShellCheck's their `run:` scripts.
+# zizmor looks for the ways a pull request reaches further than it should: an
+# expression spliced into a script, a token left in the checkout, an action
+# not pinned to a commit, a write to an environment file, a Dependabot update
+# with no cooldown. Offline, so it reads only the files, the push gate's run
+# needs no token, and both gates read the same thing.
+workflows() {
+  command -v actionlint >/dev/null 2>&1 || fail "actionlint isn't installed (brew install actionlint)"
+  command -v zizmor >/dev/null 2>&1 || fail "zizmor isn't installed (brew install zizmor)"
+  say "actionlint"
+  actionlint -config-file .github/actionlint.yaml || fail "actionlint found problems in the workflows (above)"
+  say "zizmor"
+  zizmor --offline --no-progress --config .github/zizmor.yml .github ||
+    fail "zizmor found problems in .github (above): fix them, or ignore one with a reason, as .github/zizmor.yml and the setup action do"
 }
 
 # The demo's project is Xcode 27.2's JSON project file, committed, and edited in

@@ -44,16 +44,19 @@ Deeper notes: `.claude/references/`.
   `name=` ambiguous.
 - **Two gates, one set of steps.** CI (`.github/workflows/ci.yml`) runs on every PR and push to main
   (a change only to docs other than `README.md` skips its jobs; `CI passed`, the one check main
-  requires, still reports on a pull request), on the image's newest Xcode release or
-  release candidate, 27.2 or later (a beta, with a warning, only when neither exists), and fails at
-  setup with none. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
+  requires, still reports on a pull request), weekly on main and on `gh workflow run ci.yml`; main
+  also takes a PR only once CodeQL reports no new high alert. It runs on the image's newest Xcode
+  release or release candidate, 27.2 or later (a beta, with a warning, only when neither exists),
+  and fails at setup with none. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
   tests without running them, with a warning. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
   runs them in order; both scripts stay mode `100755`, since a hook dispatcher skips a non-executable
   hook silently. The push gate refuses an untracked file under `Sources/`, `Tests/` or `Demo/` or at
   `Package.swift`, which SwiftPM would compile into the tree it proves.
-  - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, `swiftlint lint` (`trailing_comma`
-    is on, `Package.swift` included), both catalog checks, the README sample's check and the demo
-    project file's checks.
+  - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, actionlint and zizmor (offline,
+    over `.github/`; ignore a finding inline with its reason, as the setup action does), `swiftlint
+    lint` (`trailing_comma` is on, `Package.swift` included), both catalog checks, the README
+    sample's check and the demo project file's checks. Repo settings allow GitHub-owned actions only,
+    pinned to a commit.
   - `scripts/ci.sh api` runs `swift package diagnose-api-breaking-changes` against the newest `v*`
     tag in HEAD's history (CI's job checks out with `fetch-depth: 0` for it), on the macOS build's
     public API, in about 30 seconds, and fails on a removal, a rename, a changed signature or a new
@@ -68,6 +71,9 @@ Deeper notes: `.claude/references/`.
   - A test that passes only while work beats a deadline on the wall clock takes `.racesTheClock`
     (`AskEngineTests.swift`). It is skipped while the load average is past two a core, and
     `ci.sh test` says how many were.
+- **Releases.** `scripts/release.sh VERSION` only (CONTRIBUTING.md's Releases): it signs the tag
+  and pushes it before `gh release create --verify-tag`. A `v*` tag and its release can't change
+  once out.
 - **The house rules.** Read ARCHITECTURE.md's eight house rules before changing engine or screen
   behaviour. Comments cite them by number.
 - **iPhone Duo.** Lay out by size class and measured size, never by idiom or orientation. The 27.2
