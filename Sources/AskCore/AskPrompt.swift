@@ -305,7 +305,10 @@ nonisolated public enum AskPrompt {
     /// The question as it reaches a prompt: trimmed of whitespace and
     /// newlines, clamped to `maxQuestionLength` characters, and each
     /// character held to its first 16 Unicode scalars, as `clamp(_:_:)`
-    /// holds them.
+    /// holds them, then trimmed again, since what the cap drops can leave
+    /// whitespace at either end. Clamping it again changes nothing, which
+    /// matters because the fence clamps a question the engine has already
+    /// clamped, as the engine does one a prefill has.
     ///
     /// Empty for a question that is only whitespace, and every caller refuses
     /// an empty one: `AskLink` leaves it out of the link,
@@ -317,6 +320,7 @@ nonisolated public enum AskPrompt {
     /// hands them, and the engine clamps every question it is asked.
     @_spi(AskKitInternal) public static func clampQuestion(_ question: String) -> String {
         boundingScalars(question.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxQuestionLength))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// `text` without what a reader can't see, for words that reach the
@@ -452,37 +456,60 @@ nonisolated public enum AskPrompt {
     /// result again and finds nothing left. It reads the text with its
     /// newlines already spaces, as the model will.
     ///
-    /// The tags go before the cut, so the limit counts `[redacted]`, and a
-    /// tag that straddles the limit can't be cut into a half-tag that slips
-    /// past: `＜/user_req…` is no fence tag to the sanitizer, but a model
-    /// reads where it was going. The kept text is sanitized again before the
-    /// "…" goes on, for the openers the cut and the scalar cap make: a cut
-    /// just past a fence tag's name inside a longer one, as in
-    /// `＜/tool_results＞`, leaves the tag's opener, and the cap can drop the
-    /// letter that ends a run of Prepend format scalars and leave the run
-    /// touching a `＞`. `[redacted]` can be more characters than what it
-    /// replaced, so a pass that redacts anything cuts the text to the limit
-    /// again and is read again, until one finds nothing. Each pass that
-    /// redacts takes away an opening bracket, and the cut adds none, so the
-    /// passes end. The result is never longer than the limit and the "…",
-    /// and clamping it again changes nothing. A negative limit reads as zero.
+    /// The tags and the scalar cap go before the cut, so the limit counts
+    /// `[redacted]`, and a tag that straddles the limit can't be cut into a
+    /// half-tag that slips past: `＜/user_req…` is no fence tag to the
+    /// sanitizer, but a model reads where it was going. Each can make work
+    /// for the other, so the text is redacted and capped again until a pass
+    /// changes nothing: the cap can drop a run of Prepend format scalars
+    /// that parted a fence tag's name from its `＞`, and a redaction can
+    /// join what follows a tag to its `]`, a character over the cap.
+    /// The kept text is read the same way before the "…" goes on, for the
+    /// openers the cut makes: a cut just past a fence tag's name inside a
+    /// longer one, as in `＜/tool_results＞`, leaves the tag's opener.
+    /// `[redacted]` can be more characters than what it replaced, so a pass
+    /// that redacts anything cuts the text to the limit again and is read
+    /// again, until one finds nothing. Each pass that redacts takes away an
+    /// opening bracket, and the cap, the trim and the cut add none and only
+    /// ever drop scalars, so the passes end. A last character that would
+    /// join the "…", as a run of Prepend scalars joins anything, goes before
+    /// it. The result is never longer than the limit and the "…", and
+    /// clamping it again changes nothing. A negative limit reads as zero.
     public static func clamp(_ text: String, _ limit: Int) -> String {
         let limit = max(0, limit)
-        let flattened = sanitizeForFence(
+        var kept = settled(
             neuteringTags(text)
                 .split(whereSeparator: \.isNewline)
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespaces)
+                .joined(separator: " "),
+            trimmingItsEnd: true
         )
-        var kept = boundingScalars(flattened.prefix(limit))
-        var cut = flattened.count > limit
-        var clean = sanitizeForFence(kept)
-        while !clean.unicodeScalars.elementsEqual(kept.unicodeScalars) {
-            cut = cut || clean.count > limit
-            kept = String(clean.prefix(limit))
-            clean = sanitizeForFence(kept)
+        var cut = false
+        while kept.count > limit {
+            cut = true
+            kept = settled(String(kept.prefix(limit)), trimmingItsEnd: false)
         }
-        return cut ? kept + "…" : kept
+        return cut ? boundingScalars(kept, before: "…") + "…" : kept
+    }
+
+    /// `text` redacted, held to the scalar cap and trimmed of whitespace,
+    /// over and over until a pass changes nothing, so the sanitizer and the
+    /// cap would each leave it as it is.
+    ///
+    /// `trimmingItsEnd` false trims only the start, for a text that was
+    /// just cut: what it keeps before its "…" is the first characters as
+    /// they stand, a space included. Trimmed scalar by scalar, as
+    /// `trimmingCharacters(in:)` trims, so one loop serves both.
+    private static func settled(_ text: String, trimmingItsEnd: Bool) -> String {
+        var text = text
+        while true {
+            let capped = boundingScalars(sanitizeForFence(text))
+            var scalars = Substring(capped).unicodeScalars
+            while let first = scalars.first, CharacterSet.whitespaces.contains(first) { scalars.removeFirst() }
+            while trimmingItsEnd, let last = scalars.last, CharacterSet.whitespaces.contains(last) { scalars.removeLast() }
+            let next = String(scalars)
+            if next.unicodeScalars.elementsEqual(text.unicodeScalars) { return next }
+            text = next
+        }
     }
 
     /// A short label, such as a row title or a category name, as it appears
@@ -500,17 +527,71 @@ nonisolated public enum AskPrompt {
     /// clears the longest characters real text spells, ten scalars for a kiss
     /// emoji with two skin tones or a five-consonant Devanagari conjunct, so
     /// only a stack built to overflow loses any. Cutting a character short
-    /// never splits it, so the character limits still hold.
+    /// never splits it, and what it keeps joins nothing after it
+    /// (`boundingScalars(_:before:)`), so the character limits still hold and
+    /// a second clamp finds nothing to cut.
     static let maxScalarsPerCharacter = 16
 
     /// `text` with each character cut to its first `maxScalarsPerCharacter`
-    /// scalars.
-    private static func boundingScalars(_ text: Substring) -> String {
-        var out = String.UnicodeScalarView()
-        for character in text {
-            out.append(contentsOf: character.unicodeScalars.prefix(maxScalarsPerCharacter))
+    /// scalars, less any at the end of what it keeps that would join it to
+    /// what follows: the result is the same characters, each within the
+    /// cap, and bounding it again changes nothing.
+    ///
+    /// What the cap keeps of a character can reach forward. A run of Prepend
+    /// scalars, such as Arabic number signs, joins whatever comes next; a
+    /// ZWJ after an emoji joins the next emoji, a virama the next
+    /// consonant, a Hangul leading consonant the next syllable. Kept as cut,
+    /// it would swallow the character after it, a character over the cap
+    /// again. So scalars come off its end until it joins nothing, and a run
+    /// of Prepend scalars goes whole. A character whose neighbour went that
+    /// way meets the one after it, and is read against that the same way.
+    /// `trailer` is what will follow the text, as the clamp's "…" does, and
+    /// its last character is read against it.
+    ///
+    /// Read from the end, so the scalar a character is read against is the
+    /// first of what the result keeps after it. Joining is asked of Swift's
+    /// own segmentation, and only for a character the cap cut or one that
+    /// meets a new neighbour. A text with no character over the cap, whose
+    /// last joins no trailer, is returned as it is without that reading.
+    private static func boundingScalars(_ text: some StringProtocol, before trailer: Unicode.Scalar? = nil) -> String {
+        let overCap = text.contains { $0.unicodeScalars.count > maxScalarsPerCharacter }
+        let joinsTrailer = trailer.flatMap { trailer in text.last.map { joins(Array($0.unicodeScalars), trailer) } } ?? false
+        guard overCap || joinsTrailer else { return String(text) }
+        var reversed: [Unicode.Scalar] = []
+        var next = trailer
+        // Whether `next` is the scalar that followed this character in `text`.
+        var nextIsItsOwn = false
+        for character in Array(text).reversed() {
+            let scalars = character.unicodeScalars
+            let isCut = scalars.count > maxScalarsPerCharacter
+            guard isCut || (next != nil && !nextIsItsOwn) else {
+                // Whole, and followed by what followed it: nothing to read.
+                reversed.append(contentsOf: scalars.reversed())
+                next = scalars.first
+                nextIsItsOwn = true
+                continue
+            }
+            var kept = Array(scalars.prefix(maxScalarsPerCharacter))
+            if let following = next {
+                while !kept.isEmpty, joins(kept, following) { kept.removeLast() }
+            }
+            guard let first = kept.first else {
+                nextIsItsOwn = false
+                continue
+            }
+            reversed.append(contentsOf: kept.reversed())
+            next = first
+            nextIsItsOwn = true
         }
-        return String(out)
+        return String(String.UnicodeScalarView(reversed.reversed()))
+    }
+
+    /// Whether `scalar` would join the character `scalars` spell rather than
+    /// start one of its own.
+    private static func joins(_ scalars: [Unicode.Scalar], _ scalar: Unicode.Scalar) -> Bool {
+        var probe = String.UnicodeScalarView(scalars)
+        probe.append(scalar)
+        return String(probe).count == 1
     }
 
     /// A prompt as the engine sends one: `prefix`, then `lines`, then the
@@ -541,14 +622,17 @@ nonisolated public enum AskPrompt {
     /// The line a prompt carries for a photo that goes with the question: that
     /// there is one, and the host's words for what it shows.
     ///
-    /// Clamped and sanitized like any untrusted text: the words are the
-    /// host's, and they can be the reader's, such as a caption or the name
-    /// they gave an item. Only ever for a photo the model is sent. A line
-    /// about a picture the model can't see invites it to describe one anyway.
+    /// The words are the host's, often a row's title, and they can be the
+    /// reader's, such as a caption or the name they gave an item, so they are
+    /// clamped, redacted and neutered like any untrusted text, and fenced in
+    /// `<rows>`, as the titles in a recap, a referent or a steer are (house
+    /// rule 3). A label the clamp leaves empty takes no fence. Only ever for
+    /// a photo the model is sent. A line about a picture the model can't see
+    /// invites it to describe one anyway.
     static func photoLine(label: String) -> String {
         let label = sanitizeForFence(clamp(label, shortClamp))
         guard !label.isEmpty else { return "The reader attached a photo to this question." }
-        return "The reader attached a photo to this question, labelled: \(label)"
+        return "The reader attached a photo to this question, labelled: <rows>\(label)</rows>"
     }
 
     /// The answer as a thread shows it: the Markdown headings and bullets a
