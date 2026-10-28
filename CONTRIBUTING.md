@@ -2,7 +2,7 @@
 
 [README.md](README.md) says how an app adopts AskKit. This page says what a change to AskKit has to pass, and how to check it before you open a pull request.
 
-Bugs and feature requests go in issues, which have a form each; a security problem goes through the private form [SECURITY.md](SECURITY.md) describes. Before you change how the engine or the screen behaves, read the house rules and the rejected designs in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): comments cite the eight rules by number, and a change that breaks one says why. [AGENTS.md](AGENTS.md) has these rules in brief, for a coding agent.
+Bugs and feature requests go in issues, which have a form each; a security problem goes through the private form [SECURITY.md](SECURITY.md) describes. Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Before you change how the engine or the screen behaves, read the house rules and the rejected designs in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): comments cite the eight rules by number, and a change that breaks one says why. [AGENTS.md](AGENTS.md) has these rules in brief, for a coding agent.
 
 ## Toolchain
 
