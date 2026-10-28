@@ -32,9 +32,12 @@ nonisolated public enum AskProposalKind: String, Codable, Sendable {
 /// it. A proposing tool over the host's rows resolves the model's argument to
 /// one of them first, records that row with `record(rows:)` as any lookup
 /// does, and writes `title` and `detail` from the row. One with no row behind
-/// it, such as a reminder, shows what it will keep as it will keep it, so the
-/// reader confirms the thing itself, not a description of it. Both are drawn
-/// verbatim, never as Markdown.
+/// it, such as a reminder, has only the model's reading of the request to
+/// show: it shows what it will keep as it will keep it, clamped
+/// (`AskPrompt.clamp`), inside the app's own words, so the reader confirms
+/// the thing itself, not a description of it. `actionLabel` is the app's
+/// alone, so the button the reader taps never says what the model wrote.
+/// `title` and `detail` are drawn verbatim, never as Markdown.
 ///
 /// **Only in a conversation.** A standalone turn (Siri, a widget) has no card
 /// to confirm on, so a domain's `makeTools` leaves a proposing tool out when
@@ -138,16 +141,18 @@ nonisolated public enum AskProposalOutcome: Codable, Sendable, Equatable {
     /// the one an `AskProposalFailure` carried; nil reads a generic line. The
     /// card offers the action again while its turn is the newest.
     case failed(String?)
-    /// The reader confirmed, and the app was asked to carry it out and hasn't
-    /// said what came of it. Written to disk as the reader confirms, so a chat
-    /// that ends or an app that quits meanwhile never offers the action again:
-    /// confirmed a second time, it could be done twice.
+    /// The reader confirmed, and nothing has said what came of it yet.
+    /// Written to disk as the reader confirms, and the app is asked to carry
+    /// it out only once that write has landed, so a chat that ends or an app
+    /// that quits meanwhile never offers the action again: confirmed a second
+    /// time, it could be done twice.
     ///
     /// AskUI replaces it with the outcome when `AskDomain.perform(_:)`
     /// returns, wherever the turn is by then: on screen, or filed with the
     /// earlier chats. Read back where nothing is carrying it out, as after an
     /// app quit before it returned, what came of it is unknown, and the card
-    /// takes no tap.
+    /// takes no tap. An outcome this build can't decode, such as a case a
+    /// later AskKit wrote, reads back as this too.
     case performing
 }
 

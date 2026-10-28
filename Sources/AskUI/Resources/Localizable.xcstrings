@@ -8921,7 +8921,7 @@
       }
     },
     "Private Cloud Compute isn't enabled in this build." : {
-      "comment" : "Settings line: the running app does not carry the Private Cloud Compute entitlement, so answers come from the on-device model.",
+      "comment" : "Settings line: this build of the app sends Private Cloud Compute nothing, so answers come from the on-device model. Either the app doesn't hold the Private Cloud Compute entitlement, or it is a development build kept off Private Cloud Compute to save the developer's daily quota.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -10876,7 +10876,7 @@
       }
     },
     "Thinking…" : {
-      "comment" : "Ask wait row before the model has reached for anything — the only line here that is not a report of an event.",
+      "comment" : "Ask wait row wherever nothing more specific is happening: before the model has reached for anything, while it composes its answer once its tools have gone quiet, during a search or a read that names no part of the reader's things, and for an activity the app gives no words of its own. The only line here that is not a report of an event.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

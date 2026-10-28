@@ -9,7 +9,8 @@ import SwiftUI
 /// a gradient of it, top leading to bottom trailing, and the caret at the end
 /// of an answer being written is drawn in the same gradient. The composer's
 /// glass, the question bubbles, the wait row's shimmer and every tint keep
-/// the accent. With no spectrum the screen draws as it always has.
+/// the accent. With no spectrum the send circle and the caret wear the
+/// accent too.
 ///
 /// The send circle wears it on whichever face is on screen: the composer in
 /// the screen's bar, or its face in a host's tab bar slot

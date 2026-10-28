@@ -317,10 +317,14 @@ nonisolated public protocol AskDomain: Sendable {
     /// question is about, which names no tool: the `@Guide`s on
     /// `SearchArguments` then carry the argument rules alone.
     var searchPlanInstructions: String { get }
-    /// Run the search the planner chose, through the same code path the tool
+    /// Run the grounded retry's search, through the same code path the tool
     /// takes, and return what the model would have been shown. Recording the
     /// rows into the collector is the domain's job here, exactly as the tool
     /// does it.
+    ///
+    /// `arguments` are the ones the planner chose. A domain whose
+    /// `SearchArguments` is `AskNoSearchArguments` has none to choose, so no
+    /// planner is asked, and this runs with the empty value.
     ///
     /// Defaulted only for a domain whose `SearchArguments` is
     /// `AskNoSearchArguments`. A domain that names its own arguments writes
@@ -333,13 +337,15 @@ nonisolated public protocol AskDomain: Sendable {
     /// refused or ungrounded answer. Asked when the screen appears and when
     /// the app comes back to the foreground, with a fresh `overview`.
     ///
-    /// `window` is how many starters the first screen shows at once: three on
+    /// `window` is the most starters the first screen shows at once: three on
     /// iPhone and iPad, eight on the Mac and Apple Vision Pro
-    /// (`AskLayout.starterBank`). It is a ceiling, not a quota: return fewer
-    /// when there are fewer good questions to ask. The screen shows the first
-    /// `window` starters the reader hasn't tapped or dismissed ("Don't suggest
-    /// this"), so any past `window` move up as the reader dismisses chips, and
-    /// the coaching pair is the first two of those same starters.
+    /// (`AskLayout.starterBank`). A short layout shows fewer, such as two
+    /// beside the copy on a phone on its side over a host's slot. It is a
+    /// ceiling, not a quota: return fewer when there are fewer good questions
+    /// to ask. The screen shows the first of the starters the reader hasn't
+    /// tapped or dismissed ("Don't suggest this"), as many as it has room for,
+    /// so any past that move up as the reader dismisses chips, and the
+    /// coaching pair is the first two of those same starters.
     ///
     /// None by default: the first screen shows its copy and the composer, and
     /// a refused or ungrounded answer has no chips under it.
@@ -428,18 +434,23 @@ nonisolated public protocol AskDomain: Sendable {
     /// tool records an `AskProposal` and returns (`AskProposal` says how). Throw
     /// `AskProposalFailure` with the line the card should show when it can't be
     /// done; anything else thrown reads a generic line, and either way the card
-    /// offers the action again. Resolve lines against your own bundle, for the
-    /// reason `phrase(for:)` gives.
+    /// on the newest turn offers the action again. Resolve lines against your
+    /// own bundle, for the reason `phrase(for:)` gives.
     ///
-    /// **Safe to run twice.** The outcome is written to the thread after this
-    /// returns, so an app killed in between shows the card unconfirmed on the
-    /// next launch, and a reader may confirm it again.
+    /// **At most once for each yes.** The store saves the reader's yes with
+    /// the turn (`AskProposalOutcome.performing`) and calls this only once
+    /// that write has landed; a thread kept for the process only, which no
+    /// relaunch reads back, saves nothing first. A yes the disk refuses is
+    /// never carried out, and the card says it couldn't be done. An app
+    /// killed while this runs, or before its outcome is written, reads the
+    /// card back as unknown, and it takes no tap. So this runs again only on
+    /// a new yes after it threw: one that throws having done part of its work
+    /// should be safe to run again from there.
     ///
-    /// **Where it runs is the conformer's posture.** With
-    /// `NonisolatedNonsendingByDefault` on, as AskKit builds, a nonisolated
-    /// `async` function runs on its caller's actor, and the caller is the
-    /// store, on the main actor. A network call or a write belongs in a
-    /// `@concurrent` function this awaits.
+    /// **Off the main actor.** The store calls it from a `@concurrent`
+    /// function of its own, so a `nonisolated` perform runs off the main
+    /// actor whatever the host's concurrency settings, and a slow network
+    /// call or write hitches nothing on screen.
     ///
     /// The default throws: a domain that proposes nothing is never asked, and
     /// one that proposes without saying how to perform fails on the card
@@ -489,9 +500,9 @@ nonisolated public protocol AskDomain: Sendable {
     /// default, draws a glyph in the thumbnail's place.
     ///
     /// **A read of the reader's own photo**, so it goes through the app's
-    /// guarded read and off the main actor. It runs where `perform` does, on
-    /// the screen's actor under `NonisolatedNonsendingByDefault`, so the read
-    /// belongs in a `@concurrent` function this awaits.
+    /// guarded read. The thumbnail asks it from a `@concurrent` function of
+    /// its own, as the store asks `perform`, so a `nonisolated` one runs off
+    /// the main actor whatever the host's concurrency settings.
     func photoThumbnail(for photo: AskQuestionPhoto) async -> CGImage?
 }
 

@@ -323,10 +323,12 @@ nonisolated public enum AskPrompt {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// `text` without what a reader can't see, for words that reach the
-    /// composer or a chip from neither the reader nor the host: an `AskLink`'s
-    /// question, and the follow-ups a model writes. Whatever is left is what
-    /// the reader sees before they send it.
+    /// `text` without what a reader can't see: every question the engine is
+    /// asked and each question a recap quotes, before either is clamped, and
+    /// the words that reach the composer or a chip from neither the reader
+    /// nor the host, an `AskLink`'s question and the follow-ups a model
+    /// writes. Whatever is left is what the reader saw, or sees before they
+    /// send it.
     ///
     /// **Invisible text is still text to the model.** A Unicode tag character
     /// (U+E0020 to U+E007F) is a format character that draws nothing and

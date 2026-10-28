@@ -61,7 +61,7 @@ nonisolated enum AskActivityPhrase {
         String(
             localized: "Thinking…",
             bundle: #bundle,
-            comment: "Ask wait row before the model has reached for anything — the only line here that is not a report of an event."
+            comment: "Ask wait row wherever nothing more specific is happening: before the model has reached for anything, while it composes its answer once its tools have gone quiet, during a search or a read that names no part of the reader's things, and for an activity the app gives no words of its own. The only line here that is not a report of an event."
         )
     }
 }

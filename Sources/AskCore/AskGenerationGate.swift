@@ -31,7 +31,8 @@ import Synchronization
 public actor AskGenerationGate {
     /// The generation gate the process shares: the default for `run` and for
     /// `AppleModelSeam`. A host's own on-device generations go through it
-    /// too.
+    /// too. It is the only gate a host's generations and its seam should wait
+    /// at, since one at another gate can run beside one at this.
     ///
     /// Readable from any actor, and as a default argument on another one,
     /// such as `AppleModelSeam`'s initializer. That holds without the
@@ -51,12 +52,19 @@ public actor AskGenerationGate {
     private let logger: Logger
 
     /// A generation gate of its own, which serializes only what runs through
-    /// it. Almost every caller wants `shared`, which logs under the app's
-    /// bundle identifier.
+    /// it.
+    ///
+    /// **Almost every caller wants `shared`.** A generation waiting at this
+    /// gate never waits for one holding another, so a seam given a gate of
+    /// its own while the host's other on-device generations go through
+    /// `shared` lets two run at once. Never build one only to log under the
+    /// brand's subsystem (`AskBrand.logSubsystem`): `shared` logs a wedged
+    /// holder under the app's bundle identifier, and that is the price of
+    /// one gate. A gate of its own suits a test, or a process whose every
+    /// on-device generation goes through it.
     ///
     /// - Parameter logSubsystem: the subsystem a wedged holder is logged
-    ///   under: `AskBrand.logSubsystem`. Nil logs under the app's bundle
-    ///   identifier.
+    ///   under. Nil logs under the app's bundle identifier.
     public init(logSubsystem: String? = nil) {
         logger = Logger(subsystem: AskBrand.subsystem(logSubsystem), category: "gate")
     }

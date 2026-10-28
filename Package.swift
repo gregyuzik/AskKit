@@ -1,13 +1,15 @@
 // swift-tools-version: 6.4
 import PackageDescription
 
-// Approachable Concurrency, the posture every target here builds under except
-// `AskCrossPostureTests`. Consumers need not share the posture: AskCore's public
-// API states its isolation explicitly (actors, `nonisolated`, `@Sendable`
-// closures, `Sendable` values), so a package that leaves
-// `NonisolatedNonsendingByDefault` off still compiles against it. A "call to
-// main actor-isolated … in a synchronous nonisolated context" in a consumer is
-// an AskCore API bug, not a consumer bug.
+// The posture every target here builds under except `AskCrossPostureTests`:
+// main-actor default isolation, the two upcoming features Approachable
+// Concurrency adds to Swift 6 (`NonisolatedNonsendingByDefault` and
+// `InferIsolatedConformances`), `MemberImportVisibility` and `ExistentialAny`.
+// Consumers need not share the posture: AskCore's public API states its
+// isolation explicitly (actors, `nonisolated`, `@Sendable` closures, `Sendable`
+// values), so a package that leaves `NonisolatedNonsendingByDefault` off still
+// compiles against it. A "call to main actor-isolated … in a synchronous
+// nonisolated context" in a consumer is an AskCore API bug, not a consumer bug.
 let approachable: [SwiftSetting] = [
     .defaultIsolation(MainActor.self),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
@@ -20,8 +22,9 @@ let approachable: [SwiftSetting] = [
 // a host's shared package that builds for tvOS or watchOS still depends on
 // AskCore. Every FoundationModels file is
 // `#if canImport(FoundationModels) && !os(tvOS)`, with `&& !os(watchOS)` around
-// `SystemLanguageModel` (the watch has the framework, not the model); every
-// AskUI view file is `#if os(iOS) || os(macOS) || os(visionOS)`.
+// `SystemLanguageModel` (the watch has the framework, not the model) and
+// `LanguageModelSession.ToolCallError` (unavailable there); every AskUI view
+// file is `#if os(iOS) || os(macOS) || os(visionOS)`.
 let package = Package(
     name: "AskKit",
     defaultLocalization: "en",

@@ -1,6 +1,9 @@
 # `xcode-27` is a GitHub-hosted image label, newer than actionlint's list of
 # them, which otherwise rejects it as unknown. Listed here as actionlint's
-# config takes a label it doesn't know: as a self-hosted runner's.
+# config takes a label it doesn't know: as a self-hosted runner's. That quiets
+# the one check of the label, so the setup action's first step ("Insist on a
+# GitHub-hosted runner", .github/actions/setup/action.yml) fails a job the label
+# sends anywhere else.
 self-hosted-runner:
   labels:
     - xcode-27

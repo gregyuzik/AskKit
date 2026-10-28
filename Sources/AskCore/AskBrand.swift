@@ -16,7 +16,16 @@ nonisolated public struct AskBrand: Sendable {
     /// doesn't read it; it is the host's, for its own navigation.
     public let shortLabel: String
     /// The folder under `Application Support` the thread, the earlier chats
-    /// and the feedback attachments are kept in, usually the app's name.
+    /// and the feedback attachments are kept in: a name no other app keeps
+    /// files under there.
+    ///
+    /// **The app's name only inside a sandbox.** A sandboxed app's
+    /// Application Support is in its own container, so its name serves. An
+    /// unsandboxed Mac app's is the user's `~/Library/Application Support`,
+    /// which every app the user runs shares: a folder named for the app can
+    /// be another app's of the same name, whose files Delete All Chats would
+    /// reach. There, take a name no other app would, such as the bundle
+    /// identifier.
     ///
     /// **One folder.** A name that is empty, `.` or `..`, or holds a `/`,
     /// would reach Application Support itself or a folder outside it, where
@@ -26,8 +35,14 @@ nonisolated public struct AskBrand: Sendable {
     public let appDirectory: String
     /// The `os.Logger` subsystem AskKit's lines go to: the engine's, the
     /// store's, and those of the thread, archive and feedback files the store
-    /// keeps. A seam or a generation gate the host builds takes it too, as its
+    /// keeps. The seam the host builds takes it too, as `AppleModelSeam`'s
     /// `logSubsystem`.
+    ///
+    /// **No generation gate is built for it.** The process has one generation
+    /// gate, `AskGenerationGate.shared`, which logs under the app's bundle
+    /// identifier. One built to log under this subsystem would be a second
+    /// gate, and on-device generations queued at the two could run at once,
+    /// the overlap the gate exists to prevent.
     public let logSubsystem: String
     /// The placeholder shown while the draft is empty: in the screen's
     /// composer, and on the face in a host's slot.

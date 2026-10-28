@@ -7,7 +7,8 @@ host's build, not AskKit's, so the push gate builds the package for all five.
 ## The platform gates
 
 - **Foundation Models files** take `#if canImport(FoundationModels) && !os(tvOS)`. Add `&& !os(watchOS)`
-  around anything naming `SystemLanguageModel`: the watch has the framework but no on-device model.
+  around anything naming `SystemLanguageModel`, since the watch has the framework but no on-device
+  model, or `LanguageModelSession.ToolCallError`, which the SDK marks unavailable there.
 - **AskUI view files** take `#if os(iOS) || os(macOS) || os(visionOS)`.
 
 ## AskCore files
@@ -20,7 +21,8 @@ host's build, not AskKit's, so the push gate builds the package for all five.
   plain values.
 
 `AppleModelSeam` carries the stricter platform gate, with `&& !os(watchOS)`. Inside `AskTriage`, the
-`SystemLanguageModel.Error` branch sits in its own `#if !os(watchOS)`.
+`SystemLanguageModel.Error` branch and both reads of a `ToolCallError` (what a tool threw, in
+`askError(from:tier:)` and `tag(for:)`) sit in `#if !os(watchOS)`s of their own.
 
 **Ungated:**
 - `AskTier`, `AskRow`, `AskAnswer`, `AskMarkdown`, `AskError` and `AskTurnEvent`;
