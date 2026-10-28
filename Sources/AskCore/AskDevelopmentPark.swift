@@ -52,6 +52,8 @@ nonisolated public enum AskDevelopmentPark {
         isDevelopmentSigned: AskProcessEntitlements.isDevelopmentSigned,
         processName: ProcessInfo.processInfo.processName,
         environment: ProcessInfo.processInfo.environment,
+        // A required-reason API: Resources/PrivacyInfo.xcprivacy declares
+        // UserDefaults for CA92.1, the app's own launch arguments.
         launchArguments: UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain),
         appOptIn: false
     )

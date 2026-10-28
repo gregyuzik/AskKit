@@ -617,6 +617,8 @@ public actor AskThreadArchive<Row: AskRow> {
                 continue
             }
             unlistedFailures.remove(id)
+            // A required-reason API: Resources/PrivacyInfo.xcprivacy declares
+            // the file timestamp for C617.1, a file in the app's own container.
             let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
             if let summary = AskThreadSummary.of(entries, id: id, fallbackDate: modified ?? .distantPast) {
                 threads.append(summary)
