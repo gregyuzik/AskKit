@@ -74,8 +74,10 @@ struct AskChatsPane: View {
                 AskDeleteAllChatsButton(onConfirm: onDeleteAll)
                     .labelStyle(.iconOnly)
                     .buttonStyle(AskQuietIconButtonStyle())
-                    // The glyph alone, so its words as the pointer rests on
-                    // it on the Mac.
+                    // A glyph alone, so it carries the help tag every
+                    // glyph-only button does. The tag shows only on the Mac,
+                    // and the pane only beside iPhone Duo's fold, so it waits
+                    // for a Mac that lists the chats in a pane.
                     .askHelp(AskDeleteAllChatsButton.title)
             }
         }
