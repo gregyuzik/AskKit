@@ -15,8 +15,9 @@
 //
 // Anything else a local build needs can go in Local.xcconfig too, since it is
 // read last: `CODE_SIGNING_ALLOWED = YES` signs the Mac app with the same team.
-// Signed, the Mac app runs in the App Sandbox under the hardened runtime, which
-// the project asks for and an unsigned build can't carry.
+// Signed, the Mac app runs in the App Sandbox under the hardened runtime, with
+// Enhanced Security's entitlements, which the project asks for and an unsigned
+// build can't carry.
 
 DEVELOPMENT_TEAM =
 DEMO_BUNDLE_ID_SUFFIX = $(DEVELOPMENT_TEAM)
