@@ -916,7 +916,7 @@ extension CrossPostureTests {
     @Test func aToolMergesIntoTheTurnsPayloadWithoutThePosture() async throws {
         let collector = AskCollector<CrossPostureRow>()
         let read = "decades"
-        let kept = await collector.mergePayload(as: CrossPostureEnvelope.self) { envelope in
+        let kept = try await collector.mergePayload(as: CrossPostureEnvelope.self) { envelope in
             envelope = CrossPostureEnvelope(parts: (envelope?.parts ?? []) + [read])
         }
         #expect(kept)
@@ -1080,8 +1080,7 @@ extension CrossPostureTests {
     /// build one.
     @MainActor
     @Test func anEvaluationIsBuiltWithoutThePosture() {
-        let engine = AskEngine(domain: CrossPostureDomain(), seam: CrossPostureSeam(status: AskModelStatus()))
-        _ = AskEval(engine: engine)
+        _ = AskEval(domain: CrossPostureDomain(), seam: CrossPostureSeam(status: AskModelStatus()))
     }
 }
 

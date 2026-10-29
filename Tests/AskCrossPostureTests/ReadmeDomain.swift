@@ -141,7 +141,7 @@ final class LibraryAsk {
         // `.declared` only if the entitlements file holds Private Cloud Compute's.
         let seam = AppleModelSeam.make(privateCloudCompute: .undeclared)
         let engine = AskEngine(domain: domain, seam: seam)
-        store = AskConversationStore(domain: domain, engine: engine)
+        store = AskConversationStore(engine: engine)
     }
 }
 

@@ -47,7 +47,11 @@ public actor AskEngine<Domain: AskDomain> {
     /// What a turn's stream emits.
     public typealias Event = AskTurnEvent<Row>
 
-    private let domain: Domain
+    /// What the engine answers for: given once, here, and read by whatever
+    /// else needs the same value, such as the store
+    /// (`AskConversationStore.init(engine:)`), so a second copy that could
+    /// differ from it is never written.
+    public nonisolated let domain: Domain
     /// The domain's grounding policy, read once as the engine is built: it is
     /// the domain's for its life, never a turn's (`AskDomain.grounding`).
     private let grounding: AskGroundingPolicy
@@ -886,7 +890,11 @@ public actor AskEngine<Domain: AskDomain> {
     /// fresh attempt is likelier to draw nothing than something, and a turn
     /// that draws nothing ends with no text at all, where the failure would
     /// have rendered under the prose.
-    static var restartFloor: Duration { .seconds(10) }
+    ///
+    /// Public and read-only: it is house rule 5's constant, and a host
+    /// setting its own `AskDomain.turnDeadline` can read what a restart needs
+    /// left of it.
+    public nonisolated static var restartFloor: Duration { .seconds(10) }
 
     /// A failed attempt's error as the reader may be shown it: an `AskError` as
     /// it is, and anything else triaged, with its tag logged. The tag, never

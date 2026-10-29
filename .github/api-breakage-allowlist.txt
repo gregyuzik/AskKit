@@ -28,3 +28,10 @@ API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has been re
 API breakage: enumelement AskError.requestNotSupported has been added as a new enum case
 API breakage: func AskPrivateCloudState.of(_:) has return type change from AskUI.AskPrivateCloudState to AskUI.AskPrivateCloudState?
 API breakage: constructor AskPrivateCloudCard.init(store:showsDiagnostics:onRunEval:) has parameter 1 type change from Swift.Bool to Swift.Bool?
+API breakage: func AskCollector.record(payload:) is now throwing
+API breakage: func AskCollector.record(payload:) has parameter 0 type change from Foundation.Data to some Swift.Encodable & Swift.Sendable
+API breakage: func AskCollector.mergePayload(as:_:) is now without rethrows
+API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:systemImage:payload:) is now throwing
+API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:systemImage:payload:) has parameter 6 type change from Foundation.Data to some Swift.Encodable
+API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:systemImage:payload:) has removed default argument from parameter 6
+API breakage: constructor AskEval.init(engine:) has been removed

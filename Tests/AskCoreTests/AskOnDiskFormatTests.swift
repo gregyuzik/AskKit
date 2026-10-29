@@ -26,13 +26,20 @@ import Testing
         let displayTitle: String
     }
 
+    /// A proposal's payload, handed to AskKit as a value: the bytes it is
+    /// encoded as are the ones the files 0.2.0's domains wrote hold, or the
+    /// fixture's base64 changes.
+    nonisolated private struct Lending: Encodable {
+        let id: String
+    }
+
     /// Three turns: one answered, from a photo, with a proposal the reader
     /// confirmed, one that failed with prose drawn, and one the reader
     /// thumbed down that handed its proposal to the app.
     private func thread() throws -> [AskThreadEntry<Row>] {
         let proposalID = try #require(UUID(uuidString: "6F9619FF-8B86-D011-B42D-00C04FC964FF"))
         let handOffID = try #require(UUID(uuidString: "0E984725-C51C-4BF4-9960-E1C80E27ABA0"))
-        return [
+        return try [
             AskThreadEntry(
                 question: "Which of my records are from 1969?",
                 text: "Two: Abbey Road and Let It Be.",
@@ -52,7 +59,7 @@ import Testing
                         detail: "To Sam, until Friday",
                         actionLabel: "Mark as lent",
                         systemImage: "arrow.up.forward.circle",
-                        payload: Data(#"{"id":"abbey-road"}"#.utf8)
+                        payload: Lending(id: "abbey-road")
                     ),
                     grounding: .toolCall
                 ),

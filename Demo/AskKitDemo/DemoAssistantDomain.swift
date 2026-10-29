@@ -134,11 +134,11 @@ nonisolated struct DemoReminderTool: Tool {
     let context: AskToolContext<AskNoRow>
 
     @concurrent func call(arguments: DemoReminderArguments) async throws -> String {
-        await context.withToolCall { collector in
+        try await context.withToolCall { collector in
             guard let reminder = DemoReminder(arguments) else {
                 return ("Nothing to remind about: ask the reader what the reminder should say.", report: nil)
             }
-            guard await collector.record(proposal: DemoAssistantDomain.proposal(for: reminder)) else {
+            guard try await collector.record(proposal: DemoAssistantDomain.proposal(for: reminder)) else {
                 return ("The reminder couldn't be offered.", report: nil)
             }
             return (AskProposal.modelReceipt, report: nil)
@@ -276,15 +276,18 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     /// the words around them, the sentence after, and the action label, a
     /// fixed "Add Reminder", so the button the reader taps never says what
     /// the model wrote.
-    static func proposal(for reminder: DemoReminder) -> AskProposal {
-        AskProposal(
+    ///
+    /// Throws as `AskProposal`'s initializer does when a payload doesn't
+    /// encode, which a reminder of strings never makes it do.
+    static func proposal(for reminder: DemoReminder) throws -> AskProposal {
+        try AskProposal(
             id: reminder.id,
             title: "Remind you to \(reminder.text)",
             detail: (reminder.when.map { "\($0.prefix(1).uppercased() + $0.dropFirst()). " } ?? "")
                 + "Kept in this demo until it quits.",
             actionLabel: "Add Reminder",
             systemImage: "bell",
-            payload: (try? JSONEncoder().encode(reminder)) ?? Data()
+            payload: reminder
         )
     }
 
@@ -320,7 +323,9 @@ nonisolated struct DemoAssistantDomain: AskDomain {
             return AskAnswer(
                 text: "I can remind you to water the plants at 6 PM. Add it with the card below.",
                 questionKind: AskQuestionKind.lookup,
-                proposal: Self.proposal(for: reminder),
+                // `try?` only because this answer can't throw: a reminder of
+                // strings always encodes.
+                proposal: try? Self.proposal(for: reminder),
                 grounding: .toolCall
             )
         }

@@ -98,10 +98,7 @@ import Testing
 /// actions are one opener exactly when they hold one router.
 @Suite(.timeLimit(.minutes(1))) @MainActor struct AskDraftOpenActionTests {
 
-    private static let addRecord = AskProposal(
-        kind: .handOff, title: "Add Kind of Blue", actionLabel: "Add",
-        payload: Data(#"{"title":"Kind of Blue"}"#.utf8)
-    )
+    private static let addRecord = AskProposal(kind: .handOff, title: "Add Kind of Blue", actionLabel: "Add")
 
     @Test func theProposalArrivesAtTheRouter() {
         let routes = BothRoutes()

@@ -224,7 +224,7 @@ nonisolated struct DemoSearchTool: Tool {
         // searched while it is. `withToolCall` finishes the call however the
         // body ends, and only then reports the phrase the body hands back, in
         // the order `AskToolContext` gives.
-        return await context.withToolCall(.searching(scope: scope)) { collector in
+        return try await context.withToolCall(.searching(scope: scope)) { collector in
             let rows = DemoSearch.rows(query: arguments.query, kind: arguments.kind)
             // Only the rows the model is shown. An answer's tiles and the
             // count under it resolve against what is recorded, so a row past
@@ -233,7 +233,7 @@ nonisolated struct DemoSearchTool: Tool {
             await collector.record(rows: shown)
             // What the search also knew, for the card under the answer. The
             // model never sees it; the answer carries it out of the turn.
-            if let span = DemoYearSpan(rows)?.encoded { await collector.record(payload: span) }
+            if let span = DemoYearSpan(rows) { try await collector.record(payload: span) }
             return (
                 DemoSearch.render(rows, limit: context.rowLimit),
                 report: .reading(shown: shown.count, total: rows.count, scope: scope)
@@ -339,12 +339,14 @@ nonisolated struct DemoDomain: AskDomain {
                 matches: [book],
                 tiles: [book],
                 questionKind: AskQuestionKind.lookup,
-                proposal: AskProposal(
+                // `try?` only because this answer can't throw: a string id
+                // always encodes.
+                proposal: try? AskProposal(
                     title: "Mark \(book.displayTitle) as lent",
                     detail: "It stays with your books, marked as out on loan.",
                     actionLabel: "Mark as lent",
                     systemImage: "book.closed",
-                    payload: (try? JSONEncoder().encode(book.id)) ?? Data()
+                    payload: book.id
                 )
             )
         }

@@ -67,7 +67,7 @@ nonisolated final class CollectorBridge: @unchecked Sendable {
     /// What a tool also knew this turn, recorded where a real tool records it.
     func recordPayload(_ payload: Data) async {
         guard let collector = collector.withLock({ $0 }) else { return }
-        await collector.record(payload: payload)
+        await collector.record(encodedPayload: payload)
     }
 
     /// A narration the collector knows nothing about, reported with no tool

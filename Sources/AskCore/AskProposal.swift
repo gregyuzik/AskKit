@@ -59,9 +59,11 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     public let actionLabel: String
     /// An SF Symbol beside the title.
     public let systemImage: String?
-    /// What `perform` needs to carry it out, in the domain's own encoding, read
-    /// back with `payload(as:)`. It rides into the thread file with its answer,
-    /// so it is an identifier and an intent, never a copy of a row.
+    /// What `perform` needs to carry it out, as JSON: AskKit encodes the
+    /// value the initializer took, and `payload(as:)` reads it back. Empty
+    /// for a proposal made without one. It rides into the thread file with
+    /// its answer, so it is an identifier and an intent, never a copy of a
+    /// row.
     public let payload: Data
 
     /// The most a proposal's payload may weigh: `AskCollector.record(proposal:)`
@@ -83,8 +85,32 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
         "Proposed, not done: the reader confirms on a card under your answer, and confirming opens a form they fill in themselves. Say what it would start; never say it is done, and never say anything is open."
     }
 
-    /// A proposal with each field as given. Most are performed, so the kind
-    /// defaults to `.perform`.
+    /// A proposal with each field as given and no payload, for one that
+    /// `perform` can carry out from its title alone. Most are performed, so
+    /// the kind defaults to `.perform`.
+    public init(
+        id: UUID = UUID(),
+        kind: AskProposalKind = .perform,
+        title: String,
+        detail: String? = nil,
+        actionLabel: String,
+        systemImage: String? = nil
+    ) {
+        self.init(
+            id: id, kind: kind, title: title, detail: detail, actionLabel: actionLabel, systemImage: systemImage,
+            encodedPayload: Data()
+        )
+    }
+
+    /// A proposal with each field as given, carrying `payload`, which AskKit
+    /// encodes as JSON for `payload(as:)` to read back: the value itself,
+    /// such as a row's id, never its encoding.
+    ///
+    /// **Throws, rather than proposing what can't be carried out.** A value
+    /// that doesn't encode, such as a `Double` that is infinite or NaN, or a
+    /// `Data`, which is a payload already encoded, throws the encoder's
+    /// `EncodingError`: a mistake in the domain's type, which a card missing
+    /// its payload, or an empty one, would hide until a reader confirmed it.
     public init(
         id: UUID = UUID(),
         kind: AskProposalKind = .perform,
@@ -92,7 +118,26 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
         detail: String? = nil,
         actionLabel: String,
         systemImage: String? = nil,
-        payload: Data = Data()
+        payload: some Encodable
+    ) throws {
+        self.init(
+            id: id, kind: kind, title: title, detail: detail, actionLabel: actionLabel, systemImage: systemImage,
+            encodedPayload: try AskPayloadCoding.encode(payload)
+        )
+    }
+
+    /// A proposal whose payload is already JSON: what a test scripts.
+    ///
+    /// **Not public**, so a domain can't hand in bytes in an encoding of its
+    /// own, which `payload(as:)` would read as nil.
+    init(
+        id: UUID = UUID(),
+        kind: AskProposalKind = .perform,
+        title: String,
+        detail: String? = nil,
+        actionLabel: String,
+        systemImage: String? = nil,
+        encodedPayload: Data
     ) {
         self.id = id
         self.kind = kind
@@ -100,7 +145,7 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
         self.detail = detail
         self.actionLabel = actionLabel
         self.systemImage = systemImage
-        self.payload = payload
+        self.payload = encodedPayload
     }
 
     /// Hand-written, as `AskAnswer`'s is, so a field added later decodes a
@@ -117,9 +162,10 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
         payload = try container.decodeIfPresent(Data.self, forKey: .payload) ?? Data()
     }
 
-    /// The payload as the domain's own type, or nil when it no longer decodes.
+    /// The payload as the domain's own type, decoded from the JSON AskKit
+    /// encoded it as, or nil when there is none or it no longer decodes.
     public func payload<Value: Decodable>(as type: Value.Type) -> Value? {
-        try? JSONDecoder().decode(type, from: payload)
+        AskPayloadCoding.decode(type, from: payload)
     }
 }
 

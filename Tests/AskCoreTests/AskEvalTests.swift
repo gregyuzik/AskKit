@@ -19,8 +19,7 @@ import Testing
         states: [AskTierState] = [.serving(.privateCloud), .serving(.onDevice)]
     ) -> (AskEval<FakeDomain>, FakeSeam) {
         let seam = FakeSeam(status: AskModelStatus(), states: states, bridge: domain.bridge)
-        let engine = AskEngine(domain: domain, seam: seam, log: FakeLogSink())
-        return (AskEval(engine: engine), seam)
+        return (AskEval(domain: domain, seam: seam, log: FakeLogSink()), seam)
     }
 
     private func grounded(_ text: String, kind: String? = nil, tiles: [String]? = nil) -> FakeSession.Script {
@@ -203,7 +202,7 @@ import Testing
         _ = await record(thread.ask("what do I own?"))
         #expect(await thread.hasKeptConversation)
 
-        let eval = AskEval(engine: AskEngine(domain: domain, seam: seam, log: FakeLogSink()))
+        let eval = AskEval(domain: domain, seam: seam, log: FakeLogSink())
         _ = await eval.run(AskScenario(id: "answers", question: "what do I own?"))
         session.script(FakeSession.Script(error: AskError.refused, toolCallsAfter: 1))
         _ = await eval.run(AskScenario(id: "fails", question: "q"))

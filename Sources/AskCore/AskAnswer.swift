@@ -54,8 +54,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// yes-or-no; nil for no line.
     public let basis: String?
     /// What a tool also knew about this turn: the data a card under the
-    /// answer draws from, recorded through `AskCollector.record(payload:)` and
-    /// read back with `payload(as:)`. Persisted with the thread.
+    /// answer draws from, recorded through `AskCollector.record(payload:)`,
+    /// which encodes it as JSON, and read back with `payload(as:)`. Persisted
+    /// with the thread.
     public let payload: Data?
     /// What the answer offers to do, which happens only if the reader confirms
     /// it on the card under the answer. Recorded by a tool through
@@ -80,6 +81,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// An answer with each field as given. The engine builds one per turn; a
     /// domain builds one for a deterministic answer
     /// (`AskDomain.deterministicAnswer(for:)`) or a refine pass.
+    ///
+    /// A `payload` given here is JSON, as a default `JSONEncoder` writes it,
+    /// or `payload(as:)` reads it as nil and its card is left out.
     public init(
         text: String,
         matches: [Row] = [],
@@ -159,12 +163,12 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
 
     // MARK: - Payload, basis, proposal and grounding
 
-    /// The payload as the domain's own type, or nil when there is none or it
-    /// no longer decodes. A card that can't be drawn is left out; it is never
-    /// a failed answer.
+    /// The payload as the domain's own type, decoded from the JSON AskKit
+    /// encoded it as, or nil when there is none or it no longer decodes. A
+    /// card that can't be drawn is left out; it is never a failed answer.
     public func payload<Value: Decodable>(as type: Value.Type) -> Value? {
         guard let payload else { return nil }
-        return try? JSONDecoder().decode(type, from: payload)
+        return AskPayloadCoding.decode(type, from: payload)
     }
 
     /// This answer with a different basis line.

@@ -206,14 +206,22 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
 nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
     private let engine: AskEngine<Domain>
 
-    /// Give it an engine of its own, never the thread's. Every scenario starts
-    /// by resetting the engine, and on the thread's engine that is New Chat.
+    /// An evaluation of `domain` on the tiers `seam` serves, on an engine of
+    /// its own, built here, logging to `log` as `AskEngine.init(domain:seam:log:)`
+    /// does.
     ///
-    /// The seam can be the thread's. Whether a conversation is kept is each
-    /// engine's own (`AskEngine.hasKeptConversation`), so the evaluation's
-    /// resets never hide the thread's follow-up chips.
-    public init(engine: AskEngine<Domain>) {
-        self.engine = engine
+    /// **Never the thread's engine.** Every scenario starts by resetting the
+    /// engine, and on the thread's engine that is New Chat: the reader's
+    /// conversation and warm session would go, and the store's copy of
+    /// whether a conversation is kept would go stale. So the evaluation takes
+    /// no engine, and builds its own.
+    ///
+    /// The domain and the seam can be the thread's, so the evaluation answers
+    /// on the app's tiers and generation gate. Whether a conversation is kept
+    /// is each engine's own (`AskEngine.hasKeptConversation`), so the
+    /// evaluation's resets never hide the thread's follow-up chips.
+    public init(domain: Domain, seam: any AskModelSeam, log: (any AskLogSink)? = nil) {
+        engine = AskEngine(domain: domain, seam: seam, log: log)
     }
 
     /// Run one scenario through the real engine on whatever tier serves.

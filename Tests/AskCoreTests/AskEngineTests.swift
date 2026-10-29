@@ -3835,7 +3835,7 @@ private extension Trait where Self == ConditionTrait {
             text: "Hello.", matches: (0..<300).map { FakeRow("Row \($0)") },
             payload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
             proposal: AskProposal(
-                title: "Lend it", actionLabel: "Lend", payload: Data(count: AskProposal.maxPayloadBytes + 1)
+                title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: AskProposal.maxPayloadBytes + 1)
             )
         )
         let (engine, _, log) = makeEngine(domain: domain)
@@ -3848,7 +3848,7 @@ private extension Trait where Self == ConditionTrait {
         #expect(routings.contains { $0.hasPrefix("the domain's answer without a model") })
 
         // Within every limit, it is passed on as it is.
-        let proposal = AskProposal(title: "Lend it", actionLabel: "Lend", payload: Data(count: 10))
+        let proposal = AskProposal(title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: 10))
         domain.deterministic = AskAnswer(
             text: "Hello.", matches: [FakeRow("Rumours")], payload: Data(count: 10), proposal: proposal
         )
@@ -3868,13 +3868,13 @@ private extension Trait where Self == ConditionTrait {
             text: "Refined.", matches: (0..<300).map { FakeRow("Row \($0)") },
             payload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
             proposal: AskProposal(
-                title: "Lend it", actionLabel: "Lend", payload: Data(count: AskProposal.maxPayloadBytes + 1)
+                title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: AskProposal.maxPayloadBytes + 1)
             )
         )
         let (engine, seam, _) = makeEngine(domain: domain)
         var script = grounded("First draft.")
         script.payload = Data(count: 10)
-        let proposal = AskProposal(title: "Lend it", actionLabel: "Lend", payload: Data(count: 10))
+        let proposal = AskProposal(title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: 10))
         script.proposal = proposal
         seam.session(for: .privateCloud).script(script)
         let answer = try #require(await record(engine.ask("q")).answer)
