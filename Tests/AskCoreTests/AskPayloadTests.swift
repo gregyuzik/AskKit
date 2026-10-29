@@ -17,6 +17,11 @@ import Testing
         let newest: Int
     }
 
+    /// A payload of one key, whose JSON has one order to be written in.
+    nonisolated private struct Shelf: Codable, Sendable {
+        let shelf: Int
+    }
+
     /// A payload with a `Double` in it, which JSON can't hold when it is
     /// infinite or NaN.
     nonisolated private struct Reading: Codable, Sendable {
@@ -33,16 +38,23 @@ import Testing
         #expect(await collector.turnPayload == nil)
     }
 
-    /// What a tool records is its value, and AskKit encodes it: as JSON, byte
-    /// for byte what a default `JSONEncoder` writes, which is how domains
-    /// encoded their payloads for the chat files 0.2.0 wrote. The answer
-    /// reads it back as the value.
+    /// What a tool records is its value, and AskKit encodes it as the JSON a
+    /// default `JSONEncoder` writes, as domains encoded their payloads for the
+    /// chat files 0.2.0 wrote: compact, with no strategies. The order of an
+    /// object's keys is the one thing that encoder leaves open, from one
+    /// encoding to the next, so a payload of one key is pinned to the byte
+    /// (the on-disk fixture's), and one of two as the object it parses to.
+    /// The answer reads it back as the value.
     @Test func aRecordedValueIsKeptAsTheJSONADefaultEncoderWrites() async throws {
         let collector = AskCollector<FakeRow>()
+        #expect(try await collector.record(payload: Shelf(shelf: 2)))
+        #expect(await collector.turnPayload == Data(#"{"shelf":2}"#.utf8))
+
         let span = YearSpan(oldest: 1959, newest: 1977)
         #expect(try await collector.record(payload: span))
         let recorded = try #require(await collector.turnPayload)
-        #expect(recorded == (try JSONEncoder().encode(span)))
+        #expect(try JSONDecoder().decode([String: Int].self, from: recorded) == ["oldest": 1959, "newest": 1977])
+        #expect(!recorded.contains(UInt8(ascii: " ")) && !recorded.contains(UInt8(ascii: "\n")))
         #expect(AskAnswer<FakeRow>(text: "Six records.", payload: recorded).payload(as: YearSpan.self) == span)
     }
 

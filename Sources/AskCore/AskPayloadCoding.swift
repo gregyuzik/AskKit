@@ -11,9 +11,9 @@ import Foundation
 /// payload in an encoding of the domain's own, which those would read as nil
 /// and leave its card out without a word, can't go in.
 ///
-/// **Defaults, on purpose.** No output formatting and no strategies: the bytes
-/// for a value are what `JSONEncoder()` writes for it, as they are in the chat
-/// files AskKit 0.2.0's domains wrote, so those payloads still read back.
+/// **Defaults, on purpose.** No output formatting and no strategies: a value
+/// is written as `JSONEncoder()` writes it, as the payloads in the chat files
+/// AskKit 0.2.0's domains wrote were, so those still read back.
 nonisolated enum AskPayloadCoding {
     /// `value` as JSON.
     ///

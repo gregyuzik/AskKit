@@ -24,8 +24,8 @@ import Testing
     }
 
     /// A payload goes in as the domain's value and comes back as it, through
-    /// AskKit's JSON: byte for byte what a default `JSONEncoder` writes, so a
-    /// proposal kept in a thread file reads back across the change.
+    /// AskKit's JSON: what a default `JSONEncoder` writes, to the byte for an
+    /// object of one key, so a proposal kept in a thread file reads back.
     @Test func aPayloadGoesInAndComesBackAsTheValue() throws {
         let proposal = try AskProposal(title: "Mark The Peregrine as lent", actionLabel: "Mark as lent", payload: ["book": "b6"])
         #expect(proposal.payload == (try JSONEncoder().encode(["book": "b6"])))

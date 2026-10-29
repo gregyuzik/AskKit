@@ -26,9 +26,9 @@ import Testing
         let displayTitle: String
     }
 
-    /// A proposal's payload, handed to AskKit as a value: the bytes it is
-    /// encoded as are the ones the files 0.2.0's domains wrote hold, or the
-    /// fixture's base64 changes.
+    /// A proposal's payload, handed to AskKit as a value. One key, so its JSON
+    /// has one order: the bytes are the ones the files 0.2.0's domains wrote
+    /// hold, or the fixture's base64 changes.
     nonisolated private struct Lending: Encodable {
         let id: String
     }
