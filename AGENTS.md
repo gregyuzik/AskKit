@@ -38,6 +38,8 @@ Deeper notes: `.claude/references/`.
   `ReadmeAssistantDomain.swift` are README.md's Adopt code word for word: `scripts/ci.sh checks` runs
   `scripts/check-readme-sample.py`, which fails with a diff when a Swift block there isn't a run of
   one file's lines, and fails when a file has no block. Change them together.
+  `Tests/AskReadmeApproachableTests` holds symlinks to both, so they build and run again under the
+  package's posture; edit the files, never the links.
 - **The demo.** `Demo/AskKitDemo.xcodeproj` is committed, its project file in Xcode 27.2's JSON
   format (`project.xcproj`). Edit it in Xcode, with `xcrun xcodeproj` or in `Demo/Signing.xcconfig`;
   how, and why its settings are what they are: `docs/DEMO-PROJECT.md`.

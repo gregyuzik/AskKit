@@ -26,6 +26,7 @@ for it; the doc comments describe the API. Where this document and the code disa
 | `AskUI` | The Ask screen, the conversation store that drives it, and a settings card. Depends on `AskCore`. |
 | `AskCoreTests`, `AskUITests` | Swift Testing suites. |
 | `AskCrossPostureTests` | Calls the public API, and in a file of its own the SPI, from a target with no concurrency settings. |
+| `AskReadmeApproachableTests` | README.md's two samples, `AskCrossPostureTests`' `ReadmeDomain.swift` and `ReadmeAssistantDomain.swift` through symlinks, built and run again under the package's posture, whose main-actor default isolation and `NonisolatedNonsendingByDefault` a host on Xcode's app template has too. |
 
 Both libraries compile for iOS, macOS, visionOS, tvOS and watchOS 27.2, because a host's shared package
 may link them on every platform the host ships. Ask itself shows on iOS, macOS and visionOS, the only
@@ -133,7 +134,8 @@ The host wires them together:
   `tiles(_:)`, `evidenceDisclosure(_:)`, `answerFooter(_:)`) set the host's views one at a time.
 - Where a tile or a hand-off opens, it conforms a class of its own to `AskItemRouter` or
   `AskDraftRouter`, set as `askItemOpener` or `askDraftOpener`.
-- On the Mac, it adds `AskCommands` to its scene's `.commands`.
+- On the Mac, it adds `AskCommands` to its scene's `.commands`: New Chat, Send and Stop in the File
+  menu, and the newest turn's Copy, Copy answer, Edit & Resend and Ask again.
 
 `Demo/AskKitDemo/App.swift` is the shape to copy.
 
@@ -444,8 +446,11 @@ still unwinding, so the gate waits for that task, within the holder's 90 s
 **One gate per process.** A host that generates on device outside Ask goes through
 `AskGenerationGate.shared` too, `AppleModelSeam`'s default. A gate built of its own
 (`AskGenerationGate(logSubsystem:)`) serializes only what runs through it, so a generation there can
-run beside one at `shared`: a host never builds one to log the gate under its brand's subsystem, and
-`shared` logs under the app's bundle identifier.
+run beside one at `shared`. A host never builds one to log the gate under its brand's subsystem: at
+`shared` too, an `AppleModelSeam`'s generation presumed wedged is logged under the seam's
+`logSubsystem`, beside its other lines (category `gate`, at error level). A host's own generation
+through `AskGenerationGate.run` is logged under the gate's subsystem, which at `shared` is the app's
+bundle identifier.
 
 ### Triage
 
@@ -518,9 +523,13 @@ A domain whose `persistence` is `.thread` (the default) keeps the thread in
 - **Cap.** At most 50 turns are kept, oldest dropped.
 - **Writes.** They are atomic and excluded from backup, and a write whose file the system won't
   exclude counts as failed. They use complete file protection except on a Mac, natively, as a Mac
-  Catalyst build or as an iPhone or iPad app there (`AskStoredFile`), and happen off the main actor
-  after each turn. No file past 64 MiB is written or read. Every write and delete says whether it took,
-  and a caller whose write didn't keeps every other copy of what it was writing.
+  Catalyst build or as an iPhone or iPad app there, where they keep the system's default class,
+  `CompleteUntilFirstUserAuthentication`. On macOS 27.2 complete protection fails every write while
+  the Mac is locked, sandboxed or not, and the Mac build has no moment to try a refused write again,
+  as iOS has when protected data comes back, so every turn written then would be lost
+  (`AskStoredFile`). They happen off the main actor after each turn. No file past 64 MiB is written or
+  read. Every write and delete says whether it took, and a caller whose write didn't keeps every other
+  copy of what it was writing.
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
   by entry. A row that no longer decodes costs its answer that row, never the turn, and the read logs
   how many went.
@@ -809,11 +818,21 @@ so the circles stay as far inside the edge at four lines as at one: a capsule fo
 
 **Keys.** The software keyboard's Return inserts a newline, and the arrow sends. A hardware Return sends,
 Shift-Return inserts a newline, and a Return with nothing to send, or with a turn in flight, types
-nothing; a held Return's repeats are handled as the press is, so it sends once. A hardware Return that
-confirms what an input method is composing, typing Japanese, Chinese or Korean, should send nothing, and
-whether it does hasn't been watched: SwiftUI shows no field's marked text. ⌘Return sends, ⌘. stops, and
-⇧⌘N is New Chat. On the Mac, `AskCommands` in the host's `.commands` puts New Chat, Send and Stop in the
-menu bar, acting on the composer in the focused window.
+nothing; a held Return's repeats are handled as the press is, so it sends once. A hardware Return while
+an input method is composing, typing Japanese, Chinese or Korean, goes to the input method to confirm
+its conversion and sends nothing, whatever the draft, the turn or Shift: the draft holds the marked
+text too (measured on the iOS 27.2 simulator), so a Return that sent there would send the reading
+unconverted. That holds on the Mac, and on iOS in `AskScreen`. SwiftUI shows no field's marked text, so
+the composer asks UIKit and AppKit as the Return comes in (`AskMarkedText`): on iOS, the first responder
+in the screen's window (`AskScreenWindow`); on the Mac, the active input context's client. On visionOS,
+and on iOS for a composer a host draws outside `AskScreen`, which has no window to ask, nothing is
+asked and a Return is routed as above. Not yet watched with an input method on a device. ⌘Return
+sends, ⌘. stops, and ⇧⌘N is New Chat; ⌘Return is the circle's keyboard shortcut, which that check
+doesn't see. On the Mac, `AskCommands` in the host's `.commands` puts New Chat, Send and Stop in the
+File menu, acting on the composer in the focused window, and after them the newest turn's Copy, Copy
+answer, Edit & Resend and Ask again, the items of its question's menu (`AskQuestionBubble`). Those
+four act on the newest turn of the focused window's thread, which its screen hands up
+(`AskNewestTurnCommand`), and have no shortcuts: ⌘C is the system's Copy.
 
 **The circle** at the trailing end of the field changes with the state:
 
@@ -938,6 +957,26 @@ away. Tapping the thread does the same, except on the Mac.
     for nothing else, for a host whose own control confirms or declines a proposal.
 - **Identifiers.** Every control has an `ask.*` identifier (`AskAccessibility`), so one UI-test recipe
   drives every host, the history sheet's search field excepted, since `searchable` takes none.
+- **A bare button says for itself what a system control says on its own** (`AskBareButton.swift`), each
+  where its platform asks for it.
+  - It lights as the reader looks at it on visionOS or points at it on an iPad, in the shape the reader
+    sees rather than its frame's rectangle (`askHoverEffect(in:)`): the composer's circles and the
+    face's, the chips' outlines, the pill, the pending photo's Remove, the thumbs, the evidence line,
+    the default tiles' corners, and the chats pane's rows and trash. None lights while it is disabled,
+    and nothing does on the Mac, which has no hover effect. Not yet looked at on the visionOS simulator
+    or under an iPad's pointer.
+  - On the Mac every glyph alone shows a help tag, in the words VoiceOver reads for it (`askHelp(_:)`):
+    the send circle, the accessory button, the pending photo's Remove, the thumbs and the chats pane's
+    trash. Only there, since `.help` is also the accessibility hint, and on iOS and visionOS VoiceOver
+    would read each label twice. The evidence line takes none: its words say what it does, and a help
+    would replace its hint.
+  - Under Button Shapes (`accessibilityShowBorders`), a glyph alone wears a 1 pt ring in its own style,
+    so it is still read against the ground its 3:1 was chosen on: the accessory button and the face's,
+    the thumbs and the pane's trash. Words alone are underlined: the evidence line and the face's line
+    (`AskBareButtonShape`). A button that shows a shape already, such as the send circle's fill, the
+    chips' capsules or the pill's glass, wears nothing more. The ring and the underline come and go by
+    opacity and `underline(_:)`'s flag, never a conditional modifier, so the setting changing keeps
+    the button the same element under VoiceOver's focus.
 - **Dynamic Type.** The mark scales with it, and a control's frame grows by what its glyph grows, not in
   proportion to the text (`AskGrowth`): in proportion, the composer's two circles left a 402 pt phone's
   field about 70 pt at the largest.
@@ -970,10 +1009,10 @@ away. Tapping the thread does the same, except on the Mac.
   check it fails text in both appearances at any strength; the demo's UI suite audits the screen, the
   card, the nothing-to-ask button and the empty composer so, light and dark, and the first screen, an
   answer with its tiles, a failure with Try Again and the card by every other check in a second call.
-- **Copying.** The question's Copy and Copy answer stay on the device, since either can quote the
-  reader's own data: on iOS and visionOS `.localOnly`, expiring after 120 s, and on the Mac
-  `prepareForNewContents(with: .currentHostOnly)`, which has no expiry. Text selected and copied with
-  the system's own Copy goes wherever any copy goes.
+- **Copying.** The question's Copy and Copy answer, from its menu or the Mac's menu bar, stay on the
+  device, since either can quote the reader's own data: on iOS and visionOS `.localOnly`, expiring
+  after 120 s, and on the Mac `prepareForNewContents(with: .currentHostOnly)`, which has no expiry.
+  Text selected and copied with the system's own Copy goes wherever any copy goes.
 
 ### Platforms and sizes
 
@@ -1149,6 +1188,14 @@ Each of these is the obvious thing to try, and each was ruled out for the reason
   samples any content.
 - **`.submitLabel(.send)` on the composer.** On a vertical-axis field the software keyboard's Return
   never fires `onSubmit`, so a key labelled "send" inserts a newline.
+- **A text view of AskKit's own for the composer's field (`UIViewRepresentable`,
+  `NSViewRepresentable`), to see an input method's marked text.** It would see it, and give up what
+  SwiftUI's `TextField` gives the composer: the hint on the field's first baseline
+  (`AskComposerFieldStack`); the focus binding, which SwiftUI clears as the field resigns
+  (`AskKeyboard`), and VoiceOver's (`@AccessibilityFocusState`); the growth from one line to four; the
+  words' hierarchical style on glass (`AskGlassForeground`); the field's VoiceOver and Voice Control
+  labels and its `ask.field` identifier. And it would be two text views, UIKit's and AppKit's. The
+  composer asks UIKit and AppKit for the marked text as a Return comes in instead (`AskMarkedText`).
 - **The keyboard toolbar (`placement: .keyboard`) for Done.** On SDK 27 it is a floating capsule in the
   composer's band, and it lands on top of the send button.
 - **A turning conic gradient for the spectrum's glow**, a ring of its colors blurred behind the
@@ -1209,6 +1256,9 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
 - **bar strip**: iPhone Duo's vertical bar column, where the system lays out the tab bar and the
   navigation bar's items along a side of the display (`AskBarStripReader`). The keyboard shortens it,
   and it reports `.bottomBar` as the tab bar's placement.
+- **bare button**: a button that draws its label and nothing behind it: a glyph on glass, a line of
+  caption text, or a chip whose capsule is laid outside the button. It says for itself what a system
+  control says on its own (`AskBareButton.swift`, [Accessibility](#accessibility)).
 - **chunk**: a stretch of an answer's prose that arrived in one snapshot (`AskRevealChunk`), drawn in as
   a unit.
 - **coaching**: the two starters offered under a refused or ungrounded failure, as a way forward.
