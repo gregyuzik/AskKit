@@ -63,8 +63,8 @@ let package = Package(
         // none of the upcoming features — the posture a consumer that does not
         // share ours compiles under.
         //
-        // Everything above carries the identical approachable posture, so this
-        // is the only target that fails to compile when public API it calls
+        // Every other target carries the identical approachable posture, so
+        // this is the only one that fails to compile when public API it calls
         // loses its explicit isolation. Without it an AskCore change could pass
         // here and fail only in a consumer's build. Giving this target settings
         // stops it testing anything.
