@@ -5,6 +5,10 @@ import Foundation
 /// **Additive by construction.** `AskProposal`'s decoder reads an absent kind
 /// as `.perform`, so a proposal written without one reads back as what it
 /// was, and a domain that only ever performs never names a kind.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskProposalKind: String, Codable, Sendable {
     /// The app carries it out where it stands, in `AskDomain.perform(_:)`.
     case perform
@@ -170,6 +174,10 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
 }
 
 /// What became of a proposal, kept with the turn that made it.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskProposalOutcome: Codable, Sendable, Equatable {
     /// The reader confirmed and the app carried it out. The line is the app's,
     /// returned by `AskDomain.perform(_:)`; nil reads "That's done".

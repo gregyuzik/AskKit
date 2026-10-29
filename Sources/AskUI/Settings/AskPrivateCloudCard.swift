@@ -15,6 +15,10 @@ import SwiftUI
 /// no view can pin the mapping: this is the surface that tells a reader why
 /// their answers are coming from the smaller model, and getting it wrong is
 /// silent.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
     /// The tier is up and has turns left.
     case serving

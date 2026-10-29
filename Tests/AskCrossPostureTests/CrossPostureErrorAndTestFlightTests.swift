@@ -16,7 +16,8 @@ import FoundationModels
 
     /// The failure, its line and its stored form, read off any actor as a
     /// host's own screen, Siri intent or archive reads them, and named in a
-    /// host's own exhaustive switch.
+    /// host's own switch, which ends in `@unknown default` since `AskError`
+    /// is open.
     @Test func aRequestTheModelCantTakeIsReadWithoutThePosture() throws {
         let error = AskError.requestNotSupported
         #expect(!error.isRetryable)
@@ -26,6 +27,7 @@ import FoundationModels
         let offersTryAgain = switch error {
         case .modelUnavailable, .refused, .contextTooLarge, .photosNotSupported, .requestNotSupported: false
         case .couldNotAnswer, .ungrounded, .privateCloudUnreachable, .quotaReached, .model, .stopped: true
+        @unknown default: error.isRetryable
         }
         #expect(offersTryAgain == error.isRetryable)
     }

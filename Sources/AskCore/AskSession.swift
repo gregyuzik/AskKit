@@ -243,6 +243,10 @@ nonisolated public struct AskImageAttachment: Sendable {
 /// How much the tier should reason before answering:
 /// `ContextOptions.ReasoningLevel`'s levels, in a type of AskKit's own so a
 /// test's session needs no SDK type.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskReasoningLevel: String, Sendable, Equatable {
     /// Brief reasoning. The engine asks for it on Private Cloud Compute, and
     /// for no level on device.

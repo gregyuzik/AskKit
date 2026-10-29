@@ -187,6 +187,10 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     }
 
     /// One way an answer differed from its scenario's shape.
+    ///
+    /// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+    /// `switch` over it takes `@unknown default`.
+    @nonexhaustive
     nonisolated public enum Miss: Sendable, Equatable {
         /// A kind the scenario did not list, or nil when the answer claimed
         /// none.

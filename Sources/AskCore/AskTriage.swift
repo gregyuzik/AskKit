@@ -348,6 +348,10 @@ nonisolated public enum AskTriage {
 /// **One of two readings, each with what it carries.** A rate limit is one
 /// only when it named its reset (without one it is an ordinary outage, and
 /// no reading at all), so its date is never missing; only a quota's can be.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskRetryAfter: Sendable, Equatable {
     /// A rate limit that named when it lifts.
     case rateLimited(until: Date)

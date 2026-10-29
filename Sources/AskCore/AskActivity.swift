@@ -21,6 +21,10 @@ import Foundation
 /// "Searching your …") set `scope` into a sentence. So it is a noun in the
 /// host's own words and language, which a translation of those sentences
 /// quotes as it is and cannot inflect.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskActivity: Sendable, Equatable {
     /// A retrieval has started.
     case searching(scope: String?)

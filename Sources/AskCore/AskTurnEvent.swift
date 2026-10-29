@@ -1,6 +1,10 @@
 /// What a streamed turn emits, in order: the tier it runs on, what it is doing
 /// as it does it, the rows it reads as it reads them, prose as it is written,
 /// then the finished answer.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskTurnEvent<Row: AskRow>: Sendable, Equatable {
     /// The tier this turn runs on, chosen once at its start, and again for
     /// the tier a hand-down moves it to, or for the tier a host's session

@@ -24,7 +24,8 @@ import Testing
 extension CrossPostureContradictionFreeStatesTests {
 
     /// A retry-after reading switched over, as a host's own router does with
-    /// what its sessions' failures say, off any actor.
+    /// what its sessions' failures say, off any actor, ending in
+    /// `@unknown default` since `AskRetryAfter` is open.
     @Test func aRetryAfterReadingIsSwitchedOverWithoutThePosture() {
         let reset = Date(timeIntervalSinceReferenceDate: 0)
         let readings: [AskRetryAfter] = [.rateLimited(until: reset), .quotaReached(resetDate: nil)]
@@ -32,6 +33,7 @@ extension CrossPostureContradictionFreeStatesTests {
             switch reading {
             case .rateLimited(let until): until
             case .quotaReached(let resetDate): resetDate
+            @unknown default: nil
             }
         }
         #expect(resets == [reset, nil])

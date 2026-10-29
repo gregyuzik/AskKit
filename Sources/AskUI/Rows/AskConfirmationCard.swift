@@ -5,6 +5,10 @@ import SwiftUI
 
 /// What the card under a proposing answer shows
 /// (`AskConversationStore.proposalPhase(for:)`).
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskProposalPhase: Equatable, Sendable {
     /// Waiting for the reader: the action, and Not now.
     case awaiting

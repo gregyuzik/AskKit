@@ -137,3 +137,18 @@ API breakage: var AskDomain.implementsDeterministicAnswer has been removed
 API breakage: struct AskFirstScreenPolicy has been removed
 API breakage: constructor AskScreen.init(store:accent:spectrum:onNothingAction:onAttach:composerAccessory:) has been removed
 API breakage: constructor AskFirstScreen.init(phase:brand:starters:policy:isMakingRoom:windowHeight:onStarter:onNothingAction:onDecline:mark:) has been removed
+API breakage: enum AskActivity is now with @nonexhaustive
+API breakage: enum AskUnavailability is now with @nonexhaustive
+API breakage: enum AskError is now with @nonexhaustive
+API breakage: enum AskOutcome.Miss is now with @nonexhaustive
+API breakage: enum AskGrounding is now with @nonexhaustive
+API breakage: enum AskDiscard.Reason is now with @nonexhaustive
+API breakage: enum AskProposalKind is now with @nonexhaustive
+API breakage: enum AskProposalOutcome is now with @nonexhaustive
+API breakage: enum AskReasoningLevel is now with @nonexhaustive
+API breakage: enum AskTier is now with @nonexhaustive
+API breakage: struct AskRetryAfter is now with @nonexhaustive
+API breakage: enum AskTurnEvent is now with @nonexhaustive
+API breakage: enum AskStage.Phase is now with @nonexhaustive
+API breakage: enum AskProposalPhase is now with @nonexhaustive
+API breakage: enum AskPrivateCloudState is now with @nonexhaustive

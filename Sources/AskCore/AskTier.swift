@@ -17,6 +17,10 @@
 /// main actor either way, because a raw-value enum takes it from the
 /// standard library. A synthesized one, such as `AskError`'s, would not
 /// (measured on Swift 6.4).
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskTier: String, Codable, Sendable, CaseIterable {
     /// Apple's Private Cloud Compute. Preferred whenever it can serve.
     case privateCloud = "privateCloud"
