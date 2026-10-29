@@ -20,8 +20,9 @@ import Testing
     }
 
     @Test func aDeadlineNoTimerCanHoldIsNoDeadline() async throws {
-        // A sleep traps on a wait this long; the race sets no timer instead,
-        // and the work it was given wins.
+        // A sleep traps on the first of these, and the second is past the
+        // longest wait: the race sets no timer for either, and the work it
+        // was given wins.
         for duration in [Duration.seconds(Int.max), .seconds(Int64(Int32.max) + 1)] {
             let value = try await AskDeadline.run(duration) { () -> String in
                 try? await Task.sleep(for: .milliseconds(20))
