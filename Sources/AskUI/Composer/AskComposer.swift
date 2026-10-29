@@ -19,7 +19,10 @@ import SwiftUI
 /// (`AskComposerAccessory`).
 ///
 /// **Keys.** A hardware Return sends, Shift-Return inserts a newline, and a
-/// Return with nothing to send, or with a turn in flight, types nothing.
+/// Return with nothing to send, or with a turn in flight, types nothing. A
+/// Return while an input method is composing, typing Japanese, Chinese or
+/// Korean, goes to the input method to confirm its conversion, and sends
+/// nothing: on the Mac, and on iOS in `AskScreen`.
 /// ⌘Return presses the circle; while a turn is in flight the shortcut is ⌘.
 /// instead, which stops it. The software keyboard's return key inserts a
 /// newline.
@@ -60,7 +63,9 @@ public struct AskComposer: View {
     @Environment(\.accessibilityShowBorders) private var showsBorders
     #if os(iOS)
     /// The window `AskScreen` is in, where the chevron puts the keyboard away
-    /// (`askScreenWindow`): nil for a composer a host draws outside the screen.
+    /// and a hardware Return asks whether an input method is composing
+    /// (`askScreenWindow`, `isComposing`): nil for a composer a host draws
+    /// outside the screen.
     @Environment(\.askScreenWindow) private var screenWindow
     #endif
     #if os(macOS)
@@ -166,6 +171,20 @@ public struct AskComposer: View {
 
     private var trimmed: String {
         draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether an input method is composing in the field (`AskMarkedText`),
+    /// asked as a hardware Return comes in: on iOS in the screen's window,
+    /// so never for a composer a host draws outside the screen; on the Mac
+    /// of the active input context; on visionOS not at all.
+    private var isComposing: Bool {
+        #if os(iOS)
+        AskMarkedText.isComposing(in: screenWindow?.window)
+        #elseif os(macOS)
+        AskMarkedText.isComposing
+        #else
+        false
+        #endif
     }
 
     public var body: some View {
@@ -349,25 +368,25 @@ public struct AskComposer: View {
             // repeats: a send has emptied the draft by then, so its repeats
             // are taken as nothing to send.
             //
-            // **The Return that confirms an input method's composition is
-            // unmeasured.** Typing Japanese, Chinese or Korean on a hardware
-            // keyboard, a Return can be the one that confirms what the input
-            // method is composing, and that one should send nothing. SwiftUI
-            // has no way to see a field's marked text: neither `KeyPress` nor
-            // `TextSelection` carries it, in 27.2's interfaces or its
-            // documentation. So this handler can't tell that Return from one
-            // that sends, and whether the input method takes it before
-            // `onKeyPress` hears it hasn't been watched.
+            // **A Return while an input method is composing is let through to
+            // it.** Typing Japanese, Chinese or Korean on a hardware keyboard,
+            // the Return that confirms a conversion should confirm it and
+            // send nothing. The draft holds the marked text as well
+            // (measured on the iOS 27.2 simulator), so a Return that sent
+            // there would send the reading as typed, unconverted. So the
+            // handler asks for the field's marked text (`isComposing`) before
+            // anything else: before a send, and before nothing to send and a
+            // turn in flight, which would swallow it (`AskComposerReturn.of`).
+            // Not yet watched with an input method: whether it takes the
+            // Return before `onKeyPress` hears it, which would make this check
+            // moot rather than wrong.
             .onKeyPress(.return, phases: AskComposerReturn.phases) { press in
-                switch AskComposerReturn.of(shift: press.modifiers.contains(.shift), draft: draft, isThinking: isThinking) {
-                case .newline:
-                    return .ignored
-                case .send:
-                    onSend()
-                    return .handled
-                case .nothing:
-                    return .handled
-                }
+                let route = AskComposerReturn.of(
+                    shift: press.modifiers.contains(.shift), draft: draft,
+                    isThinking: isThinking, isComposing: isComposing
+                )
+                if route == .send { onSend() }
+                return route.result
             }
             .accessibilityLabel(AskComposerWords.yourQuestion)
             // The placeholder has no element of its own
@@ -723,6 +742,10 @@ nonisolated enum AskComposerMetrics {
 /// so it can be tested. `AskComposer`'s field says why a hardware Return
 /// sends at all.
 nonisolated enum AskComposerReturn: Equatable {
+    /// An input method is composing in the field (`AskMarkedText`): the key
+    /// is the input method's, to confirm its conversion with, whatever the
+    /// draft, the turn or the modifiers.
+    case composing
     /// Shift-Return: the field keeps its newline.
     case newline
     /// A question to send and no turn in flight.
@@ -735,10 +758,26 @@ nonisolated enum AskComposerReturn: Equatable {
     /// repeats, which reach the field if the handler doesn't take them.
     static let phases: KeyPress.Phases = [.down, .repeat]
 
-    static func of(shift: Bool, draft: String, isThinking: Bool) -> Self {
+    /// `isComposing` is what `AskMarkedText` says as the key comes in.
+    ///
+    /// **Composing comes first**, before nothing to send and a turn in
+    /// flight as well as before a send: each of those takes the key, and the
+    /// Return that confirms a conversion would never reach the input method.
+    static func of(shift: Bool, draft: String, isThinking: Bool, isComposing: Bool) -> Self {
+        if isComposing { return .composing }
         if shift { return .newline }
         if isThinking || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .nothing }
         return .send
+    }
+
+    /// What the field's handler answers the key press with: let through, to
+    /// the input method or for the field's newline, or taken, to send or to
+    /// type nothing.
+    var result: KeyPress.Result {
+        switch self {
+        case .composing, .newline: .ignored
+        case .send, .nothing: .handled
+        }
     }
 }
 

@@ -25,8 +25,8 @@ import Testing
     /// A repeat meets the draft the press left behind: a send has emptied it,
     /// so the held key sends once and then types nothing.
     @Test func aRepeatAfterASendHasNothingLeftToSend() {
-        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: false) == .send)
-        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: false) == .nothing)
+        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: false, isComposing: false) == .send)
+        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: false, isComposing: false) == .nothing)
     }
 }
 
