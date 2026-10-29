@@ -184,7 +184,7 @@ nonisolated public struct AskFeedback: Sendable, Equatable {
     public let tier: AskTier?
     /// The answer's normalized kind (`AskAnswer.questionKind`), so a verdict
     /// can be read against the kind of question it was on.
-    public let questionKind: String?
+    public let questionKind: AskQuestionKind?
     /// How many tiles the answer showed.
     public let tilesShown: Int
     /// How many rows stood behind the answer (`AskAnswer.matches`).
@@ -197,7 +197,7 @@ nonisolated public struct AskFeedback: Sendable, Equatable {
     public init(
         sentiment: Sentiment,
         tier: AskTier?,
-        questionKind: String?,
+        questionKind: AskQuestionKind?,
         tilesShown: Int,
         rowsRead: Int,
         wasTruncated: Bool
@@ -212,7 +212,7 @@ nonisolated public struct AskFeedback: Sendable, Equatable {
 
     /// The `[feedback]` line.
     public var line: String {
-        "[feedback] \(sentiment.rawValue) tier=\(tier?.rawValue ?? "–") kind=\(questionKind ?? "–") "
+        "[feedback] \(sentiment.rawValue) tier=\(tier?.rawValue ?? "–") kind=\(questionKind?.rawValue ?? "–") "
             + "tiles=\(tilesShown) rows=\(rowsRead)\(wasTruncated ? " truncated" : "")"
     }
 }

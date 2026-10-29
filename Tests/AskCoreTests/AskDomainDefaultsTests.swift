@@ -105,9 +105,9 @@ import FoundationModels
         // until one says so.
         let domain = BareDomain()
         #expect(domain.rerollableKinds.isEmpty)
-        let kinds: [String?] = [AskQuestionKind.pick, AskQuestionKind.suggestion, AskQuestionKind.lookup, nil]
+        let kinds: [AskQuestionKind?] = [AskQuestionKind.pick, AskQuestionKind.suggestion, AskQuestionKind.lookup, nil]
         for kind in kinds {
-            #expect(!domain.isRerollable(Self.answer(kind), question: "q"), "\(kind ?? "no kind")")
+            #expect(!domain.isRerollable(Self.answer(kind), question: "q"), "\(kind?.rawValue ?? "no kind")")
         }
     }
 
@@ -148,15 +148,15 @@ import FoundationModels
         // `other`.
         var domain = FakeDomain()
         domain.kinds = [AskQuestionKind.pick, AskQuestionKind.count]
-        #expect(domain.normalizedKind(AskQuestionKind.superlative) == AskQuestionKind.pick)
-        #expect(domain.normalizedKind(AskQuestionKind.pick) == AskQuestionKind.pick)
+        #expect(domain.normalizedKind(AskQuestionKind.superlative.rawValue) == AskQuestionKind.pick)
+        #expect(domain.normalizedKind(AskQuestionKind.pick.rawValue) == AskQuestionKind.pick)
     }
 
     @Test func aSuperlativeStaysOneForADomainThatListsIt() {
         var domain = FakeDomain()
         domain.kinds = [AskQuestionKind.pick, AskQuestionKind.superlative]
-        #expect(domain.normalizedKind(AskQuestionKind.superlative) == AskQuestionKind.superlative)
-        #expect(domain.normalizedKind(AskQuestionKind.pick) == AskQuestionKind.pick)
+        #expect(domain.normalizedKind(AskQuestionKind.superlative.rawValue) == AskQuestionKind.superlative)
+        #expect(domain.normalizedKind(AskQuestionKind.pick.rawValue) == AskQuestionKind.pick)
     }
 
     @Test func aSuperlativeIsOtherForADomainThatListsNeither() {
@@ -164,8 +164,8 @@ import FoundationModels
         // kind the domain doesn't list is.
         var domain = FakeDomain()
         domain.kinds = [AskQuestionKind.lookup, AskQuestionKind.count]
-        #expect(domain.normalizedKind(AskQuestionKind.superlative) == AskQuestionKind.other)
-        #expect(domain.normalizedKind(AskQuestionKind.pick) == AskQuestionKind.other)
+        #expect(domain.normalizedKind(AskQuestionKind.superlative.rawValue) == AskQuestionKind.other)
+        #expect(domain.normalizedKind(AskQuestionKind.pick.rawValue) == AskQuestionKind.other)
     }
 
     @Test func aDomainNamingNoKindsGetsSuperlativesAsPicks() {
@@ -173,10 +173,10 @@ import FoundationModels
         // names no kinds gets its superlatives as picks.
         #expect(AskQuestionKind.all.contains(AskQuestionKind.superlative))
         #expect(!AskQuestionKind.default.contains(AskQuestionKind.superlative))
-        #expect(BareDomain().normalizedKind(AskQuestionKind.superlative) == AskQuestionKind.pick)
+        #expect(BareDomain().normalizedKind(AskQuestionKind.superlative.rawValue) == AskQuestionKind.pick)
     }
 
-    private static func answer(_ kind: String?) -> AskAnswer<FakeRow> {
+    private static func answer(_ kind: AskQuestionKind?) -> AskAnswer<FakeRow> {
         AskAnswer(text: "x", matches: [FakeRow("Rumours")], tiles: [FakeRow("Rumours")], questionKind: kind)
     }
 }

@@ -360,7 +360,7 @@ nonisolated struct UIDomain: AskDomain {
 
     var rows: [UIRow] = UIRow.three
     var persistenceMode: AskPersistence = .perLaunch
-    var rerollKinds: Set<String> = [AskQuestionKind.pick]
+    var rerollKinds: Set<AskQuestionKind> = [AskQuestionKind.pick]
     /// Titles `referent(from:)` adds beyond the tiles, as a domain that reads
     /// "tiles, else what the prose named" would.
     var extraReferents: [String] = []
@@ -415,7 +415,7 @@ nonisolated struct UIDomain: AskDomain {
 
     func referent(from answer: AskAnswer<UIRow>) -> [String] { answer.tiles.map(\.displayTitle) + extraReferents }
 
-    var rerollableKinds: Set<String> { rerollKinds }
+    var rerollableKinds: Set<AskQuestionKind> { rerollKinds }
 
     /// Questions whose picks the domain says are superlatives.
     var nonRerollableQuestions: Set<String> = []
@@ -570,7 +570,7 @@ extension AskAnswer where Row == UIRow {
         tiles: [UIRow] = [],
         followUps: [String] = [],
         truncated: Bool = false,
-        kind: String? = nil
+        kind: AskQuestionKind? = nil
     ) -> AskAnswer<UIRow> {
         AskAnswer(
             text: text, matches: tiles, tiles: tiles, followUps: followUps,

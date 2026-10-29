@@ -48,7 +48,7 @@ import Testing
                     matches: [Row(id: "abbey-road", displayTitle: "Abbey Road"), Row(id: "let-it-be", displayTitle: "Let It Be")],
                     tiles: [Row(id: "abbey-road", displayTitle: "Abbey Road")],
                     followUps: ["Which is on vinyl?"],
-                    questionKind: "which",
+                    questionKind: AskQuestionKind(rawValue: "which"),
                     isTruncated: false,
                     basis: "Both came out in 1969.",
                     payload: Data(#"{"shelf":2}"#.utf8),

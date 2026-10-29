@@ -37,7 +37,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// truncated answer. It decides "no tiles for a count"
     /// (`AskQuestionKind.showNoTiles`): a list of English cues would decide
     /// nothing in the other 24 languages (house rule 7).
-    public let questionKind: String?
+    public let questionKind: AskQuestionKind?
     /// The answer ended part-way: the turn's deadline cut the stream, or the
     /// reader stopped a turn that had already written something
     /// (`AskThreadEntry.stopped` tells the two apart). `text` is as far as it
@@ -89,7 +89,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         matches: [Row] = [],
         tiles: [Row] = [],
         followUps: [String] = [],
-        questionKind: String? = nil,
+        questionKind: AskQuestionKind? = nil,
         isTruncated: Bool = false,
         basis: String? = nil,
         payload: Data? = nil,
@@ -122,7 +122,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         matches = Self.salvagedRows(in: container, forKey: .matches, counting: droppedRows)
         tiles = Self.salvagedRows(in: container, forKey: .tiles, counting: droppedRows)
         followUps = try container.decodeIfPresent([String].self, forKey: .followUps) ?? []
-        questionKind = try container.decodeIfPresent(String.self, forKey: .questionKind)
+        questionKind = try container.decodeIfPresent(AskQuestionKind.self, forKey: .questionKind)
         isTruncated = try container.decodeIfPresent(Bool.self, forKey: .isTruncated) ?? false
         basis = try container.decodeIfPresent(String.self, forKey: .basis)
         payload = try container.decodeIfPresent(Data.self, forKey: .payload)

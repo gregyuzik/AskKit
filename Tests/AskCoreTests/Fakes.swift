@@ -777,7 +777,7 @@ nonisolated struct FakeDomain: AskDomain {
     /// Rows the tool hands back. The tool records into the collector, so a test
     /// that wants a grounded turn scripts the session's `toolCallsAfter` too.
     var rows: [FakeRow] = FakeRow.six
-    var kinds: [String] = AskQuestionKind.default
+    var kinds: [AskQuestionKind] = AskQuestionKind.default
     var deadline: Duration = .seconds(45)
     /// Outranks `deadline` while set. A class, for `instructionsFor`'s reason.
     let deadlineOverride = DeadlineOverride()
@@ -806,7 +806,7 @@ nonisolated struct FakeDomain: AskDomain {
     var basisText: String?
     /// The kinds offering "Another pick": none, as the framework's default
     /// offers, unless a test lists some.
-    var rerollKinds: Set<String> = []
+    var rerollKinds: Set<AskQuestionKind> = []
     /// Where `makeTools` publishes the collector the engine built.
     var bridge = CollectorBridge()
     /// The line each scope is asked with; a scope missing here gets none, as
@@ -829,7 +829,7 @@ nonisolated struct FakeDomain: AskDomain {
         )
     }
 
-    var questionKinds: [String] { kinds }
+    var questionKinds: [AskQuestionKind] { kinds }
     var turnDeadline: Duration { deadlineOverride.deadline ?? deadline }
 
     func maxTurns(for tier: AskTier) -> Int {
@@ -916,7 +916,7 @@ nonisolated struct FakeDomain: AskDomain {
 
     func basis(for answer: AskAnswer<FakeRow>) -> String? { basisText }
 
-    var rerollableKinds: Set<String> { rerollKinds }
+    var rerollableKinds: Set<AskQuestionKind> { rerollKinds }
 
     func refine(
         _ answer: AskAnswer<FakeRow>,
@@ -991,13 +991,13 @@ extension AskTierState {
 extension AskReplySnapshot {
     static func answering(
         _ text: String,
-        kind: String? = nil,
+        kind: AskQuestionKind? = nil,
         tiles: [String]? = nil,
         showsEveryMatch: Bool? = nil,
         followUps: [String]? = nil
     ) -> AskReplySnapshot {
         AskReplySnapshot(
-            answer: text, questionKind: kind, showsEveryMatch: showsEveryMatch,
+            answer: text, questionKind: kind?.rawValue, showsEveryMatch: showsEveryMatch,
             tiles: tiles, followUps: followUps
         )
     }

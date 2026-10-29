@@ -22,7 +22,7 @@ import Testing
         return (AskEval(domain: domain, seam: seam, log: FakeLogSink()), seam)
     }
 
-    private func grounded(_ text: String, kind: String? = nil, tiles: [String]? = nil) -> FakeSession.Script {
+    private func grounded(_ text: String, kind: AskQuestionKind? = nil, tiles: [String]? = nil) -> FakeSession.Script {
         FakeSession.Script(snapshots: [.answering(text, kind: kind, tiles: tiles)], toolCallsAfter: 1)
     }
 
