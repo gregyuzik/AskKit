@@ -97,8 +97,9 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     public var rowsRead = 0
     /// How many tiles the answer showed.
     public var tiles = 0
-    /// How long the turn took, from the question to its end.
-    public var milliseconds = 0
+    /// How long the turn took, from the question to its end. The table
+    /// prints it in whole milliseconds.
+    public var duration: Duration = .zero
     /// The question kind the answer claimed, in the domain's vocabulary.
     public var questionKind: String?
     /// The turn threw away what it had and started over: the grounded retry,
@@ -280,7 +281,7 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
         // A stream that ends with neither an answer nor an error, as one let
         // go before its answer does, answered nothing, and is no "ok".
         if !answered, outcome.failure == nil { outcome.failure = "no answer" }
-        outcome.milliseconds = AskEngine<Domain>.ms(ContinuousClock().now - started)
+        outcome.duration = ContinuousClock().now - started
         // The engine's count, not the tools' activity: a tool says what it is
         // doing however its domain likes, and counting `.searching` would read
         // 0 for a domain whose tools report `.custom`.
@@ -331,7 +332,7 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
             lines.append(
                 "| \(outcome.id) | \(outcome.tier?.rawValue ?? "–") | \(outcome.toolCalls) | \(outcome.restarts) "
                 + "| \(outcome.rowsRead) | \(outcome.tiles) | \(outcome.questionKind ?? "–") "
-                + "| \(outcome.proposed ? "yes" : "–") | \(outcome.milliseconds) | \(outcome.verdict) |"
+                + "| \(outcome.proposed ? "yes" : "–") | \(outcome.duration.wholeMilliseconds) | \(outcome.verdict) |"
             )
         }
         let good = outcomes.filter(\.isGood).count

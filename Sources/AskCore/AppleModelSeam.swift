@@ -40,12 +40,12 @@ public actor AppleModelSeam: AskModelSeam {
     /// ask re-probes. A terminal one is never re-probed. A locale probe or a
     /// context-window read that couldn't say is remembered as no answer for as
     /// long.
-    nonisolated public static let reprobeInterval: TimeInterval = 60
+    nonisolated public static let reprobeInterval: Duration = .seconds(60)
     /// How long Private Cloud Compute sits out after a transport failure that
     /// did not say when to come back, so a burst of questions on a bad
     /// connection does not wait on it every time. A rate limit that names its
     /// reset is held until then instead.
-    nonisolated public static let transportCooldown: TimeInterval = 60
+    nonisolated public static let transportCooldown: Duration = .seconds(60)
 
     /// The mirror this seam publishes to.
     public nonisolated let status: AskModelStatus
@@ -170,7 +170,7 @@ public actor AppleModelSeam: AskModelSeam {
         self.logSubsystem = subsystem
         let logger = Logger(subsystem: subsystem, category: "seam")
         self.logger = logger
-        let memory = Duration.seconds(Self.reprobeInterval)
+        let memory = Self.reprobeInterval
         localeProbes = AskSharedRead(
             label: "locale probe for privateCloud", bound: Self.privateCloudReadBound, failureMemory: memory,
             logger: logger
@@ -356,7 +356,7 @@ public actor AppleModelSeam: AskModelSeam {
     /// change while the process runs. Everything else is re-probed after
     /// `reprobeInterval`.
     private func probeAvailability() -> Bool {
-        if let probe, probe.terminal || now() - probe.at < .seconds(Self.reprobeInterval) {
+        if let probe, probe.terminal || now() - probe.at < Self.reprobeInterval {
             return probe.available
         }
         guard let model = model() else {
@@ -693,7 +693,7 @@ public actor AppleModelSeam: AskModelSeam {
         // Never shorter than a hold already running: the engine reports a rate
         // limit here too, after the session has already held the tier until
         // the reset the limit named (`noteFailure(_:)`).
-        cooledUntil = Self.extendedHold(cooledUntil, to: now + .seconds(Self.transportCooldown), now: now)
+        cooledUntil = Self.extendedHold(cooledUntil, to: now + Self.transportCooldown, now: now)
         let held = (cooledUntil ?? now) - now
         logger.notice("transport failure — cooling private cloud for \(held.components.seconds, privacy: .public)s")
         await refreshStatus()

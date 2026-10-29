@@ -1560,10 +1560,10 @@ public actor AskEngine<Domain: AskDomain> {
         let measured = measuring.withLock { $0 }
         stats.snapshots = measured.snapshots
         stats.growths = measured.growths
-        stats.msToFirstWord = measured.firstWord.map { Self.ms($0 - started) }
-        stats.msToLastWord = measured.lastWord.map { Self.ms($0 - started) }
-        stats.msToFirstTool = firstTool.withLock { $0 }.map { Self.ms($0 - started) }
-        stats.msTotal = Self.ms(ContinuousClock().now - started)
+        stats.timeToFirstWord = measured.firstWord.map { $0 - started }
+        stats.timeToLastWord = measured.lastWord.map { $0 - started }
+        stats.timeToFirstTool = firstTool.withLock { $0 }.map { $0 - started }
+        stats.duration = ContinuousClock().now - started
         // A follow-up is logged as grounded by the thread only when the
         // verdict says so: one discarded as ungrounded logs `.nothing`, as does
         // one `.notRequired` keeps that nothing grounded. The answer records
@@ -1973,10 +1973,6 @@ public actor AskEngine<Domain: AskDomain> {
             contextSize: size,
             tier: kept.box.tier
         )
-    }
-
-    nonisolated static func ms(_ duration: Duration) -> Int {
-        Int(Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) * 1e-15)
     }
 }
 

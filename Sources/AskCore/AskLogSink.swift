@@ -60,19 +60,19 @@ nonisolated public struct AskTurnStats: Sendable, Equatable {
     public var toolCalls = 0
     /// The rows behind the answer (`AskAnswer.matches`).
     public var rowsRead = 0
-    /// Milliseconds from the turn's start to the first activity a tool
-    /// reported, as its call started (`AskToolContext.withToolCall(_:_:)`
-    /// with an activity) or through the relay, as it happened rather than
-    /// when a snapshot noticed it. Nil when no tool reported one.
-    public var msToFirstTool: Int?
-    /// Milliseconds from the turn's start to the first snapshot that added
-    /// prose. Nil when none did.
-    public var msToFirstWord: Int?
-    /// Milliseconds from the turn's start to the last snapshot that added
-    /// prose. Nil when none did.
-    public var msToLastWord: Int?
-    /// Milliseconds from the turn's start to the generation's end.
-    public var msTotal = 0
+    /// How long from the turn's start to the first activity a tool reported,
+    /// as its call started (`AskToolContext.withToolCall(_:_:)` with an
+    /// activity) or through the relay, as it happened rather than when a
+    /// snapshot noticed it. Nil when no tool reported one.
+    public var timeToFirstTool: Duration?
+    /// How long from the turn's start to the first snapshot that added prose.
+    /// Nil when none did.
+    public var timeToFirstWord: Duration?
+    /// How long from the turn's start to the last snapshot that added prose.
+    /// Nil when none did.
+    public var timeToLastWord: Duration?
+    /// How long from the turn's start to the generation's end.
+    public var duration: Duration = .zero
     /// The generation's last response, when the tier reports it
     /// (`AskSession.usage()`): its input tokens.
     public var inputTokens: Int?
@@ -97,16 +97,22 @@ nonisolated public struct AskTurnStats: Sendable, Equatable {
     /// paragraphs.
     public var meanDelta: Int { growths > 0 ? characters / growths : 0 }
 
-    /// The `[stream]` line.
+    /// The `[stream]` line, its times in whole milliseconds. `proseSpan` is
+    /// the last word's time less the first's, each cut to whole milliseconds
+    /// first, so `firstWord` plus `proseSpan` reads as the last word's time.
     public var streamLine: String {
-        func at(_ ms: Int?) -> String { ms.map { "\($0)ms" } ?? "–" }
+        func at(_ time: Duration?) -> String { time.map { "\($0.wholeMilliseconds)ms" } ?? "–" }
         let span: String
-        if let first = msToFirstWord, let last = msToLastWord { span = "\(last - first)ms" } else { span = "–" }
+        if let first = timeToFirstWord, let last = timeToLastWord {
+            span = "\(last.wholeMilliseconds - first.wholeMilliseconds)ms"
+        } else {
+            span = "–"
+        }
         return "[stream] \(tier.rawValue) snapshots=\(snapshots) growths=\(growths) "
-            + "firstWord=\(at(msToFirstWord)) proseSpan=\(span) chars=\(characters) "
-            + "meanDelta=\(meanDelta) firstTool=\(at(msToFirstTool)) tools=\(toolCalls) "
+            + "firstWord=\(at(timeToFirstWord)) proseSpan=\(span) chars=\(characters) "
+            + "meanDelta=\(meanDelta) firstTool=\(at(timeToFirstTool)) tools=\(toolCalls) "
             + "rows=\(rowsRead) grounding=\(grounding.rawValue)\(retried ? " retried" : "") "
-            + "total=\(msTotal)ms"
+            + "total=\(duration.wholeMilliseconds)ms"
     }
 
     /// The `[usage]` line, when the tier reported token counts.
@@ -115,6 +121,14 @@ nonisolated public struct AskTurnStats: Sendable, Equatable {
         func n(_ value: Int?) -> String { value.map(String.init) ?? "–" }
         return "[usage] \(tier.rawValue) input=\(n(inputTokens)) cached=\(n(cachedTokens)) "
             + "output=\(n(outputTokens)) reasoning=\(n(reasoningTokens))"
+    }
+}
+
+nonisolated extension Duration {
+    /// The duration in whole milliseconds, the fraction cut off toward zero:
+    /// how the `[stream]` line and the evaluation's table print a time.
+    var wholeMilliseconds: Int {
+        Int(components.seconds) * 1_000 + Int(components.attoseconds / 1_000_000_000_000_000)
     }
 }
 

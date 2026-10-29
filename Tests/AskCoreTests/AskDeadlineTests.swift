@@ -7,12 +7,12 @@ import Testing
 @Suite(.timeLimit(.minutes(1))) struct AskDeadlineTests {
 
     @Test func returnsTheValueWhenTheWorkWins() async throws {
-        let value = try await AskDeadline.run(seconds: 5) { "done" }
+        let value = try await AskDeadline.run(.seconds(5)) { "done" }
         #expect(value == "done")
     }
 
     @Test func returnsNilWhenTheDeadlineWins() async throws {
-        let value = try await AskDeadline.run(seconds: 0.05) { () -> String in
+        let value = try await AskDeadline.run(.milliseconds(50)) { () -> String in
             try? await Task.sleep(for: .seconds(5))
             return "too late"
         }
@@ -20,33 +20,39 @@ import Testing
     }
 
     @Test func aDeadlineNoTimerCanHoldIsNoDeadline() async throws {
-        // `Duration` traps on each of these; the race sets no timer instead,
-        // and the work it was given wins.
-        for seconds in [TimeInterval.infinity, .nan, 1e300] {
-            let value = try await AskDeadline.run(seconds: seconds) { () -> String in
+        // A sleep traps on the first of these, and the second is past the
+        // longest wait: the race sets no timer for either, and the work it
+        // was given wins.
+        for duration in [Duration.seconds(Int.max), .seconds(Int64(Int32.max) + 1)] {
+            let value = try await AskDeadline.run(duration) { () -> String in
                 try? await Task.sleep(for: .milliseconds(20))
                 return "done"
             }
-            #expect(value == "done", "\(seconds)")
+            #expect(value == "done", "\(duration)")
+            #expect(AskDeadline.timerWait(duration) == nil)
         }
-        #expect(AskDeadline.timerWait(.infinity) == nil)
-        #expect(AskDeadline.timerWait(.nan) == nil)
-        #expect(AskDeadline.timerWait(1e300) == nil)
+    }
+
+    @Test func theLongestWaitSetsATimer() {
+        // The edge of what a timer is set for, from either side.
+        #expect(AskDeadline.timerWait(AskDeadline.longestWait) == AskDeadline.longestWait)
+        #expect(AskDeadline.timerWait(AskDeadline.longestWait + .nanoseconds(1)) == nil)
+        #expect(AskDeadline.timerWait(.nanoseconds(1)) == .nanoseconds(1))
     }
 
     @Test func aDeadlineAlreadyPastGivesUp() async throws {
-        let value = try await AskDeadline.run(seconds: -5) { () -> String in
+        let value = try await AskDeadline.run(.seconds(-5)) { () -> String in
             try? await Task.sleep(for: .seconds(5))
             return "too late"
         }
         #expect(value == nil)
-        #expect(AskDeadline.timerWait(-5) == .zero)
-        #expect(AskDeadline.timerWait(-.infinity) == .zero)
+        #expect(AskDeadline.timerWait(.seconds(-5)) == .zero)
+        #expect(AskDeadline.timerWait(.zero) == .zero)
     }
 
     @Test func rethrowsWhatTheOperationThrew() async {
         await #expect(throws: AskError.self) {
-            _ = try await AskDeadline.run(seconds: 5) { () -> String in
+            _ = try await AskDeadline.run(.seconds(5)) { () -> String in
                 throw AskError.refused
             }
         }
@@ -54,7 +60,7 @@ import Testing
 
     @Test func aThrownErrorArrivesUnchanged() async throws {
         do {
-            _ = try await AskDeadline.run(seconds: 5) { () -> String in
+            _ = try await AskDeadline.run(.seconds(5)) { () -> String in
                 throw AskError.quotaReached(resetDate: nil)
             }
             Issue.record("expected a throw")
@@ -67,18 +73,13 @@ import Testing
         // The distinction is deliberate: nil is what a caller degrades on, and
         // the reader leaving is not the same event as the ceiling.
         let task = Task { () -> String? in
-            try await AskDeadline.run(seconds: 10) { () -> String in
+            try await AskDeadline.run(.seconds(10)) { () -> String in
                 try? await Task.sleep(for: .seconds(10))
                 return "never"
             }
         }
         task.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
-    }
-
-    @Test func theDurationOverloadAgrees() async throws {
-        let value = try await AskDeadline.run(.seconds(5)) { 42 }
-        #expect(value == 42)
     }
 
     @Test func aSubSecondDurationIsHonoured() async throws {
@@ -103,7 +104,7 @@ import Testing
             delivered.withLock { $0 = continuation }
         }
 
-        _ = try await AskDeadline.run(seconds: 0.05) { () -> String in
+        _ = try await AskDeadline.run(.milliseconds(50)) { () -> String in
             do {
                 try await Task.sleep(for: .seconds(5))
             } catch {
@@ -147,7 +148,7 @@ import Testing
             work.open()
         }
         defer { backstop.cancel() }
-        let value = try await AskDeadline.run(seconds: 0.1) { () async throws -> Int in
+        let value = try await AskDeadline.run(.milliseconds(100)) { () async throws -> Int in
             await work.wait()
             finished.withLock { $0 = true }
             return 7
@@ -165,7 +166,7 @@ import Testing
         // its enclosing context, so this is pinned rather than assumed: that
         // work must not land on the main thread. `pthread_main_np()`, because
         // `Thread.isMainThread` is banned from async contexts.
-        let ranOffMain = try await AskDeadline.run(seconds: 5) { pthread_main_np() == 0 }
+        let ranOffMain = try await AskDeadline.run(.seconds(5)) { pthread_main_np() == 0 }
         #expect(ranOffMain == true)
     }
 }
