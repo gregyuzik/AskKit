@@ -632,7 +632,7 @@ extension CrossPostureTests {
     /// shares, from its own nonisolated code.
     @Test func aHostsOwnGenerationWaitsAtTheSharedGateWithoutThePosture() async throws {
         #expect(try await AskGenerationGate.run { 42 } == 42)
-        #expect(try await AskGenerationGate.run(gate: .shared, deadline: .seconds(5)) { "done" } == "done")
+        #expect(try await AskGenerationGate.run(deadline: .seconds(5)) { "done" } == "done")
     }
 }
 
@@ -1209,19 +1209,12 @@ extension CrossPostureTests {
         // Both ways an app builds the seam, each with the declaration it must
         // make. Undeclared: this process holds no Private Cloud Compute. The
         // second logs where the domain's own lines go, a generation presumed
-        // wedged included, and waits at the one gate the process shares,
-        // spelled out as a host may spell the default.
+        // wedged included.
         _ = AppleModelSeam(status: AskModelStatus(), privateCloudCompute: .undeclared)
         let engine = AskEngine(domain: domain, seam: AppleModelSeam.make(
             privateCloudCompute: .undeclared,
-            gate: .shared,
             logSubsystem: domain.brand.logSubsystem
         ))
-        // A gate of its own, built and handed to no seam, which is how it
-        // stays: a seam waiting at one runs its generations beside every one
-        // at `shared`. Its initializer is public for tests until 0.3.0 takes
-        // it away.
-        _ = AskGenerationGate(logSubsystem: domain.brand.logSubsystem)
         let folder = FileManager.default.temporaryDirectory
             .appending(path: "AskKitCrossPosture-\(UUID().uuidString)", directoryHint: .isDirectory)
         let directory = domain.brand.appDirectory

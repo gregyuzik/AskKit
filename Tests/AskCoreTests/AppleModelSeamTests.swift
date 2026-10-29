@@ -556,8 +556,9 @@ import Synchronization
     }
 
     @Test func aWedgedOnDeviceGenerationIsLoggedUnderTheSeamsSubsystem() async throws {
-        // The brand's subsystem, at the process's one gate: a host never
-        // builds a gate of its own to find the line beside the seam's.
+        // The brand's subsystem, at the process's one gate: a host has no
+        // gate of its own to build, and needs none, to find the line beside
+        // the seam's.
         let lines = try await wedgedGenerationLines(seamLogSubsystem: "com.example.brand")
         #expect(lines == [.init(subsystem: "com.example.brand", deadline: .milliseconds(50))])
     }
@@ -565,6 +566,18 @@ import Synchronization
     @Test func aSeamWithNoSubsystemLogsItsWedgedGenerationWhereItsOtherLinesGo() async throws {
         let lines = try await wedgedGenerationLines(seamLogSubsystem: nil)
         #expect(lines == [.init(subsystem: AskBrand.subsystem(nil), deadline: .milliseconds(50))])
+    }
+
+    // MARK: - One gate per process
+
+    /// Both ways a host builds the seam take no gate: its on-device
+    /// generations wait at `AskGenerationGate.shared`, where the host's own
+    /// do, whatever subsystem it logs under.
+    @Test func aSeamAHostBuildsWaitsAtTheSharedGate() async {
+        let built = AppleModelSeam(status: AskModelStatus(), privateCloudCompute: .undeclared)
+        let made = AppleModelSeam.make(privateCloudCompute: .undeclared, logSubsystem: "com.example.brand")
+        #expect(await built.gate === AskGenerationGate.shared)
+        #expect(await made.gate === AskGenerationGate.shared)
     }
 }
 

@@ -17,3 +17,11 @@ API breakage: func askServableTiers(from:) has been removed
 API breakage: func askUnavailability(from:) has been removed
 API breakage: func askIsTierOutage(_:) has been removed
 API breakage: func AskThreadArchive.archive(_:at:sparing:) has been removed
+API breakage: func AppleModelSeam.make(privateCloudCompute:gate:logSubsystem:) has parameter 1 type change from AskCore.AskGenerationGate to Swift.String?
+API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has parameter 1 type change from AskCore.AskGenerationGate to Swift.Duration
+API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has parameter 2 type change from Swift.Duration to () async throws -> T
+API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has removed default argument from parameter 2
+API breakage: constructor AppleModelSeam.init(status:privateCloudCompute:gate:logSubsystem:) has been removed
+API breakage: func AppleModelSeam.make(privateCloudCompute:gate:logSubsystem:) has been renamed to func make(privateCloudCompute:logSubsystem:)
+API breakage: constructor AskGenerationGate.init(logSubsystem:) has been removed
+API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has been renamed to func run(isolation:deadline:_:)
