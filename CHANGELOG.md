@@ -34,9 +34,9 @@ Copy, Copy answer, Edit & Resend and Ask again in the Mac's File menu. The publi
   `declinedStarters` no longer holds declined follow-ups.
 - **An `AskComposer` a host draws outside `AskScreen` puts its keyboard away from the chevron by
   writing its focus binding**, rather than resigning the key window's first responder.
-- **The push gate fails when fewer than 1,350 package tests run**, where it was 600, and `ci.sh
-  test-ios` when fewer than 1,320 pass, so an over-tight `#if` can no longer compile out most of
-  AskUI's tests unnoticed.
+- **The push gate fails when fewer than 1,530 package tests run**, where it was 600, and `ci.sh
+  test-ios` when fewer than 1,500 pass, so an over-tight `#if` can no longer compile out a big test
+  file unnoticed, such as AskConversationStoreTests' 236 or AskEngineTests' 223.
 - **README.md's two Adopt samples are built and run under the package's posture too**, in
   `AskReadmeApproachableTests`, as well as under none in `AskCrossPostureTests`: a host on Xcode's app
   template, with main-actor default isolation and `NonisolatedNonsendingByDefault`, copies code proven
@@ -145,8 +145,7 @@ Copy, Copy answer, Edit & Resend and Ask again in the Mac's File menu. The publi
     looks at it or points at it: the composer's circles and the face's, the chips, the thumbs, the
     evidence line, the pill, the pending photo's Remove, the default tiles, and the chats pane's rows
     and trash. None lights while it is disabled.
-  - On the Mac, the glyph-only buttons, the send circle, the accessory button, the pending photo's
-    Remove and the thumbs, show their label as a help tag.
+  - On the Mac, every glyph-only button shows its label as a help tag.
   - Under Button Shapes, a bare glyph wears a ring in its own color, and a bare line of words is
     underlined: the accessory button and the face's, the thumbs and the chats pane's trash take the
     ring, and the evidence line and the face's line the underline.
@@ -163,7 +162,10 @@ Copy, Copy answer, Edit & Resend and Ask again in the Mac's File menu. The publi
   matches whole words, ignores one-letter ones and treats digits as words, so "Le Guin" no longer finds
   "Alexander" and "1984" finds *1984*. The demo records only the rows it shows the model, so an
   answer's tiles and the count under it are rows the model read. Its own screens draw secondary text at
-  AskKit's contrast, and its sheets close with the system's localized close button.
+  AskKit's contrast, and its sheets close with the system's localized close button. The demo's iOS app
+  supports all four orientations on iPad, so its device build no longer warns that every orientation
+  must be supported unless the app requires full screen; it stays resizable, with no
+  `UIRequiresFullScreen`.
 
 ### Security
 

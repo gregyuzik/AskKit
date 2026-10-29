@@ -965,10 +965,11 @@ away. Tapping the thread does the same, except on the Mac.
     the default tiles' corners, and the chats pane's rows and trash. None lights while it is disabled,
     and nothing does on the Mac, which has no hover effect. Not yet looked at on the visionOS simulator
     or under an iPad's pointer.
-  - On the Mac a glyph alone shows a help tag, in the words VoiceOver reads for it (`askHelp(_:)`): the
-    send circle, the accessory button, the pending photo's Remove and the thumbs. Only there, since
-    `.help` is also the accessibility hint, and on iOS and visionOS VoiceOver would read each label
-    twice. The evidence line takes none: its words say what it does, and a help would replace its hint.
+  - On the Mac every glyph alone shows a help tag, in the words VoiceOver reads for it (`askHelp(_:)`):
+    the send circle, the accessory button, the pending photo's Remove, the thumbs and the chats pane's
+    trash. Only there, since `.help` is also the accessibility hint, and on iOS and visionOS VoiceOver
+    would read each label twice. The evidence line takes none: its words say what it does, and a help
+    would replace its hint.
   - Under Button Shapes (`accessibilityShowBorders`), a glyph alone wears a 1 pt ring in its own style,
     so it is still read against the ground its 3:1 was chosen on: the accessory button and the face's,
     the thumbs and the pane's trash. Words alone are underlined: the evidence line and the face's line
