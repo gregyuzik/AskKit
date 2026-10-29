@@ -32,7 +32,7 @@ struct AskFailureRow: View {
     /// Whether the line is the reader's own stop, before the turn had a word
     /// (`AskTurn.isReadersStopBeforeAWord`).
     private let readerStopped: Bool
-    private let retryable: Bool
+    private let isRetryable: Bool
     private let coaching: [AskStarter]
     private let takesFocus: Bool
     private let onRetry: () -> Void
@@ -53,7 +53,7 @@ struct AskFailureRow: View {
     init(
         message: String,
         readerStopped: Bool = false,
-        retryable: Bool,
+        isRetryable: Bool,
         coaching: [AskStarter] = [],
         takesFocus: Bool = false,
         onRetry: @escaping () -> Void,
@@ -63,7 +63,7 @@ struct AskFailureRow: View {
     ) {
         self.message = message
         self.readerStopped = readerStopped
-        self.retryable = retryable
+        self.isRetryable = isRetryable
         self.coaching = coaching
         self.takesFocus = takesFocus
         self.onRetry = onRetry
@@ -91,7 +91,7 @@ struct AskFailureRow: View {
                     // around it, which is a group and not a stop.
                     .accessibilityFocused($lineIsFocused)
             }
-            if retryable {
+            if isRetryable {
                 Button(action: onRetry) {
                     Text("Try Again", bundle: #bundle, comment: "Button under a failed Ask answer that asks the same question again.")
                         // **Room to wrap.** At the largest text sizes

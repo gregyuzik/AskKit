@@ -66,26 +66,26 @@ import UIKit
 ///   and as it refreshes, and the follow-up chips show only while it is
 ///   true.
 ///
-/// Seven members are required: `ask(_:origin:)`, `stop()`, `reset()`,
+/// Seven members are required: `ask(_:mode:)`, `stop()`, `reset()`,
 /// `prewarm()`, `refreshStatus()`, `status` and `hasKeptConversation`. The
 /// rest have defaults for an engine with none of what they're for: photos,
 /// scopes, a limit-increase route, a warm session to drop, a thread to resume
 /// and a feedback attachment.
-nonisolated public protocol AskAsking<Row>: Sendable {
+nonisolated public protocol AskAnswering<Row>: Sendable {
     /// The domain's row type, which the turn's events carry.
     associatedtype Row: AskRow
 
     /// Ask a question, streaming the turn's events. The store asks one turn at
     /// a time: before it asks again, it settles the turn on screen and lets
     /// that turn's stream go.
-    func ask(_ question: String, origin: AskOrigin) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error>
+    func ask(_ question: String, mode: AskTurnMode) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error>
     /// Ask a question the reader attached photos to. Defaulted: an engine
     /// that reads no photos asks without them when there are none, and fails
     /// a question that has one with `AskError.photosNotSupported` rather than
     /// answering as though it had seen it.
     func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment]
     ) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error>
     /// Ask a question a host asked from one part of what the app holds
@@ -94,7 +94,7 @@ nonisolated public protocol AskAsking<Row>: Sendable {
     /// on its own words.
     func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?
     ) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error>
@@ -166,28 +166,28 @@ nonisolated public protocol AskAsking<Row>: Sendable {
     func recordFeedback(_ feedback: AskFeedback, isLatestTurn: Bool) async -> Data?
 }
 
-nonisolated extension AskAsking {
+nonisolated extension AskAnswering {
     /// Asks without photos, and fails a question that has one with
     /// `AskError.photosNotSupported`.
     public func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment]
     ) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error> {
         guard images.isEmpty else {
             return AsyncThrowingStream { $0.finish(throwing: AskError.photosNotSupported) }
         }
-        return ask(question, origin: origin)
+        return ask(question, mode: mode)
     }
 
     /// Asks without the scope.
     public func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?
     ) -> AsyncThrowingStream<AskTurnEvent<Row>, any Error> {
-        ask(question, origin: origin, images: images)
+        ask(question, mode: mode, images: images)
     }
 
     /// Does nothing. An engine with no route to offer leaves
@@ -207,7 +207,7 @@ nonisolated extension AskAsking {
 
 /// `AskEngine` meets every requirement with a member of its own, photos and
 /// scope included, so none of the defaults apply to it.
-extension AskEngine: AskAsking {}
+extension AskEngine: AskAnswering {}
 
 /// The Ask thread: the turns, the turn in flight, and the draft in the composer.
 ///
@@ -500,7 +500,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// folder in Application Support and its log subsystem.
     public let brand: AskBrand
 
-    @ObservationIgnored private let engine: any AskAsking<Row>
+    @ObservationIgnored private let engine: any AskAnswering<Row>
     @ObservationIgnored private let thread: AskThreadStore<Row>
     @ObservationIgnored private let archive: AskThreadArchive<Row>
     /// The chat on screen's identity in the history list. Only the list reads
@@ -637,7 +637,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// The thread for `domain`, asked through an engine of the host's own
-    /// (`AskAsking`), such as a scripted one for previews and tests.
+    /// (`AskAnswering`), such as a scripted one for previews and tests.
     ///
     /// **Not for an `AskEngine`**, which carries its domain: build the store
     /// from it with `init(engine:thread:archive:feedbackAttachments:)`. Here
@@ -659,7 +659,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     ///     kept, for the diagnostics row to share.
     public convenience init(
         domain: Domain,
-        engine: any AskAsking<Row>,
+        engine: any AskAnswering<Row>,
         thread: AskThreadStore<Row>? = nil,
         archive: AskThreadArchive<Row>? = nil,
         feedbackAttachments: AskFeedbackAttachments? = nil
@@ -678,7 +678,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// draws every answer at once, or never.
     init(
         domain: Domain,
-        engine: any AskAsking<Row>,
+        engine: any AskAnswering<Row>,
         thread: AskThreadStore<Row>? = nil,
         archive: AskThreadArchive<Row>? = nil,
         feedbackAttachments: AskFeedbackAttachments? = nil,
@@ -735,16 +735,15 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// A question from the composer (`.typed`, or `.prefilled` from an entry
     /// point's `prefill(_:scope:send:)`) empties the draft and takes the photo
     /// waiting there, and a `.typed` one takes the scope a prefill left with
-    /// the draft. A starter or a chip is a question of its own, so the draft
-    /// and the photo wait on for the next one.
+    /// the draft. A starter, a chip or Another pick is a question of its own,
+    /// so the draft and the photo wait on for the next one.
     ///
-    /// Two origins are how the engine runs a turn, not where a question came
-    /// from, and are asked as `.typed`, the default: `.standalone`, a
-    /// one-shot that shares nothing with the thread, which a turn on the
-    /// thread can't be (`AskEngine.answerOnce(_:)` asks one), and `.reroll`,
-    /// which is Another pick's (`rerollPick(_:)`).
+    /// Every origin is asked as itself, on the thread. `.reroll` is Another
+    /// pick's: the engine runs it as `AskTurnMode.reroll`, hotter, and tells
+    /// the model what the last answer chose so it picks something else
+    /// (`rerollPick(_:)` asks one of a turn on the thread, with its photo and
+    /// scope). Every other origin runs as `AskTurnMode.conversation`.
     public func ask(_ question: String, origin: AskOrigin = .typed) {
-        let origin = origin == .standalone || origin == .reroll ? .typed : origin
         // The composer's send carries the scope a host left in the draft. Read
         // here, before the draft is emptied, and the scope with it.
         ask(question, origin: origin, scope: origin == .typed ? draftScope : nil)
@@ -894,7 +893,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                for try await event in self.engine.ask(trimmed, origin: origin, images: images, scope: scope) {
+                for try await event in self.engine.ask(trimmed, mode: origin.mode, images: images, scope: scope) {
                     if Task.isCancelled { return }
                     self.apply(event, to: id)
                 }
@@ -1968,7 +1967,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             turn.activity = nil
             turn.failure = AskTurn.Failure(
                 message: Turn.Failure.message(for: error, stoppedByReader: stoppedByReader),
-                retryable: error.isRetryable,
+                isRetryable: error.isRetryable,
                 error: error,
                 coaching: coaching
             )
@@ -1983,7 +1982,7 @@ public final class AskConversationStore<Domain: AskDomain> {
 
     /// Read the library's overview and the starters again, give a failure
     /// read back from disk its coaching, and have the engine read every
-    /// tier's state again (`AskAsking.refreshStatus()`). The screen calls it
+    /// tier's state again (`AskAnswering.refreshStatus()`). The screen calls it
     /// as it appears and as the app comes back to the foreground. A host may
     /// call it too, such as when its library changes while the screen is up.
     ///
@@ -2073,7 +2072,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             guard let failure = turn.failure, failure.error?.isCoached == true else { continue }
             update(turn.id) { turn in
                 turn.failure = AskTurn.Failure(
-                    message: failure.message, retryable: failure.retryable,
+                    message: failure.message, isRetryable: failure.isRetryable,
                     error: failure.error, coaching: offered
                 )
             }
@@ -2121,7 +2120,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Undo the host's `prewarm()`: stop warming for it, and drop a warm
-    /// session no question took (`AskAsking.forgetWarmIfEmpty()`), unless an
+    /// session no question took (`AskAnswering.forgetWarmIfEmpty()`), unless an
     /// Ask screen that is up still wants one. A kept conversation stays. Kept,
     /// a warm session nobody takes would hold its tool set, its collector and
     /// its relay for the life of the process.
@@ -2844,14 +2843,14 @@ public final class AskConversationStore<Domain: AskDomain> {
         return false
     }
 
-    /// The engine's mirror (`AskAsking.status`), which the tier caption, the
+    /// The engine's mirror (`AskAnswering.status`), which the tier caption, the
     /// can't-serve first screen and the quota banner read. Read straight
     /// through rather than copied, so the screen can never disagree with the
     /// engine about who is serving.
     public var status: AskModelStatus { engine.status }
 
     /// Whether the engine keeps a conversation, so a follow-up chip has
-    /// something to refer to (`AskAsking.hasKeptConversation`), as the store
+    /// something to refer to (`AskAnswering.hasKeptConversation`), as the store
     /// last read it: as each turn's stream ended, after the engine's reset, a
     /// restore and a seed, and in `refresh()`. The follow-up chips read it.
     ///

@@ -113,3 +113,15 @@ API breakage: constructor AskTierState.init(tier:isAvailable:speaksLanguage:quot
 API breakage: var AskRetryAfter.date has been removed
 API breakage: var AskRetryAfter.isQuota has been removed
 API breakage: constructor AskRetryAfter.init(date:isQuota:) has been removed
+API breakage: func AskEngine.ask(_:origin:) has parameter 1 type change from AskCore.AskOrigin to AskCore.AskTurnMode
+API breakage: func AskEngine.ask(_:origin:images:) has parameter 1 type change from AskCore.AskOrigin to AskCore.AskTurnMode
+API breakage: func AskEngine.ask(_:origin:images:scope:) has parameter 1 type change from AskCore.AskOrigin to AskCore.AskTurnMode
+API breakage: enum AskOrigin has been removed
+API breakage: func AskEngine.ask(_:origin:) has been renamed to func ask(_:mode:)
+API breakage: func AskEngine.ask(_:origin:images:) has been renamed to func ask(_:mode:images:)
+API breakage: func AskEngine.ask(_:origin:images:scope:) has been renamed to func ask(_:mode:images:scope:)
+API breakage: constructor AskConversationStore.init(domain:engine:thread:archive:feedbackAttachments:) has parameter 1 type change from any AskUI.AskAsking<AskUI.AskConversationStore<Domain>.Row> to any AskUI.AskAnswering<AskUI.AskConversationStore<Domain>.Row>
+API breakage: extension AskEngine has removed conformance to AskAsking
+API breakage: protocol AskAsking has been removed
+API breakage: var AskTurn.Failure.retryable has been renamed to var isRetryable
+API breakage: constructor AskTurn.Failure.init(message:retryable:error:coaching:) has been removed

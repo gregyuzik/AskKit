@@ -58,7 +58,7 @@ import Testing
 
     private func failed() -> AskTurn<UIRow> {
         var turn = waiting()
-        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
         return turn
     }
 
@@ -74,7 +74,7 @@ import Testing
         var stopped = waiting()
         stopped.stopped = true
         stopped.failure = AskTurn<UIRow>.Failure(
-            message: AskAnnouncement.stoppedByReader, retryable: true, error: .stopped
+            message: AskAnnouncement.stoppedByReader, isRetryable: true, error: .stopped
         )
         #expect(AskUnclaimedEnding.wait(before: stopped) == AskUnclaimedEnding.beat)
 

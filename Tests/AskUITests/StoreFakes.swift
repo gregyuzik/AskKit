@@ -32,7 +32,7 @@ extension UIRow {
 /// The store's whole job is turning a stream of `AskTurnEvent`s into a thread,
 /// so a scripted stream is not a stand-in for the engine here — it is the exact
 /// input the store is specified against.
-nonisolated final class ScriptedAsker: AskAsking, @unchecked Sendable {
+nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
     typealias Row = UIRow
 
     /// One turn's worth: the events, then optionally a throw.
@@ -46,7 +46,7 @@ nonisolated final class ScriptedAsker: AskAsking, @unchecked Sendable {
 
     private let queued = Mutex<[Script]>([])
     private let fallback = Mutex(Script())
-    let questions = Mutex<[(String, AskOrigin)]>([])
+    let questions = Mutex<[(String, AskTurnMode)]>([])
     let stops = Mutex(0)
     let resets = Mutex(0)
     let prewarms = Mutex(0)
@@ -69,27 +69,27 @@ nonisolated final class ScriptedAsker: AskAsking, @unchecked Sendable {
     /// The scope each question was asked in, in order — nil for none.
     let scopes = Mutex<[String?]>([])
 
-    func ask(_ question: String, origin: AskOrigin) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
-        ask(question, origin: origin, images: [], scope: nil)
+    func ask(_ question: String, mode: AskTurnMode) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
+        ask(question, mode: mode, images: [], scope: nil)
     }
 
     func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment]
     ) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
-        ask(question, origin: origin, images: images, scope: nil)
+        ask(question, mode: mode, images: images, scope: nil)
     }
 
     func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?
     ) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
         scopes.withLock { $0.append(scope) }
         imageLabels.withLock { $0.append(images.map(\.label)) }
-        questions.withLock { $0.append((question, origin)) }
+        questions.withLock { $0.append((question, mode)) }
         let script = queued.withLock { $0.isEmpty ? nil : $0.removeFirst() } ?? fallback.withLock { $0 }
         // Paced where stops and resets cancel, so a turn is still streaming
         // when one sent before it reaches the engine lands, as a model's turn
@@ -529,15 +529,15 @@ nonisolated struct UISearchArguments: Sendable {
 }
 
 /// An engine that reads no photos and no scopes: only the seven members
-/// `AskAsking` requires, so photos, scopes and everything else take the
+/// `AskAnswering` requires, so photos, scopes and everything else take the
 /// protocol's defaults.
-nonisolated final class WordsOnlyAsker: AskAsking, @unchecked Sendable {
+nonisolated final class WordsOnlyAsker: AskAnswering, @unchecked Sendable {
     typealias Row = UIRow
 
     private let inner = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(AskAnswer<UIRow>(text: "Words."))]))
 
-    func ask(_ question: String, origin: AskOrigin) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
-        inner.ask(question, origin: origin)
+    func ask(_ question: String, mode: AskTurnMode) -> AsyncThrowingStream<AskTurnEvent<UIRow>, any Error> {
+        inner.ask(question, mode: mode)
     }
 
     func stop() async {}

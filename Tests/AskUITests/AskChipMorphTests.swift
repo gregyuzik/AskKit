@@ -60,14 +60,14 @@ import AskCore
         // A turn that failed, or that the reader stopped before a word, has
         // landed too.
         var failed = turn("Which one is the oldest?", origin: .followUp)
-        failed.failure = AskTurn<UIRow>.Failure(message: "That didn't work", retryable: true)
+        failed.failure = AskTurn<UIRow>.Failure(message: "That didn't work", isRetryable: true)
         #expect(!AskChipMorph.matches(failed, isNewest: true))
     }
 
     @Test func onlyAQuestionWithAChipBehindItClaimsTheID() {
-        // A typed question, a host-prefilled one and a one-shot Siri turn have
-        // no chip on screen to come from.
-        for origin in [AskOrigin.typed, .prefilled, .standalone] {
+        // A typed question, a host-prefilled one and Another pick have no chip
+        // on screen to come from.
+        for origin in [AskOrigin.typed, .prefilled, .reroll] {
             #expect(!AskChipMorph.matches(turn("Anything", origin: origin), isNewest: true))
         }
     }

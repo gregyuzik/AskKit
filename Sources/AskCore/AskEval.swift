@@ -262,9 +262,10 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
         let started = ContinuousClock().now
         var answered = false
         do {
-            // Typed, with the scope the app would send it with: a shelf's
-            // question is left in the composer, and the reader sends it.
-            for try await event in engine.ask(scenario.question, origin: .typed, images: [], scope: scenario.scope) {
+            // On the thread, as the reader's typed question runs, with the
+            // scope the app would send it with: a shelf's question is left in
+            // the composer, and the reader sends it.
+            for try await event in engine.ask(scenario.question, mode: .conversation, images: [], scope: scenario.scope) {
                 switch event {
                 case .tier(let tier):
                     outcome.tier = tier

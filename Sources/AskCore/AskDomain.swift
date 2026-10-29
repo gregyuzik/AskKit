@@ -43,9 +43,9 @@ nonisolated public struct AskToolContext<Row: AskRow>: Sendable {
     /// The tier the session runs on.
     public let tier: AskTier
     /// Whether this session belongs to the thread. False for a one-shot
-    /// `.standalone` answer, such as a Siri intent's, which has no card to
-    /// confirm a proposal on (`AskProposal`). Its session's tools and its
-    /// grounded retry's search are told the same.
+    /// answer (`AskTurnMode.standalone`), such as a Siri intent's, which has
+    /// no card to confirm a proposal on (`AskProposal`). Its session's tools
+    /// and its grounded retry's search are told the same.
     public let isConversation: Bool
 
     /// A context over a session's collector and relay, with the tier's

@@ -39,10 +39,10 @@ nonisolated public enum AskProposalKind: String, Codable, Sendable {
 /// alone, so the button the reader taps never says what the model wrote.
 /// `title` and `detail` are drawn verbatim, never as Markdown.
 ///
-/// **Only in a conversation.** A standalone turn (Siri, a widget) has no card
-/// to confirm on, so a domain's `makeTools` leaves a proposing tool out when
-/// `context.isConversation` is false, and its `instructions` leave out any
-/// sentence naming it.
+/// **Only in a conversation.** A standalone turn (`AskTurnMode.standalone`:
+/// Siri, a widget) has no card to confirm on, so a domain's `makeTools`
+/// leaves a proposing tool out when `context.isConversation` is false, and
+/// its `instructions` leave out any sentence naming it.
 ///
 /// Behind no platform gate, like `AskAnswer`, which carries it into the
 /// thread file.

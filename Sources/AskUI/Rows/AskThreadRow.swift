@@ -372,7 +372,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                 AskFailureRow(
                     message: failure.message,
                     readerStopped: turn.isReadersStopBeforeAWord,
-                    retryable: offersRetry,
+                    isRetryable: offersRetry,
                     coaching: isLast ? failure.coaching : [],
                     takesFocus: waitRowHandoff == .failure,
                     onRetry: onRetry,
@@ -506,7 +506,7 @@ extension AskTurn {
     /// thinking in the update that writes it, so a turn that has just failed
     /// offers it at once.
     nonisolated func offersRetry(isNewest: Bool, whileThinking isThinking: Bool) -> Bool {
-        failure?.retryable == true && isNewest && !isThinking
+        failure?.isRetryable == true && isNewest && !isThinking
     }
 }
 

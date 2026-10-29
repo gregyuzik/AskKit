@@ -22,7 +22,7 @@ import Testing
 
     private func failedBeforeAWord() -> AskTurn<UIRow> {
         var turn = waiting()
-        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
         return turn
     }
 
@@ -50,7 +50,7 @@ import Testing
         var stopped = waiting()
         stopped.stopped = true
         stopped.failure = AskTurn<UIRow>.Failure(
-            message: AskAnnouncement.stoppedByReader, retryable: true, error: .stopped
+            message: AskAnnouncement.stoppedByReader, isRetryable: true, error: .stopped
         )
         #expect(stopped.isReadersStopBeforeAWord)
         #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: stopped) == .failure)
@@ -60,7 +60,7 @@ import Testing
     /// and a failure at once leaves the failure to its announcement.
     @Test func wordsAndAFailureTogetherHandTheFocusToTheProse() {
         var both = written()
-        both.failure = AskTurn<UIRow>.Failure(message: "Try again.", retryable: true)
+        both.failure = AskTurn<UIRow>.Failure(message: "Try again.", isRetryable: true)
         #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: both) == .prose)
     }
 
@@ -123,7 +123,7 @@ import Testing
         #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: again) == .prose)
 
         var failed = restarted()
-        failed.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        failed.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
         #expect(AskWaitRowHandoff.successor(hadFocus: true, leaving: failed) == .failure)
     }
 

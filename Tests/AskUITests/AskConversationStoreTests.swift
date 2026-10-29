@@ -31,7 +31,7 @@ import Testing
         #expect(turn?.text == "You own three records")
         // And the message reads under them.
         #expect(turn?.failure?.message == AskError.privateCloudUnreachable.errorDescription)
-        #expect(turn?.failure?.retryable == true)
+        #expect(turn?.failure?.isRetryable == true)
         #expect(store.turns.count == 1)
     }
 
@@ -118,7 +118,7 @@ import Testing
         let turn = store.turns.last
         #expect(turn?.stopped == true)
         #expect(turn?.answer == nil)
-        #expect(turn?.failure?.retryable == true)
+        #expect(turn?.failure?.isRetryable == true)
         #expect(turn?.failure?.error == .stopped)
         #expect(turn?.failure?.message == AskAnnouncement.stoppedByReader)
         #expect(AskAnnouncement.terminal(for: turn) == AskAnnouncement.stoppedByReader)
@@ -136,7 +136,7 @@ import Testing
         let turn = store.turns.last
         #expect(turn?.stopped == false)
         #expect(turn?.failure?.message == AskError.stopped.errorDescription)
-        #expect(turn?.failure?.retryable == true)
+        #expect(turn?.failure?.isRetryable == true)
         #expect(turn?.isReadersStopBeforeAWord == false)
         #expect(AskFailureRow.glyph(readerStopped: turn?.isReadersStopBeforeAWord ?? true) != nil)
     }
@@ -538,7 +538,8 @@ import Testing
         #expect(store.turns.count == 1)
         #expect(store.turns[0].answer?.text == "Worked this time.")
         // Re-asked the way it was first asked.
-        #expect(asker.questions.withLock { $0 }.map(\.1) == [.starter, .starter])
+        #expect(store.turns.map(\.origin) == [.starter])
+        #expect(asker.questions.withLock { $0 }.map(\.1) == [.conversation, .conversation])
     }
 
     @Test func tryAgainUnderProseTheTurnDrewKeepsItAndAsksBelowIt() async throws {
@@ -559,7 +560,7 @@ import Testing
         store.ask("What do I own?", origin: .starter)
         await settle(store)
         let failed = try #require(store.turns.last)
-        #expect(failed.failure?.retryable == true)
+        #expect(failed.failure?.isRetryable == true)
 
         store.retry(failed)
         await settle(store)
@@ -570,7 +571,7 @@ import Testing
         #expect(store.turns.first?.failure != nil)
         #expect(store.turns.last?.answer?.text == "You own three records.")
         // Re-asked the way it was first asked, below it, as Ask again asks.
-        #expect(asker.questions.withLock { $0 }.map(\.1) == [.starter, .starter])
+        #expect(store.turns.map(\.origin) == [.starter, .starter])
         let onDisk = await AskThreadStore<UIRow>(appDirectory: "unused", url: url).load().entries
         #expect(onDisk.map(\.text) == ["You own three", "You own three records."])
 
@@ -589,7 +590,8 @@ import Testing
         await settle(store)
 
         #expect(store.turns.count == 2)
-        #expect(asker.questions.withLock { $0 }.map(\.1) == [.typed, .followUp])
+        #expect(store.turns.map(\.origin) == [.typed, .followUp])
+        #expect(asker.questions.withLock { $0 }.map(\.1) == [.conversation, .conversation])
     }
 
     @Test func theDraftIsClearedByATypedQuestionAndKeptByAStarter() async {
@@ -607,22 +609,25 @@ import Testing
         #expect(store.draft == "half a thought")
     }
 
-    @Test func anOriginOnlyTheEngineRunsIsAskedAsTyped() async throws {
-        // Passed through, `.standalone` would leave the kept conversation
-        // untouched though the turn joins the thread, and `.reroll` would
-        // steer an ordinary question away from the last answer's picks.
+    @Test func aRerollAHostAsksRunsAsARerollAndLeavesTheComposerAlone() async throws {
+        // Rewritten to `.typed`, a host's Another pick would run cool and
+        // unsteered, and come back with the pick it asked to replace. It is
+        // a question of its own, as a chip's is, so the draft waits on.
         let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road."))]))
         let store = makeStore(asker: asker)
-        store.ask("Which is the oldest?", origin: .standalone)
+        store.ask("Which is the oldest?")
         await settle(store)
-        store.ask("And the newest?", origin: .reroll)
+        store.draft = "half a thought"
+        store.ask("Which is the oldest?", origin: .reroll)
         await settle(store)
-        #expect(asker.questions.withLock { $0 }.map(\.1) == [.typed, .typed])
-        #expect(store.turns.map(\.origin) == [.typed, .typed])
-        // Another pick is still the store's own to ask.
+        #expect(asker.questions.withLock { $0 }.last?.1 == .reroll)
+        #expect(store.turns.map(\.origin) == [.typed, .reroll])
+        #expect(store.draft == "half a thought")
+        // Another pick under an answer asks the same way.
         store.rerollPick(try #require(store.turns.last))
         await settle(store)
         #expect(asker.questions.withLock { $0 }.last?.1 == .reroll)
+        #expect(store.turns.last?.origin == .reroll)
     }
 
     @Test func anEmptyQuestionAsksNothing() async {
@@ -675,7 +680,7 @@ import Testing
         store.ask("Which is the oldest?")
         await settle(store)
         let failed = try #require(store.turns.last)
-        #expect(failed.failure?.retryable == true)
+        #expect(failed.failure?.isRetryable == true)
 
         asker.parksStop.withLock { $0 = true }
         store.stop(byReader: true)
@@ -868,7 +873,7 @@ import Testing
         await settle(store)
 
         let failure = store.turns.last?.failure
-        #expect(failure?.retryable == false)
+        #expect(failure?.isRetryable == false)
         #expect(failure?.coaching.count == 2)
     }
 
@@ -1502,7 +1507,8 @@ import Testing
         let store = makeStore(asker: asker)
         store.prefill("What should I read tonight?", send: true)
         await settle(store)
-        #expect(asker.questions.withLock { $0 }.map { $0.1 } == [.prefilled])
+        #expect(store.turns.map(\.origin) == [.prefilled])
+        #expect(asker.questions.withLock { $0 }.map { $0.1 } == [.conversation])
         #expect(store.turns.first?.question == "What should I read tonight?")
         #expect(store.composerFocusRequest == nil)
     }
@@ -1670,7 +1676,8 @@ import Testing
         store.rerollPick(try #require(store.turns.last))
         await settle(store)
 
-        #expect(asker.questions.withLock { $0 }.map(\.1) == [.prefilled, .prefilled, .followUp, .reroll])
+        #expect(store.turns.map(\.origin) == [.prefilled, .followUp, .reroll])
+        #expect(asker.questions.withLock { $0 }.map(\.1) == [.conversation, .conversation, .conversation, .reroll])
         #expect(asker.scopes.withLock { $0 } == ["records", "records", "records", "records"])
     }
 
@@ -2190,7 +2197,7 @@ import Testing
         await settle(store)
         #expect(store.turns.last?.failure?.error == .photosNotSupported)
         // No Try Again: it would send the photo again, and fail the same way.
-        #expect(store.turns.last?.failure?.retryable == false)
+        #expect(store.turns.last?.failure?.isRetryable == false)
 
         // With no photo, the same engine answers.
         store.ask("What do I own?")

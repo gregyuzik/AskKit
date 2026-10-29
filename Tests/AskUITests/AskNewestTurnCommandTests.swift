@@ -96,7 +96,7 @@ import Testing
         await settle(store)
         let asked = asker.questions.withLock { $0.map(\.0) }
         #expect(asked == ["How many records do I own?", "Which is the newest?", "Which is the newest?"])
-        #expect(asker.questions.withLock { $0.last?.1 } == .followUp)
+        #expect(store.turns.last?.origin == .followUp)
         #expect(store.turns.count == 3)
     }
 

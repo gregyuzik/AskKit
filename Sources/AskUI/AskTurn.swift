@@ -4,6 +4,31 @@ import AskCore
 import CoreGraphics
 import Foundation
 
+/// Where a question came from: what the screen draws for it, and how Try
+/// Again asks it again.
+///
+/// The engine is told only how to run the turn (`AskTurnMode`): Another pick
+/// as `.reroll`, and every other origin as `.conversation`.
+nonisolated public enum AskOrigin: Sendable, Equatable {
+    /// Typed into the composer.
+    case typed
+    /// A starter chip, from the first screen or from the coaching under a
+    /// failure.
+    case starter
+    /// A follow-up chip under the last answer, or Ask again.
+    case followUp
+    /// Sent at once by the host, through
+    /// `AskConversationStore.prefill(_:scope:send:)` with `send: true`.
+    case prefilled
+    /// "Another pick": the last question again, from the button under its
+    /// answer, for something other than what the answer chose. The store runs
+    /// it as `AskTurnMode.reroll`.
+    case reroll
+
+    /// How the engine runs a question from here.
+    var mode: AskTurnMode { self == .reroll ? .reroll : .conversation }
+}
+
 /// One question and what came back for it.
 ///
 /// **One value per exchange, not one per message.** The question and its answer
@@ -22,7 +47,7 @@ nonisolated public struct AskTurn<Row: AskRow>: Identifiable, Sendable {
         public let message: String
         /// Whether the failure offers Try Again. The thread offers it under
         /// the newest turn only.
-        public let retryable: Bool
+        public let isRetryable: Bool
         /// The typed error behind the line, where one is known. Carried so a
         /// restored turn can re-render `message` in the reader's current
         /// language instead of replaying the language they had when it failed.
@@ -34,9 +59,9 @@ nonisolated public struct AskTurn<Row: AskRow>: Identifiable, Sendable {
 
         /// A failure that shows `message`, with `error` behind it where one is
         /// known, and `coaching` under it.
-        public init(message: String, retryable: Bool, error: AskError? = nil, coaching: [AskStarter] = []) {
+        public init(message: String, isRetryable: Bool, error: AskError? = nil, coaching: [AskStarter] = []) {
             self.message = message
-            self.retryable = retryable
+            self.isRetryable = isRetryable
             self.error = error
             self.coaching = coaching
         }
@@ -208,7 +233,7 @@ nonisolated public struct AskTurn<Row: AskRow>: Identifiable, Sendable {
             answer: answer,
             failureMessage: failure?.message,
             failure: failure?.error,
-            failureIsRetryable: failure?.retryable ?? false,
+            failureIsRetryable: failure?.isRetryable ?? false,
             stopped: stopped,
             tier: tier,
             askedAt: askedAt,
@@ -249,11 +274,11 @@ nonisolated public struct AskTurn<Row: AskRow>: Identifiable, Sendable {
         if let error = entry.failure {
             failure = Failure(
                 message: Failure.message(for: error, stoppedByReader: entry.stopped, fallback: entry.failureMessage),
-                retryable: error.isRetryable,
+                isRetryable: error.isRetryable,
                 error: error
             )
         } else if let message = entry.failureMessage {
-            failure = Failure(message: message, retryable: entry.failureIsRetryable)
+            failure = Failure(message: message, isRetryable: entry.failureIsRetryable)
         }
     }
 }

@@ -8,9 +8,9 @@ import Testing
 
 /// When a failure offers Try Again (`AskTurn.offersRetry(isNewest:whileThinking:)`).
 @Suite(.timeLimit(.minutes(1))) struct AskTryAgainOfferTests {
-    private func failed(retryable: Bool = true) -> AskTurn<UIRow> {
+    private func failed(isRetryable: Bool = true) -> AskTurn<UIRow> {
         var turn = AskTurn<UIRow>(question: "What's the oldest?", origin: .typed)
-        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: retryable)
+        turn.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: isRetryable)
         return turn
     }
 
@@ -30,7 +30,7 @@ import Testing
     /// Only the newest turn, and only a failure that can be asked again.
     @Test func anOlderOrAnUnretryableFailureOffersNothing() {
         #expect(!failed().offersRetry(isNewest: false, whileThinking: false))
-        #expect(!failed(retryable: false).offersRetry(isNewest: true, whileThinking: false))
+        #expect(!failed(isRetryable: false).offersRetry(isNewest: true, whileThinking: false))
         let unfailed = AskTurn<UIRow>(question: "What's the oldest?", origin: .typed)
         #expect(!unfailed.offersRetry(isNewest: true, whileThinking: false))
     }

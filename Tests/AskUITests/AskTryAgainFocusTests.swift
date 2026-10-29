@@ -78,10 +78,10 @@ import Testing
     @Test func theRequestNamesTheFailedTurnOnlyWhereItDrewProse() {
         let earlier = AskTurn<UIRow>(question: "What's the oldest?", origin: .typed)
         var drewNothing = AskTurn<UIRow>(question: "And the newest?", origin: .typed)
-        drewNothing.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        drewNothing.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
         var drewProse = AskTurn<UIRow>(question: "And the newest?", origin: .typed)
         drewProse.write("Going by what you own,", at: 0)
-        drewProse.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        drewProse.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
 
         #expect(AskWaitRowFocus.retrying(drewNothing, after: earlier) == AskWaitRowFocus(after: earlier.id))
         #expect(AskWaitRowFocus.retrying(drewNothing, after: nil) == AskWaitRowFocus(after: nil))

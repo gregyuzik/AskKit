@@ -59,9 +59,9 @@ nonisolated enum AskChipMorph {
     /// first screen's exit, not about chips. The coaching pair under a failure
     /// asks as `.starter` too, and its bank is given no namespace.
     ///
-    /// `.typed`, `.prefilled` and `.standalone` have no chip on screen to come
-    /// from, and `.reroll` comes from "Another pick", which isn't a question
-    /// and carries no morph.
+    /// `.typed` and `.prefilled` have no chip on screen to come from, and
+    /// `.reroll` comes from "Another pick", which isn't a question and carries
+    /// no morph.
     static func matches<Row: AskRow>(_ turn: AskTurn<Row>, isNewest: Bool) -> Bool {
         isNewest && !turn.isComplete && turn.origin == .followUp
     }
