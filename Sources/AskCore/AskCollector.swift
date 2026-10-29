@@ -64,8 +64,9 @@ public actor AskCollector<Row: AskRow> {
     public static var maxPayloadBytes: Int { 16_384 }
 
     /// What a tool also knows about this turn that a list of rows can't carry
-    /// (a breakdown, a span of years, a series), encoded by the domain.
-    /// Cleared when a turn begins; handed out on the answer.
+    /// (a breakdown, a span of years, a series), as JSON: AskKit encodes the
+    /// value a tool records (`record(payload:)`). Cleared when a turn begins;
+    /// handed out on the answer.
     public private(set) var turnPayload: Data?
 
     /// What this turn offers to do, if anything: the first proposal a tool
@@ -113,19 +114,41 @@ public actor AskCollector<Row: AskRow> {
         turnProposal = nil
     }
 
-    /// Record this turn's payload, replacing any earlier one. JSON, so
-    /// `AskAnswer.payload(as:)` can read it back.
+    /// Record `value` as this turn's payload, replacing any earlier one.
+    /// AskKit encodes it as JSON, and `AskAnswer.payload(as:)` reads it back
+    /// the same way.
+    ///
+    /// **The value, never its encoding.** A payload a tool encoded itself, in
+    /// JSON or in an encoding of its own, is a `Data`, and is refused with a
+    /// throw rather than encoded a second time into a payload nothing reads.
     ///
     /// **A tool adding to what another recorded uses `mergePayload(as:_:)`,
     /// not this.** Reading `turnPayload` in one call and recording here in the
     /// next lets another tool record in between, and this record then drops
     /// its half.
     ///
-    /// Refused over `maxPayloadBytes`, and the refusal is returned: a card
-    /// missing is a smaller failure than a thread file that grows by megabytes
-    /// a turn.
+    /// Two failures, told apart, and neither leaves a card out without a word.
+    /// Each leaves the payload as it was:
+    /// - Over `maxPayloadBytes`, encoded, it is refused, and `false` is
+    ///   returned: something the tool can tell the model, and a card missing
+    ///   is a smaller failure than a thread file that grows by megabytes a
+    ///   turn.
+    /// - A value that doesn't encode, such as a `Double` that is infinite or
+    ///   NaN, or a `Data`, throws the encoder's `EncodingError`. That is a
+    ///   mistake in the domain's type, which no word to the model mends, so
+    ///   the domain hears it.
     @discardableResult
-    public func record(payload: Data) -> Bool {
+    public func record(payload value: some Encodable & Sendable) throws -> Bool {
+        record(encodedPayload: try AskPayloadCoding.encode(value))
+    }
+
+    /// Record a payload already encoded as JSON: what `mergePayload(as:_:)`
+    /// records, and what a test scripts. Refused over `maxPayloadBytes`.
+    ///
+    /// **Not public**, so a domain can't hand in bytes in an encoding of its
+    /// own, which `AskAnswer.payload(as:)` would read as nil.
+    @discardableResult
+    func record(encodedPayload payload: Data) -> Bool {
         guard payload.count <= Self.maxPayloadBytes else { return false }
         turnPayload = payload
         return true
@@ -147,22 +170,23 @@ public actor AskCollector<Row: AskRow> {
     ///
     /// Refused (`false`, and the payload exactly as it was) when what is there
     /// doesn't decode as `Value`, since `combine` could only drop what it
-    /// can't read; when the result doesn't encode; and over `maxPayloadBytes`,
-    /// as `record(payload:)` is. A `combine` that throws records nothing, and
-    /// the error reaches the caller.
+    /// can't read, and over `maxPayloadBytes`, as `record(payload:)` is. A
+    /// result that doesn't encode throws the encoder's `EncodingError`, as
+    /// `record(payload:)` does, and so does a `combine` that throws; either
+    /// way nothing is recorded.
     ///
-    /// The payload is decoded and encoded here, on the collector, so `Value`'s
-    /// `Codable` conformance has to be usable off the main actor: a type in a
-    /// package with MainActor default isolation is declared `nonisolated`, as
-    /// a tool encoding it for itself already needs.
+    /// The payload is decoded and encoded here, on the collector, as JSON
+    /// (`record(payload:)`), so `Value`'s `Codable` conformance has to be
+    /// usable off the main actor: a type in a package with MainActor default
+    /// isolation is declared `nonisolated`.
     @discardableResult
     public func mergePayload<Value: Codable & Sendable>(
         as type: Value.Type,
         _ combine: @Sendable (inout Value?) throws -> Void
-    ) rethrows -> Bool {
+    ) throws -> Bool {
         var value: Value?
         if let turnPayload {
-            guard let recorded = try? JSONDecoder().decode(type, from: turnPayload) else { return false }
+            guard let recorded = AskPayloadCoding.decode(type, from: turnPayload) else { return false }
             value = recorded
         }
         try combine(&value)
@@ -170,8 +194,7 @@ public actor AskCollector<Row: AskRow> {
             turnPayload = nil
             return true
         }
-        guard let data = try? JSONEncoder().encode(value) else { return false }
-        return record(payload: data)
+        return record(encodedPayload: try AskPayloadCoding.encode(value))
     }
 
     /// Record what this turn offers to do. **Nothing is done here**: the

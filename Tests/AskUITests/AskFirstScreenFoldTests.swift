@@ -74,7 +74,7 @@ import Testing
         AskFirstScreen(
             phase: screen.phase,
             brand: AskBrand(
-                title: "Ask the Tests", shortLabel: "Ask", appDirectory: "AskKitTests",
+                title: "Ask the Tests", appDirectory: "AskKitTests",
                 logSubsystem: "AskKit.uitests", help: "Ask about your things",
                 firstScreenHeadline: "Ask about your things",
                 firstScreenSentence: "Books, records, tools and clothes.",

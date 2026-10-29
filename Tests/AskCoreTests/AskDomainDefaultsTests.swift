@@ -21,7 +21,7 @@ import FoundationModels
 
         var brand: AskBrand {
             AskBrand(
-                title: "Bare", shortLabel: "Bare", appDirectory: "AskKitTests",
+                title: "Bare", appDirectory: "AskKitTests",
                 logSubsystem: "AskKit.tests", help: "help",
                 firstScreenHeadline: "headline", firstScreenSentence: "sentence",
                 nothingToAskCopy: "nothing", disclosureSentence: "disclosure",
@@ -189,7 +189,7 @@ extension AskDomainDefaultsTests {
     private struct BareRowlessDomain: AskDomain {
         var brand: AskBrand {
             AskBrand(
-                title: "Bare", shortLabel: "Bare", appDirectory: "AskKitTests",
+                title: "Bare", appDirectory: "AskKitTests",
                 logSubsystem: "AskKit.tests", help: "help",
                 firstScreenHeadline: "headline", firstScreenSentence: "sentence",
                 disclosureSentence: "disclosure", scopeCaveat: "caveat"
@@ -272,7 +272,7 @@ extension AskDomainDefaultsTests {
 
         var brand: AskBrand {
             AskBrand(
-                title: "Bare", shortLabel: "Bare", appDirectory: "AskKitTests",
+                title: "Bare", appDirectory: "AskKitTests",
                 logSubsystem: "AskKit.tests", help: "help",
                 firstScreenHeadline: "headline", firstScreenSentence: "sentence",
                 disclosureSentence: "disclosure", scopeCaveat: "caveat"
@@ -299,11 +299,10 @@ extension AskDomainDefaultsTests {
 
     /// The policy's raw values are what a host's own settings or tests would
     /// write down, so they are pinned.
-    @Test func thePoliciesRoundTripByName() throws {
+    @Test func thePoliciesRoundTripByName() {
         let policies: [AskGroundingPolicy] = [.retrieval, .toolCall, .notRequired]
         #expect(policies.map(\.rawValue) == ["retrieval", "toolCall", "notRequired"])
-        let written = try JSONEncoder().encode(policies)
-        #expect(try JSONDecoder().decode([AskGroundingPolicy].self, from: written) == policies)
+        #expect(policies.map(\.rawValue).compactMap(AskGroundingPolicy.init(rawValue:)) == policies)
     }
 }
 

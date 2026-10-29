@@ -64,7 +64,7 @@ nonisolated public struct AskFirstScreenPolicy: Sendable, Equatable {
 ///
 /// Ungated, as `AskFirstScreenPolicy` is, so a host's shared code can name it
 /// on every platform it builds for.
-nonisolated public enum AskGroundingPolicy: String, Sendable, Equatable, Codable {
+nonisolated public enum AskGroundingPolicy: String, Sendable, Equatable {
     /// An answer with no retrieval behind it is never shown, and the app
     /// retrieves for a model that didn't. Prose draws only once the turn is
     /// grounded. A first answer on a fresh session that ends ungrounded gets

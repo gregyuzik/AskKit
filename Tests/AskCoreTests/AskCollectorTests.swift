@@ -142,6 +142,12 @@ import Testing
         let oldest: Int
     }
 
+    /// A payload with a `Double` in it, which JSON can't hold when it is
+    /// infinite.
+    nonisolated struct Reading: Codable, Equatable, Sendable {
+        var value: Double
+    }
+
     /// What a `merge` closure throws when it gives up halfway. Built inside
     /// the closure, which runs on the collector, so it cannot take the suite's
     /// isolation.
@@ -152,16 +158,17 @@ import Testing
         return try? JSONDecoder().decode(Bars.self, from: data)
     }
 
-    @Test func manyToolsMergingAtOnceLoseNothing() async {
+    @Test func manyToolsMergingAtOnceLoseNothing() async throws {
         let collector = AskCollector<FakeRow>()
-        await withTaskGroup(of: Void.self) { group in
+        try await withThrowingTaskGroup(of: Void.self) { group in
             for index in 0..<64 {
                 group.addTask {
-                    await collector.mergePayload(as: Bars.self) { bars in
+                    try await collector.mergePayload(as: Bars.self) { bars in
                         bars = Bars(groups: (bars?.groups ?? []) + ["group \(index)"])
                     }
                 }
             }
+            try await group.waitForAll()
         }
         let merged = await bars(in: collector)?.groups ?? []
         #expect(merged.count == 64, "every merge kept every merge before it")
@@ -170,14 +177,14 @@ import Testing
 
     @Test func aMergeKeepsWhatAnotherToolRecorded() async throws {
         let collector = AskCollector<FakeRow>()
-        await collector.record(payload: try JSONEncoder().encode(Bars(groups: ["decades"])))
-        #expect(await collector.mergePayload(as: Bars.self) { $0?.groups.append("genres") })
+        try await collector.record(payload: Bars(groups: ["decades"]))
+        #expect(try await collector.mergePayload(as: Bars.self) { $0?.groups.append("genres") })
         #expect(await bars(in: collector)?.groups == ["decades", "genres"])
     }
 
-    @Test func aMergeOnATurnWithNoPayloadStartsFromNothing() async {
+    @Test func aMergeOnATurnWithNoPayloadStartsFromNothing() async throws {
         let collector = AskCollector<FakeRow>()
-        let kept = await collector.mergePayload(as: Bars.self) { bars in
+        let kept = try await collector.mergePayload(as: Bars.self) { bars in
             bars = Bars(groups: [bars == nil ? "from nothing" : "from something"])
         }
         #expect(kept)
@@ -190,9 +197,9 @@ import Testing
         // again, by another route: decoding a payload of another shape as
         // nothing, and writing over it.
         let collector = AskCollector<FakeRow>()
-        let span = try JSONEncoder().encode(YearSpan(oldest: 1959))
-        await collector.record(payload: span)
-        let ran = await collector.mergePayload(as: Bars.self) { bars in
+        #expect(try await collector.record(payload: YearSpan(oldest: 1959)))
+        let span = await collector.turnPayload
+        let ran = try await collector.mergePayload(as: Bars.self) { bars in
             bars = Bars(groups: ["genres"])
         }
         #expect(!ran)
@@ -201,10 +208,10 @@ import Testing
 
     @Test func anOversizeResultIsRefusedAndTheEarlierPayloadStands() async throws {
         let collector = AskCollector<FakeRow>()
-        let small = try JSONEncoder().encode(Bars(groups: ["decades"]))
-        await collector.record(payload: small)
+        #expect(try await collector.record(payload: Bars(groups: ["decades"])))
+        let small = await collector.turnPayload
         let oversize = String(repeating: "x", count: AskCollector<FakeRow>.maxPayloadBytes)
-        let kept = await collector.mergePayload(as: Bars.self) { bars in
+        let kept = try await collector.mergePayload(as: Bars.self) { bars in
             bars?.groups.append(oversize)
         }
         #expect(!kept)
@@ -213,8 +220,8 @@ import Testing
 
     @Test func aMergeThatThrowsRecordsNothing() async throws {
         let collector = AskCollector<FakeRow>()
-        let small = try JSONEncoder().encode(Bars(groups: ["decades"]))
-        await collector.record(payload: small)
+        #expect(try await collector.record(payload: Bars(groups: ["decades"])))
+        let small = await collector.turnPayload
         await #expect(throws: Refusal.self) {
             try await collector.mergePayload(as: Bars.self) { bars in
                 bars?.groups.append("half")
@@ -224,18 +231,31 @@ import Testing
         #expect(await collector.turnPayload == small, "the half-made merge never reached the payload")
     }
 
+    /// A merge whose result JSON can't hold throws, as `record(payload:)`
+    /// does, rather than reading as a refusal the tool might pass over: the
+    /// mistake is the domain's type, and no word to the model mends it.
+    @Test func aResultThatDoesNotEncodeThrowsAndTheEarlierPayloadStands() async throws {
+        let collector = AskCollector<FakeRow>()
+        #expect(try await collector.record(payload: Reading(value: 1.5)))
+        let earlier = await collector.turnPayload
+        await #expect(throws: EncodingError.self) {
+            try await collector.mergePayload(as: Reading.self) { $0?.value = .infinity }
+        }
+        #expect(await collector.turnPayload == earlier, "nothing recorded, and nothing cleared")
+    }
+
     @Test func leavingNothingClearsThePayload() async throws {
         let collector = AskCollector<FakeRow>()
-        await collector.record(payload: try JSONEncoder().encode(Bars(groups: ["decades"])))
-        #expect(await collector.mergePayload(as: Bars.self) { $0 = nil })
+        try await collector.record(payload: Bars(groups: ["decades"]))
+        #expect(try await collector.mergePayload(as: Bars.self) { $0 = nil })
         #expect(await collector.turnPayload == nil)
     }
 
-    @Test func aMergedPayloadDoesNotOutliveItsTurn() async {
+    @Test func aMergedPayloadDoesNotOutliveItsTurn() async throws {
         let collector = AskCollector<FakeRow>()
-        await collector.mergePayload(as: Bars.self) { $0 = Bars(groups: ["decades"]) }
+        try await collector.mergePayload(as: Bars.self) { $0 = Bars(groups: ["decades"]) }
         await collector.beginTurn()
-        let kept = await collector.mergePayload(as: Bars.self) { bars in
+        let kept = try await collector.mergePayload(as: Bars.self) { bars in
             bars = Bars(groups: [bars == nil ? "a new turn" : "the last turn's"])
         }
         #expect(kept)

@@ -19,7 +19,7 @@ import Testing
     /// is called from.
     nonisolated struct ThumbnailDomain: AskDomain {
         let brand = AskBrand(
-            title: "Ask Test", shortLabel: "Ask", appDirectory: "AskKitUITests",
+            title: "Ask Test", appDirectory: "AskKitUITests",
             logSubsystem: "AskKit.uitests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             disclosureSentence: "disclosure", scopeCaveat: "caveat"

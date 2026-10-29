@@ -32,7 +32,11 @@ nonisolated public enum AskPrompt {
     /// Every tag the prompt fences data in, and no other: the sanitizer
     /// redacts each of these in text it reads, so a tag nothing composes
     /// would only cost a host's tool the word.
-    static let fenceTags = [
+    ///
+    /// **Public so a tool can avoid them.** A tool returns its lines bare,
+    /// with no fence of its own and none of these names: one it wrote would
+    /// reach the model as `[redacted]`.
+    public static let fenceTags: [String] = [
         "user_request", "rows", "previous_question", "previous_answer", "tool_result"
     ]
 

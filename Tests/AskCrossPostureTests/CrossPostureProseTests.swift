@@ -75,7 +75,7 @@ private struct ShapeUnnamedDomain: AskDomain {
 private struct ProseDomain: AskDomain {
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Prose", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+            title: "Ask Prose", appDirectory: "AskKitCrossPosture",
             logSubsystem: "AskKit.crossPosture", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             disclosureSentence: "disclosure", scopeCaveat: "caveat"

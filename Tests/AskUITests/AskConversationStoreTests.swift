@@ -2201,16 +2201,10 @@ import Testing
     // MARK: - What an answer offers to do
 
     /// An offer the domain carries out itself: a `.perform`, the default kind.
-    private static let lendBook = AskProposal(
-        title: "Mark The Peregrine as lent", actionLabel: "Mark as lent",
-        payload: Data(#"{"title":"The Peregrine"}"#.utf8)
-    )
+    private static let lendBook = AskProposal(title: "Mark The Peregrine as lent", actionLabel: "Mark as lent")
 
     /// An offer that opens the host's editor instead: a `.handOff`.
-    private static let addRecord = AskProposal(
-        kind: .handOff, title: "Add Kind of Blue", actionLabel: "Add",
-        payload: Data(#"{"title":"Kind of Blue"}"#.utf8)
-    )
+    private static let addRecord = AskProposal(kind: .handOff, title: "Add Kind of Blue", actionLabel: "Add")
 
     /// A store whose one answer offers `proposal`, or `lendBook` when none is
     /// given.

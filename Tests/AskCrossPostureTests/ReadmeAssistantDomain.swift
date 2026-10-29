@@ -50,7 +50,6 @@ nonisolated struct ConvertDistance: Tool {
 nonisolated struct AssistantDomain: AskDomain {
     let brand = AskBrand(
         title: "Ask the Assistant",
-        shortLabel: "Ask",
         appDirectory: "MyAssistant",
         logSubsystem: "com.example.myassistant",
         help: "Ask anything",

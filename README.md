@@ -84,7 +84,7 @@ data in their own words.
 4. Make one seam with AppleModelSeam.make(privateCloudCompute: .undeclared), passing .declared only
    if the app's entitlements file grants com.apple.developer.private-cloud-compute, and one
    AskEngine(domain:seam:).
-5. Own one AskConversationStore(domain:engine:) at app scope, outside any view.
+5. Own one AskConversationStore(engine:) at app scope, outside any view.
 6. Show AskScreen(store:) in a NavigationStack with .navigationTitle(store.brand.title), where the
    app wants Ask, such as a tab of its own.
 7. Put the brand's copy, the starters and every other string the reader sees in the app's String
@@ -193,7 +193,6 @@ nonisolated struct LibraryDomain: AskDomain {
 
     let brand = AskBrand(
         title: "Ask My Library",
-        shortLabel: "Ask",
         appDirectory: "MyLibrary",
         logSubsystem: "com.example.mylibrary",
         help: "Ask about your books",
@@ -280,7 +279,7 @@ final class LibraryAsk {
         // `.declared` only if the entitlements file holds Private Cloud Compute's.
         let seam = AppleModelSeam.make(privateCloudCompute: .undeclared)
         let engine = AskEngine(domain: domain, seam: seam)
-        store = AskConversationStore(domain: domain, engine: engine)
+        store = AskConversationStore(engine: engine)
     }
 }
 ```
@@ -375,7 +374,6 @@ nonisolated struct ConvertDistance: Tool {
 nonisolated struct AssistantDomain: AskDomain {
     let brand = AskBrand(
         title: "Ask the Assistant",
-        shortLabel: "Ask",
         appDirectory: "MyAssistant",
         logSubsystem: "com.example.myassistant",
         help: "Ask anything",

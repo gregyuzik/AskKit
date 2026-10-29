@@ -11,7 +11,7 @@ import Testing
 
     private static let lend = AskProposal(
         title: "Mark The Peregrine as lent", detail: "It stays with your books, marked as out on loan.",
-        actionLabel: "Mark as lent", systemImage: "book.closed", payload: Data(#"{"book":"b6"}"#.utf8)
+        actionLabel: "Mark as lent", systemImage: "book.closed", encodedPayload: Data(#"{"book":"b6"}"#.utf8)
     )
 
     // MARK: - The value
@@ -21,6 +21,37 @@ import Testing
         #expect(decoded == Self.lend)
         #expect(decoded.payload(as: [String: String].self) == ["book": "b6"])
         #expect(decoded.payload(as: [Int].self) == nil)
+    }
+
+    /// A payload goes in as the domain's value and comes back as it, through
+    /// AskKit's JSON: what a default `JSONEncoder` writes, to the byte for an
+    /// object of one key, so a proposal kept in a thread file reads back.
+    @Test func aPayloadGoesInAndComesBackAsTheValue() throws {
+        let proposal = try AskProposal(title: "Mark The Peregrine as lent", actionLabel: "Mark as lent", payload: ["book": "b6"])
+        #expect(proposal.payload == (try JSONEncoder().encode(["book": "b6"])))
+        #expect(proposal.payload(as: [String: String].self) == ["book": "b6"])
+        let decoded = try JSONDecoder().decode(AskProposal.self, from: JSONEncoder().encode(proposal))
+        #expect(decoded.payload(as: [String: String].self) == ["book": "b6"])
+    }
+
+    /// A proposal made without a payload carries none, and reads back none.
+    @Test func aProposalMadeWithoutAPayloadCarriesNone() {
+        let proposal = AskProposal(title: "Mark The Peregrine as lent", actionLabel: "Mark as lent")
+        #expect(proposal.payload.isEmpty)
+        #expect(proposal.payload(as: String.self) == nil)
+    }
+
+    /// A payload JSON can't hold, or one the domain already encoded, is never
+    /// proposed: the initializer throws, rather than offering a card whose
+    /// `perform` would read nil.
+    @Test func aPayloadThatDoesNotEncodeIsNeverProposed() throws {
+        #expect(throws: EncodingError.self) {
+            try AskProposal(title: "Lend it", actionLabel: "Lend", payload: Double.infinity)
+        }
+        let propertyList = try PropertyListEncoder().encode(["book": "b6"])
+        #expect(throws: EncodingError.self) {
+            try AskProposal(title: "Lend it", actionLabel: "Lend", payload: propertyList)
+        }
     }
 
     @Test func everyOutcomeRoundTrips() throws {
@@ -48,7 +79,7 @@ import Testing
     @Test func aHandOffKeepsItsKindAcrossTheThreadFile() throws {
         let handOff = AskProposal(
             kind: .handOff, title: "Add Kind of Blue", actionLabel: "Add",
-            payload: Data(#"{"title":"Kind of Blue"}"#.utf8)
+            encodedPayload: Data(#"{"title":"Kind of Blue"}"#.utf8)
         )
         let decoded = try JSONDecoder().decode(AskProposal.self, from: JSONEncoder().encode(handOff))
         #expect(decoded.kind == .handOff)
@@ -116,7 +147,7 @@ import Testing
     @Test func aProposalCarryingMoreThanAnIntentIsRefused() async {
         let collector = AskCollector<FakeRow>()
         let heavy = AskProposal(
-            title: "Mark The Peregrine as lent", actionLabel: "Mark as lent", payload: Data(count: AskProposal.maxPayloadBytes + 1)
+            title: "Mark The Peregrine as lent", actionLabel: "Mark as lent", encodedPayload: Data(count: AskProposal.maxPayloadBytes + 1)
         )
         #expect(await collector.record(proposal: heavy) == false)
         #expect(await collector.turnProposal == nil)

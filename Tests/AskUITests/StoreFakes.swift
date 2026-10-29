@@ -374,7 +374,7 @@ nonisolated struct UIDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Test", shortLabel: "Ask", appDirectory: "AskKitUITests",
+            title: "Ask Test", appDirectory: "AskKitUITests",
             logSubsystem: "AskKit.uitests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: nothingToAskCopy, disclosureSentence: "disclosure",

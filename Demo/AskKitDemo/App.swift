@@ -140,7 +140,7 @@ final class DemoAsk<Domain: AskDomain> {
         self.domain = domain
         self.seam = seam
         self.engine = engine
-        self.store = AskConversationStore(domain: domain, engine: engine)
+        self.store = AskConversationStore(engine: engine)
         self.scenarios = scenarios
     }
 
@@ -193,12 +193,12 @@ final class DemoAsk<Domain: AskDomain> {
     /// The scenarios through the real engine, as a table to read or share.
     /// What the settings card's diagnostics row runs.
     ///
-    /// On an engine of its own. `AskEval` resets its engine before every
-    /// scenario, and on the thread's engine that reset would drop the chat's
-    /// conversation. The domain and the seam are the app's, so the tiers and
-    /// the generation gate are too.
+    /// On an engine of its own, which `AskEval` builds: it resets its engine
+    /// before every scenario, and on the thread's engine that reset would
+    /// drop the chat's conversation. The domain and the seam are the app's,
+    /// so the tiers and the generation gate are too.
     func runEval() async -> String {
-        let eval = AskEval(engine: AskEngine(domain: domain, seam: seam))
+        let eval = AskEval(domain: domain, seam: seam)
         let outcomes = await eval.run(scenarios)
         return AskEval<Domain>.table(outcomes)
     }

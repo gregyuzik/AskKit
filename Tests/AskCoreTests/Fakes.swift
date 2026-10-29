@@ -67,7 +67,7 @@ nonisolated final class CollectorBridge: @unchecked Sendable {
     /// What a tool also knew this turn, recorded where a real tool records it.
     func recordPayload(_ payload: Data) async {
         guard let collector = collector.withLock({ $0 }) else { return }
-        await collector.record(payload: payload)
+        await collector.record(encodedPayload: payload)
     }
 
     /// A narration the collector knows nothing about, reported with no tool
@@ -821,7 +821,7 @@ nonisolated struct FakeDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Fake", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask Fake", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: "nothing", disclosureSentence: "disclosure",
@@ -949,7 +949,7 @@ nonisolated struct RowlessDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Rowless", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask Rowless", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: nothingToAskCopy, disclosureSentence: "disclosure",

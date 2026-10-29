@@ -81,7 +81,6 @@ nonisolated struct LibraryDomain: AskDomain {
 
     let brand = AskBrand(
         title: "Ask My Library",
-        shortLabel: "Ask",
         appDirectory: "MyLibrary",
         logSubsystem: "com.example.mylibrary",
         help: "Ask about your books",
@@ -141,7 +140,7 @@ final class LibraryAsk {
         // `.declared` only if the entitlements file holds Private Cloud Compute's.
         let seam = AppleModelSeam.make(privateCloudCompute: .undeclared)
         let engine = AskEngine(domain: domain, seam: seam)
-        store = AskConversationStore(domain: domain, engine: engine)
+        store = AskConversationStore(engine: engine)
     }
 }
 

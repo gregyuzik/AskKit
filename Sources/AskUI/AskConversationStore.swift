@@ -598,25 +598,60 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// (`AskPrivateCloudCard`), so Share never offers a file that has gone.
     private(set) var feedbackRevision = 0
 
-    /// The thread for `domain`, asked through `engine`.
+    /// The thread for `engine`'s domain (`AskEngine.domain`), asked through
+    /// `engine`: what a host builds.
     ///
     /// Make one for the life of the app, and hold it outside any view: the
     /// type's note says why. Nothing is read or asked here. The screen reads
     /// the saved thread, the library and the model's state as it appears
     /// (`restoreIfNeeded()`, `refresh()`), and a host may call either first.
     ///
+    /// **The domain is given once, to the engine.** The store reads the
+    /// engine's, so the rules the engine answers by (its grounding policy,
+    /// what its tools read and write) and the ones the store draws and keeps
+    /// by (its brand, its folder, its persistence, `perform(_:)`) are one
+    /// value's.
+    ///
     /// The last three default to the domain's folder in Application Support
     /// (`AskBrand.appDirectory`), logging under `AskBrand.logSubsystem`. A
     /// test passes its own, in a folder of its own.
     ///
     /// - Parameters:
+    ///   - engine: What asks the questions, and what the thread asks about.
+    ///     The screen reads the model's state from its `status`.
+    ///   - thread: Where the thread on screen is kept, for a domain whose
+    ///     `persistence` is `.thread`.
+    ///   - archive: Where the earlier chats are kept, for the same domains.
+    ///   - feedbackAttachments: Where a rated answer's feedback attachment is
+    ///     kept, for the diagnostics row to share.
+    public convenience init(
+        engine: AskEngine<Domain>,
+        thread: AskThreadStore<Row>? = nil,
+        archive: AskThreadArchive<Row>? = nil,
+        feedbackAttachments: AskFeedbackAttachments? = nil
+    ) {
+        self.init(
+            domain: engine.domain, engine: engine, thread: thread, archive: archive,
+            feedbackAttachments: feedbackAttachments
+        )
+    }
+
+    /// The thread for `domain`, asked through an engine of the host's own
+    /// (`AskAsking`), such as a scripted one for previews and tests.
+    ///
+    /// **Not for an `AskEngine`**, which carries its domain: build the store
+    /// from it with `init(engine:thread:archive:feedbackAttachments:)`. Here
+    /// only the row type ties `domain` to `engine`, and nothing checks the
+    /// rest: an engine answering by another domain's folder, grounding policy
+    /// or tools would answer by rules the store doesn't draw or keep by.
+    ///
+    /// Everything else is as `init(engine:thread:archive:feedbackAttachments:)`
+    /// says.
+    ///
+    /// - Parameters:
     ///   - domain: What the thread asks about.
-    ///   - engine: What asks the questions: an `AskEngine` built on this same
-    ///     domain value, or an engine of the host's own (`AskAsking`). The
-    ///     screen reads the model's state from its `status`. Only the row type
-    ///     ties the two together, and nothing checks the rest: an engine on a
-    ///     domain with another folder, grounding policy or referent would
-    ///     answer by rules the store doesn't draw or keep by.
+    ///   - engine: What asks the questions. The screen reads the model's
+    ///     state from its `status`.
     ///   - thread: Where the thread on screen is kept, for a domain whose
     ///     `persistence` is `.thread`.
     ///   - archive: Where the earlier chats are kept, for the same domains.
@@ -2908,7 +2943,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         // the way a declined starter does.
         return (last.answer?.followUps ?? [])
             .filter { !declinedFollowUps.contains($0) }
-            .map { AskStarter(text: $0, bank: "followUp") }
+            .map { AskStarter(text: $0) }
     }
 
     /// Whether the last answer offers "Another pick": its stream has ended, it
