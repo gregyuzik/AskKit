@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/icon-dark.png">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/gregyuzik/AskKit/raw/main/docs/images/icon-dark.png">
     <img src="docs/images/icon.png" width="128" height="128" alt="The demo app's icon: three plates of tinted glass in the shape of SF Symbols' speech bubble, receding straight back on a pastel field, each smaller and fainter than the one in front, shading together from cyan through blue, violet and magenta to coral">
   </picture>
 </p>
