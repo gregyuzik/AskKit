@@ -166,7 +166,7 @@ public actor AskEngine<Domain: AskDomain> {
         // count shows tiles (house rule 7), and nothing else says so.
         let strangers = AskQuestionKind.unrecognized(in: domain.questionKinds)
         if !strangers.isEmpty {
-            mistake("questionKinds not in the schema vocabulary: \(strangers.joined(separator: ", "))")
+            mistake("questionKinds not in the schema vocabulary: \(strangers.map(\.rawValue).joined(separator: ", "))")
         }
         // The same silence for "Another pick". An answer's kind is one of
         // `questionKinds`, a superlative read as a pick where only `pick` is
@@ -175,7 +175,7 @@ public actor AskEngine<Domain: AskDomain> {
         let unreachable = domain.rerollableKinds.subtracting(domain.questionKinds + [AskQuestionKind.other])
         if !unreachable.isEmpty {
             mistake(
-                "rerollableKinds not in questionKinds, never offered Another pick: \(unreachable.sorted().joined(separator: ", "))"
+                "rerollableKinds not in questionKinds, never offered Another pick: \(unreachable.map(\.rawValue).sorted().joined(separator: ", "))"
             )
         }
         // And all of them under the prose shape, whose answers the model
@@ -1598,7 +1598,7 @@ public actor AskEngine<Domain: AskDomain> {
         // the full reply anyway (`AskSession`'s default) chose them for a
         // shape nobody asked for. Nor do the rows its prose names stand in
         // for a choice the domain never asks the model to make.
-        func chosenTiles(_ names: [String]?, showsEveryMatch: Bool?, kind: String?, text: String) -> [Row] {
+        func chosenTiles(_ names: [String]?, showsEveryMatch: Bool?, kind: AskQuestionKind?, text: String) -> [Row] {
             guard shape == .full else { return [] }
             if let kind, AskQuestionKind.showNoTiles.contains(kind) { return [] }
             return AskAnswer<Row>.tiles(

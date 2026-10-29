@@ -64,7 +64,7 @@ private extension Trait where Self == ConditionTrait {
 
     /// A session that answers, having called a tool.
     private func grounded(
-        _ text: String, kind: String? = nil, tiles: [String]? = nil,
+        _ text: String, kind: AskQuestionKind? = nil, tiles: [String]? = nil,
         showsEveryMatch: Bool? = nil, followUps: [String]? = nil
     ) -> FakeSession.Script {
         FakeSession.Script(
@@ -2241,6 +2241,17 @@ private extension Trait where Self == ConditionTrait {
         #expect(recording.answer?.questionKind == AskQuestionKind.other)
     }
 
+    @Test func aMisspelledQuestionKindIsLoggedOnceTheEngineIsBuilt() {
+        // A kind is a type, so a misspelling is built on purpose, with
+        // `init(rawValue:)`, and is still a typo: the model's correct `count`
+        // would be normalized to `other`, and a count would show tiles
+        // (house rule 7). The line names the word, not the type.
+        var domain = FakeDomain()
+        domain.kinds = [AskQuestionKind.lookup, AskQuestionKind(rawValue: "cuont")]
+        let (_, _, log) = makeEngine(domain: domain)
+        #expect(log.routings.withLock { $0 } == ["questionKinds not in the schema vocabulary: cuont"])
+    }
+
     @Test func anotherPickKindsNoAnswerCanHaveAreLoggedOnceTheEngineIsBuilt() {
         // An answer's kind is one of `questionKinds`, or `other` for any the
         // model gave outside them, a superlative read as a pick. So a kind
@@ -2248,7 +2259,10 @@ private extension Trait where Self == ConditionTrait {
         // one, is never offered it, and nothing else says so.
         var domain = FakeDomain()
         domain.kinds = [AskQuestionKind.pick, AskQuestionKind.count]
-        domain.rerollKinds = [AskQuestionKind.pick, AskQuestionKind.other, AskQuestionKind.superlative, "recomendation"]
+        domain.rerollKinds = [
+            AskQuestionKind.pick, AskQuestionKind.other, AskQuestionKind.superlative,
+            AskQuestionKind(rawValue: "recomendation")
+        ]
         let (_, _, log) = makeEngine(domain: domain)
         #expect(log.routings.withLock { $0 } == [
             "rerollableKinds not in questionKinds, never offered Another pick: recomendation, superlative"

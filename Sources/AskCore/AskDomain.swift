@@ -157,7 +157,7 @@ nonisolated public protocol AskDomain: Sendable {
     var persistence: AskPersistence { get }
     /// The subset of `AskQuestionKind.all` this domain's questions really come
     /// in. Anything the model returns outside it is normalized to `other`.
-    var questionKinds: [String] { get }
+    var questionKinds: [AskQuestionKind] { get }
     /// How long one turn may run, counted from the question: the domain's
     /// `deterministicAnswer(for:)`, `overview()` and
     /// `promptLines(question:overview:)`, every generation in it, the tools
@@ -416,7 +416,7 @@ nonisolated public protocol AskDomain: Sendable {
     /// picks. Such a domain listing `pick` here says which of its picks are
     /// superlatives in `isRerollable`; one that lists `superlative` gets them
     /// apart from the model, and can still check.
-    var rerollableKinds: Set<String> { get }
+    var rerollableKinds: Set<AskQuestionKind> { get }
 
     /// Whether this answer offers "Another pick": by default, whether its kind
     /// is in `rerollableKinds`. A domain that can tell a superlative from a
@@ -513,7 +513,7 @@ nonisolated extension AskDomain {
     public var persistence: AskPersistence { .thread }
     /// `AskQuestionKind.default`: lookup, count, pick, every match, yes or no,
     /// and other.
-    public var questionKinds: [String] { AskQuestionKind.default }
+    public var questionKinds: [AskQuestionKind] { AskQuestionKind.default }
     /// 45 seconds. Measured, Private Cloud Compute takes 5 to 20 s to its first
     /// word, and a pairing question answered on device takes about 13 s, so
     /// 45 s clears the slow end of both without holding a wedged turn forever.
@@ -599,7 +599,7 @@ nonisolated extension AskDomain {
     public func basis(for answer: AskAnswer<Row>) -> String? { nil }
 
     /// None: no answer offers "Another pick".
-    public var rerollableKinds: Set<String> { [] }
+    public var rerollableKinds: Set<AskQuestionKind> { [] }
 
     /// Whether the answer's kind is in `rerollableKinds`.
     public func isRerollable(_ answer: AskAnswer<Row>, question: String) -> Bool {
@@ -640,22 +640,22 @@ nonisolated extension AskDomain {
     /// Nil: a scoped question goes as it would unscoped.
     public func scopeLine(for scope: String) -> String? { nil }
 
-    /// Normalize what the model claimed against what this domain actually
-    /// asks. A kind outside the domain's list is `other`: the schema's
-    /// vocabulary is shared by every host, so an answer can claim
-    /// `totalValue` in a domain that has nothing with a value.
+    /// Normalize the word the model claimed (`AskReplySnapshot.questionKind`)
+    /// against what this domain actually asks, into its kind. A kind outside
+    /// the domain's list is `other`: the schema's vocabulary is shared by
+    /// every host, so an answer can claim `totalValue` in a domain that has
+    /// nothing with a value.
     ///
     /// **Except a superlative, for a domain that asks in picks.** A domain
     /// listing `pick` without `superlative` gets its superlatives as picks:
     /// mapped to `other`, "my oldest record" would lose whatever the domain
     /// does with a pick.
-    func normalizedKind(_ raw: String?) -> String? {
+    func normalizedKind(_ raw: String?) -> AskQuestionKind? {
         guard let raw, !raw.isEmpty else { return nil }
-        if questionKinds.contains(raw) { return raw }
-        if raw == AskQuestionKind.superlative, questionKinds.contains(AskQuestionKind.pick) {
-            return AskQuestionKind.pick
-        }
-        return AskQuestionKind.other
+        let kind = AskQuestionKind(rawValue: raw)
+        if questionKinds.contains(kind) { return kind }
+        if kind == .superlative, questionKinds.contains(.pick) { return .pick }
+        return .other
     }
 }
 

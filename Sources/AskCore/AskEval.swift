@@ -34,7 +34,7 @@ nonisolated public struct AskScenario: Sendable, Identifiable {
     /// another, or none, misses. Empty means any, and is all a domain whose
     /// reply shape is `.prose` asks: every answer its model writes is
     /// `other`, and shows no tiles.
-    public let expectedKinds: [String]
+    public let expectedKinds: [AskQuestionKind]
     /// Titles the answer ought to name, if it is any good.
     public let expectedTitles: [String]
     /// A count or a total: tiles would be wrong, and an answer showing any
@@ -64,7 +64,7 @@ nonisolated public struct AskScenario: Sendable, Identifiable {
         id: String,
         question: String,
         scope: String? = nil,
-        expectedKinds: [String] = [],
+        expectedKinds: [AskQuestionKind] = [],
         expectedTitles: [String] = [],
         expectsNoTiles: Bool = false,
         expectsProposal: Bool? = nil,
@@ -101,7 +101,7 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     /// prints it in whole milliseconds.
     public var duration: Duration = .zero
     /// The question kind the answer claimed, in the domain's vocabulary.
-    public var questionKind: String?
+    public var questionKind: AskQuestionKind?
     /// The turn threw away what it had and started over: the grounded retry,
     /// or a hand-down. (A follow-up that outgrew its window starts over too,
     /// and no scenario is a follow-up.)
@@ -163,7 +163,7 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     nonisolated public enum Miss: Sendable, Equatable {
         /// A kind the scenario did not list, or nil when the answer claimed
         /// none.
-        case kind(expected: [String], got: String?)
+        case kind(expected: [AskQuestionKind], got: AskQuestionKind?)
         /// Tiles, this many, where the scenario expects none.
         case tiles(Int)
         /// No card, where the scenario expects one.
@@ -180,7 +180,7 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
         public var line: String {
             switch self {
             case .kind(let expected, let got):
-                return "KIND \(got ?? "none"), expected \(expected.joined(separator: " or "))"
+                return "KIND \(got?.rawValue ?? "none"), expected \(expected.map(\.rawValue).joined(separator: " or "))"
             case .tiles(let count):
                 return "\(count) TILES, expected none"
             case .noProposal:
@@ -331,7 +331,7 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
         for outcome in outcomes {
             lines.append(
                 "| \(outcome.id) | \(outcome.tier?.rawValue ?? "–") | \(outcome.toolCalls) | \(outcome.restarts) "
-                + "| \(outcome.rowsRead) | \(outcome.tiles) | \(outcome.questionKind ?? "–") "
+                + "| \(outcome.rowsRead) | \(outcome.tiles) | \(outcome.questionKind?.rawValue ?? "–") "
                 + "| \(outcome.proposed ? "yes" : "–") | \(outcome.duration.wholeMilliseconds) | \(outcome.verdict) |"
             )
         }

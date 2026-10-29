@@ -107,7 +107,7 @@ private struct FullReplySession: AskSession {
     ) -> AsyncThrowingStream<AskReplySnapshot, any Error> {
         AsyncThrowingStream { continuation in
             continuation.yield(AskReplySnapshot(
-                answer: Self.answer, questionKind: AskQuestionKind.count, showsEveryMatch: true,
+                answer: Self.answer, questionKind: AskQuestionKind.count.rawValue, showsEveryMatch: true,
                 tiles: ["Lisbon"], followUps: Self.followUps
             ))
             continuation.finish()

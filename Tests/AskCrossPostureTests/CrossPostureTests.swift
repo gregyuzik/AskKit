@@ -57,7 +57,7 @@ import FoundationModels
         #expect(AskTier.privateCloud.rawValue == "privateCloud")
         #expect(AskQuestionKind.all.contains(AskQuestionKind.count))
         #expect(AskQuestionKind.all.contains(AskQuestionKind.superlative))
-        #expect(AskQuestionKind.unrecognized(in: ["count", "cuont"]) == ["cuont"])
+        #expect(AskQuestionKind.unrecognized(in: [.count, AskQuestionKind(rawValue: "cuont")]) == [AskQuestionKind(rawValue: "cuont")])
         #expect(AskError.stopped.isRetryable)
         #expect(AskGrounding.toolCall.rawValue == "tool call")
         #expect(AskDiscard.Reason.ungrounded.rawValue == "ungrounded")
@@ -1067,8 +1067,8 @@ extension CrossPostureTests {
     /// own eval test reads them.
     @Test func anEvaluationsTableIsReadWithoutThePosture() {
         var outcome = AskOutcome(id: "count")
-        outcome.misses = [.kind(expected: ["count"], got: "lookup"), .tiles(3)]
-        #expect(outcome.misses.first == .kind(expected: ["count"], got: "lookup"))
+        outcome.misses = [.kind(expected: [.count], got: .lookup), .tiles(3)]
+        #expect(outcome.misses.first == .kind(expected: [.count], got: .lookup))
         #expect(outcome.misses.map(\.line) == ["KIND lookup, expected count", "3 TILES, expected none"])
         let table = AskEval<CrossPostureDomain>.table([outcome])
         #expect(table.hasSuffix("0/1 grounded, clean and as expected."))
@@ -1125,7 +1125,7 @@ extension CrossPostureTests {
             id: "count", question: "How many?", expectedKinds: [AskQuestionKind.count],
             expectedTitles: ["Dune"], expectsNoTiles: true
         )
-        #expect(scenario.expectedKinds == ["count"] && scenario.expectedTitles == ["Dune"] && scenario.expectsNoTiles)
+        #expect(scenario.expectedKinds == [.count] && scenario.expectedTitles == ["Dune"] && scenario.expectsNoTiles)
         var outcome = AskOutcome(id: scenario.id)
         outcome.toolCalls = 2
         outcome.duration = .milliseconds(1_400)

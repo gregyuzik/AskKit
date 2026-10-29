@@ -2,80 +2,6 @@
 
 import FoundationModels
 
-/// The question kinds a reply may claim.
-///
-/// **One static vocabulary, deliberately.** `@Generable` builds a *static*
-/// `generationSchema`: the macro can't read an instance's
-/// `AskDomain.questionKinds`, and `AskReply` can't be generic over a domain,
-/// so `.anyOf` here has to be a compile-time list. It is the union of the
-/// kinds real hosts needed, so a few (`totalValue`, `wear`, `pairing`,
-/// `suggestion`) belong to one kind of app. Each domain narrows it two ways:
-/// its own `questionKinds` is what the engine normalizes the answer against
-/// (anything outside becomes `other`), and its prompt's steer line is what
-/// tells the model which of these its questions actually come in.
-///
-/// Why not a schema per domain: ARCHITECTURE.md, Rejected designs.
-nonisolated public enum AskQuestionKind {
-    /// Anything else about what the reader has.
-    public static let lookup = "lookup"
-    /// How many: the number is the answer, so no tiles.
-    public static let count = "count"
-    /// What a set is worth all together: likewise no tiles.
-    public static let totalValue = "totalValue"
-    /// A recommendation: a choice among things that could each be right, so
-    /// one or two tiles, and another pick is a fair thing to ask for.
-    public static let pick = "pick"
-    /// The one that ranks first by a measure: the oldest, the most valuable,
-    /// the highest rated. One right answer, so another pick of it is a wrong
-    /// one. A domain that lists `pick` without this kind gets its superlatives
-    /// as picks.
-    public static let superlative = "superlative"
-    /// A which/what/do-I-have question asking for all of them.
-    public static let everyMatch = "everyMatch"
-    /// A plain yes or no: the word is the answer, so no tiles.
-    public static let yesNo = "yesNo"
-    /// What has or hasn't been used, as in a wardrobe's wear history.
-    public static let wear = "wear"
-    /// What goes with one particular piece, such as what to wear with a
-    /// jacket.
-    public static let pairing = "pairing"
-    /// A whole outfit or plan for an occasion.
-    public static let suggestion = "suggestion"
-    /// None of the above.
-    public static let other = "other"
-
-    /// The full vocabulary, for the schema.
-    public static let all = [
-        lookup, count, totalValue, pick, superlative, everyMatch, yesNo, wear, pairing, suggestion, other
-    ]
-
-    /// The default a domain gets when it names none.
-    public static let `default` = [lookup, count, pick, everyMatch, yesNo, other]
-
-    /// The kinds for which a number or a plain yes or no, not the things, is
-    /// the answer, so no tiles are shown whatever the model returned. The
-    /// `tiles` guide asks for none for each of them, and an empty list is not
-    /// enough to say so: it falls back to the rows the prose names.
-    public static let showNoTiles: Set<String> = [count, totalValue, yesNo]
-
-    /// Anything in a domain's `questionKinds` that this vocabulary doesn't
-    /// contain, which can only be a typo.
-    ///
-    /// The schema's vocabulary is fixed and shared, so a domain listing
-    /// `"cuont"` isn't declaring a kind of its own: it is failing to declare
-    /// `count`. The engine then normalizes the model's correct `count` to
-    /// `other`, so the kind no longer decides that a count shows no tiles
-    /// (house rule 7), and nothing else says so. `AskEngine` logs what this
-    /// finds when it is built.
-    ///
-    /// A *subset* is normal and isn't reported: every domain lists only the
-    /// kinds it asks about.
-    public static func unrecognized(in kinds: [String]) -> [String] {
-        let known = Set(all)
-        return kinds.filter { !known.contains($0) }
-    }
-}
-
 /// What one turn asks the model to write, unless its domain's reply shape is
 /// `.prose` (`AskProseReply`).
 ///
@@ -95,7 +21,8 @@ nonisolated public struct AskReply: Sendable {
     @Guide(description: AskReply.answerGuide)
     public var answer: String
 
-    /// What kind of question the reader asked, from `AskQuestionKind.all`.
+    /// What kind of question the reader asked: the word of one of
+    /// `AskQuestionKind.all`, which the engine normalizes into a kind.
     ///
     /// **Every host's model reads this text, so a word here changes every
     /// host's answers.** Its examples are drawn from real hosts, and they are
@@ -122,7 +49,7 @@ nonisolated public struct AskReply: Sendable {
         "pairing" for what goes with one particular piece. "suggestion" for a whole plan for a day \
         or an occasion (what to wear today or tomorrow). "lookup" for anything else about what \
         they have. "other" when the question is about none of that.
-        """, .anyOf(AskQuestionKind.all))
+        """, .anyOf(AskQuestionKind.all.map(\.rawValue)))
     public var questionKind: String
 
     /// Whether the answer is every row the tools found, so all of them show as
@@ -219,7 +146,9 @@ nonisolated public struct AskProseReply: Sendable {
 nonisolated public struct AskReplySnapshot: Sendable, Equatable {
     /// `AskReply.answer`, as far as it has been written.
     public var answer: String?
-    /// `AskReply.questionKind`, as far as it has been written.
+    /// `AskReply.questionKind`, as far as it has been written: the word, not
+    /// yet an `AskQuestionKind`, since a partial "cou" isn't one until the
+    /// engine normalizes it against the domain's `questionKinds`.
     public var questionKind: String?
     /// `AskReply.showsEveryMatch`, once the model has written it.
     public var showsEveryMatch: Bool?

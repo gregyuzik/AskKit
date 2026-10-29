@@ -53,3 +53,51 @@ API breakage: var AskTurnStats.msToFirstTool has been removed
 API breakage: var AskTurnStats.msToFirstWord has been removed
 API breakage: var AskTurnStats.msToLastWord has been removed
 API breakage: var AskTurnStats.msTotal has been removed
+API breakage: var AskAnswer.questionKind has declared type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: accessor AskAnswer.questionKind.Get() has return type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: constructor AskAnswer.init(text:matches:tiles:followUps:questionKind:isTruncated:basis:payload:proposal:grounding:) has parameter 4 type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: var AskDomain.questionKinds has declared type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: accessor AskDomain.questionKinds.Get() has return type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: var AskDomain.rerollableKinds has declared type change from Swift.Set<Swift.String> to Swift.Set<AskCore.AskQuestionKind>
+API breakage: accessor AskDomain.rerollableKinds.Get() has return type change from Swift.Set<Swift.String> to Swift.Set<AskCore.AskQuestionKind>
+API breakage: var AskScenario.expectedKinds has declared type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: accessor AskScenario.expectedKinds.Get() has return type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: constructor AskScenario.init(id:question:scope:expectedKinds:expectedTitles:expectsNoTiles:expectsProposal:expectsGrounding:) has parameter 3 type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: var AskOutcome.questionKind has declared type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: accessor AskOutcome.questionKind.Get() has return type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: accessor AskOutcome.questionKind.Set() has parameter 0 type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: enumelement AskOutcome.Miss.kind has declared type change from (AskCore.AskOutcome.Miss.Type) -> ([Swift.String], Swift.String?) -> AskCore.AskOutcome.Miss to (AskCore.AskOutcome.Miss.Type) -> ([AskCore.AskQuestionKind], AskCore.AskQuestionKind?) -> AskCore.AskOutcome.Miss
+API breakage: var AskFeedback.questionKind has declared type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: accessor AskFeedback.questionKind.Get() has return type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: constructor AskFeedback.init(sentiment:tier:questionKind:tilesShown:rowsRead:wasTruncated:) has parameter 2 type change from Swift.String? to AskCore.AskQuestionKind?
+API breakage: enum AskQuestionKind has been changed to a struct
+API breakage: var AskQuestionKind.lookup has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.lookup.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.count has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.count.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.totalValue has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.totalValue.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.pick has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.pick.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.superlative has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.superlative.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.everyMatch has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.everyMatch.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.yesNo has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.yesNo.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.wear has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.wear.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.pairing has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.pairing.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.suggestion has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.suggestion.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.other has declared type change from Swift.String to AskCore.AskQuestionKind
+API breakage: accessor AskQuestionKind.other.Get() has return type change from Swift.String to AskCore.AskQuestionKind
+API breakage: var AskQuestionKind.all has declared type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: accessor AskQuestionKind.all.Get() has return type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: var AskQuestionKind.default has declared type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: accessor AskQuestionKind.default.Get() has return type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: var AskQuestionKind.showNoTiles has declared type change from Swift.Set<Swift.String> to Swift.Set<AskCore.AskQuestionKind>
+API breakage: accessor AskQuestionKind.showNoTiles.Get() has return type change from Swift.Set<Swift.String> to Swift.Set<AskCore.AskQuestionKind>
+API breakage: func AskQuestionKind.unrecognized(in:) has return type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: func AskQuestionKind.unrecognized(in:) has parameter 0 type change from [Swift.String] to [AskCore.AskQuestionKind]

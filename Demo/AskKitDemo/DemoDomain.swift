@@ -268,7 +268,7 @@ nonisolated struct DemoDomain: AskDomain {
     /// The default kinds and `superlative`. Without it a superlative arrives
     /// as a pick (`normalizedKind`), and "Another pick" would offer a second
     /// oldest thing (`rerollableKinds`).
-    var questionKinds: [String] { AskQuestionKind.default + [AskQuestionKind.superlative] }
+    var questionKinds: [AskQuestionKind] { AskQuestionKind.default + [AskQuestionKind.superlative] }
 
     /// The demo takes a photo, so the composer has its photo button to show
     /// (under `DemoLaunchArgument.photos`) and the thread what becomes of a
@@ -402,7 +402,7 @@ nonisolated struct DemoDomain: AskDomain {
     /// one and "what should I read tonight" as a pick, in any language. A host
     /// that can tell them apart from its tool's arguments, its rows or its
     /// payload as well overrides `isRerollable` to check.
-    var rerollableKinds: Set<String> { [AskQuestionKind.pick] }
+    var rerollableKinds: Set<AskQuestionKind> { [AskQuestionKind.pick] }
 
     /// The demo's one action, offered by its scripted answer about lending a
     /// book. There is no shelf behind it to change, so it keeps nothing and
