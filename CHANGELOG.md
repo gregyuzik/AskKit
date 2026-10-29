@@ -12,6 +12,10 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-29
+
+The composer's hint no longer makes an empty field two lines tall.
+
 ### Changed
 
 - The composer's hint takes one line, ending in an ellipsis when it is longer than the field is wide,
@@ -465,7 +469,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/gregyuzik/AskKit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/gregyuzik/AskKit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gregyuzik/AskKit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/gregyuzik/AskKit/releases/tag/v0.1.0
