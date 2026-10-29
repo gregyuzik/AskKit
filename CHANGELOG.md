@@ -12,6 +12,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Changed
+
+- The composer's hint takes one line, ending in an ellipsis when it is longer than the field is wide,
+  so an empty field is always one line tall; only a draft grows the capsule. A hint that wrapped held
+  the capsule two lines tall on an iPhone before the reader had typed a word. VoiceOver still reads the
+  hint whole. Keep a host's hint short enough to show whole.
+
 ## [0.3.0] - 2026-10-29
 
 The public API's shape, and fixes across the engine, the stored chats and the screen, many of them for

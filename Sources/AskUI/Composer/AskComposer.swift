@@ -85,9 +85,9 @@ public struct AskComposer: View {
     ///   - isFocused: Whether the field has focus. The circle focuses the
     ///     field when there is nothing to send, and on iOS and visionOS takes
     ///     the focus of a focused, empty field away.
-    ///   - placeholder: What the field shows while `draft` is empty, wrapping
-    ///     to as many lines as the field grows to, four at most, with the
-    ///     capsule growing to hold them.
+    ///   - placeholder: What the field shows while `draft` is empty, on one
+    ///     line, ending in an ellipsis where it is longer than the field is
+    ///     wide. Only a draft grows the capsule.
     ///   - accent: The capsule's tint, at up to half strength (less on a
     ///     light accent in dark mode, where the draft's words would fall under
     ///     4.5:1 at half), and the circle's fill.
@@ -526,13 +526,11 @@ public struct AskComposer: View {
 /// apart from the composer so the layout can be drawn in a test with a
 /// stand-in for the text field (`AskComposerPlaceholderTests`).
 ///
-/// **The placeholder sizes the field, from inside the field's own stack.** An
-/// overlay is offered the field's frame, one line while the draft is empty, so
-/// there the host's hint ends in an ellipsis at the accessibility sizes and in
-/// the longer locales, however many lines it is let wrap to: measured on the
-/// Mac, a hint 120 pt wide in an overlay under `.lineLimit(1...2)` stayed one
-/// 16 pt line. Beside the field it wraps to as many lines as the field grows
-/// to, and the capsule grows with it, as it does for a draft that long.
+/// **One line, whatever its length**, so an empty field is the height of one
+/// line of draft: a hint that wrapped held the capsule two lines tall before
+/// the reader had typed a word. A hint longer than the field is wide ends in
+/// an ellipsis, as a system text field's prompt does, and VoiceOver reads it
+/// whole (`accessibilityHint`). Only a draft grows the capsule.
 ///
 /// **On the field's first baseline**, so the hint's first line sits where the
 /// draft's will: measured on the Mac, a text field padded 10 pt from the top
@@ -552,17 +550,14 @@ struct AskComposerFieldStack<Field: View>: View {
             if let placeholder {
                 Text(placeholder)
                     .font(.body)
-                    // As many lines as the field grows to, and no more: a
-                    // hint any longer would hold the capsule taller than a
-                    // draft can make it.
-                    .lineLimit(AskComposerMetrics.lines.upperBound)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(style)
                     // **A tap on the hint puts the reader in the field.** The
-                    // field lies over the hint's first line and takes a tap
-                    // there itself, but an empty field is one line tall, so
-                    // the hint's other lines are outside it, where a tap
-                    // would reach nothing.
+                    // field lies over the hint and takes a tap there itself;
+                    // this catches one on the rest of the hint's frame, where
+                    // the field's own frame doesn't reach.
                     .contentShape(.rect)
                     .onTapGesture(perform: focusField)
                     // **No element, rather than a hidden one.** Hidden by
@@ -708,8 +703,7 @@ nonisolated enum AskComposerMetrics {
     static let fieldInset: CGFloat = 11
     #endif
 
-    /// The lines the field grows through, and the most the placeholder wraps
-    /// to.
+    /// The lines the field grows through as the draft does.
     static let lines: ClosedRange<Int> = 1...4
 
     /// The circle around the glyphs, given the widest one as the text scales

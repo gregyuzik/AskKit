@@ -128,10 +128,9 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
 /// The composer's placeholder, the host's hint, beside its field, read off a
 /// render on white, one point to a pixel.
 ///
-/// **The hint sizes the field.** Laid over the field, it was offered the
-/// field's one line and ended in an ellipsis at the accessibility sizes,
-/// however many lines it could wrap to. A narrow column stands in for a large
-/// text size here, since the Mac's body font doesn't scale.
+/// **The hint never sizes the field.** One line, whatever its length, so an
+/// empty field is one line tall. A narrow column stands in for a large text
+/// size or a long locale here, since the Mac's body font doesn't scale.
 ///
 /// **A stand-in for the text field**, lines of text drawn in no ink: a
 /// `TextField` drawn in this process brings up `NSApplication`, after which
@@ -177,19 +176,20 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
         }
     }
 
-    /// A hint longer than a line wraps, and the field grows to hold it. A
-    /// hint of one line, or none, leaves the field its own size.
-    @Test func aLongHintWrapsAndTheFieldGrowsWithIt() throws {
-        #expect(try render(Self.long).pixelsHigh > render(Self.short).pixelsHigh)
-        #expect(try render(Self.short).pixelsHigh == render(nil).pixelsHigh)
+    /// A hint of any length leaves the empty field one line tall: a long
+    /// one ends in an ellipsis rather than wrapping.
+    @Test func aHintOfAnyLengthLeavesTheFieldOneLineTall() throws {
+        let oneLine = try render(nil).pixelsHigh
+        #expect(try render(Self.short).pixelsHigh == oneLine)
+        #expect(try render(Self.long).pixelsHigh == oneLine)
+        #expect(try render(Self.longest).pixelsHigh == oneLine)
+        #expect(try render(nil, lines: 2).pixelsHigh > oneLine)
     }
 
-    /// As many lines as the field grows to, and no more: a hint too long for
-    /// four is as tall as four lines of draft.
-    @Test func theHintWrapsToTheFieldsFourLinesAndNoMore() throws {
-        let fourLines = try render(nil, lines: 4).pixelsHigh
-        #expect(try render(Self.longest).pixelsHigh == fourLines)
-        #expect(try render(nil, lines: 6).pixelsHigh == fourLines)
+    /// A truncated hint is still drawn: the ellipsis shortens it, and leaves
+    /// ink on its line.
+    @Test func aLongHintIsStillDrawn() throws {
+        #expect(try firstInk(in: render(Self.long)) != nil)
     }
 
     /// **The hint's first line sits on the field's first baseline**, so it
