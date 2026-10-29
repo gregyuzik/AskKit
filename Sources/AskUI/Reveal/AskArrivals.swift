@@ -1,5 +1,5 @@
 import AskCore
-import Foundation
+public import Foundation
 
 /// One stretch of answer text that arrived together: how many characters of the
 /// drawn (markdown-parsed) text it spans, and when it landed.

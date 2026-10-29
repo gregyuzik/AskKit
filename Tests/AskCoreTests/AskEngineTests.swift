@@ -15,7 +15,8 @@ import Testing
 /// run.
 nonisolated private func theMacIsUnderLoad() -> Bool {
     var load = 0.0
-    guard getloadavg(&load, 1) == 1 else { return false }
+    // `unsafe`: `getloadavg` writes one sample through `&load`, which holds one.
+    guard unsafe getloadavg(&load, 1) == 1 else { return false }
     return load > 2 * Double(ProcessInfo.processInfo.activeProcessorCount)
 }
 

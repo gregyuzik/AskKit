@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The accessory button: the one button a composer carries before its field,
 /// such as a photo or a barcode scan, as a value the host hands the screen.

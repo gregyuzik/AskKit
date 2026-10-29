@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import Foundation
+public import AskCore
+public import Foundation
 import SwiftUI
 
 // In AskUI's own names, for the doc below: the prose fades through

@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// How the host opens its own editor for a proposal that hands off
 /// (`AskProposalKind.handOff`).

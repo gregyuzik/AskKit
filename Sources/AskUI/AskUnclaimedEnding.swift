@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import Foundation
+public import Foundation
 
 /// When the screen speaks an ending that a line on the thread may have spoken
 /// first, apart from the view so it can be tested: a failure, whose line

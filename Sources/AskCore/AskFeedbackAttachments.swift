@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import os
 
 /// Where a reader's feedback attachments wait for someone to send them.

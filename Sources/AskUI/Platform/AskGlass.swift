@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 // MARK: - Why AskUI doesn't call SwiftUI's glass API directly
 //

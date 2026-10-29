@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The one deep-link shape every host opens Ask with: `<scheme>://ask?q=<question>`.
 ///

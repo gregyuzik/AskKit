@@ -1,7 +1,7 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import Foundation
-import FoundationModels
+public import Foundation
+public import FoundationModels
 import Synchronization
 
 /// `AskSession` over a real `LanguageModelSession`.

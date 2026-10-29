@@ -1,7 +1,7 @@
 #if os(macOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// New Chat, Send and Stop in the Mac menu bar, and the newest turn's Copy,
 /// Copy answer, Edit & Resend and Ask again.

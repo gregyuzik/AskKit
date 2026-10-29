@@ -1,6 +1,6 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import Foundation
+public import Foundation
 import FoundationModels
 
 /// Raw Foundation Models errors to `AskError`, in one place.

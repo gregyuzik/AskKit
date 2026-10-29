@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// A bank of chips, each a question to ask with a tap: the first screen's
 /// starters, the follow-ups under an answer, or the coaching pair under a

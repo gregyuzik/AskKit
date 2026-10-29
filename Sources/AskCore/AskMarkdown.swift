@@ -1,4 +1,4 @@
-import Foundation
+package import Foundation
 
 /// The one reading of the inline Markdown a model writes: the one AskUI draws
 /// an answer's prose with (`AskArrivals.parse`), and the one that makes a

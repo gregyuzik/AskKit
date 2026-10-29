@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The columns a bank of tiles is laid out in: as many as fit at `minimum`
 /// wide with `spacing` between them, each grown to share the width, and none

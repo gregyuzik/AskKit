@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// Which tier is answering: the navigation subtitle, or a caption leading the
 /// bar where the title has no room to show it.

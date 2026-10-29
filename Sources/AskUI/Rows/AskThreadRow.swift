@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// One exchange on the thread: the question, the answer, everything the answer
 /// brought with it, and, on the newest turn, the chips it earned.

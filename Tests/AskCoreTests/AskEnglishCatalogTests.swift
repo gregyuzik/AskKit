@@ -32,7 +32,8 @@ import Testing
     private static var keys: [String] {
         guard let url = english.url(forResource: "Localizable", withExtension: "strings"),
               let data = try? Data(contentsOf: url),
-              let table = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: String]
+              // `unsafe`: `format:` is a pointer to write the format through; nil writes nothing.
+              let table = (try? unsafe PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: String]
         else { preconditionFailure("the en table is a strings file") }
         return table.keys.sorted()
     }

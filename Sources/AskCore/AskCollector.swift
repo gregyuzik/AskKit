@@ -1,6 +1,6 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import Foundation
+public import Foundation
 import Synchronization
 
 /// What the collector tells whoever is drawing the wait. SPI

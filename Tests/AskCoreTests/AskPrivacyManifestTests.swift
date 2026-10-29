@@ -21,7 +21,8 @@ import Testing
     private static var manifest: [String: Any] {
         guard let url = Bundle.module.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"),
               let data = try? Data(contentsOf: url),
-              let plist = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
+              // `unsafe`: `format:` is a pointer to write the format through; nil writes nothing.
+              let plist = (try? unsafe PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
         else { preconditionFailure("the package ships PrivacyInfo.xcprivacy as a property list") }
         return plist
     }

@@ -1,6 +1,6 @@
 #if os(iOS)
-import SwiftUI
-import UIKit
+public import SwiftUI
+public import UIKit
 
 /// Reports the height of the window the screen is in, for the first screen to
 /// arrange itself by (`AskFirstScreen.isSideBySide`), and keeps that window

@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// A host's request for the composer that a screen took
 /// (`AskConversationStore.claimComposerFocus(_:)`), and when: what lets the

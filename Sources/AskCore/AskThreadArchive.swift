@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import os
 
 /// One earlier chat, as the history list shows it.

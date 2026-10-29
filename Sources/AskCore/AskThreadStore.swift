@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import os
 
 /// One turn of the thread as it is kept on disk.

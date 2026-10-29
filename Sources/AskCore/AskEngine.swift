@@ -1,6 +1,6 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import Foundation
+public import Foundation
 import Synchronization
 
 /// How the engine runs one turn: on the thread, on the thread for another

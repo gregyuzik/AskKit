@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The banner over the thread when the reader has used Private Cloud
 /// Compute's quota for the day: the limit's sentence, when it resets where the

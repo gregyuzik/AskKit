@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The date above a thread's first turn, and above the first turn of each
 /// later day: the time for today, "Yesterday", or the date.

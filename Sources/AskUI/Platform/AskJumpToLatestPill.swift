@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The "Jump to latest" pill: a glass capsule offering to take the reader
 /// back to the newest text when it is out of view. `AskScreen` decides when

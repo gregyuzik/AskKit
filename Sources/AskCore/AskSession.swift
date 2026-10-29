@@ -1,8 +1,8 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import CoreGraphics
-import Foundation
-import FoundationModels
+public import CoreGraphics
+public import Foundation
+public import FoundationModels
 
 /// What a session's newest response cost, as the tier reports it: its input
 /// (the whole transcript it was sent, and how much of that was cached) and its

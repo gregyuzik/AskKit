@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The Ask composer: a text field and its circle on a glass capsule, tinted
 /// with the host's accent at up to half strength, lighter than the question

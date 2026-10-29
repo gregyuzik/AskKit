@@ -1,8 +1,8 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import CoreGraphics
-import SwiftUI
+public import AskCore
+public import CoreGraphics
+public import SwiftUI
 
 /// The reader's own question, trailing.
 ///

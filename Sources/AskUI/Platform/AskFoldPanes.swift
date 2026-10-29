@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The screen laid out around iPhone Duo's fold (`AskFoldArrangement`): a
 /// pane on the leading side beside the conversation, or the conversation

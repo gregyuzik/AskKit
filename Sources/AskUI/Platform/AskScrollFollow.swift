@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// **Never pull the reader down a streaming answer, and never leave them
 /// staring at the space where it is being written.**

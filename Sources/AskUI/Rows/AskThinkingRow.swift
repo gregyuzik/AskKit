@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// What the turn is doing while the reader waits.
 ///

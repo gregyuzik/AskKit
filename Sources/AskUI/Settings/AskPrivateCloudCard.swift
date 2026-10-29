@@ -1,8 +1,8 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import Foundation
-import SwiftUI
+public import AskCore
+public import Foundation
+public import SwiftUI
 
 /// What a settings surface has to say about Private Cloud Compute.
 ///

@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// How the rest of an answer arrives: the tiles it chose, the line saying what
 /// it read, the cards and buttons under it, and the follow-ups, **each the way

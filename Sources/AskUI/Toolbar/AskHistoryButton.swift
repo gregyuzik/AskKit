@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The reader's earlier chats, beside New Chat: the way back to a chat New
 /// Chat put away.

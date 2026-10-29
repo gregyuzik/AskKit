@@ -1,8 +1,8 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
+public import AskCore
 import os
-import SwiftUI
+public import SwiftUI
 
 /// The mark `AskScreen` draws when the host gives it none: the sparkles
 /// symbol, tertiary when unlit, and when lit in the environment's tint. That

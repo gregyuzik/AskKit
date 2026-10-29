@@ -134,7 +134,8 @@ import Testing
 
     /// A one-pixel picture, the smallest a prompt can carry.
     private static func onePixel() -> CGImage? {
-        CGContext(
+        // `unsafe`: `data:` is a raw pointer even when nil, and nil has Core Graphics allocate the buffer.
+        unsafe CGContext(
             data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         )?.makeImage()

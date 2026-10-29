@@ -168,16 +168,21 @@ nonisolated public enum AskProcessEntitlements {
     /// that loads the app's code from a `.debug.dylib`, the stub is the image
     /// that carries the signature.
     static func embeddedEntitlements() -> [String: Any]? {
+        // `unsafe` throughout: dyld answers in raw pointers into the loaded
+        // images, and the one read here is the main executable's, loaded for
+        // the life of the process.
         for index in 0..<_dyld_image_count() {
-            guard let header = _dyld_get_image_header(index),
-                  header.pointee.filetype == UInt32(MH_EXECUTE) else { continue }
+            guard let header = unsafe _dyld_get_image_header(index),
+                  unsafe header.pointee.filetype == UInt32(MH_EXECUTE) else { continue }
             var size: UInt = 0
-            let bytes = UnsafeRawPointer(header).withMemoryRebound(to: mach_header_64.self, capacity: 1) { header64 in
-                getsectiondata(header64, "__TEXT", "__entitlements", &size)
+            let bytes = unsafe UnsafeRawPointer(header).withMemoryRebound(to: mach_header_64.self, capacity: 1) { header64 in
+                unsafe getsectiondata(header64, "__TEXT", "__entitlements", &size)
             }
-            guard let bytes, size > 0 else { return nil }
-            let data = Data(bytes: bytes, count: Int(size))
-            return (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
+            guard let bytes = unsafe bytes, size > 0 else { return nil }
+            // Copies the section's `size` bytes out, so nothing outlives the read.
+            let data = unsafe Data(bytes: bytes, count: Int(size))
+            // `unsafe`: `format:` is a pointer to write the format through; nil writes nothing.
+            return (try? unsafe PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
         }
         return nil
     }
@@ -214,7 +219,8 @@ nonisolated public enum AskProcessEntitlements {
               let end = data.range(of: Data("</plist>".utf8), options: .backwards)?.upperBound,
               start < end
         else { return nil }
-        let plist = try? PropertyListSerialization.propertyList(
+        // `unsafe`: `format:` is a pointer to write the format through; nil writes nothing.
+        let plist = try? unsafe PropertyListSerialization.propertyList(
             from: Data(data[start..<end]), format: nil
         )
         return (plist as? [String: Any])?["Entitlements"] as? [String: Any]

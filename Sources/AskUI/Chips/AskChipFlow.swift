@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// Lays chips out from the leading edge, and starts a new line when the next
 /// one wouldn't fit.

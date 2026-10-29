@@ -13,7 +13,8 @@ nonisolated private let onAVirtualizedSimulator: Bool = {
     #if targetEnvironment(simulator)
     var present: Int32 = 0
     var size = MemoryLayout<Int32>.size
-    return sysctlbyname("kern.hv_vmm_present", &present, &size, nil, 0) == 0 && present == 1
+    // `unsafe`: `sysctlbyname` writes at most `size` bytes into `present`, which is that size.
+    return unsafe sysctlbyname("kern.hv_vmm_present", &present, &size, nil, 0) == 0 && present == 1
     #else
     return false
     #endif

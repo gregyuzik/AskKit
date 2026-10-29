@@ -1,8 +1,8 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import CoreGraphics
+public import CoreGraphics
 import Foundation
-import FoundationModels
+public import FoundationModels
 
 /// What a session's tools are given: where to record what they read, where to
 /// say what they are doing, and the budgets for this tier.

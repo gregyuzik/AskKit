@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The hairline above a turn whose fresh session opened with a recap
 /// (`AskTurn.summarizedBefore`).

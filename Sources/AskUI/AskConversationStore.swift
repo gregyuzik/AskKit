@@ -1,10 +1,10 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 // SPI for `AskPrompt.clampQuestion`, which `prefill` clamps a host's question with.
-@_spi(AskKitInternal) import AskCore
-import CoreGraphics
-import Foundation
-import Observation
+@_spi(AskKitInternal) public import AskCore
+public import CoreGraphics
+public import Foundation
+public import Observation
 import os
 import Synchronization
 #if os(iOS) || os(visionOS)

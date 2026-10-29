@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// The reader's chats as the pane beside iPhone Duo's fold
 /// (`AskFoldArrangement`): on screen beside the conversation, where the sheet

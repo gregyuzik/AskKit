@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The line under a question asked with a photo when the answer read only its
 /// words: the tier answering reads no photos, or the app answered without a

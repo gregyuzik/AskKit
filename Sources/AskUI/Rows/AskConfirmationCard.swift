@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// What the card under a proposing answer shows
 /// (`AskConversationStore.proposalPhase(for:)`).
