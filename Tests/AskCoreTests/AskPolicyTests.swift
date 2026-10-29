@@ -116,6 +116,12 @@ import Testing
         #expect(!askIsTierOutage(.photosNotSupported))
     }
 
+    @Test func aRequestTheModelCantTakeIsNotAnOutage() {
+        // It fails on that tier every turn: handed down, every turn would
+        // spend a request there first, and the mismatch would stay hidden.
+        #expect(!askIsTierOutage(.requestNotSupported))
+    }
+
     // MARK: - Retryability
 
     @Test func whatOffersTryAgain() {
@@ -133,8 +139,20 @@ import Testing
         #expect(!AskError.refused.isRetryable)
         #expect(!AskError.contextTooLarge.isRetryable)
         #expect(!AskError.modelUnavailable(.appleIntelligenceOff).isRetryable)
-        // Asking again with the photo fails the same way.
+        // Asking again with the photo fails the same way, and so does a
+        // request the model can't take.
         #expect(!AskError.photosNotSupported.isRetryable)
+        #expect(!AskError.requestNotSupported.isRetryable)
+    }
+
+    @Test func aRequestTheModelCantTakeHasItsOwnLine() {
+        // Not the couldn't-answer line, which asks the reader to try again,
+        // nor the reword-it one: neither would help.
+        let line = AskError.requestNotSupported.errorDescription
+        #expect(line?.isEmpty == false)
+        #expect(line != AskError.couldNotAnswer.errorDescription)
+        #expect(line != AskError.refused.errorDescription)
+        #expect(line != AskError.model(tag: "x").errorDescription)
     }
 
     @Test func aPhotoTheSessionCantTakeHasItsOwnLine() {
@@ -156,7 +174,8 @@ import Testing
     @Test func everyErrorHasCopy() {
         let errors: [AskError] = [
             .couldNotAnswer, .ungrounded, .refused, .privateCloudUnreachable,
-            .contextTooLarge, .photosNotSupported, .quotaReached(resetDate: nil), .model(tag: "x"), .stopped
+            .contextTooLarge, .photosNotSupported, .requestNotSupported, .quotaReached(resetDate: nil),
+            .model(tag: "x"), .stopped
         ] + AskUnavailability.allCases.map { AskError.modelUnavailable($0) }
         for error in errors {
             let message = error.errorDescription

@@ -1070,6 +1070,161 @@
         }
       }
     },
+    "Couldn't answer that. The model doesn't support what this app asks of it." : {
+      "comment" : "Shown when the model answering can't take what the app's request asks of it: a feature, an output format or content the model doesn't support. Not the reader's doing, and not retryable: asking again fails the same way. \"The model\" is the Apple Intelligence model answering; \"this app\" is the app showing the line, unnamed.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذر الرد على ذلك. النموذج لا يدعم ما يطلبه منه هذا التطبيق."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na to nelze odpovědět. Model nepodporuje to, co tato aplikace od něj žádá."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare på det. Modellen understøtter ikke det, som denne app beder om."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das konnte nicht beantwortet werden. Das Modell unterstützt nicht, was diese App von ihm verlangt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn’t answer that. The model doesn’t support what this app asks of it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido responder. El modelo no admite lo que le pide la app."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo responder. El modelo no admite lo que le pide la app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de répondre. Le modèle ne prend pas en charge ce que lui demande l’app."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לא ניתן היה לענות על כך. המודל אינו תומך במה שהאפליקציה מבקשת ממנו."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak dapat menjawab itu. Model tidak mendukung apa yang diminta app ini."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non è stato possibile rispondere. Il modello non supporta ciò che l’app gli chiede."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その質問には回答できませんでした。モデルは、このAppが求める内容に対応していません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "그 질문에는 답할 수 없습니다. 모델은 이 앱이 요청하는 내용을 지원하지 않습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke svare på det. Modellen støtter ikke det appen ber den om."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kon dat niet beantwoorden. Het model ondersteunt niet wat deze app vraagt."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się na to odpowiedzieć. Model nie obsługuje tego, czego wymaga ta aplikacja."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível responder a isso. O modelo não oferece suporte ao que este app pede."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось ответить на это. Модель не поддерживает то, что от неё требует это приложение."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunde inte svara på det. Modellen stöder inte det som appen begär av den."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ตอบคำถามนั้นไม่ได้ โมเดลไม่รองรับสิ่งที่แอปนี้ขอให้ทำ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu yanıtlanamadı. Model, bu uygulamanın ondan istediğini desteklemiyor."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося відповісти на це. Модель не підтримує того, чого від неї вимагає ця програма."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể trả lời điều đó. Mô hình không hỗ trợ những gì ứng dụng này yêu cầu."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法回答该问题。模型不支持此 App 提出的要求。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法回答該問題。模型不支援此App提出的要求。"
+          }
+        }
+      }
+    },
     "Couldn't reach Apple Intelligence right now. Try again later." : {
       "comment" : "Shown when no model can answer for a reason the app cannot name — a tier that is not ready, no network behind Private Cloud Compute, or a reason newer than this build.",
       "localizations" : {

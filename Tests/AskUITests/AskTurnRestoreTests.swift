@@ -62,6 +62,24 @@ import Testing
         #expect(turn.failure?.error == nil)
     }
 
+    /// A request the model couldn't take reads back with its own line, no Try
+    /// Again and no coaching: a reworded question or a starter goes to the
+    /// same model with the same request, and fails the same way. The flag
+    /// stored beside a typed error never decides.
+    @Test func aRestoredRequestTheModelCantTakeOffersNoTryAgain() {
+        let turn = AskTurn(entry: AskThreadEntry<UIRow>(
+            question: "Which records do I own?",
+            text: "",
+            answer: nil,
+            failureMessage: "Couldn't answer that just now. Please try again.",
+            failure: .requestNotSupported,
+            failureIsRetryable: true
+        ))
+        #expect(turn.failure?.message == AskError.requestNotSupported.errorDescription)
+        #expect(turn.failure?.retryable == false)
+        #expect(AskError.requestNotSupported.isCoached == false)
+    }
+
     /// A stop before the first word reads back as it read when it happened:
     /// the reader's own says so, and one they didn't ask for says the app
     /// couldn't answer. Both keep Try Again.

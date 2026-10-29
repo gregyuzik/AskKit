@@ -14,6 +14,7 @@ import Testing
 @Suite(.timeLimit(.minutes(1))) struct AskEnglishCatalogTests {
     private static let off = "Apple Intelligence is turned off. Turn it on in Settings."
     private static let notEligible = "This device can't run Apple Intelligence."
+    private static let requestNotSupported = "Couldn't answer that. The model doesn't support what this app asks of it."
 
     /// The `en` table's bundle: the package's resources, narrowed to `en`.
     private static var english: Bundle {
@@ -72,5 +73,24 @@ import Testing
     func theErrorLinesReadTheCatalogsEnglish() {
         #expect(AskError.unavailableMessage(.appleIntelligenceOff) == Self.line(Self.off))
         #expect(AskError.unavailableMessage(.deviceNotEligible) == Self.line(Self.notEligible))
+        // The `en` value differs from its key by its apostrophes, so a lookup
+        // that fell through to the host's bundle, and handed back the key,
+        // would fail here.
+        #expect(AskError.requestNotSupported.errorDescription == Self.line(Self.requestNotSupported))
+        #expect(Self.line(Self.requestNotSupported) != Self.requestNotSupported)
+    }
+
+    /// The line for a request the model can't take is in every table the
+    /// package ships, translated: read from each locale's own table in the
+    /// package's bundle, it is never the English key.
+    @Test func theRequestLineIsTranslatedInEveryTableThePackageShips() throws {
+        let locales = Bundle.module.localizations.filter { $0 != "en" && $0 != "Base" }
+        #expect(locales.count == 24, "\(locales)")
+        for locale in locales {
+            let url = try #require(Bundle.module.url(forResource: locale, withExtension: "lproj"), "\(locale)")
+            let table = try #require(Bundle(url: url), "\(locale)")
+            let line = String(localized: String.LocalizationValue(Self.requestNotSupported), bundle: table)
+            #expect(!line.isEmpty && line != Self.requestNotSupported && line != Self.line(Self.requestNotSupported), "\(locale)")
+        }
     }
 }

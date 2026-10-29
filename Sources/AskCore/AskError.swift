@@ -113,7 +113,26 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// The question carried a photo, and the session or engine answering it
     /// can't take one. It fails rather than answering as though it had seen
     /// the photo, and asking again with the photo fails the same way.
+    ///
+    /// A model that says it can't see (`LanguageModelError`'s
+    /// `unsupportedCapability` for `vision`), or can't take a prompt that
+    /// carries a picture (`unsupportedTranscriptContent`), fails with this
+    /// too: the photo is what it couldn't take.
     case photosNotSupported
+    /// The model answering can't take what the request asks of it: a
+    /// capability it lacks, such as tool calling, guided generation or
+    /// reasoning, a generation guide it doesn't support, or content in the
+    /// prompt it can't process (`LanguageModelError`'s `unsupportedCapability`,
+    /// `unsupportedGenerationGuide` and `unsupportedTranscriptContent`, a
+    /// photo aside: `photosNotSupported`).
+    ///
+    /// A verdict on the request, which is the host's (its domain's schema and
+    /// tools, and the options AskKit asks with) more than the reader's, so the
+    /// same request fails the same way on that model every time: it offers no
+    /// Try Again, and isn't handed down to the other tier
+    /// (`askIsTierOutage`). The raw error's tag is in the routing log
+    /// (`AskTriage.tag(for:)`), which says which of the three it was.
+    case requestNotSupported
     /// The daily Private Cloud Compute quota is spent. `resetDate` is when it
     /// resets, when that is known. The turn is handed down to the on-device
     /// model when that model can serve, and this is the turn's error when it
@@ -143,14 +162,14 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// the thread offers **Try Again**.
     ///
     /// A refusal or an overflow is a verdict on the question, and a photo the
-    /// session can't take fails the same way again. No servable model is a
-    /// state of the device that trying again at once doesn't change, and its
-    /// line says why. Everything else (a timeout, an empty answer, a spent
-    /// quota, an unreachable tier, a transient fault, a stop) can go
-    /// differently next time.
+    /// session can't take, or a request the model can't, fails the same way
+    /// again. No servable model is a state of the device that trying again at
+    /// once doesn't change, and its line says why. Everything else (a timeout,
+    /// an empty answer, a spent quota, an unreachable tier, a transient fault,
+    /// a stop) can go differently next time.
     public var isRetryable: Bool {
         switch self {
-        case .modelUnavailable, .refused, .contextTooLarge, .photosNotSupported: return false
+        case .modelUnavailable, .refused, .contextTooLarge, .photosNotSupported, .requestNotSupported: return false
         case .couldNotAnswer, .ungrounded, .privateCloudUnreachable, .quotaReached, .model, .stopped: return true
         }
     }
@@ -179,6 +198,9 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
         case .photosNotSupported:
             return String(localized: "Couldn't read the photo. Ask again without it.", bundle: #bundle,
                           comment: "Shown when a question was asked with a photo and the model answering it can't take photos. Not retryable: asking again with the photo fails the same way, so the reader is told to ask without it.")
+        case .requestNotSupported:
+            return String(localized: "Couldn't answer that. The model doesn't support what this app asks of it.", bundle: #bundle,
+                          comment: "Shown when the model answering can't take what the app's request asks of it: a feature, an output format or content the model doesn't support. Not the reader's doing, and not retryable: asking again fails the same way. \"The model\" is the Apple Intelligence model answering; \"this app\" is the app showing the line, unnamed.")
         case .quotaReached:
             return String(localized: "Private Cloud Compute has reached today's limit.", bundle: #bundle,
                           comment: "Shown when Private Cloud Compute's daily quota, the reader's iCloud account's, is spent. When it comes back is a sentence of its own after this one, on the quota banner and on the settings card, as a time or as a day and a time.")

@@ -123,6 +123,7 @@ nonisolated enum AskOnDiskFormatFixtures {
       {"privateCloudUnreachable": {}},
       {"contextTooLarge": {}},
       {"photosNotSupported": {}},
+      {"requestNotSupported": {}},
       {"quotaReached": {"resetDate": 783086400}},
       {"quotaReached": {}},
       {"model": {"tag": "offline"}},
