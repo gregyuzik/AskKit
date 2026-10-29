@@ -37,9 +37,9 @@ let memorySafe: [SwiftSetting] = approachable + [.strictMemorySafety()]
 // a host's shared package that builds for tvOS or watchOS still depends on
 // AskCore. Every FoundationModels file is
 // `#if canImport(FoundationModels) && !os(tvOS)`, with `&& !os(watchOS)` around
-// `SystemLanguageModel` (the watch has the framework, not the model) and
-// `LanguageModelSession.ToolCallError` (unavailable there); every AskUI view
-// file is `#if os(iOS) || os(macOS) || os(visionOS)`.
+// `SystemLanguageModel` (the watch has the framework, not the model),
+// `LanguageModelSession.ToolCallError` and `GenerationError` (unavailable
+// there); every AskUI view file is `#if os(iOS) || os(macOS) || os(visionOS)`.
 let package = Package(
     name: "AskKit",
     defaultLocalization: "en",

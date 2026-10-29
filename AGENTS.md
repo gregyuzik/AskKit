@@ -8,13 +8,15 @@ Deeper notes: `.claude/references/`.
   `#available`. Compile for all five, though Ask shows only on iOS, macOS and visionOS. A host's
   shared package links AskCore on tvOS and watchOS too, so a wrong platform gate breaks the host; the
   push gate builds all five. Foundation Models files take `#if canImport(FoundationModels) && !os(tvOS)`,
-  plus `&& !os(watchOS)` around `SystemLanguageModel` and `LanguageModelSession.ToolCallError`
-  (`platform-gates.md`).
+  plus `&& !os(watchOS)` around `SystemLanguageModel`, `LanguageModelSession.ToolCallError` and
+  `GenerationError` (`platform-gates.md`).
 - **`nonisolated` public API.** Spell every public value type, protocol and extension in AskCore
   `nonisolated`. Otherwise `InferIsolatedConformances` gives it a main-actor conformance that a host
   without AskKit's posture can't use. A host's "call to main actor-isolated … in a synchronous
   nonisolated context" is an AskCore bug. Only `AskCrossPostureTests` catches it (no `swiftSettings`, on
   purpose), and only for API it calls, so add new public API there (`concurrency.md`).
+- **Public enums.** A new one is `@nonexhaustive`, with a doc paragraph saying it is open, unless its
+  cases are fixed by what it is (CONTRIBUTING.md's Pull requests; README.md lists both kinds).
 - **`@concurrent`.** The package defaults to the main actor, so tool bodies and file I/O need
   `@concurrent`, or they run on it.
 - **Private Cloud Compute's context gate.** A process outside an app's context, such as a command-line
@@ -68,12 +70,14 @@ Deeper notes: `.claude/references/`.
     pinned to a commit.
   - `scripts/ci.sh api` runs `swift package diagnose-api-breaking-changes` against the newest `v*`
     tag in HEAD's history (CI's job checks out with `fetch-depth: 0` for it), on the macOS build's
-    public API, in about 30 seconds, and fails on a removal, a rename, a changed signature or a new
-    enum case. A break you mean goes in `.github/api-breakage-allowlist.txt` in the same PR, each
-    line the check printed as it stands (`API breakage: …`), with its CHANGELOG entry; the list is
-    emptied after each release. Comments there start with `//`: the digester runs the file through
-    the C preprocessor, and a `#` line empties the list, so the step refuses one. The push gate runs
-    it after `test`, and counts the allowlist as part of the tree.
+    public and `package` API, in about 30 seconds, and fails on a removal, a rename, a changed
+    signature or a new enum case. It prints nothing for a public declaration made `package` or a
+    change of isolation alone: give each its CHANGELOG entry by hand. A break you mean goes in
+    `.github/api-breakage-allowlist.txt` in the same PR, each line the check printed as it stands
+    (`API breakage: …`), with its CHANGELOG entry; the list is emptied after each release. Comments
+    there start with `//`: the digester runs the file through the C preprocessor, and a `#` line
+    empties the list, so the step refuses one. The push gate runs it after `test`, and counts the
+    allowlist as part of the tree.
   - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in neither: run them by hand
     after changing an `os(iOS)` leg or the screen. CI's virtual Mac draws views too slowly for the
     suite's deadlines.

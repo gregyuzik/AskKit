@@ -26,7 +26,7 @@ for it; the doc comments describe the API. Where this document and the code disa
 | `AskUI` | The Ask screen, the conversation store that drives it, and a settings card. Depends on `AskCore`. |
 | `AskCoreTests`, `AskUITests` | Swift Testing suites. |
 | `AskCrossPostureTests` | Calls the public API, and in a file of its own the SPI, from a target with no concurrency settings. |
-| `AskReadmeApproachableTests` | README.md's two samples, `AskCrossPostureTests`' `ReadmeDomain.swift` and `ReadmeAssistantDomain.swift` through symlinks, built and run again under the package's posture, whose main-actor default isolation and `NonisolatedNonsendingByDefault` a host on Xcode's app template has too. |
+| `AskReadmeApproachableTests` | README.md's two samples, `AskCrossPostureTests`' `ReadmeDomain.swift` and `ReadmeAssistantDomain.swift` through symlinks, built and run again under the package's posture, whose main-actor default isolation and `NonisolatedNonsendingByDefault` a host on Xcode's app template has too. Not under strict memory safety, which the template doesn't turn on. |
 
 Both libraries compile for iOS, macOS, visionOS, tvOS and watchOS 27.2, because a host's shared package
 may link them on every platform the host ships. Ask itself shows on iOS, macOS and visionOS, the only
@@ -36,8 +36,12 @@ The rest of AskCore builds on all five, so a widget can build an Ask link (`AskL
 never shows Ask. `.claude/references/platform-gates.md` has the gates, file by file.
 
 **Concurrency posture.** Every target but `AskCrossPostureTests` builds with main-actor default
-isolation, `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility` and
-`ExistentialAny`. A host needn't share that posture, so AskCore's public API spells out its isolation:
+isolation, `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility`,
+`ExistentialAny`, `InternalImportsByDefault` and `ImmutableWeakCaptures`, and AskKit's own code, the
+two libraries and their tests, with strict memory safety too. So an `import` is internal unless a
+public or `@inlinable` signature names its module (`public import`) or only a `package` one does
+(`package import`), and every unsafe use is marked `unsafe`, with why it is sound. A host needn't
+share that posture, so AskCore's public API spells out its isolation:
 value types, protocols and extensions are `nonisolated`, the stateful parts are actors, and the
 screen's state is `@MainActor`. `AskCrossPostureTests` has no settings at all, on purpose: it fails to
 compile when public API it calls has picked up a main-actor conformance, which no target sharing the
@@ -52,7 +56,7 @@ posture can catch (`.claude/references/concurrency.md`).
 - what a refine pass calls to clean the follow-ups it writes the engine's way:
   `AskAnswer.cleanedFollowUps(_:)`;
 - for a host with more of its own, `AppleAskSession` and `AskTriage.retryAfter(from:)` for a seam over
-  its own model router, and `AskAsking` for an engine of its own behind the store.
+  its own model router, and `AskAnswering` for an engine of its own behind the store.
 
 The pieces `AskScreen` assembles from (the composer, the first screens, the chip rows, the quota
 banner, the toolbar's buttons and the jump pill) stay public too, so a host that draws one keeps it.
@@ -62,7 +66,10 @@ stand-in a preview, the demo or a UI test arranges the screen around (`AskSimula
 calls one spells its import `@_spi(AskKitInternal) import AskCore` (or `AskUI`), and only that file
 sees it: neither a plain `import` elsewhere in the module nor `@testable import` does. An SPI
 declaration keeps its `nonisolated` spelling. Everything else is internal, or `package` where AskUI
-alone reads it of AskCore, and AskKit has no third-party dependencies.
+reads it of AskCore, or a test target that imports AskCore without `@testable` does (`AskUITests`),
+and AskKit has no third-party dependencies. `scripts/ci.sh api` compares `package` declarations as well
+as public ones, so a public declaration made `package` prints no break, nor does an isolation change:
+each goes in the CHANGELOG by hand.
 
 **The demo.** `Demo/` is a small library, thirty books, records, tools and clothes behind one search tool
 (`DemoDomain`), and, under `-askAssistant`, an assistant with no rows in its place
@@ -98,14 +105,16 @@ its own `SearchArguments` has to write `search(_:context:)`, since its default e
   rest on the reader's data. It records it (`AskAnswer.grounding`), and its evidence line reads "Not
   from this app's data" unless the domain words the line itself.
 
-The default `firstScreenPolicy` follows it: `.ownedLibrary`, which reads an empty overview as nothing to
-ask about, under `.retrieval`, and `.openSubject`, the ready first screen with nothing counted, under
-the other two.
+**Which first screen an empty overview gets** is the brand's: with `nothingToAskCopy`, the
+nothing-to-ask screen, for a domain whose every question is about rows the reader owns; without it,
+the ready screen, whatever the overview counts ([The first screens](#the-first-screens)). A domain
+that doesn't retrieve and gives the copy is logged as it is built, since its default overview,
+`.empty`, would show that screen to every reader.
 
 **A domain whose tools read no rows** names neither type: `Row` is then `AskNoRow`, a stand-in nothing
 needs to record, and `SearchArguments` is `AskNoSearchArguments`, which has no fields. Its `overview()`
-defaults to `.empty`, and its brand may leave out `nothingToAskCopy`. Under `.retrieval` it sets
-`firstScreenPolicy` to `.openSubject`, and it still has the grounded retry: a first answer that calls no
+defaults to `.empty`, so its brand leaves out `nothingToAskCopy` and its first screen is the ready one.
+Under `.retrieval` it still has the grounded retry: a first answer that calls no
 tool asks no planner, since there is nothing to choose, and goes to `search(_:context:)`, whose default
 fails the turn as ungrounded. The engine logs such a domain once, as it is built. Under `.toolCall` that
 answer fails at once, and under `.notRequired` it is kept.
@@ -118,15 +127,20 @@ never show tiles, such as one without rows: its model spends no window on a kind
 whatever rows are behind them.
 
 The rest have defaults, which `AskDomain`'s doc comments give one by one: the prompt's lines and
-prefix, starters, the referent, persistence, the question kinds, the deadline, photos, the grounding
-policy, the reply shape, the first-screen policy, budgets per tier, the wait row's phrases, the basis and evidence lines, proposals, deterministic
-answers and a refine pass. Two are traps: `promptPrefix` must stay byte-stable, because a warm session
+prefix, starters, the referent, persistence, the question kinds (`AskQuestionKind`), the deadline,
+photos, the grounding policy, the reply shape, budgets per tier, the wait row's phrases, the basis and
+evidence lines, proposals, answers without a model (`deterministicAnswer(for:)`, and
+`answersWithoutModel`, which keeps the starters and the composer where no model can serve) and a
+refine pass. Two are traps: `promptPrefix` must stay byte-stable, because a warm session
 caches it, and `promptLines(question:overview:)` is asked only when a question starts a fresh session.
 
 The host wires them together:
 - It builds one `AppleModelSeam` (`AppleModelSeam.make(privateCloudCompute:)`, declaring whether the
   app holds the Private Cloud Compute entitlement), one `AskEngine(domain:seam:)` and one
-  `AskConversationStore(domain:engine:)`.
+  `AskConversationStore(engine:)`, which takes the domain from the engine (`AskEngine.domain`), so
+  the store draws, keeps and performs by the domain the engine answers by.
+  `AskConversationStore(domain:engine:)` is for an engine of the host's own (`AskAnswering`), which
+  carries no domain.
 - It holds the store for the life of the app, not in a view. A Mac `NavigationSplitView` rebuilds its
   detail on every sidebar change, so a store owned by a view loses the thread, and any turn in flight.
 - It shows `AskScreen` with its own mark and tiles, or AskKit's where it has none.
@@ -147,13 +161,15 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    prefilling the composer (`AskConversationStore.prefill`). A deep link (`AskLink`) only ever prefills:
    a URL can come from anywhere, so it never sends, and its question loses what draws nothing (tag
    characters, the other invisible format characters, bidi controls) and its line breaks, so the reader
-   sends only what the composer showed them. The store appends a turn and calls `ask`, which
-   returns an `AsyncThrowingStream` of `AskTurnEvent`s; dropping it cancels the turn.
+   sends only what the composer showed them. The store appends a turn, which keeps where its question
+   came from (`AskOrigin`), and calls the engine's `ask` in a mode (`AskTurnMode`): `.reroll` for
+   Another pick, `.conversation` for every other origin. `ask` returns an `AsyncThrowingStream` of
+   `AskTurnEvent`s; dropping it cancels the turn.
 2. **One turn at a time.** A new question cancels the turn in flight and waits for it to finish: a second
    question is always the newer intent, and two generations on one session throw. Each question takes a
    number before it waits, and one overtaken meanwhile, by a newer question or by the end of its chat,
-   stands down rather than cancel the turn the newer question installed. A one-shot `.standalone` turn,
-   such as an intent answered through `answerOnce(_:)`, is exempt.
+   stands down rather than cancel the turn the newer question installed. A one-shot turn
+   (`AskTurnMode.standalone`), such as an intent answered through `answerOnce(_:)`, is exempt.
 3. **One deadline.** The turn gets one deadline, `turnDeadline` (45 s by default), counted from the
    question. Everything it waits on before its answer shares it: the domain's hooks
    (`deterministicAnswer(for:)`, `overview()`, `promptLines(question:overview:)` and the refine pass),
@@ -167,7 +183,10 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
 4. **The question.** It loses what draws nothing, as a link's does, then is trimmed and clamped to 500
    characters, none longer than 16 Unicode scalars, and an empty question fails at once. If the domain
    can answer without a model (`deterministicAnswer(for:)`: small talk, or a starter where nothing can
-   serve), that is the whole turn.
+   serve), that is the whole turn. So is a throw from it, which asks no model and reads, cools and
+   hands down no tier: an `AskError` it throws is the turn's error, a cancellation is a stop, and
+   anything else is logged by its tag (`AskTriage.tag(for:)`) and fails the turn as `.model(tag:)`,
+   which Try Again retries, as a failure of the domain's search does.
 5. **The tier.** The engine reads every tier's state once (`AskModelSeam.tierStates()`). A tier is
    servable when it is available, speaks the answer language, has quota left and isn't cooling down
    after a failure. Private Cloud Compute is listed first, so it serves whenever it can. With nothing
@@ -235,7 +254,9 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    rows the prose names.
 
    An answer with tiles gets the domain's basis line, if it writes one, and a proposal or payload a
-   tool recorded rides along. A domain's refine pass then runs on the same session, within the
+   tool recorded rides along. A payload is the domain's own `Encodable` value, which AskKit encodes as
+   JSON and `payload(as:)` decodes; a value JSON can't hold, or a `Data`, throws as it is recorded. A
+   domain's refine pass then runs on the same session, within the
    deadline: the stream reports `.refining` when the pass first asks the model, and the store records
    it as the turn's activity (`AskActivity.refiningKey`). A failure or a timeout keeps the first
    answer, and a refined one is cleaned and cut the same way, and keeps the first answer's payload,
@@ -266,8 +287,9 @@ mirror (`AskModelStatus`) that the screen reads. `AppleModelSeam` implements it 
 tests use scripted sessions; the engine never names `LanguageModelSession`.
 
 **One seam per process.** A host that already routes its own model calls bridges them to this
-protocol, or the process runs two cooldowns and two generation gates against one on-device model; a
-second `AppleModelSeam` alive in the process is logged as a fault. The router's sessions reach the
+protocol, or the process runs two cooldowns and two quota holds against one Private Cloud Compute,
+though both seams wait at the process's one generation gate; a second `AppleModelSeam` alive in the
+process is logged as a fault. The router's sessions reach the
 engine wrapped in `AppleAskSession`, whose `noteFailure` hands the router each raw failure, and
 `AskTriage.retryAfter(from:)` reads a quota's or a rate limit's reset off it. A router that answers a
 request for one tier with another's session says so in the box (`AskSessionBox.tier`): the engine runs
@@ -374,8 +396,11 @@ under the prose, and the tier still cools. A turn that has drawn nothing hands d
 left. The 10 s is bounded by measurements (Private Cloud Compute's first word at 5 to 20 s, an on-device
 answer at about 13 s whole), not one itself. Nothing is handed down twice. A refusal, an overflowing
 context or an ungrounded answer is never handed down, since the other model would reach the same verdict,
-only later. Nor is a failure of the host's own search (`AskDomain.search`): it fails the turn as
-`.model(tag:)` and cools nothing, since a host's network error isn't Private Cloud Compute's.
+only later. Nor is a request the model can't take (`.requestNotSupported`, or `.photosNotSupported`
+for its photo): it fails the same way on that tier every turn, so a hand-down would spend a request
+there before every answer and hide the mismatch from the host. Nor is a failure of the host's own
+search (`AskDomain.search`): it fails the turn as `.model(tag:)` and cools nothing, since a host's
+network error isn't Private Cloud Compute's.
 
 ### Continuation: tail, referent, recap, rollover
 
@@ -444,13 +469,12 @@ still unwinding, so the gate waits for that task, within the holder's 90 s
 (`AskGenerationProducers`).
 
 **One gate per process.** A host that generates on device outside Ask goes through
-`AskGenerationGate.shared` too, `AppleModelSeam`'s default. A gate built of its own
-(`AskGenerationGate(logSubsystem:)`) serializes only what runs through it, so a generation there can
-run beside one at `shared`. A host never builds one to log the gate under its brand's subsystem: at
-`shared` too, an `AppleModelSeam`'s generation presumed wedged is logged under the seam's
-`logSubsystem`, beside its other lines (category `gate`, at error level). A host's own generation
-through `AskGenerationGate.run` is logged under the gate's subsystem, which at `shared` is the app's
-bundle identifier.
+`AskGenerationGate.run`, which always waits at `shared`, where every `AppleModelSeam` waits too.
+Neither the gate's initializer nor `shared` is public, and no public API takes a gate, so a host can't
+make a second one: a gate of its own would serialize only what ran through it, and let a generation
+there run beside one at `shared`. An `AppleModelSeam`'s generation presumed wedged is logged under the
+seam's `logSubsystem`, beside its other lines (category `gate`, at error level), and a host's own
+through `run` under the app's bundle identifier.
 
 ### Triage
 
@@ -467,6 +491,8 @@ asked for where no session was built yet:
 | An unsupported language | `.modelUnavailable(.languageNotSupported)` |
 | A guardrail violation or a refusal | `.refused` |
 | An exceeded context | `.contextTooLarge` |
+| A capability the model lacks that is `vision`, or prompt content it can't process that carries a photo | `.photosNotSupported` |
+| Any other capability the model lacks, a generation guide it doesn't support, or other content it can't process | `.requestNotSupported` |
 | A timeout on device, or concurrent requests | `.couldNotAnswer` |
 | A rate limit on device | `.model(tag:)` |
 
@@ -475,7 +501,12 @@ domain and code where it has no name, never the SDK's message, which can quote t
 tool's failure is tagged by what the tool threw, inside `ToolCallError(…)`, and no tag runs past 60
 characters. A session or an engine without photo support fails a question that carries a photo with
 `.photosNotSupported`, which isn't retryable and isn't a tier outage, rather than answer as though it
-had seen the photo. `AskError`'s lines live in AskCore's catalog: a failed turn stores its case beside
+had seen the photo, and so does a model that says the photo is what it can't take. That is read from
+the error, not from whether the turn had a photo: a model that can't reason, asked with a photo, isn't
+failing on the photo. `.requestNotSupported` is a verdict on the request, which is the host's (its
+schema, its tools and the options AskKit asks with) more than the reader's: it fails the same way every
+time, so it offers no Try Again and no coaching, and the routing log keeps the raw error's tag, which
+names the case. `AskError`'s lines live in AskCore's catalog: a failed turn stores its case beside
 its sentence, the line is rendered again from the case in the reader's current language, and a case
 that no longer decodes falls back to the stored sentence. A reason no tier could serve that this build has
 no case for decodes as `AskUnavailability.unknown`, and reads as its line.
@@ -594,6 +625,14 @@ filing goes once that write took and every one of its turns decoded.
 `.perLaunch` keeps the thread for the process only, and removes the feedback attachments the launch
 before left.
 
+**The files are the store's alone.** `AskThreadStore`, `AskThreadArchive` and `AskFeedbackAttachments`
+read and write only for `AskConversationStore`: their reads and writes are `package`, since the rules
+above live in the store, and a host's own `clear()` could delete the only copy of a chat. A host builds
+the three only to hand them to the store, to keep the files in a folder of its own; it lists the chats
+through the store's `history`, and the attachments are shared from the settings card's diagnostics
+row. A widget that reads the chats from an App Group folder decodes `threads/<id>.json` as
+`[AskThreadEntry<Row>]`, which is public and `Codable`.
+
 ### Proposals
 
 A tool may offer to do something rather than just read (`AskProposal`): the model proposes, the reader
@@ -629,17 +668,24 @@ outcome this build can't decode, such as a case a later AskKit wrote.
 expectations are shapes, never prose: the question kinds, titles the answer should name, no tiles, a
 proposal, whether something grounded it (`expectsGrounding`: true for a question a tool should answer,
 false for one a `.notRequired` domain should answer from the conversation alone). An outcome's `invented` lists the expected titles the prose names but the turn never read; it
-sees only the titles the scenario lists. Each scenario resets its engine, so an evaluation needs an
-engine of its own beside the thread's, though it can share the seam: whether a conversation is kept is
-each engine's own to say (`AskAsking.hasKeptConversation`), so an evaluation's resets never hide the
-thread's follow-up chips. Scenarios run one after another, and `table(_:)` ends with "N/M grounded,
-clean and as expected."
+sees only the titles the scenario lists. An outcome's failure is one value, or none
+(`AskOutcome.Failure`: an `AskError`, another error's tag, or no answer at all), and its time is a
+`Duration`. Each scenario resets its engine, so an evaluation builds an engine of its own
+(`AskEval(domain:seam:log:)`) and is never handed the thread's, whose reset would be New Chat; it can
+share the thread's domain and seam. Whether a conversation is kept is each engine's own to say
+(`AskEngine.hasKeptConversation`), so an evaluation's resets never hide the thread's follow-up chips.
+Scenarios run one after another, and `table(_:)` ends with "N/M grounded, clean and as expected."
 
 `AskEval` is compiled into every build and isn't gated itself. `AskPrivateCloudCard` shows a diagnostics
-row that runs it when the host passes `onRunEval` and diagnostics are on (`showsDiagnostics`, by default
-`AskDiagnostics.isEnabled`): a Debug build, a TestFlight build on iOS or visionOS, or the host's
-`enabledByApp`, which a Mac release build needs because the TestFlight check reads false there. So a
-signed build can measure Private Cloud Compute from the host's settings.
+row that runs it when the host passes `onRunEval` and diagnostics are on (`showsDiagnostics`; nil, the
+default, reads `AskDiagnostics.isEnabled` as the card draws): a Debug build, a TestFlight build, or the
+host's `enabledByApp`. A TestFlight build is one whose app transaction StoreKit verified as signed in
+the sandbox (`AskDiagnostics.isTestFlight`), on every platform, the Mac's included. It is read once a
+process, off the main actor, and reads false until StoreKit answers, so the rows come in when it does;
+a Debug build never asks. A build under App Review most likely reads as TestFlight too, since nothing
+public in 27.2 tells the two apart on every platform: a host that must keep the rows from a reviewer
+passes `showsDiagnostics` itself. So a signed build can measure Private Cloud Compute from the host's
+settings.
 
 The same switch turns on the feedback thumbs under answers. A thumbs-up or thumbs-down on the latest turn
 of a kept conversation saves the session's feedback attachment locally (`AskFeedbackAttachments`, at most
@@ -658,7 +704,10 @@ and persists, restores and archives the thread.
   failed before drawing anything gives its place to the re-ask; one that drew prose keeps it, and the
   question is asked again below it. It isn't offered while a question waits to be asked, which is newer
   though it has no turn yet. Ask again asks the question again over the thread as it stands, as a new
-  turn. Another pick rerolls a pick. Edit & Resend puts a question back in the composer.
+  turn. Another pick rerolls a pick: its turn's origin is `.reroll`, which the store asks as
+  `AskTurnMode.reroll`, and a host's `ask(_:origin: .reroll)` is asked the same way, leaving the
+  composer's draft, photo and scope where they are, as a chip does. Edit & Resend puts a question back
+  in the composer.
 - **Stopping.** A stopped turn keeps its prose as its answer. A stop the reader asked for before the
   first word says so ("You stopped this answer") and offers Try Again, since `AskError.stopped`'s own
   line ("Couldn't answer that just now") would say the app failed; any other stop, such as a host's,
@@ -716,12 +765,12 @@ composer rising out of the slot**, over the keyboard.
 `AskFirstScreen` has three variants:
 - **Ready.** The lit mark, the headline, a sentence, the scope caveat, "Try asking" with the starters
   (up to three on iOS, eight on macOS and visionOS), and the disclosure of what leaves the device.
-- **Nothing to ask about.** The unlit mark, the host's copy and an optional action. Only for a host
-  whose policy needs owned rows (`AskFirstScreenPolicy.needsOwnedRows`) and whose brand has the copy
-  (`AskBrand.nothingToAskCopy`): with none, an empty library shows the ready screen, and the engine logs
-  the mismatch as it is built.
-- **Can't serve.** The unlit mark, dimmed, and the reason. The starters stay only when the host can
-  answer them without a model (`AskFirstScreenPolicy.answersWithoutModel`).
+- **Nothing to ask about.** The unlit mark, the host's copy and, when the host passes one, its button
+  (`AskNothingToAskAction`: the label and what it does, in one value). Only for a host whose brand has
+  the copy (`AskBrand.nothingToAskCopy`), once the overview has been read and is empty: with no copy,
+  an empty library shows the ready screen.
+- **Can't serve.** The unlit mark, dimmed, and the reason. The starters stay, with a live composer,
+  only when the domain answers them without a model (`AskDomain.answersWithoutModel`).
 
 On iOS, a first screen with starters to put beside its copy lays out side by side in compact height, or
 in a regular-width window too short for the stack, but never at the accessibility sizes. On a phone on
@@ -1009,6 +1058,10 @@ away. Tapping the thread does the same, except on the Mac.
   check it fails text in both appearances at any strength; the demo's UI suite audits the screen, the
   card, the nothing-to-ask button and the empty composer so, light and dark, and the first screen, an
   answer with its tiles, a failure with Try Again and the card by every other check in a second call.
+  Confirm's black label passes the audit in light and dark, and the nothing-to-ask button's in dark,
+  and the suite lets through only what the audit misreads on glass: the starters' capsules, whose
+  transparent corners it reads as their ground, and in light the nothing-to-ask button, whose shaded
+  fill and rim it fails whatever the label.
 - **Copying.** The question's Copy and Copy answer, from its menu or the Mac's menu bar, stay on the
   device, since either can quote the reader's own data: on iOS and visionOS `.localOnly`, expiring
   after 120 s, and on the Mac `prepareForNewContents(with: .currentHostOnly)`, which has no expiry.
@@ -1061,8 +1114,9 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
    reader gets no switch.** The tier is chosen once a turn, from one read of every tier's state; an
    outage on Private Cloud Compute (unreachable, offline, rate-limited, timed out, over quota, or stopped
    by its context gate) hands the turn down once; with nowhere to hand it, it is the turn's error, which
-   Try Again retries, though a spent quota is asked nothing until its reset. Refusals, overflows and
-   ungrounded answers are never handed down, and the caption names the tier answering.
+   Try Again retries, though a spent quota is asked nothing until its reset. Refusals, overflows,
+   ungrounded answers and requests the model can't take are never handed down, and the caption names
+   the tier answering.
 
    *Why:* the larger model answers better and reads photos, so it should serve whenever it can. A toggle
    would be a second, contradictory answer to a question the engine decides on every turn, and a reader
@@ -1294,6 +1348,12 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
 - **mirror**: `AskModelStatus`, the main-actor copy of the seam's state that the screen reads: the next
   tier, why nothing can serve, and the quota. Until the seam publishes to it (`hasHeardFromSeam`) it
   knows nothing, though it reads as a tier serving.
+- **nothing-to-ask action**: the nothing-to-ask screen's one button, its label and what it does in one
+  value (`AskNothingToAskAction`), which the host hands the screen. With none, that screen has no
+  button.
+- **origin**: where a question came from (`AskOrigin`, in AskUI): typed, a starter, a follow-up,
+  prefilled, or Another pick (`.reroll`). It is the turn's, for the screen to draw and Try Again to
+  re-ask by; how the engine runs the turn is its **turn mode**.
 - **park**: `AskDevelopmentPark`, which keeps development builds off Private Cloud Compute and the
   developer's quota.
 - **pane**: one side of iPhone Duo's fold where the screen splits there (`AskFoldPanes`): the leading
@@ -1301,6 +1361,10 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
 - **pill**: the "Jump to latest" button (`AskJumpToLatestPill`).
 - **proposal**: an action a tool offers (`AskProposal`), which the app carries out, or hands to its own
   editor, only once the reader confirms the card under the answer.
+- **question kind**: what kind of question the model says it answered (`AskQuestionKind`), one of
+  eleven words such as `count` and `pick`, which decides whether the answer shows tiles (house rule 7).
+  A domain names the kinds it uses by their static members (`questionKinds`), and a chat file keeps
+  each as its bare word.
 - **reader**: the person using the host app, so that "user" never has to mean the developer.
 - **recap**: the fenced summary a fresh session starts with, the titles discussed and the last exchanges
   (`AskContinuation.recap`), marked in the thread by "Earlier in this chat is summarized".
@@ -1323,11 +1387,16 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
   the accent.
 - **Stage**: `AskStage`, the one animation key a turn can reach.
 - **steer**: a prompt line that nudges the model without being the question: the domain's per-turn
-  lines, a scope line, or "Another pick"'s list of what not to choose again (`AskOrigin.reroll`).
+  lines, a scope line, or "Another pick"'s list of what not to choose again (`AskTurnMode.reroll`).
 - **tail**: the thread's last three exchanges, each an `AskThreadTail`: a question, its answer and the
   titles of the rows it showed. It outlives the session it was built on, and a relaunch.
 - **tier**: which model serves a turn (`AskTier`): `.privateCloud` or `.onDevice`, chosen as the turn
   starts.
+- **turn mode**: how the engine runs a turn (`AskTurnMode`): `.conversation`, on the thread's kept
+  conversation; `.reroll`, the same with Another pick's steer at temperature 0.8; or `.standalone`, a
+  one-shot that neither reads nor replaces the kept conversation, such as a Siri intent's
+  (`answerOnce(_:)`). The store asks a turn whose **origin** is `.reroll` as `.reroll`, and every other
+  as `.conversation`.
 
 ### Words kept to one meaning
 

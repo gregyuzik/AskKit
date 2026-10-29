@@ -402,9 +402,12 @@ extension CrossPostureTests {
         #expect(Answer.maxFollowUps == 2 && Answer.maxFollowUpLength == 80)
     }
 
-    /// What the thread file holds, encoded and decoded off the main actor as
-    /// a host's own archive would, and what a read of it says.
-    @Test func aThreadEntryAndItsReadAreUsableWithoutThePosture() throws {
+    /// What a chat file holds, `[AskThreadEntry<Row>]`, encoded and decoded
+    /// off the main actor as a host's widget reading the chats in an App
+    /// Group folder would. The store's own reads, which tell no thread and a
+    /// thread that couldn't be read from an empty one, are AskKit's
+    /// (`AskThreadStoreTests`).
+    @Test func aThreadEntryIsUsableWithoutThePosture() throws {
         let row = CrossPosturePlainRow(id: "Dune")
         let entry = AskThreadEntry(
             question: "How many?", text: "Two.", answer: AskAnswer(text: "Two.", matches: [row]),
@@ -413,14 +416,6 @@ extension CrossPostureTests {
         let kept = try JSONEncoder().encode([entry])
         let read = try JSONDecoder().decode([AskThreadEntry<CrossPosturePlainRow>].self, from: kept)
         #expect(read == [entry])
-        // Read by its case, the only public way: no thread and a thread that
-        // couldn't be read are not an empty one.
-        let reads: [AskThreadRead<CrossPosturePlainRow>] = [.thread(read, dropped: 0), .empty, .unreadable]
-        let entries = reads.map { read -> [AskThreadEntry<CrossPosturePlainRow>]? in
-            if case .thread(let entries, dropped: 0) = read { return entries }
-            return nil
-        }
-        #expect(entries == [[entry], nil, nil])
     }
 
     /// A deadline raced from a host's own nonisolated code, as it might bound
@@ -591,33 +586,15 @@ extension CrossPostureTests {
         #expect(entry.proposalOutcome == .declined && entry.answerSawPhoto)
     }
 
-    /// What bounds the thread, the archive and the feedback attachments, and
-    /// what each reads where nothing has been written, asked off any actor.
-    /// Under a folder nobody creates, as the store's are above.
-    @Test func theStoresBoundsAndFirstReadsAreUsableWithoutThePosture() async {
+    /// What bounds the thread, the archive and the feedback attachments, read
+    /// off any actor. A host builds the three only to hand them to the store,
+    /// as `aConsumerBuildsAnEngineAStoreAndAScreenWithoutThePosture` does;
+    /// their reads and writes are AskKit's own (`package`), proven in
+    /// AskCoreTests.
+    @Test func theStoresBoundsAreUsableWithoutThePosture() {
         #expect(AskThreadStore<CrossPosturePlainRow>.maxPersistedTurns == 50)
         #expect(AskThreadArchive<CrossPosturePlainRow>.maxThreads == 50)
         #expect(AskFeedbackAttachments.maxKept == 10)
-        let folder = FileManager.default.temporaryDirectory
-            .appending(path: "AskKitCrossPosture-\(UUID().uuidString)", directoryHint: .isDirectory)
-        let thread = AskThreadStore<CrossPosturePlainRow>(
-            appDirectory: "AskKitCrossPosture", url: folder.appending(path: "thread.json"),
-            logSubsystem: "askkit.crossposture"
-        )
-        guard case .empty = await thread.load() else {
-            Issue.record("a thread never written reads as none")
-            return
-        }
-        let archive = AskThreadArchive<CrossPosturePlainRow>(
-            appDirectory: "AskKitCrossPosture", directory: folder.appending(path: "threads"),
-            logSubsystem: "askkit.crossposture"
-        )
-        #expect(await archive.summaries().isEmpty)
-        let attachments = AskFeedbackAttachments(
-            appDirectory: "AskKitCrossPosture", directory: folder.appending(path: "feedback"),
-            logSubsystem: "askkit.crossposture"
-        )
-        #expect(await attachments.urls().isEmpty)
     }
 
     /// A host's own on-device generation, through the one gate the process

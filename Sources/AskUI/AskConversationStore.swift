@@ -2965,10 +2965,10 @@ public final class AskConversationStore<Domain: AskDomain> {
 
     /// Whether answers carry the feedback thumbs: while
     /// `AskDiagnostics.isEnabled`, the switch that also shows the settings
-    /// card's diagnostics row. That is a Debug build, a TestFlight build on
-    /// iOS or visionOS, or a host that turns it on
-    /// (`AskDiagnostics.enabledByApp`). A verdict keeps the session's feedback
-    /// attachment only while it holds (`rate`).
+    /// card's diagnostics row. That is a Debug build, a TestFlight build, the
+    /// Mac's included, once StoreKit has said so (`AskDiagnostics.isTestFlight`),
+    /// or a host that turns it on (`AskDiagnostics.enabledByApp`). A verdict
+    /// keeps the session's feedback attachment only while it holds (`rate`).
     public var offersFeedback: Bool { diagnosticsOverride ?? AskDiagnostics.isEnabled }
 
     /// What `offersFeedback` reads in place of `AskDiagnostics.isEnabled`. For

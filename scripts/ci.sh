@@ -292,21 +292,21 @@ step_test() {
     { grep -E 'recorded an issue|error:' "$log" || true; } | head -20 >&2
     exit 1
   fi
-  # The tests the test targets' runs report, summed, must reach 1,530. The
+  # The tests the test targets' runs report, summed, must reach 1,640. The
   # count is of tests run, a skipped one included, so it is the count of what
-  # compiled in: 1,604 when the minimum was set, on main as of #38
-  # (AskCoreTests 797, AskUITests 722, AskCrossPostureTests 82,
-  # AskReadmeApproachableTests 3). The 74 between them leave room for a
+  # compiled in: 1,675 when the minimum was set, on main as of #50
+  # (AskCoreTests 844, AskUITests 724, AskCrossPostureTests 104,
+  # AskReadmeApproachableTests 3). The 35 between them leave room for a
   # deliberate deletion, and fail a run that lost more: a big file's
   # over-tight `#if` (AskConversationStoreTests holds 236, AskEngineTests
-  # 223), all of AskCrossPostureTests (1,522 would run), or the platform line
-  # every AskUI test file opens with, edited across them. A smaller file can
-  # still go unnoticed (AskPromptTests holds 63), and so can all of
-  # AskReadmeApproachableTests. Raise the minimum as the suite grows, or the
-  # widening gap lets more of the suite go missing unnoticed.
+  # 228, AskPromptTests 63), all of AskCrossPostureTests (1,571 would run),
+  # or the platform line every AskUI test file opens with, edited across
+  # them. A file of 35 tests or fewer can still go unnoticed, and so can all
+  # of AskReadmeApproachableTests. Raise the minimum as the suite grows, or
+  # the widening gap lets more of the suite go missing unnoticed.
   ran=$(sed -nE 's/.*Test run with ([0-9]+) tests.*/\1/p' "$log" | awk '{ s += $1 } END { print s + 0 }')
-  if [ "$ran" -lt 1530 ]; then
-    say "only $ran tests ran (minimum 1,530), so part of the suite likely didn't compile in — $log"
+  if [ "$ran" -lt 1640 ]; then
+    say "only $ran tests ran (minimum 1,640), so part of the suite likely didn't compile in — $log"
     exit 1
   fi
   # The tests that race the wall clock stand down while the Mac is under load
@@ -394,16 +394,12 @@ step_api() {
 # The minimum is lower than `step_test`'s, and counts tests passed, read from the
 # result bundle, since `-quiet` keeps the per-test lines out of the log. The
 # simulator compiles fewer of AskUITests' tests than the Mac does, since some
-# compile for the Mac alone. A result bundle from #35's branch passed 1,533
-# where the Mac ran 1,577: AskCoreTests 797 of 797, AskUITests 677 of 721 and
-# AskCrossPostureTests 59 of 59. The 27 tests main has gained since, #34's 23
-# cross-posture tests and AskReadmeApproachableTests' 3 and #38's one, all
-# compile for iOS, so main as of #38 compiles 1,560 there: worked out from
-# that bundle and the tests' gates, not yet run. The twelve tests that race
+# compile for the Mac alone. A run on main as of #48 passed 1,619 where the
+# Mac ran 1,675, and #49 and #50 added no test. The twelve tests that race
 # the wall clock count as skipped, not passed, while the Mac is under load, so
-# 1,500 leaves 60 for a deliberate deletion, 48 with all twelve skipped, and
+# 1,580 leaves 39 for a deliberate deletion, 27 with all twelve skipped, and
 # fails a run that lost AskConversationStoreTests (236 here too) or
-# AskEngineTests (223). Raise it with `step_test`'s.
+# AskEngineTests (228). Raise it with `step_test`'s.
 #
 # The bundle keeps each failure, so a failure collects no sysdiagnose: on a CI
 # runner that took ten minutes and timed out.
@@ -421,8 +417,8 @@ step_test_ios() {
   fi
   passes=$(xcrun xcresulttool get test-results summary --path "$results" --compact |
     python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("passedTests", 0))')
-  if [ "$passes" -lt 1500 ]; then
-    say "only $passes tests passed on iOS (minimum 1,500), so part of the suite likely didn't compile in — $results"
+  if [ "$passes" -lt 1580 ]; then
+    say "only $passes tests passed on iOS (minimum 1,580), so part of the suite likely didn't compile in — $results"
     exit 1
   fi
   say "$passes tests passed on iOS"

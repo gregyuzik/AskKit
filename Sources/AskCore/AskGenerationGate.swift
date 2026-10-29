@@ -36,11 +36,15 @@ public actor AskGenerationGate {
     /// generation presumed wedged here is logged under the seam's
     /// `logSubsystem`, and a host's own under the app's bundle identifier.
     ///
+    /// **Not public either.** The gate has no member a host could call: a
+    /// host's generation reaches it through the static `run`, which always
+    /// waits here.
+    ///
     /// Readable from any actor or none, as `AppleModelSeam`'s initializer
     /// reads it. That holds without the `nonisolated`: the package's
     /// main-actor default isolation reaches a struct's static members but
     /// never an actor's, so the spelling only states what is already true.
-    nonisolated public static let shared = AskGenerationGate()
+    nonisolated static let shared = AskGenerationGate()
 
     /// How long a holder may keep the generation gate before it is presumed
     /// wedged and the next caller is let in: 90 s, far above any legitimate
@@ -153,8 +157,9 @@ public actor AskGenerationGate {
     /// (`AskGenerationProducers`): an `AppleAskSession` stream the body let
     /// go of holds it until the task running `streamResponse` has returned.
     ///
-    /// The body waits at `shared`, the process's one generation gate, and a
-    /// holder presumed wedged is logged under the app's bundle identifier.
+    /// The body waits at the process's one generation gate, where every
+    /// `AppleModelSeam`'s on-device generations wait too, and a holder
+    /// presumed wedged is logged under the app's bundle identifier.
     ///
     /// - Parameters:
     ///   - isolation: the caller's actor, which the body runs on.

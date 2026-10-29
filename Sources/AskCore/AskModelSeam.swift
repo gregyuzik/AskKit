@@ -14,8 +14,9 @@ public import FoundationModels
 /// `AppleModelSeam` implements this on Foundation Models. A host that already
 /// routes its own model calls bridges its router to this protocol, wrapping
 /// each session in `AppleAskSession`, rather than running `AppleModelSeam`
-/// beside it: two seams mean two cooldowns on one Private Cloud Compute, and
-/// two generation gates on one on-device model.
+/// beside it: two seams mean two cooldowns and two quota holds on one
+/// Private Cloud Compute, though they share the process's one generation
+/// gate.
 nonisolated public protocol AskModelSeam: Sendable {
     /// Every tier's state, most preferred first, from one read, so the tier a
     /// turn runs on, the one it would hand down to and the reason the reader is
