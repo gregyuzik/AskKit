@@ -16,7 +16,9 @@ import SwiftUI
 /// of its own, and on iOS a long press on it reaches neither a menu nor a
 /// selection (`AskAnswerProse`), so "Copy answer" here is how a reader takes an
 /// answer's words. VoiceOver reaches the same four as the bubble's actions,
-/// and Copy answer as an action of the prose's as well.
+/// and Copy answer as an action of the prose's as well. On the Mac the menu
+/// bar holds them for the newest turn, for a reader with only a keyboard
+/// (`AskCommands`).
 ///
 /// **A photo the question went with sits above it**, trailing like the words:
 /// the pixels while this process has them, the host's thumbnail for a thread
@@ -220,23 +222,24 @@ struct AskQuestionBubble: View {
         Text("Your question", bundle: #bundle, comment: "VoiceOver label for the reader's own question in the Ask thread.")
     }
 
-    // One spelling of each item, for the menu and its VoiceOver action.
+    // One spelling of each item, for the menu, its VoiceOver action and the
+    // Mac menu bar's item for the newest turn (`AskCommands`).
 
-    private static var copyTitle: Text {
-        Text("Copy", bundle: #bundle, comment: "Menu item that copies the reader's own Ask question to the clipboard.")
+    static var copyTitle: Text {
+        Text("Copy", bundle: #bundle, comment: "Menu item that copies the reader's own Ask question to the clipboard; and the Mac menu item, in the File menu, that copies the newest question.")
     }
 
     /// Also the prose's VoiceOver action (`AskAnswerProse`).
     static var copyAnswerTitle: Text {
-        Text("Copy answer", bundle: #bundle, comment: "Menu item that copies the answer to the reader's Ask question to the clipboard.")
+        Text("Copy answer", bundle: #bundle, comment: "Menu item that copies the answer to the reader's Ask question to the clipboard; and the Mac menu item, in the File menu, that copies the newest answer.")
     }
 
-    private static var editTitle: Text {
-        Text("Edit & Resend", bundle: #bundle, comment: "Menu item that puts the reader's Ask question back in the composer to change and send again.")
+    static var editTitle: Text {
+        Text("Edit & Resend", bundle: #bundle, comment: "Menu item that puts the reader's Ask question back in the composer to change and send again; and the Mac menu item, in the File menu, that does it to the newest question.")
     }
 
-    private static var askAgainTitle: Text {
-        Text("Ask again", bundle: #bundle, comment: "Menu item that asks the same Ask question over, for a different answer.")
+    static var askAgainTitle: Text {
+        Text("Ask again", bundle: #bundle, comment: "Menu item that asks the same Ask question over, for a different answer; and the Mac menu item, in the File menu, that asks the newest question over.")
     }
 }
 

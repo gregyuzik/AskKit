@@ -153,6 +153,9 @@ struct AskChatsPane: View {
         differentiatesWithoutColor || boldText
     }
 
+    /// The radius of the open chat's wash, and of a row's light.
+    static let markCorner: CGFloat = 14
+
     /// What marks the open chat for the eye: a wash of the screen's accent
     /// behind its row, inset from the pane's edges and from the hinge, with
     /// the title's weight and, under Differentiate Without Color or Bold Text,
@@ -161,7 +164,7 @@ struct AskChatsPane: View {
     @ViewBuilder
     private func mark(isOpen: Bool) -> some View {
         if isOpen {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.markCorner, style: .continuous)
                 .fill(accent.opacity(0.16))
                 .padding(.horizontal, 12)
         } else {
@@ -180,18 +183,35 @@ struct AskChatsPane: View {
 /// A glyph alone as a button, in the pane's title row: the text's quiet color,
 /// since the dialog it opens is where a deletion is red, and a 44 pt target
 /// around a glyph half that size.
+///
+/// **A style of its own, so it says outright what a bare button says**: it
+/// lights under the reader's eyes and the pointer, in a circle round the
+/// target (`askHoverEffect(in:)`), and wears a ring round the glyph under
+/// Button Shapes (`AskBareButtonShape`).
 private struct AskQuietIconButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityShowBorders) private var showsBorders
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body)
+            // Round the glyph rather than the target, as the thumbs under an
+            // answer are: a capsule, so a glyph taller than it is wide stays
+            // inside.
+            .padding(AskBareButtonShape.ringInset)
+            .askButtonShapeRing(.capsule, showsBorders: showsBorders)
             .foregroundStyle(.secondary)
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(.rect)
+            .askHoverEffect(in: .circle)
             .opacity(configuration.isPressed ? 0.4 : 1)
     }
 }
 
-/// A chat's row as a button: its label as it is, faded only while pressed.
+/// A chat's row as a button: its label as it is, faded only while pressed,
+/// and lit under the reader's eyes and the pointer in the corners of the open
+/// chat's wash (`AskChatsPane.mark(isOpen:)`), since a style of AskKit's own
+/// lights nothing unless it says so (`askHoverEffect(in:)`). The open chat's
+/// row is disabled, and isn't lit.
 ///
 /// **Not the plain style**, which dims a disabled button's label, and the open
 /// chat's row is disabled: dimmed, the chat on screen would read as the one
@@ -201,6 +221,7 @@ private struct AskQuietIconButtonStyle: ButtonStyle {
 private struct AskChatRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .askHoverEffect(in: .rect(cornerRadius: AskChatsPane.markCorner, style: .continuous))
             .opacity(configuration.isPressed ? 0.4 : 1)
     }
 }

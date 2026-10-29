@@ -291,6 +291,9 @@ struct AskComposerFace<Domain: AskDomain>: View {
     let focusComposer: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether the reader has Button Shapes on, which rings the accessory
+    /// button's glyph and underlines the line (`AskBareButtonShape`).
+    @Environment(\.accessibilityShowBorders) private var showsBorders
 
     private let glyph = AskComposerMetrics.circle
     private let target = AskComposerMetrics.target
@@ -336,10 +339,13 @@ struct AskComposerFace<Domain: AskDomain>: View {
             Image(systemName: accessory.systemImage)
                 .font(.body)
                 .frame(width: glyph, height: glyph)
+                // A ring under Button Shapes, as on the composer.
+                .askButtonShapeRing(.circle, showsBorders: showsBorders)
                 .frame(width: target, height: target)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        .askHoverEffect(in: .circle)
         // 3:1 over the wash, as on the composer's capsule.
         .foregroundStyle(AskGlassForeground(tint: accent.opacity(Self.wash), minimum: AskGlassForeground.glyph))
         .disabled(store.isThinking)
@@ -361,6 +367,9 @@ struct AskComposerFace<Domain: AskDomain>: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // A capsule inside the face's own, from the accessory button to the
+        // send.
+        .askHoverEffect(in: .capsule)
         .accessibilityLabel(AskComposerWords.yourQuestion)
         .accessibilityValue(Text(verbatim: store.draft))
         // The host's hint about what to ask, as the composer's field has it.
@@ -383,14 +392,20 @@ struct AskComposerFace<Domain: AskDomain>: View {
     }
 
     /// The draft, or the placeholder while there is none: 4.5:1 over the
-    /// wash, as on the composer's capsule.
+    /// wash, as on the composer's capsule. Underlined under Button Shapes:
+    /// the line is a button that raises the composer, and words alone
+    /// (`AskBareButtonShape`). The large content viewer's copy too, which is
+    /// the same button shown larger.
     @ViewBuilder
     private var line: some View {
+        let underlined = AskBareButtonShape.underlines(showsBorders: showsBorders)
         if store.draft.isEmpty {
             Text(store.brand.help)
                 .foregroundStyle(AskGlassForeground(tint: accent.opacity(Self.wash), minimum: AskGlassForeground.text))
+                .underline(underlined)
         } else {
             Text(verbatim: store.draft)
+                .underline(underlined)
         }
     }
 
@@ -413,6 +428,7 @@ struct AskComposerFace<Domain: AskDomain>: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        .askHoverEffect(in: .circle)
         .accessibilityShowsLargeContentViewer()
         .accessibilityLabel(buttonLabel)
         // "Stop" as well as "Cancel" for the stop square, as on the composer.

@@ -13,7 +13,8 @@ import SwiftUI
 /// out-shout the evidence line beside it, which is the line a reader actually
 /// needs. Secondary until chosen; the chosen one fills. The hit region is a
 /// full target around a caption-sized glyph: 44 pt, 60 on visionOS, or 28 on
-/// the Mac, where a pointer does the aiming.
+/// the Mac, where a pointer does the aiming. A reader who has Button Shapes on
+/// gets a ring round each glyph (`AskBareButtonShape`).
 ///
 /// **The target grows by what the glyph grows, not in proportion to it**
 /// (`AskFeedbackTarget`). In proportion, the 16 pt around a 12 pt glyph is
@@ -27,6 +28,9 @@ struct AskFeedbackButtons: View {
     /// The glyph's size as the text scales it: `.caption`, 12 pt at the
     /// default size.
     @ScaledMetric(relativeTo: .caption) private var glyph: CGFloat = AskFeedbackTarget.glyph
+    /// Whether the reader has Button Shapes on, which rings each thumb
+    /// (`AskBareButtonShape`).
+    @Environment(\.accessibilityShowBorders) private var showsBorders
 
     private var target: CGFloat { AskFeedbackTarget.side(glyph: glyph) }
 
@@ -49,12 +53,21 @@ struct AskFeedbackButtons: View {
         } label: {
             Image(systemName: Self.symbol(for: sentiment, chosen: chosen))
                 .font(.caption)
+                // **A ring round the glyph under Button Shapes, not round
+                // the target**: the two targets touch, and rings their size
+                // would run into each other.
+                .padding(AskBareButtonShape.ringInset)
+                .askButtonShapeRing(.capsule, showsBorders: showsBorders)
                 .frame(width: target, height: target)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        // A circle the target's size: the pair is two lights side by side,
+        // not one bar.
+        .askHoverEffect(in: .circle)
         .foregroundStyle(chosen ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
         .accessibilityLabel(Self.label(for: sentiment))
+        .askHelp(Self.label(for: sentiment))
         // What Voice Control answers to: the label, and the name of the
         // glyph a reader sees.
         .accessibilityInputLabels([Self.label(for: sentiment), Self.glyphName(for: sentiment)])
@@ -71,7 +84,8 @@ struct AskFeedbackButtons: View {
         }
     }
 
-    private static func label(for sentiment: AskFeedback.Sentiment) -> Text {
+    /// What VoiceOver calls a thumb, and the Mac's help tag on it.
+    static func label(for sentiment: AskFeedback.Sentiment) -> Text {
         switch sentiment {
         case .positive:
             Text("Helpful", bundle: #bundle, comment: "VoiceOver label for the thumbs-up under an Ask answer: tells the app the answer helped.")

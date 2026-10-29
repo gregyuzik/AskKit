@@ -37,6 +37,9 @@ public struct AskJumpToLatestPill: View {
             .contentShape(.capsule)
         }
         .buttonStyle(.plain)
+        // Lit in its capsule: on visionOS the glass under it is a fill that
+        // answers no gaze (`askGlass`).
+        .askHoverEffect(in: .capsule)
         .askGlass(.interactive, in: .capsule)
         .accessibilityIdentifier(AskAccessibility.jumpToLatest)
     }

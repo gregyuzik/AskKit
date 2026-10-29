@@ -30,6 +30,9 @@ struct AskEvidenceLine: View {
     private let content: Content?
     private let isExpanded: Binding<Bool>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether the reader has Button Shapes on, which underlines the line's
+    /// words where it is a button (`AskBareButtonShape`).
+    @Environment(\.accessibilityShowBorders) private var showsBorders
 
     init(content: Content?, isExpanded: Binding<Bool>? = nil) {
         self.content = content
@@ -46,7 +49,9 @@ struct AskEvidenceLine: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        label
+                        // Words alone, so underlined under Button Shapes.
+                        // The plain line below is text, and isn't.
+                        label.underline(AskBareButtonShape.underlines(showsBorders: showsBorders))
                         // A swap, not a `rotationEffect`. A rotation isn't
                         // mirrored in a right-to-left layout, so a +90° turn
                         // that points down in English points *up* in Hebrew,
@@ -67,6 +72,10 @@ struct AskEvidenceLine: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                // The whole band lit, its ends round: what a tap on it lands
+                // on. No help tag: the words say what the line is, and the
+                // hint below says what a tap does, which `.help` would take.
+                .askHoverEffect(in: .capsule)
                 .accessibilityLabel(label)
                 // Not `.isSelected`, which VoiceOver speaks as "selected": the
                 // line isn't selected, it is expanded or collapsed, and the

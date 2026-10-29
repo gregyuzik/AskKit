@@ -228,6 +228,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// headline's request for the sheet to make as it goes: made while the
     /// sheet is still closing, the focus goes nowhere.
     @State private var headlineAwaitsSheet = false
+    #if os(macOS)
+    /// What the menu bar's Copy, Copy answer, Edit & Resend and Ask again call
+    /// (`AskNewestTurnCommand`): one object for the screen's life, so the
+    /// value handed up compares equal until what it says changes.
+    @State private var newestTurnActions = AskNewestTurnActions()
+    #endif
     /// Whether the thread's first turn takes VoiceOver's focus on its wait
     /// row: set as a starter on the first screen is tapped, since the first
     /// screen and the starter with it go as the thread takes their place
@@ -491,6 +497,24 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         }
         #endif
         .toolbar { toolbarItems }
+        #if os(macOS)
+        // What the menu bar's items for the newest turn act on (`AskCommands`),
+        // for the window this screen is in: flags from the thread's shape,
+        // which this body reads already, and closures that look the turn up
+        // as they run (`AskNewestTurn`), so the value changes as a turn
+        // arrives or writes its first word, and not with every word.
+        .focusedSceneValue(\.askNewestTurn, AskNewestTurnCommand(
+            store: store,
+            actions: newestTurnActions.holding(
+                copy: { AskNewestTurn.question(in: store).map(copy) },
+                copyAnswer: { AskNewestTurn.answer(in: store).map(copy) },
+                // As the bubble's Edit & Resend: the reader goes to the field
+                // with the question, VoiceOver's focus included.
+                edit: { AskNewestTurn.turn(in: store).map(editAndResend) },
+                askAgain: { AskNewestTurn.askAgain(in: store) }
+            )
+        ))
+        #endif
         // The screen's own scroll lets the bar go a beat after its last step:
         // `jumpGlideWindow`, twice the 0.25 s an animated scroll here takes.
         // On the screen and not the thread, so a thread that goes mid-scroll,

@@ -55,6 +55,9 @@ public struct AskComposer: View {
     /// (`capsuleTint`): the whole environment, not the appearance alone, since
     /// an asset color's variants follow Increase Contrast as well.
     @Environment(\.self) private var environment
+    /// Whether the reader has Button Shapes on, which rings the accessory
+    /// button's glyph (`AskBareButtonShape`).
+    @Environment(\.accessibilityShowBorders) private var showsBorders
     #if os(iOS)
     /// The window `AskScreen` is in, where the chevron puts the keyboard away
     /// (`askScreenWindow`): nil for a composer a host draws outside the screen.
@@ -256,17 +259,23 @@ public struct AskComposer: View {
             Image(systemName: accessory.systemImage)
                 .font(.body)
                 .frame(width: circle, height: circle)
+                // A bare glyph, so under Button Shapes a ring the send
+                // circle's size (`AskBareButtonShape`).
+                .askButtonShapeRing(.circle, showsBorders: showsBorders)
                 .frame(width: target, height: target)
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        .askHoverEffect(in: .circle)
         // A glyph that says what it does: 3:1 on the capsule's tint, which
         // `.secondary` falls under on a light ground (`AskGlassForeground`).
         .foregroundStyle(AskGlassForeground(tint: capsuleTint, minimum: AskGlassForeground.glyph))
         .disabled(isThinking)
         // Named in words the host supplies, since VoiceOver would otherwise
-        // read out the name of the glyph.
+        // read out the name of the glyph, and on the Mac shown in those words
+        // as the pointer rests on it.
         .accessibilityLabel(accessory.label)
+        .askHelp(accessory.label)
         .accessibilityIdentifier(accessory.identifier)
         .accessibilityShowsLargeContentViewer()
         // Hidden by name at rest, as the send is (`sendButton` says why).
@@ -397,6 +406,12 @@ public struct AskComposer: View {
     /// each thing a tap on it does (`sendButton`). The smoke suite reads this
     /// label to know which state the button is in.
     private var buttonLabel: Text {
+        Self.buttonLabel(isThinking: isThinking, dismissesKeyboard: dismissesKeyboard, hasQuestion: !trimmed.isEmpty)
+    }
+
+    /// `buttonLabel` for each state, apart from the view so the words, which
+    /// are the Mac's help tag too, can be pinned (`AskBareButtonTests`).
+    static func buttonLabel(isThinking: Bool, dismissesKeyboard: Bool, hasQuestion: Bool) -> Text {
         if isThinking {
             return Text("Cancel", bundle: #bundle, comment: "VoiceOver label for the Ask composer's button while a question is being answered — it stops the turn.")
         }
@@ -405,7 +420,7 @@ public struct AskComposer: View {
         }
         // Nothing to send, so the arrow puts the reader in the field. Called
         // Send, it would promise a question the tap never asks.
-        if trimmed.isEmpty {
+        if !hasQuestion {
             return Text("Write a question", bundle: #bundle, comment: "VoiceOver label for the Ask composer's button while the field is empty — it takes the reader to the field to type a question, and sends nothing.")
         }
         return Text("Send", bundle: #bundle, comment: "VoiceOver label for the Ask composer's send button; and the Mac menu item, shortcut ⌘↩, that sends the question.")
@@ -459,9 +474,14 @@ public struct AskComposer: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        // Lit in the hit region's circle, round the fill. The fill is the
+        // button's shape already, so Button Shapes adds none.
+        .askHoverEffect(in: .circle)
         .accessibilityShowsLargeContentViewer()
         .keyboardShortcut(isThinking ? "." : .return, modifiers: .command)
         .accessibilityLabel(buttonLabel)
+        // What the circle does now, as the pointer rests on it on the Mac.
+        .askHelp(buttonLabel)
         .accessibilityInputLabels(inputLabels)
         .accessibilityIdentifier(AskAccessibility.send)
         // **Hidden by name while the composer rests in a host's slot, as well
