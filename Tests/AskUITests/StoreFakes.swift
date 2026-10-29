@@ -351,9 +351,9 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
 
 /// The domain the store's tests run on. Nothing here reaches a model: the
 /// store asks it for the brand, the overview, the starters, the persistence
-/// and the first-screen policy, and for what the tests vary: which answers can
-/// be rerolled, the referent, whether it takes photos, and carrying out a
-/// proposal.
+/// and whether it answers without a model, and for what the tests vary:
+/// which answers can be rerolled, the referent, whether it takes photos, and
+/// carrying out a proposal.
 nonisolated struct UIDomain: AskDomain {
     typealias Row = UIRow
     typealias SearchArguments = UISearchArguments
@@ -371,6 +371,9 @@ nonisolated struct UIDomain: AskDomain {
     /// What the nothing-to-ask screen says, or nil for a brand with no words
     /// for it.
     var nothingToAskCopy: String? = "nothing"
+    /// Whether the domain says it answers its starters without a model, as
+    /// the protocol's default doesn't.
+    var answersWithoutModel = false
 
     var brand: AskBrand {
         AskBrand(

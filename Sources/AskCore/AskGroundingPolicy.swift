@@ -1,0 +1,47 @@
+/// Which answers the engine keeps, by what grounded them: one domain's
+/// policy for its life (`AskDomain.grounding`), never one question's.
+///
+/// **Grounded** is judged the same way under all three. The model called a
+/// tool, the app searched for it (the grounded retry), or, on a follow-up, the
+/// turn read rows or its prose names a row the thread has already read. The
+/// answer records which (`AskAnswer.grounding`). The policies differ only in
+/// what they do with a turn nothing grounded.
+///
+/// Ungated, so a host's shared code can name it on every platform it builds
+/// for.
+nonisolated public enum AskGroundingPolicy: String, Sendable, Equatable {
+    /// An answer with no retrieval behind it is never shown, and the app
+    /// retrieves for a model that didn't. Prose draws only once the turn is
+    /// grounded. A first answer on a fresh session that ends ungrounded gets
+    /// the grounded retry: the planner fills in the domain's
+    /// `SearchArguments`, the app runs `AskDomain.search(_:context:)`, and the
+    /// question is asked again with the rows fenced as data. An ungrounded
+    /// follow-up on a kept conversation fails as `AskError.ungrounded`, with
+    /// coaching.
+    ///
+    /// The default, and the policy for a domain over the reader's own data,
+    /// where an answer that read none of it is invented (house rule 2).
+    case retrieval
+    /// Exactly `.retrieval` without the grounded retry. Grounding is judged
+    /// the same way, a follow-up included, which the thread's rows still
+    /// ground, and prose draws only once the turn is grounded. But a first
+    /// answer that ends ungrounded fails as `AskError.ungrounded` at once,
+    /// with coaching: no planner, no search and no second generation, so
+    /// `SearchArguments`, `search(_:context:)` and `searchPlanInstructions`
+    /// go unused.
+    ///
+    /// For a domain whose every question is a lookup or an action, so its
+    /// tools ground every answer worth keeping.
+    case toolCall
+    /// Grounding is recorded, never required. Prose draws from the first
+    /// token, no turn is asked again for want of it, no turn fails as
+    /// `AskError.ungrounded`, and the deadline keeps a truncated answer by the
+    /// same rule as a finished one, grounded or not. The answer records what
+    /// grounded it, or that nothing did (`AskGrounding.nothing`).
+    ///
+    /// For a domain whose answers needn't rest on the reader's data, such as
+    /// an assistant whose tools convert, look up the time or take actions, and
+    /// whose model may answer "thanks" or "say that more simply" from the
+    /// conversation alone.
+    case notRequired
+}

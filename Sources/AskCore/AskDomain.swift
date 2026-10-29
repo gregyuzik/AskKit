@@ -129,9 +129,8 @@ nonisolated public struct AskNoSearchArguments: Sendable {
 /// `grounding` says what becomes of a first answer that calls no tool: under
 /// `.retrieval`, the default, the grounded retry has nothing to search and
 /// the answer fails as ungrounded; under `.toolCall` it fails at once; under
-/// `.notRequired` it is kept. Its overview is empty, so under `.retrieval` it
-/// sets `firstScreenPolicy` to `.openSubject`, which the other two policies
-/// get by default.
+/// `.notRequired` it is kept. Its overview is empty, so its brand gives no
+/// `nothingToAskCopy`, and the first screen is the ready one.
 ///
 /// Inside the Foundation Models platform gate, because it names `Tool` and
 /// `Generable`.
@@ -197,9 +196,19 @@ nonisolated public protocol AskDomain: Sendable {
     /// session answers in the shape its first turn asked for, and the schema
     /// is part of the prefix a session caches (house rule 6).
     var replyShape: AskReplyShape { get }
-    /// What the first screen may show: whether an empty library means there is
-    /// nothing to ask about, and whether the starters work with no model.
-    var firstScreenPolicy: AskFirstScreenPolicy { get }
+    /// Whether `deterministicAnswer(for:)` answers the first screen's starters
+    /// and a typed question with no model, so a device that can't serve keeps
+    /// its starters and a live composer under the reason: the reason is a
+    /// caption, not a wall. False by default, where the reason and the mark
+    /// are the whole screen and the composer is off.
+    ///
+    /// **A value, not derived from the hook.** Nothing ties it to an override
+    /// of `deterministicAnswer(for:)`: a domain that sets it and leaves the
+    /// hook to its default gets a screen whose starters fail. It is a value
+    /// so a domain can answer without a model only some of the time, as
+    /// AskKit's demo does under a launch argument; whatever turns it on turns
+    /// the hook's answers on too.
+    var answersWithoutModel: Bool { get }
 
     // MARK: Budgets
 
@@ -217,10 +226,8 @@ nonisolated public protocol AskDomain: Sendable {
     /// before a fresh session's first prompt is built.
     ///
     /// `.empty` by default, for a domain whose subject isn't rows the reader
-    /// keeps. Under a first-screen policy that needs owned rows, the default
-    /// one for a domain that retrieves, an empty overview is the
-    /// nothing-to-ask first screen, so such a domain under `.retrieval` sets
-    /// `AskFirstScreenPolicy.openSubject`.
+    /// keeps. With the brand's `nothingToAskCopy`, an empty overview is the
+    /// nothing-to-ask first screen, so such a domain gives no copy.
     ///
     /// The read before a prompt runs inside the turn's deadline
     /// (`turnDeadline`): one still running when it passes is abandoned, and
@@ -460,15 +467,22 @@ nonisolated public protocol AskDomain: Sendable {
     // MARK: Optional hooks
 
     /// An answer the app can give without a model: small talk, or a starter on
-    /// a device where nothing can serve. An answer returned here is the whole
-    /// turn, and no model is asked.
+    /// a device where nothing can serve (`answersWithoutModel`). An answer
+    /// returned here is the whole turn, and no model is asked; nil leaves the
+    /// question to one.
+    ///
+    /// **A throw fails the turn**, and no model is asked either: the domain
+    /// took the question and couldn't answer it. An `AskError` it throws is
+    /// the turn's error as it is, and a `CancellationError` a stop. Anything
+    /// else is the host's failure, never a tier's: it is logged by its tag
+    /// (`AskTriage.tag(for:)`) and the turn fails as `AskError.model(tag:)`,
+    /// which Try Again retries. So a payload that doesn't encode, which
+    /// `AskAnswer`'s initializer throws for, is a failed turn the log names,
+    /// never an answer missing its card.
     ///
     /// It runs inside the turn's deadline (`turnDeadline`): one still running
     /// when it passes is abandoned, and the turn fails.
-    func deterministicAnswer(for question: String) async -> AskAnswer<Row>?
-    /// Whether this domain overrides `deterministicAnswer(for:)`: set it true
-    /// alongside the override.
-    var implementsDeterministicAnswer: Bool { get }
+    func deterministicAnswer(for question: String) async throws -> AskAnswer<Row>?
     /// A second pass over an answer the app already has, such as a look at
     /// photos of the rows it chose. Return nil to keep the first answer, which
     /// a failure keeps too.
@@ -528,13 +542,9 @@ nonisolated extension AskDomain {
     /// `.full`: the model says what kind of question it was and chooses the
     /// tiles.
     public var replyShape: AskReplyShape { .full }
-    /// Follows `grounding`. `.ownedLibrary` for a domain that retrieves: an
-    /// empty library means there is nothing to ask about, and the starters
-    /// need a model. `.openSubject` for one that doesn't: the ready first
-    /// screen whatever the overview counts.
-    public var firstScreenPolicy: AskFirstScreenPolicy {
-        grounding == .retrieval ? .ownedLibrary : .openSubject
-    }
+    /// False: the default `deterministicAnswer(for:)` answers nothing, so the
+    /// starters need a model.
+    public var answersWithoutModel: Bool { false }
 
     /// 40 rows on Private Cloud Compute and 12 on device. Forty rows are a few
     /// thousand tokens of Private Cloud Compute's 32,768-token window. On
@@ -613,16 +623,7 @@ nonisolated extension AskDomain {
     }
 
     /// Nil: every question goes to a model.
-    public func deterministicAnswer(for question: String) async -> AskAnswer<Row>? { nil }
-
-    /// False, matching the default `deterministicAnswer(for:)`.
-    ///
-    /// A domain overriding `deterministicAnswer(for:)` overrides this too: one
-    /// line, and without it the protocol can't tell "not implemented" from
-    /// "implemented and returned nil", which
-    /// `firstScreenPolicy.answersWithoutModel` needs to know when the engine is
-    /// built rather than at the reader's first tap.
-    public var implementsDeterministicAnswer: Bool { false }
+    public func deterministicAnswer(for question: String) async throws -> AskAnswer<Row>? { nil }
 
     /// Nil: the first answer stands.
     public func refine(

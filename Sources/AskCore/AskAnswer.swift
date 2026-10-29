@@ -55,7 +55,8 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     public let basis: String?
     /// What a tool also knew about this turn: the data a card under the
     /// answer draws from, recorded through `AskCollector.record(payload:)`,
-    /// which encodes it as JSON, and read back with `payload(as:)`. Persisted
+    /// or given to the initializer of an answer the domain builds itself,
+    /// which encode it as JSON, and read back with `payload(as:)`. Persisted
     /// with the thread.
     public let payload: Data?
     /// What the answer offers to do, which happens only if the reader confirms
@@ -78,12 +79,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// with the thread.
     public let grounding: AskGrounding?
 
-    /// An answer with each field as given. The engine builds one per turn; a
-    /// domain builds one for a deterministic answer
+    /// An answer with each field as given and no payload. The engine builds
+    /// one per turn; a domain builds one for a deterministic answer
     /// (`AskDomain.deterministicAnswer(for:)`) or a refine pass.
-    ///
-    /// A `payload` given here is JSON, as a default `JSONEncoder` writes it,
-    /// or `payload(as:)` reads it as nil and its card is left out.
     public init(
         text: String,
         matches: [Row] = [],
@@ -92,7 +90,60 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         questionKind: AskQuestionKind? = nil,
         isTruncated: Bool = false,
         basis: String? = nil,
-        payload: Data? = nil,
+        proposal: AskProposal? = nil,
+        grounding: AskGrounding? = nil
+    ) {
+        self.init(
+            text: text, matches: matches, tiles: tiles, followUps: followUps, questionKind: questionKind,
+            isTruncated: isTruncated, basis: basis, encodedPayload: nil, proposal: proposal, grounding: grounding
+        )
+    }
+
+    /// An answer with each field as given, carrying `payload`, which AskKit
+    /// encodes as JSON for `payload(as:)` to read back, as it encodes what a
+    /// tool records (`AskCollector.record(payload:)`): the value itself, such
+    /// as the years a pick spans, never its encoding.
+    ///
+    /// **Throws, rather than building an answer missing its card.** A value
+    /// that doesn't encode, such as a `Double` that is infinite or NaN, or a
+    /// `Data`, which is a payload already encoded, throws the encoder's
+    /// `EncodingError`: a mistake in the domain's type, which a card left out
+    /// without a word would hide. Thrown from
+    /// `AskDomain.deterministicAnswer(for:)`, it fails the turn, and from a
+    /// refine pass it keeps the first answer; the log names it either way.
+    public init(
+        text: String,
+        matches: [Row] = [],
+        tiles: [Row] = [],
+        followUps: [String] = [],
+        questionKind: AskQuestionKind? = nil,
+        isTruncated: Bool = false,
+        basis: String? = nil,
+        payload: some Encodable & Sendable,
+        proposal: AskProposal? = nil,
+        grounding: AskGrounding? = nil
+    ) throws {
+        self.init(
+            text: text, matches: matches, tiles: tiles, followUps: followUps, questionKind: questionKind,
+            isTruncated: isTruncated, basis: basis, encodedPayload: try AskPayloadCoding.encode(payload),
+            proposal: proposal, grounding: grounding
+        )
+    }
+
+    /// An answer whose payload is already JSON, or nil for none: what the
+    /// engine builds from a turn's collector, and what a test scripts.
+    ///
+    /// **Not public**, so a domain can't hand in bytes in an encoding of its
+    /// own, which `payload(as:)` would read as nil.
+    init(
+        text: String,
+        matches: [Row] = [],
+        tiles: [Row] = [],
+        followUps: [String] = [],
+        questionKind: AskQuestionKind? = nil,
+        isTruncated: Bool = false,
+        basis: String? = nil,
+        encodedPayload payload: Data?,
         proposal: AskProposal? = nil,
         grounding: AskGrounding? = nil
     ) {
@@ -175,16 +226,25 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     public func replacing(basis newBasis: String?) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: tiles, followUps: followUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: newBasis, payload: payload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: newBasis, encodedPayload: payload,
             proposal: proposal, grounding: grounding
         )
     }
 
-    /// This answer with a different payload.
-    public func replacing(payload newPayload: Data?) -> AskAnswer<Row> {
+    /// This answer carrying `payload` in place of whatever it carried,
+    /// encoded as JSON as the initializer encodes one. Throws the encoder's
+    /// `EncodingError` for a value that doesn't encode, as the initializer
+    /// does, and for a `Data`.
+    public func replacing(payload newPayload: some Encodable & Sendable) throws -> AskAnswer<Row> {
+        replacing(encodedPayload: try AskPayloadCoding.encode(newPayload))
+    }
+
+    /// This answer with a payload already JSON, or none: the engine's, which
+    /// keeps the first answer's payload under a refined one that has none.
+    func replacing(encodedPayload newPayload: Data?) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: tiles, followUps: followUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: basis, payload: newPayload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: newPayload,
             proposal: proposal, grounding: grounding
         )
     }
@@ -193,7 +253,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     public func replacing(proposal newProposal: AskProposal?) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: tiles, followUps: followUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: basis, payload: payload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: payload,
             proposal: newProposal, grounding: grounding
         )
     }
@@ -203,7 +263,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     public func replacing(grounding newGrounding: AskGrounding?) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: tiles, followUps: followUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: basis, payload: payload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: payload,
             proposal: proposal, grounding: newGrounding
         )
     }
@@ -213,7 +273,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     func replacing(followUps newFollowUps: [String]) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: tiles, followUps: newFollowUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: basis, payload: payload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: payload,
             proposal: proposal, grounding: grounding
         )
     }
@@ -222,7 +282,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     func replacing(tiles newTiles: [Row]) -> AskAnswer<Row> {
         AskAnswer(
             text: text, matches: matches, tiles: newTiles, followUps: followUps,
-            questionKind: questionKind, isTruncated: isTruncated, basis: basis, payload: payload,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: payload,
             proposal: proposal, grounding: grounding
         )
     }

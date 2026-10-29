@@ -28,12 +28,10 @@ import Testing
             firstScreenHeadline: "Ask about your records",
             firstScreenSentence: "Find, count and compare what is in your crates.",
             nothingToAskCopy: resolved,
-            nothingToAskActionLabel: "Add Your First Record",
             disclosureSentence: "Questions are answered on this device.",
             scopeCaveat: "Ask reads only your records."
         )
         #expect(fromCatalog.nothingToAskCopy == resolved)
-        #expect(fromCatalog.nothingToAskActionLabel == "Add Your First Record")
     }
 
     /// A host that never shows the nothing-to-ask screen leaves the copy out.
@@ -47,6 +45,5 @@ import Testing
             scopeCaveat: "It can be wrong."
         )
         #expect(brand.nothingToAskCopy == nil)
-        #expect(brand.nothingToAskActionLabel == nil)
     }
 }

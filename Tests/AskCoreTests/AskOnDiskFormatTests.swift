@@ -51,7 +51,7 @@ import Testing
                     questionKind: AskQuestionKind(rawValue: "which"),
                     isTruncated: false,
                     basis: "Both came out in 1969.",
-                    payload: Data(#"{"shelf":2}"#.utf8),
+                    encodedPayload: Data(#"{"shelf":2}"#.utf8),
                     proposal: AskProposal(
                         id: proposalID,
                         kind: .perform,

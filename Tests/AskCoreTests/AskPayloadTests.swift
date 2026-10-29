@@ -55,7 +55,7 @@ import Testing
         let recorded = try #require(await collector.turnPayload)
         #expect(try JSONDecoder().decode([String: Int].self, from: recorded) == ["oldest": 1959, "newest": 1977])
         #expect(!recorded.contains(UInt8(ascii: " ")) && !recorded.contains(UInt8(ascii: "\n")))
-        #expect(AskAnswer<FakeRow>(text: "Six records.", payload: recorded).payload(as: YearSpan.self) == span)
+        #expect(AskAnswer<FakeRow>(text: "Six records.", encodedPayload: recorded).payload(as: YearSpan.self) == span)
     }
 
     /// A value JSON can't hold throws, so the domain hears of it rather than
@@ -103,7 +103,7 @@ import Testing
         let collector = AskCollector<FakeRow>()
         let span = YearSpan(oldest: 1959, newest: 1977)
         try await collector.record(payload: span)
-        let answer = AskAnswer<FakeRow>(text: "You own six records.", payload: await collector.turnPayload)
+        let answer = AskAnswer<FakeRow>(text: "You own six records.", encodedPayload: await collector.turnPayload)
         #expect(answer.payload(as: YearSpan.self) == span)
         // The wrong type is no card, never a failed answer.
         #expect(answer.payload(as: [String].self) == nil)
@@ -119,16 +119,16 @@ import Testing
     }
 
     @Test func aPayloadAndABasisSurviveTheThread() throws {
-        let answer = AskAnswer<FakeRow>(text: "You own six records.", basis: "From your records", payload: Data("{}".utf8))
+        let answer = AskAnswer<FakeRow>(text: "You own six records.", basis: "From your records", encodedPayload: Data("{}".utf8))
         let decoded = try JSONDecoder().decode(AskAnswer<FakeRow>.self, from: JSONEncoder().encode(answer))
         #expect(decoded.basis == "From your records")
         #expect(decoded.payload == Data("{}".utf8))
     }
 
-    @Test func replacingOneFieldKeepsEveryOther() {
+    @Test func replacingOneFieldKeepsEveryOther() throws {
         let answer = AskAnswer<FakeRow>(
             text: "a", matches: [FakeRow("Rumours")], tiles: [FakeRow("Rumours")], followUps: ["Why?"],
-            questionKind: AskQuestionKind.pick, isTruncated: false, basis: "b", payload: Data("p".utf8)
+            questionKind: AskQuestionKind.pick, isTruncated: false, basis: "b", encodedPayload: Data("p".utf8)
         )
         let rebased = answer.replacing(basis: "c")
         #expect(rebased.basis == "c")
@@ -137,9 +137,53 @@ import Testing
         #expect(rebased.followUps == ["Why?"])
         #expect(rebased.questionKind == AskQuestionKind.pick)
 
-        let emptied = answer.replacing(payload: nil)
+        let emptied = answer.replacing(encodedPayload: nil)
         #expect(emptied.payload == nil)
         #expect(emptied.basis == "b")
+
+        // A value in place of what was there, encoded as the initializer
+        // encodes one, and everything else kept.
+        let reshelved = try answer.replacing(payload: Shelf(shelf: 3))
+        #expect(reshelved.payload == Data(#"{"shelf":3}"#.utf8))
+        #expect(reshelved.basis == "b")
+        #expect(reshelved.tiles.map(\.displayTitle) == ["Rumours"])
+        #expect(reshelved.followUps == ["Why?"])
+        #expect(reshelved.questionKind == AskQuestionKind.pick)
+    }
+
+    // MARK: - An answer the domain builds
+
+    /// An answer the domain builds itself, in `deterministicAnswer(for:)` or
+    /// a refine pass, takes its payload as a value, as a tool's collector
+    /// does, and AskKit encodes it to the bytes the collector would: the
+    /// JSON a default `JSONEncoder` writes. It reads back as the value.
+    @Test func anAnswersPayloadIsEncodedAsACollectorEncodesIt() async throws {
+        #expect(try AskAnswer<FakeRow>(text: "Shelf two.", payload: Shelf(shelf: 2)).payload == Data(#"{"shelf":2}"#.utf8))
+
+        let span = YearSpan(oldest: 1959, newest: 1977)
+        let answer = try AskAnswer<FakeRow>(text: "Six records.", payload: span)
+        let collector = AskCollector<FakeRow>()
+        try await collector.record(payload: span)
+        let recorded = try #require(await collector.turnPayload)
+        let built = try #require(answer.payload)
+        #expect(try JSONDecoder().decode([String: Int].self, from: built) == JSONDecoder().decode([String: Int].self, from: recorded))
+        #expect(answer.payload(as: YearSpan.self) == span)
+    }
+
+    /// A value JSON can't hold, or a payload already encoded, throws from the
+    /// initializer and from `replacing(payload:)`, so the domain hears of it
+    /// rather than an answer arriving without its card; the answer it would
+    /// have replaced keeps what it had.
+    @Test func anAnswersPayloadThatDoesNotEncodeThrows() throws {
+        #expect(throws: EncodingError.self) { try AskAnswer<FakeRow>(text: "x", payload: Reading(value: .infinity)) }
+        #expect(throws: EncodingError.self) { try AskAnswer<FakeRow>(text: "x", payload: Reading(value: .nan)) }
+        let json = try JSONEncoder().encode(YearSpan(oldest: 1959, newest: 1977))
+        #expect(throws: EncodingError.self) { try AskAnswer<FakeRow>(text: "x", payload: json) }
+
+        let answer = try AskAnswer<FakeRow>(text: "x", payload: Shelf(shelf: 2))
+        #expect(throws: EncodingError.self) { try answer.replacing(payload: Reading(value: .nan)) }
+        #expect(throws: EncodingError.self) { try answer.replacing(payload: json) }
+        #expect(answer.payload == Data(#"{"shelf":2}"#.utf8))
     }
 }
 

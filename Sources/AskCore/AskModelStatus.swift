@@ -168,7 +168,7 @@ public final class AskModelStatus {
     /// The tier the next question will run on, or nil when none can serve.
     /// On an empty thread, the first screen then says why, and the composer
     /// is disabled unless the domain answers without a model
-    /// (`AskFirstScreenPolicy.answersWithoutModel`).
+    /// (`AskDomain.answersWithoutModel`).
     ///
     /// With nothing servable, a Private Cloud Compute held off only by a
     /// cooldown or a spent quota is still the next tier, since the next

@@ -44,7 +44,7 @@ nonisolated enum DemoLaunchArgument {
     /// answer never creates.
     ///
     /// No model is needed at all: without Apple Intelligence the first screen
-    /// keeps its starters and a live composer (`DemoDomain.firstScreenPolicy`).
+    /// keeps its starters and a live composer (`DemoDomain.answersWithoutModel`).
     static let scriptedAnswer = "-askScriptedAnswer"
 
     /// Hold every turn in flight until Stop: the demo answers every question

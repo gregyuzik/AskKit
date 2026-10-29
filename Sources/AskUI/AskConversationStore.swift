@@ -2825,7 +2825,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             turnIDs: shape.ids, lastHasText: shape.lastHasText,
             lastIsComplete: shape.lastIsComplete, isThinking: isThinking,
             overview: overview, unavailability: unavailability,
-            policy: domain.firstScreenPolicy, hasNothingToAskCopy: brand.nothingToAskCopy != nil,
+            hasNothingToAskCopy: brand.nothingToAskCopy != nil,
             overviewIsRead: hasReadOverview, overviewIsOverdue: overviewIsOverdue, statusIsRead: statusIsRead
         )
     }
@@ -2838,7 +2838,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// both read this.
     var composerIsDisabled: Bool {
         if case .cannotServe = stage.phase {
-            return !domain.firstScreenPolicy.answersWithoutModel
+            return !domain.answersWithoutModel
         }
         return false
     }

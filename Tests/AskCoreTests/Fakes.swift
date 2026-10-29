@@ -782,6 +782,9 @@ nonisolated struct FakeDomain: AskDomain {
     /// Outranks `deadline` while set. A class, for `instructionsFor`'s reason.
     let deadlineOverride = DeadlineOverride()
     var deterministic: AskAnswer<FakeRow>?
+    /// Thrown by `deterministicAnswer(for:)` in place of `deterministic`, as a
+    /// domain's hook throws when the answer it builds doesn't encode.
+    var deterministicError: (any Error)?
     /// Where `deterministicAnswer(for:)` can be made to wait, as `overviewHold`
     /// makes `overview()` wait.
     let deterministicHold = TestHold()
@@ -819,12 +822,14 @@ nonisolated struct FakeDomain: AskDomain {
     /// `grounding`, a test about the default uses a domain that names none.
     var replyShape: AskReplyShape = .full
 
+    /// The nothing-to-ask copy only while the domain retrieves: a domain
+    /// that doesn't gives none, or the engine logs the copy as a mistake.
     var brand: AskBrand {
         AskBrand(
             title: "Ask Fake", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
-            nothingToAskCopy: "nothing", disclosureSentence: "disclosure",
+            nothingToAskCopy: grounding == .retrieval ? "nothing" : nil, disclosureSentence: "disclosure",
             scopeCaveat: "caveat"
         )
     }
@@ -909,8 +914,9 @@ nonisolated struct FakeDomain: AskDomain {
         return answer.tiles.isEmpty ? answer.mentioned.map(\.displayTitle) : answer.tiles.map(\.displayTitle)
     }
 
-    func deterministicAnswer(for question: String) async -> AskAnswer<FakeRow>? {
+    func deterministicAnswer(for question: String) async throws -> AskAnswer<FakeRow>? {
         await deterministicHold.pass()
+        if let deterministicError { throw deterministicError }
         return deterministic
     }
 
@@ -944,7 +950,6 @@ nonisolated struct FakeDomain: AskDomain {
 /// only through a script's `toolCallsAfter`.
 nonisolated struct RowlessDomain: AskDomain {
     var nothingToAskCopy: String?
-    var firstScreenPolicy: AskFirstScreenPolicy = .openSubject
     var grounding: AskGroundingPolicy = .retrieval
 
     var brand: AskBrand {

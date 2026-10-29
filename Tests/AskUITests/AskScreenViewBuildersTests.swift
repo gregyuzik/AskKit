@@ -160,7 +160,7 @@ struct AskScreenViewBuildersTests {
             store: store,
             accent: .blue,
             spectrum: .aurora,
-            onNothingAction: {},
+            nothingToAskAction: AskNothingToAskAction("Add Your First Record") {},
             onAttach: {},
             composerAccessory: AskComposerAccessory(
                 systemImage: "dice", label: Text(verbatim: "Surprise me"), identifier: "surprise"

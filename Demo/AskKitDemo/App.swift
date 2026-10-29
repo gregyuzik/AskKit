@@ -326,7 +326,9 @@ struct ContentView: View {
                 // host would take the reader to add a first item. The demo
                 // has nothing to add, so it shows its Library tab, where
                 // there is one.
-                onNothingAction: DemoDomain.offersFirstItem ? { selectedTab = .library } : nil,
+                nothingToAskAction: DemoDomain.offersFirstItem
+                    ? AskNothingToAskAction("Add Your First Item") { selectedTab = .library }
+                    : nil,
                 onAttach: offersPhotos ? { attachPhoto() } : nil,
                 composerAccessory: offersPhotos ? nil : surpriseMe
             )

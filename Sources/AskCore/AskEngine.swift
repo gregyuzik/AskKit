@@ -120,16 +120,13 @@ public actor AskEngine<Domain: AskDomain> {
     /// the thread's engine is New Chat.
     ///
     /// With no `log`, the engine logs through `AskOSLogSink` under the
-    /// domain's `AskBrand.logSubsystem`. It logs seven domain mistakes once,
+    /// domain's `AskBrand.logSubsystem`. It logs five domain mistakes once,
     /// here: question kinds outside `AskQuestionKind.all`, "Another pick"
-    /// kinds no answer can have, by its kinds or by its reply shape, a
-    /// first-screen policy that answers without a model from a domain that
-    /// doesn't implement `deterministicAnswer(for:)`, one that needs owned
-    /// rows from a brand with no `nothingToAskCopy`, a domain with no search
-    /// arguments under the grounded retry, and one that doesn't retrieve
-    /// under a first-screen policy that needs owned rows. Each is a fault
-    /// under that subsystem, whatever `log` is, and a `routing` line to a
-    /// `log` passed here as well.
+    /// kinds no answer can have, by its kinds or by its reply shape, a domain
+    /// with no search arguments under the grounded retry, and nothing-to-ask
+    /// copy (`AskBrand.nothingToAskCopy`) from a domain that doesn't
+    /// retrieve. Each is a fault under that subsystem, whatever `log` is, and
+    /// a `routing` line to a `log` passed here as well.
     public init(domain: Domain, seam: any AskModelSeam, log: (any AskLogSink)? = nil) {
         self.init(domain: domain, seam: seam, log: log) { ContinuousClock().now }
     }
@@ -184,20 +181,6 @@ public actor AskEngine<Domain: AskDomain> {
                 "rerollableKinds under replyShape .prose — no answer the model writes has a question kind or tiles, so none offers Another pick"
             )
         }
-        // And the mistake a domain can make by writing one `true`.
-        // `answersWithoutModel` promises the app answers its own starters with
-        // no model; `deterministicAnswer` is what actually answers them. A
-        // domain claiming the first without implementing the second gets a
-        // first screen whose chips fail.
-        if domain.firstScreenPolicy.answersWithoutModel, !domain.implementsDeterministicAnswer {
-            mistake("firstScreenPolicy.answersWithoutModel is set and deterministicAnswer(for:) is not implemented — the first screen's chips will fail")
-        }
-        // The same for the nothing-to-ask screen, which needs the host's
-        // words: with none, AskUI shows the ready first screen for an empty
-        // overview, and a domain that asked for the other one never sees it.
-        if domain.firstScreenPolicy.needsOwnedRows, domain.brand.nothingToAskCopy == nil {
-            mistake("firstScreenPolicy.needsOwnedRows is set and brand.nothingToAskCopy is nil — an empty overview shows the ready first screen")
-        }
         // And a domain with no search under the grounded retry, which a
         // domain that retrieves has: it plans `SearchArguments` and runs
         // `search`. With `AskNoSearchArguments` there is nothing to plan, so no
@@ -207,13 +190,14 @@ public actor AskEngine<Domain: AskDomain> {
         if grounding == .retrieval, Domain.SearchArguments.self == AskNoSearchArguments.self {
             mistake("SearchArguments is AskNoSearchArguments under the grounded retry — a first answer that calls no tool has no search to plan, and the default search(_:context:) fails it as ungrounded")
         }
-        // And a domain that doesn't retrieve under a first screen that reads
-        // an empty overview as nothing to ask about: the default policy for
-        // it is `.openSubject`, so this one was set by hand, often left
-        // behind from `.retrieval`. With the default overview, `.empty`, every
-        // reader would get the nothing-to-ask screen.
-        if grounding != .retrieval, domain.firstScreenPolicy.needsOwnedRows {
-            mistake("firstScreenPolicy.needsOwnedRows is set and grounding is \(grounding.rawValue) — an empty overview shows the nothing-to-ask first screen to a domain that doesn't retrieve")
+        // And a domain that doesn't retrieve with words for the nothing-to-ask
+        // screen, whose presence is what asks for it: copy often left behind
+        // from `.retrieval`. With the default overview, `.empty`, every reader
+        // would get that screen. A domain that retrieves and gives none gets
+        // the ready screen for an empty overview, which is a choice it states
+        // by leaving the copy out, not a mistake.
+        if grounding != .retrieval, domain.brand.nothingToAskCopy != nil {
+            mistake("brand.nothingToAskCopy is set and grounding is \(grounding.rawValue) — an empty overview shows the nothing-to-ask first screen to a domain that doesn't retrieve")
         }
     }
 
@@ -603,10 +587,29 @@ public actor AskEngine<Domain: AskDomain> {
 
         // 1. An answer the app can give without a model. Small talk, and the
         //    starters on a device where nothing can serve.
+        //
+        //    **A throw is the host's failure, not a tier's**, as the domain's
+        //    search's is: no tier has been asked, so none is cooled and
+        //    nothing is handed down, and the question isn't passed to a model
+        //    either, which would answer it without the card the domain meant
+        //    it to have. An `AskError` the domain chose, and a stop, go on as
+        //    they are.
         let domain = self.domain
-        guard let deterministic = try await AskDeadline.run(until: deadline, {
-            await domain.deterministicAnswer(for: question)
-        }) else {
+        let reached: AskAnswer<Row>??
+        do {
+            reached = try await AskDeadline.run(until: deadline) {
+                try await domain.deterministicAnswer(for: question)
+            }
+        } catch let chosen as AskError {
+            throw chosen
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let tag = AskTriage.tag(for: error)
+            log.routing("the domain's answer without a model failed: \(tag)")
+            throw AskError.model(tag: tag)
+        }
+        guard let deterministic = reached else {
             log.routing("ran out of time waiting for the domain's answer without a model")
             throw AskError.couldNotAnswer
         }
@@ -1631,7 +1634,7 @@ public actor AskEngine<Domain: AskDomain> {
             var answer = AskAnswer<Row>(
                 text: partial, matches: rows, tiles: tiles, followUps: [],
                 questionKind: nil, isTruncated: true,
-                payload: await collector.turnPayload,
+                encodedPayload: await collector.turnPayload,
                 proposal: await collector.turnProposal,
                 grounding: stats.grounding
             )
@@ -1666,7 +1669,7 @@ public actor AskEngine<Domain: AskDomain> {
             text: text, matches: rows, tiles: tiles,
             followUps: AskAnswer<Row>.cleanedFollowUps(outcome.followUps ?? []),
             questionKind: kind,
-            payload: await collector.turnPayload,
+            encodedPayload: await collector.turnPayload,
             proposal: await collector.turnProposal,
             grounding: stats.grounding
         )
@@ -1710,7 +1713,7 @@ public actor AskEngine<Domain: AskDomain> {
                 // proposal past them is one it did not carry, and the first
                 // answer's, which a tool recorded within them, stands.
                 let refined = heldToTheCollectorsLimits(refined, from: "the domain's refine pass")
-                var kept = refined.payload == nil ? refined.replacing(payload: answer.payload) : refined
+                var kept = refined.payload == nil ? refined.replacing(encodedPayload: answer.payload) : refined
                 if kept.proposal == nil { kept = kept.replacing(proposal: answer.proposal) }
                 if kept.grounding == nil { kept = kept.replacing(grounding: answer.grounding) }
                 kept = kept.replacing(followUps: AskAnswer<Row>.cleanedFollowUps(kept.followUps)).cappingTiles()
@@ -1848,7 +1851,7 @@ public actor AskEngine<Domain: AskDomain> {
         return AskAnswer(
             text: answer.text, matches: matches, tiles: answer.tiles, followUps: answer.followUps,
             questionKind: answer.questionKind, isTruncated: answer.isTruncated, basis: answer.basis,
-            payload: payload, proposal: proposal, grounding: answer.grounding
+            encodedPayload: payload, proposal: proposal, grounding: answer.grounding
         )
     }
 

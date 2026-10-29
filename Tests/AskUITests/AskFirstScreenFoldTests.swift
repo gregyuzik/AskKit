@@ -79,14 +79,13 @@ import Testing
                 firstScreenHeadline: "Ask about your things",
                 firstScreenSentence: "Books, records, tools and clothes.",
                 nothingToAskCopy: screen.sentence,
-                nothingToAskActionLabel: screen.action,
                 disclosureSentence: screen.disclosure,
                 scopeCaveat: "Ask reads only what you own, and it can be wrong."
             ),
             starters: screen.starters,
-            policy: AskFirstScreenPolicy(answersWithoutModel: screen.answersWithoutModel),
+            answersWithoutModel: screen.answersWithoutModel,
             onStarter: { _ in },
-            onNothingAction: screen.action == nil ? nil : {},
+            nothingToAskAction: screen.action.map { AskNothingToAskAction($0) {} },
             mark: { _ in Color(red: 1, green: 0, blue: 0) }
         )
         .environment(\.askFoldSplit, split)

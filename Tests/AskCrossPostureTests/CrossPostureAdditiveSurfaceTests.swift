@@ -45,14 +45,17 @@ import AskUI
         #expect(await eval.run([]).isEmpty)
     }
 
-    /// A payload of a host's own plain type, recorded by a tool and carried by
-    /// a proposal: AskKit encodes it, and it reads back as the type.
+    /// A payload of a host's own plain type, recorded by a tool, given to an
+    /// answer the domain builds and carried by a proposal: AskKit encodes it
+    /// as JSON each way, and it reads back as the type.
     @Test func aPayloadGoesInAndComesBackAsTheHostsType() async throws {
         let span = SurfaceSpan(oldest: 1959, newest: 1977)
         let collector = AskCollector<AskNoRow>()
         #expect(try await collector.record(payload: span))
-        let answer = AskAnswer<AskNoRow>(text: "Six records, 1959 to 1977.", payload: await collector.turnPayload)
+        let answer = try AskAnswer<AskNoRow>(text: "Six records, 1959 to 1977.", payload: span)
         #expect(answer.payload(as: SurfaceSpan.self) == span)
+        let recorded = try #require(await collector.turnPayload)
+        #expect(try JSONDecoder().decode(SurfaceSpan.self, from: recorded) == span)
 
         let proposal = try AskProposal(title: "Shelve them by year", actionLabel: "Shelve", payload: span)
         #expect(proposal.payload(as: SurfaceSpan.self) == span)

@@ -3,6 +3,30 @@
 import AskCore
 import SwiftUI
 
+/// The nothing-to-ask first screen's button: its label, in the host's words,
+/// and what a tap on it does, such as opening the host's sheet for adding a
+/// first item.
+///
+/// **One value, so the two can't disagree.** A label with no action, or an
+/// action with no label, would be a button that does nothing or says
+/// nothing, so the screen draws the button exactly when it has one of these
+/// (`AskScreen`'s `nothingToAskAction`). The label is the host's own copy,
+/// resolved against its own bundle, as `AskBrand`'s strings are.
+nonisolated public struct AskNothingToAskAction: Sendable {
+    /// The button's label, such as "Add Your First Item": a sentence of the
+    /// host's, which wraps rather than leaving its capsule at an
+    /// accessibility size.
+    public let label: String
+    /// What a tap on the button does.
+    public let handler: @MainActor () -> Void
+
+    /// A button labelled `label` that runs `handler` when tapped.
+    public init(_ label: String, handler: @escaping @MainActor () -> Void) {
+        self.label = label
+        self.handler = handler
+    }
+}
+
 /// What the screen shows before anything has been asked.
 ///
 /// Three of them (ready, nothing to ask about, and can't serve), and which one
@@ -12,7 +36,10 @@ public struct AskFirstScreen<Mark: View>: View {
     private let phase: AskStage.Phase
     private let brand: AskBrand
     private let starters: [AskStarter]
-    private let policy: AskFirstScreenPolicy
+    /// Whether the domain answers its starters without a model
+    /// (`AskDomain.answersWithoutModel`), so the screen that can't serve
+    /// keeps them under its reason.
+    private let answersWithoutModel: Bool
     /// Whether the screen is making room for the keyboard. The ready screen
     /// lets its sentence and caveat go, and what stays closes up, so the mark,
     /// the headline, the chips and the disclosure all fit above the composer.
@@ -30,7 +57,7 @@ public struct AskFirstScreen<Mark: View>: View {
     /// `isSideBySide` says what it decides.
     private let windowHeight: CGFloat
     private let onStarter: (AskStarter) -> Void
-    private let onNothingAction: (() -> Void)?
+    private let nothingToAskAction: AskNothingToAskAction?
     private let onDecline: ((AskStarter) -> Void)?
     private let mark: (Bool) -> Mark
 
@@ -147,7 +174,7 @@ public struct AskFirstScreen<Mark: View>: View {
         case .ready:
             return !starters.isEmpty
         case .cannotServe:
-            return policy.answersWithoutModel && !starters.isEmpty
+            return answersWithoutModel && !starters.isEmpty
         case .nothingToAskAbout, .thread:
             return false
         }
@@ -214,7 +241,7 @@ public struct AskFirstScreen<Mark: View>: View {
     private var hasTwoHalves: Bool {
         AskFirstScreenArrangement.hasTwoHalves(
             phase: phase,
-            answersWithoutModel: policy.answersWithoutModel,
+            answersWithoutModel: answersWithoutModel,
             hasStarters: !starters.isEmpty
         )
     }
@@ -262,18 +289,19 @@ public struct AskFirstScreen<Mark: View>: View {
     ///   - phase: Which screen shows (`AskStage.Phase`). `.thread` draws
     ///     nothing.
     ///   - brand: The host's words: the headline, the sentence, the scope and
-    ///     caveat, the disclosure, and the nothing-to-ask copy and its
-    ///     button's label.
+    ///     caveat, the disclosure, and the nothing-to-ask copy.
     ///   - starters: The questions to offer, of which the first
     ///     `AskLayout.starterBank` show.
-    ///   - policy: What the screen offers where nothing can serve
-    ///     (`AskFirstScreenPolicy`).
+    ///   - answersWithoutModel: Whether the screen that can't serve keeps the
+    ///     starters under its reason, for a domain that answers them with no
+    ///     model (`AskDomain.answersWithoutModel`). False by default.
     ///   - isMakingRoom: Whether the ready screen closes up for the keyboard.
     ///   - windowHeight: The height of the window this sits in, or zero
     ///     before it is measured, which `isSideBySide` reads.
     ///   - onStarter: What a tap on a starter does, handed the starter.
-    ///   - onNothingAction: What the nothing-to-ask screen's button does. Nil,
-    ///     or a brand with no `nothingToAskActionLabel`, for no button.
+    ///   - nothingToAskAction: The nothing-to-ask screen's button, its label
+    ///     and what it does (`AskNothingToAskAction`). Nil, the default, for
+    ///     no button.
     ///   - onDecline: "Don't suggest this" on a starter, handed the starter.
     ///     Nil for no such action.
     ///   - mark: The host's mark, handed whether it is lit: lit on the ready
@@ -283,22 +311,22 @@ public struct AskFirstScreen<Mark: View>: View {
         phase: AskStage.Phase,
         brand: AskBrand,
         starters: [AskStarter],
-        policy: AskFirstScreenPolicy = .ownedLibrary,
+        answersWithoutModel: Bool = false,
         isMakingRoom: Bool = false,
         windowHeight: CGFloat = 0,
         onStarter: @escaping (AskStarter) -> Void,
-        onNothingAction: (() -> Void)? = nil,
+        nothingToAskAction: AskNothingToAskAction? = nil,
         onDecline: ((AskStarter) -> Void)? = nil,
         @ViewBuilder mark: @escaping (Bool) -> Mark
     ) {
         self.phase = phase
         self.brand = brand
         self.starters = starters
-        self.policy = policy
+        self.answersWithoutModel = answersWithoutModel
         self.isMakingRoom = isMakingRoom
         self.windowHeight = windowHeight
         self.onStarter = onStarter
-        self.onNothingAction = onNothingAction
+        self.nothingToAskAction = nothingToAskAction
         self.onDecline = onDecline
         self.mark = mark
     }
@@ -492,14 +520,14 @@ public struct AskFirstScreen<Mark: View>: View {
                     }
                 }
                 .frame(minHeight: bend?.above)
-                if let onNothingAction, let label = brand.nothingToAskActionLabel {
+                if let nothingToAskAction {
                     // The label is a host's sentence, not a word, such as "Add
                     // Your First Item", and `Button(_:action:)`'s own `Text` is
                     // held to one line by the glass style's height, so at an
                     // accessibility size it runs straight out of its capsule.
                     // Spelled out with room to wrap, the capsule grows instead.
-                    Button(action: onNothingAction) {
-                        Text(label)
+                    Button(action: nothingToAskAction.handler) {
+                        Text(nothingToAskAction.label)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             // The style's white, or black where white falls
@@ -525,7 +553,7 @@ public struct AskFirstScreen<Mark: View>: View {
     /// An app whose Ask needs a model has nothing to offer a device that can't
     /// run one, and the unlit mark and the reason are the whole screen. An app
     /// that answers some of its own questions without a model
-    /// (`AskFirstScreenPolicy.answersWithoutModel`), such as one whose own
+    /// (`AskDomain.answersWithoutModel`), such as one whose own
     /// data answers its starters, keeps its starters and its composer under
     /// the same line, because those chips work. Without that, adopting
     /// Ask would turn a working screen into a dead end on every device without
@@ -549,7 +577,7 @@ public struct AskFirstScreen<Mark: View>: View {
                     .font(.body)
                     .askDeemphasizedText()
             } ask: {
-                if policy.answersWithoutModel, !starters.isEmpty {
+                if answersWithoutModel, !starters.isEmpty {
                     tryAsking
                 }
                 disclosure

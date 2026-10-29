@@ -429,14 +429,9 @@ extension CrossPostureTests {
         #expect(try await AskDeadline.run(.seconds(5)) { "done" } == "done")
     }
 
-    /// What a domain declares about its first screen, its thread and its
-    /// proposals, compared and decoded off any actor.
+    /// What a domain declares about its thread and its proposals, compared
+    /// and decoded off any actor.
     @Test func aDomainsPoliciesAreUsableWithoutThePosture() throws {
-        let policy = AskFirstScreenPolicy(answersWithoutModel: true, needsOwnedRows: false)
-        #expect(policy != .ownedLibrary)
-        #expect(AskFirstScreenPolicy.ownedLibrary == AskFirstScreenPolicy())
-        #expect(policy.answersWithoutModel && !policy.needsOwnedRows)
-
         #expect(AskPersistence(rawValue: "perLaunch") == .perLaunch)
         #expect(AskPersistence.thread.rawValue == "thread")
 
@@ -546,10 +541,10 @@ extension CrossPostureTests {
             title: "Ask", appDirectory: "AskKitCrossPosture",
             logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
             firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
-            nothingToAskCopy: "Nothing to ask about yet.", nothingToAskActionLabel: "Add a row",
+            nothingToAskCopy: "Nothing to ask about yet.",
             disclosureSentence: "Answers come from your rows.", scopeCaveat: "Only your rows."
         )
-        #expect(brand.nothingToAskActionLabel == "Add a row")
+        #expect(brand.nothingToAskCopy == "Nothing to ask about yet.")
     }
 
     /// A proposal's detail, the bound on its payload and the lines the model
@@ -1083,7 +1078,7 @@ extension CrossPostureTests {
 extension CrossPostureTests {
     /// The rest of what `AskDomain` defaults, heard off any actor by a
     /// consumer that writes none of it.
-    @Test func theDomainsOtherDefaultsServeAConsumerThatWritesNone() async {
+    @Test func theDomainsOtherDefaultsServeAConsumerThatWritesNone() async throws {
         let domain = CrossPostureDomain()
         #expect(domain.turnDeadline == .seconds(45))
         #expect(domain.questionKinds == AskQuestionKind.default)
@@ -1093,8 +1088,8 @@ extension CrossPostureTests {
         let answer = AskAnswer(text: "Dune.", matches: [CrossPostureRow(id: "Dune")], questionKind: AskQuestionKind.pick)
         #expect(!domain.isRerollable(answer, question: "Pick one for tonight"))
         #expect(domain.evidenceScope(from: answer) == nil)
-        #expect(!domain.implementsDeterministicAnswer)
-        #expect(await domain.deterministicAnswer(for: "How many?") == nil)
+        #expect(!domain.answersWithoutModel)
+        #expect(try await domain.deterministicAnswer(for: "How many?") == nil)
         #expect(await domain.photoThumbnail(for: AskQuestionPhoto(label: "A record sleeve", reference: "asset-1")) == nil)
     }
 

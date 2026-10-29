@@ -200,16 +200,11 @@ nonisolated struct DemoAssistantDomain: AskDomain {
         CommandLine.arguments.contains(DemoLaunchArgument.resetThread) ? .perLaunch : .thread
     }
 
-    /// The ready first screen whatever the overview counts, since there is
-    /// nothing to own, and, under `-askScriptedAnswer`, starters that answer
-    /// without a model, as `DemoDomain.firstScreenPolicy` says.
-    var firstScreenPolicy: AskFirstScreenPolicy {
-        AskFirstScreenPolicy(answersWithoutModel: implementsDeterministicAnswer, needsOwnedRows: false)
-    }
-
     /// The thread is kept in a folder of its own: a thread the library wrote
     /// holds `DemoRow`s, which an `AskNoRow` thread can't read, and would be
-    /// set aside as unreadable.
+    /// set aside as unreadable. No nothing-to-ask copy: there is nothing to
+    /// own, so the first screen is the ready one whatever the overview
+    /// counts.
     var brand: AskBrand {
         AskBrand(
             title: "Ask the Assistant",
@@ -302,9 +297,11 @@ nonisolated struct DemoAssistantDomain: AskDomain {
 
     // MARK: Scripted answers
 
-    /// A fixed answer under `-askScriptedAnswer`, so the UI smoke suite can
-    /// assert on the card and the evidence line without a model.
-    var implementsDeterministicAnswer: Bool {
+    /// Under `-askScriptedAnswer` the assistant answers every question
+    /// itself, so the UI smoke suite can assert on the card and the evidence
+    /// line without a model, and its starters stay where nothing can serve,
+    /// as `DemoDomain.answersWithoutModel` says.
+    var answersWithoutModel: Bool {
         CommandLine.arguments.contains(DemoLaunchArgument.scriptedAnswer)
     }
 
@@ -315,16 +312,14 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     ///
     /// The English phrases matched here choose which fixture stands in for
     /// the model, before anything is generated, as `DemoDomain`'s do.
-    func deterministicAnswer(for question: String) async -> AskAnswer<AskNoRow>? {
-        guard implementsDeterministicAnswer else { return nil }
+    func deterministicAnswer(for question: String) async throws -> AskAnswer<AskNoRow>? {
+        guard answersWithoutModel else { return nil }
         if question.localizedCaseInsensitiveContains("remind") {
             let reminder = DemoReminder(id: UUID(), text: "water the plants", when: "at 6 PM")
             return AskAnswer(
                 text: "I can remind you to water the plants at 6 PM. Add it with the card below.",
                 questionKind: AskQuestionKind.lookup,
-                // `try?` only because this answer can't throw: a reminder of
-                // strings always encodes.
-                proposal: try? Self.proposal(for: reminder),
+                proposal: try Self.proposal(for: reminder),
                 grounding: .toolCall
             )
         }

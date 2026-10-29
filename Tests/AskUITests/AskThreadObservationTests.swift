@@ -155,7 +155,7 @@ private final class ObservationTally {
             store.stage == AskStage.of(
                 turns: store.turns, isThinking: store.isThinking,
                 overview: store.overview, unavailability: store.unavailability,
-                policy: store.domain.firstScreenPolicy, overviewIsRead: store.hasReadOverview,
+                hasNothingToAskCopy: store.brand.nothingToAskCopy != nil, overviewIsRead: store.hasReadOverview,
                 statusIsRead: store.statusIsRead
             )
         }

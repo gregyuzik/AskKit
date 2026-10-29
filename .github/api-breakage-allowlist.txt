@@ -125,3 +125,15 @@ API breakage: extension AskEngine has removed conformance to AskAsking
 API breakage: protocol AskAsking has been removed
 API breakage: var AskTurn.Failure.retryable has been renamed to var isRetryable
 API breakage: constructor AskTurn.Failure.init(message:retryable:error:coaching:) has been removed
+API breakage: constructor AskAnswer.init(text:matches:tiles:followUps:questionKind:isTruncated:basis:payload:proposal:grounding:) is now throwing
+API breakage: constructor AskAnswer.init(text:matches:tiles:followUps:questionKind:isTruncated:basis:payload:proposal:grounding:) has parameter 7 type change from Foundation.Data? to some Swift.Encodable & Swift.Sendable
+API breakage: constructor AskAnswer.init(text:matches:tiles:followUps:questionKind:isTruncated:basis:payload:proposal:grounding:) has removed default argument from parameter 7
+API breakage: func AskAnswer.replacing(payload:) is now throwing
+API breakage: func AskAnswer.replacing(payload:) has parameter 0 type change from Foundation.Data? to some Swift.Encodable & Swift.Sendable
+API breakage: func AskDomain.deterministicAnswer(for:) is now throwing
+API breakage: var AskBrand.nothingToAskActionLabel has been removed
+API breakage: var AskDomain.firstScreenPolicy has been removed
+API breakage: var AskDomain.implementsDeterministicAnswer has been removed
+API breakage: struct AskFirstScreenPolicy has been removed
+API breakage: constructor AskScreen.init(store:accent:spectrum:onNothingAction:onAttach:composerAccessory:) has been removed
+API breakage: constructor AskFirstScreen.init(phase:brand:starters:policy:isMakingRoom:windowHeight:onStarter:onNothingAction:onDecline:mark:) has been removed
