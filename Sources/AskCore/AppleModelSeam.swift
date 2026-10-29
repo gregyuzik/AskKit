@@ -117,9 +117,12 @@ public actor AppleModelSeam: AskModelSeam {
     ///     read it exactly, or on a device whose provisioning profile doesn't
     ///     grant it. It doesn't serve in a development build either
     ///     (`AskDevelopmentPark`).
-    ///   - gate: the generation gate on-device generations wait at. The
-    ///     default, `AskGenerationGate.shared`, is the one the process's other
-    ///     on-device generations should use too.
+    ///   - gate: the generation gate on-device generations wait at. Leave it
+    ///     at the default, `AskGenerationGate.shared`, the one the process's
+    ///     other on-device generations wait at too: a gate of its own lets a
+    ///     generation here run beside one there. Never pass one only to log
+    ///     the gate under `logSubsystem`; `shared` logs a wedged holder under
+    ///     the app's bundle identifier.
     ///   - logSubsystem: the subsystem the seam logs under: the domain's
     ///     `AskBrand.logSubsystem`, so its lines sit with the engine's. Nil
     ///     logs under the app's bundle identifier.

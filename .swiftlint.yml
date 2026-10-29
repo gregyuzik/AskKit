@@ -19,8 +19,10 @@ disabled_rules:
   # the explicit string is the storage contract, so a future case-rename can't
   # silently change what's on disk.
   - redundant_string_enum_value
-  # `@Guide("…")` prose on a `@Generable` property is one literal and cannot be
-  # wrapped without changing what the model reads.
+  # Off because lines here run as long as their statement does: a test's
+  # arrangement, a localized string with its translator comment beside it.
+  # Not because of `@Guide`s, which wrap: `AskReply.questionKind`'s is a `"""`
+  # literal with `\` continuations, one line to the model.
   - line_length
   - identifier_name
   - file_length

@@ -109,7 +109,7 @@ nonisolated public struct AskReply: Sendable {
     /// that one filed "What do I have that's good for work?" as a pairing on 8
     /// of 9 samples, and "Do I own anything in green?" outside `lookup` on 3 of
     /// 9, both `lookup` on baseline; "what they have" filed them `lookup` on 11
-    /// of 12 (2026-10-26). A possessive question needs a possessive anchor.
+    /// of 12. A possessive question needs a possessive anchor.
     @Guide(description: """
         What kind of question this was, whatever language it was asked in — what the USER asked \
         for, never what your own answer happens to mention: an answer that volunteers what \

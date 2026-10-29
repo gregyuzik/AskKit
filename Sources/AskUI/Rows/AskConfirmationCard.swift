@@ -152,11 +152,12 @@ struct AskConfirmationCard: View {
         //
         // **A request, taken by the line** (`statusLabel`): the line is
         // inserted in this same update, and a focus set on an element that
-        // isn't in the accessibility tree yet goes nowhere. The screen
-        // doesn't announce the outcome, so a focus that missed would leave the
-        // reader never hearing whether their tap took. So the line says when
-        // the focus has landed on it, and claims the outcome only then
-        // (`AskSpeechLedger.Line.proposalOutcome`).
+        // isn't in the accessibility tree yet goes nowhere. So the line says
+        // when the focus has landed on it, and claims the outcome only then
+        // (`AskSpeechLedger.Line.proposalOutcome`); a focus that missed leaves
+        // it unclaimed, and the screen speaks it a beat later
+        // (`AskUnclaimedEnding`), so the reader still hears whether their tap
+        // took.
         //
         // **Initial too**, for a card rebuilt while the app worked, such as a
         // lazy row the thread made again: it appears with the outcome already

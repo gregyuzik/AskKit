@@ -1536,7 +1536,7 @@
       }
     },
     "Private Cloud Compute has reached today's limit." : {
-      "comment" : "Shown when the daily per-user Private Cloud Compute quota is spent. The reset time is shown separately by the quota banner.",
+      "comment" : "Shown when Private Cloud Compute's daily quota, the reader's iCloud account's, is spent. When it comes back is a sentence of its own after this one, on the quota banner and on the settings card, as a time or as a day and a time.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

@@ -31,8 +31,8 @@ Both libraries compile for iOS, macOS, visionOS, tvOS and watchOS 27.2, because 
 may link them on every platform the host ships. Ask itself shows on iOS, macOS and visionOS, the only
 platforms AskUI's views compile for. AskCore's Foundation Models half is compiled out on tvOS, and
 anything naming `SystemLanguageModel` on watchOS too, which has the framework but no on-device model.
-The rest of AskCore needs only Foundation, so a widget can build an Ask link (`AskLink`) on a platform
-that never shows Ask. `.claude/references/platform-gates.md` has the gates, file by file.
+The rest of AskCore builds on all five, so a widget can build an Ask link (`AskLink`) on a platform that
+never shows Ask. `.claude/references/platform-gates.md` has the gates, file by file.
 
 **Concurrency posture.** Every target but `AskCrossPostureTests` builds with main-actor default
 isolation, `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility` and
@@ -102,12 +102,12 @@ ask about, under `.retrieval`, and `.openSubject`, the ready first screen with n
 the other two.
 
 **A domain whose tools read no rows** names neither type: `Row` is then `AskNoRow`, a stand-in nothing
-needs to record, and `SearchArguments` is `AskNoSearchArguments`, which has no fields. Its
-`overview()` defaults to `.empty`, and its brand may leave out `nothingToAskCopy`. Under `.retrieval`
-it sets `firstScreenPolicy` to `.openSubject`, and it still has the grounded retry: a first answer that
-calls no tool goes to the planner, which has nothing to choose, and the default `search(_:context:)`
-fails the turn as ungrounded. The engine logs such a domain once, as it is built. Under `.toolCall`
-that answer fails at once, and under `.notRequired` it is kept.
+needs to record, and `SearchArguments` is `AskNoSearchArguments`, which has no fields. Its `overview()`
+defaults to `.empty`, and its brand may leave out `nothingToAskCopy`. Under `.retrieval` it sets
+`firstScreenPolicy` to `.openSubject`, and it still has the grounded retry: a first answer that calls no
+tool asks no planner, since there is nothing to choose, and goes to `search(_:context:)`, whose default
+fails the turn as ungrounded. The engine logs such a domain once, as it is built. Under `.toolCall` that
+answer fails at once, and under `.notRequired` it is kept.
 
 **What the model writes** is the domain's `replyShape`, one `AskReplyShape` for its life. `.full`, the
 default, is `AskReply`: the answer, what kind of question it was, which rows to show as tiles, and the
@@ -155,17 +155,26 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
 3. **One deadline.** The turn gets one deadline, `turnDeadline` (45 s by default), counted from the
    question. Everything it waits on before its answer shares it: the domain's hooks
    (`deterministicAnswer(for:)`, `overview()`, `promptLines(question:overview:)` and the refine pass),
-   the read of the tiers' states, the session builds, every generation, the grounded retry's planner and
-   search, and a hand-down. A hook still running when it passes is abandoned, so one that never returns
-   can't hold the turn, or every question after it.
-4. **The question.** It is trimmed and clamped to 500 characters, none longer than 16 Unicode scalars,
-   and an empty question fails at once. If the domain can answer without a model
-   (`deterministicAnswer(for:)`: small talk, or a starter where nothing can serve), that is the whole
-   turn.
+   the read of the tiers' states, the session builds and the session's own reads (its tool calls, its
+   usage and its window), every generation, the grounded retry's planner and search, and a hand-down. A
+   hook or a read still running when it passes is abandoned, so one that never returns can't hold the
+   turn, or every question after it. An on-device generation the deadline abandons still holds the
+   generation gate until it returns, within the holder's 90 s ([the generation
+   gate](#the-deadline-and-the-generation-gate)), and the next on-device question waits there inside its
+   own deadline.
+4. **The question.** It loses what draws nothing, as a link's does, then is trimmed and clamped to 500
+   characters, none longer than 16 Unicode scalars, and an empty question fails at once. If the domain
+   can answer without a model (`deterministicAnswer(for:)`: small talk, or a starter where nothing can
+   serve), that is the whole turn.
 5. **The tier.** The engine reads every tier's state once (`AskModelSeam.tierStates()`). A tier is
    servable when it is available, speaks the answer language, has quota left and isn't cooling down
-   after a failure. Private Cloud Compute is listed first, so it serves whenever it can; with nothing
-   servable the turn fails with the reason (`AskError.modelUnavailable`). The first event is `.tier`.
+   after a failure. Private Cloud Compute is listed first, so it serves whenever it can. With nothing
+   servable, a Private Cloud Compute held off only by its cooldown takes the turn all the same, since
+   the outage that cooled it was a turn's error, which Try Again retries ([house rule
+   1](#5-the-house-rules)). One whose quota is spent is the turn's too, and asked nothing: the turn fails
+   at once as `AskError.quotaReached`, with the reset date the mirror holds, since until then every
+   request would fail the same way and spend one. Otherwise the turn fails with the reason
+   (`AskError.modelUnavailable`). The first event is `.tier`, the spent tier's included.
 6. **The session.**
    - **Continuing.** The question continues the thread's kept conversation when that conversation is on
      this tier, under the domain's turn limit, not flagged for a fresh session and not due to roll over.
@@ -196,8 +205,10 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    - **`.retrieval`**, the default. On a fresh session it gets the grounded retry: the stream reports
      `.restarted` on the same tier, the model fills in the domain's `SearchArguments` with no tools on
      offer, so its only possible reply is a search, the app runs `AskDomain.search`, and the question is
-     asked again with the rows fenced in `<tool_result>` as data. The conversation counts as retrieved
-     by the app from then on. An ungrounded follow-up on a kept conversation fails with coaching.
+     asked again with the rows fenced in `<tool_result>` as data. `AskNoSearchArguments` has nothing to
+     fill in, so no planner is asked, and the search runs with no arguments. The conversation counts as
+     retrieved by the app from then on. An ungrounded follow-up on a kept conversation fails with
+     coaching.
    - **`.toolCall`**: the same without the retry, so an ungrounded first answer fails with coaching at
      once, with no planner and no second generation.
    - **`.notRequired`**: it is kept. No turn fails as ungrounded.
@@ -258,23 +269,28 @@ second `AppleModelSeam` alive in the process is logged as a fault. The router's 
 engine wrapped in `AppleAskSession`, whose `noteFailure` hands the router each raw failure, and
 `AskTriage.retryAfter(from:)` reads a quota's or a rate limit's reset off it. A router that answers a
 request for one tier with another's session says so in the box (`AskSessionBox.tier`): the engine runs
-the turn on the box's tier, its generation gate, reasoning level and caption included, and logs the
-swap.
+the turn on the box's tier, its generation gate, reasoning level, caption and photos included, triages
+what that session's generations throw as that tier's, and logs the swap. So an on-device session
+answering for Private Cloud Compute is sent no photo, and what it throws cools nothing.
 
 `AppleModelSeam` is the only place the Private Cloud Compute model is constructed, and it sends it
-nothing unless the host declared the entitlement, the build doesn't prove it absent and the process
-isn't parked. It reads availability in one place, serving a transient answer from cache for 60 s
-("available" and "device not eligible" are final for the process), and learns it is offline
-from `NWPathMonitor`, which reads as connected until it has reported. It asks the tiers about the app's
-language, the main bundle's first preferred localization, not the system's: an app that doesn't ship
-the system's language runs in another, and a tier that couldn't write the system's would take Ask down.
-English skips Private Cloud Compute's locale probe; a probe that throws or runs past its bound is
-remembered as no answer for 60 s, and the tier is read as speaking the language, which is named to the
-model only once a probe confirmed it. The locale probe and the context-window read are each shared by
-overlapping callers, kept once answered, and bounded at 3 s, so a stalled network can't hold the turn.
+nothing unless the host declared the entitlement, the build doesn't prove it absent and the process isn't
+parked. It reads availability in one place, serving a transient answer from cache for 60 s ("available"
+and "device not eligible" are final for the process), and learns it is offline from `NWPathMonitor`,
+which reads as connected until it has reported. It asks the tiers about the app's language, the main
+bundle's first preferred localization, not the system's: an app that doesn't ship the system's language
+runs in another, and a tier that couldn't write the system's would take Ask down. English skips Private
+Cloud Compute's locale probe; a probe that throws or runs past its bound is remembered as no answer for
+60 s, and the tier is read as speaking the language, which is named to the model only once a probe
+confirmed it. The on-device model's answer about the language is kept until its availability changes,
+except a no given while the model wasn't available, as while its assets download, which is asked again.
+The locale probe and the context-window read are each shared by overlapping callers, kept once answered,
+and bounded at 3 s, so a stalled network can't hold the turn.
 
 After a failure, a transport failure cools Private Cloud Compute for 60 s, a rate limit that names its
-reset cools it until then, and a spent quota holds it until the day's reset; no hold is ever shortened.
+reset cools it until then, and a spent quota holds it until the day's reset; no hold is ever shortened,
+and none runs past a day, whatever date the tier gave. The holds and the availability cache run on the
+monotonic clock, so a change to the device's clock moves none of them.
 Sessions are built off the main actor, with on-device replies capped at 1,024 tokens and the grounded
 retry's plan at 256. `AskSession.usage()` is the newest response's usage, not the session's running total
 ([rollover](#continuation-tail-referent-recap-rollover)), and tool calls are counted off the transcript.
@@ -335,7 +351,7 @@ measure Private Cloud Compute despite it.
 ### The hand-down
 
 A failure is a tier outage (`askIsTierOutage`) when it triages to `.privateCloudUnreachable` (a network
-failure, the service unavailable, a rate limit, being offline, or the context gate) or to
+failure, the service unavailable, a rate limit, a timeout, being offline, or the context gate) or to
 `.quotaReached`. An outage on Private Cloud Compute hands the turn down once, to the next servable tier:
 - **Only an unreachable tier cools.** A spent quota is no network fault, and the tier's state already
   says it is spent until its reset, so a quota hand-down cools nothing. The cooldown and the mirror's
@@ -346,16 +362,18 @@ failure, the service unavailable, a rate limit, being offline, or the context ga
   move with the turn: the question is asked on the fallback as the first of a new conversation, carrying
   the thread's tail, so a handed-down follow-up or "Another pick" still has the last exchanges.
 
-With nothing to hand down to, the outage is the turn's error, and Try Again retries it. **Nor with no time
-to answer:** a turn that has drawn prose hands down only while at least 10 s of its deadline are left
+With nothing to hand down to, the outage is the turn's error, and Try Again retries it: on Private Cloud
+Compute, which takes the turn though it is cooling, since nothing else can, while a spent quota is asked
+nothing until its reset, and the turn fails at once as the quota (§2, step 5). **Nor with no time to
+answer:** a turn that has drawn prose hands down only while at least 10 s of its deadline are left
 (`AskEngine.restartFloor`), since a fallback with less is likelier to draw nothing than something, and
 the reader would lose the prose for an empty turn. Below that the outage is the turn's error, rendered
 under the prose, and the tier still cools. A turn that has drawn nothing hands down however little is
 left. The 10 s is bounded by measurements (Private Cloud Compute's first word at 5 to 20 s, an on-device
-answer at about 13 s whole), not one itself. Nothing is handed down twice. A refusal, an overflowing context or an ungrounded answer is never handed down, since the
-other model would reach the same verdict, only later. Nor is a failure of the host's own search
-(`AskDomain.search`): it fails the turn as `.model(tag:)` and cools nothing, since a host's network error
-isn't Private Cloud Compute's.
+answer at about 13 s whole), not one itself. Nothing is handed down twice. A refusal, an overflowing
+context or an ungrounded answer is never handed down, since the other model would reach the same verdict,
+only later. Nor is a failure of the host's own search (`AskDomain.search`): it fails the turn as
+`.model(tag:)` and cools nothing, since a host's network error isn't Private Cloud Compute's.
 
 ### Continuation: tail, referent, recap, rollover
 
@@ -417,22 +435,34 @@ generation keeps spending quota until it finishes on Apple's side, and its sessi
 `AskGenerationGate.shared` serializes on-device generation across the process, first in, first out,
 because overlapping on-device generations race inside the framework and can trip an internal trap.
 Private Cloud Compute passes straight through, a waiter whose task is cancelled leaves the queue, a
-holder past 90 s is presumed wedged and passed over, and the gate isn't re-entrant. A host that generates
-on device outside Ask goes through `AskGenerationGate.shared` too, `AppleModelSeam`'s default.
+holder past 90 s is presumed wedged and passed over, and the gate isn't re-entrant. A holder lets the
+next generation in only once the generations it started have returned too: an `AppleAskSession` stream
+generates in a task of its own, which a stopped or abandoned turn lets go of while `streamResponse` is
+still unwinding, so the gate waits for that task, within the holder's 90 s
+(`AskGenerationProducers`).
+
+**One gate per process.** A host that generates on device outside Ask goes through
+`AskGenerationGate.shared` too, `AppleModelSeam`'s default. A gate built of its own
+(`AskGenerationGate(logSubsystem:)`) serializes only what runs through it, so a generation there can
+run beside one at `shared`: a host never builds one to log the gate under its brand's subsystem, and
+`shared` logs under the app's bundle identifier.
 
 ### Triage
 
-`AskTriage` turns each Foundation Models error into an `AskError`:
+`AskTriage` turns each failure into an `AskError`, by the tier whose session raised it, or the tier
+asked for where no session was built yet:
 
 | Error | `AskError` |
 |---|---|
+| An `AskError`, bare or inside a tool's `ToolCallError` | itself |
+| A cancellation, bare or inside a `ToolCallError` | `.stopped` |
 | Private Cloud Compute's quota limit | `.quotaReached(resetDate:)` |
-| On Private Cloud Compute: a network failure, the service unavailable, a rate limit, a lost connection, or the context gate | `.privateCloudUnreachable` |
+| On Private Cloud Compute: a network failure, the service unavailable, a rate limit, a timeout, a lost connection, or the context gate | `.privateCloudUnreachable` |
 | A missing on-device model asset | `.modelUnavailable(.modelNotReady)` |
 | An unsupported language | `.modelUnavailable(.languageNotSupported)` |
 | A guardrail violation or a refusal | `.refused` |
 | An exceeded context | `.contextTooLarge` |
-| A timeout, or concurrent requests | `.couldNotAnswer` |
+| A timeout on device, or concurrent requests | `.couldNotAnswer` |
 | A rate limit on device | `.model(tag:)` |
 
 Anything else becomes `.model(tag:)`. The tag is the error's case name, read by reflection, or its
@@ -451,7 +481,8 @@ AskKit fences what it composes, in five tags held in one list that `AskPrompt`'s
 `user_request`, `rows`, `previous_question`, `previous_answer` and `tool_result`.
 - **The question** is clamped to 500 characters, none longer than 16 Unicode scalars (the clamp counts
   characters, and one character can stack any number of combining marks), redacted, neutered and fenced
-  in `<user_request>`. Thread titles are clamped to 60 characters, flattened, redacted and neutered.
+  in `<user_request>`. Thread titles are clamped to 60 characters, flattened, redacted and neutered,
+  and so is a photo's label, fenced in `<rows>` as the titles in a recap are.
 - **Redacting** (`AskPrompt.sanitizeForFence(_:)`) turns each of AskKit's fence tags, opening or closing,
   into `[redacted]` in any spelling that compatibility decomposition (NFKD) maps to the tag once marks
   are dropped: any case, whitespace or attributes; a combining mark or a format character beside a
@@ -466,13 +497,14 @@ AskKit fences what it composes, in five tags held in one list that `AskPrompt`'s
 **Tool output is untrusted.** What a tool returns reaches the model as it stands. Rows it returns are the
 reader's own data, so it shows at most `context.rowLimit` of them, and every field it returns, a row's or
 not, goes through `AskPrompt.clamp(_:_:)`, with `shortClamp` (60) or `longClamp` (220), as the demo's
-`DemoSearch.render` does. `clamp` swaps the angle brackets, flattens, redacts, cuts and caps, then
-redacts again, cutting again while that lengthens it, so clamping twice changes nothing. A tool whose
-line breaks carry its layout can't clamp, and redacts with `sanitizeForFence(_:)` as well as neutering:
-the bracket swap alone leaves a tag in other brackets, with its name in ASCII or in letters that
-normalize to it. Tool output takes no fence of its own and uses none of AskKit's tag names: in the
-grounded retry the engine fences the search's output in `<tool_result>` and redacts every AskKit tag
-inside, a wrapper's included.
+`DemoSearch.render` does. `clamp` swaps the angle brackets and flattens, then redacts, caps each
+character's scalars and trims until a pass changes nothing; past the limit it cuts and does the same
+again, until what is left fits, and drops a last character that would join the "…" it adds. So clamping
+twice changes nothing. A tool whose line breaks carry its layout can't clamp, and redacts with
+`sanitizeForFence(_:)` as well as neutering: the bracket swap alone leaves a tag in other brackets, with
+its name in ASCII or in letters that normalize to it. Tool output takes no fence of its own and uses none
+of AskKit's tag names: in the grounded retry the engine fences the search's output in `<tool_result>` and
+redacts every AskKit tag inside, a wrapper's included.
 
 The domain's `promptLines(question:overview:)` and `refine` are handed the reader's question clamped,
 not redacted, so a line that quotes it is the host's to clamp. The rendered answer loses every link and
@@ -484,20 +516,23 @@ would be a hidden tap target inside trusted app chrome.
 A domain whose `persistence` is `.thread` (the default) keeps the thread in
 `Application Support/<appDirectory>/ask-thread.json`, through `AskThreadStore`:
 - **Cap.** At most 50 turns are kept, oldest dropped.
-- **Writes.** They are atomic and excluded from backup. They use complete file protection everywhere
-  except macOS, where that option fails the write. They happen off the main actor after each turn.
-  Every write and delete says whether it took, and a caller whose write didn't keeps every other copy
-  of what it was writing.
+- **Writes.** They are atomic and excluded from backup, and a write whose file the system won't
+  exclude counts as failed. They use complete file protection except on a Mac, natively, as a Mac
+  Catalyst build or as an iPhone or iPad app there (`AskStoredFile`), and happen off the main actor
+  after each turn. No file past 64 MiB is written or read. Every write and delete says whether it took,
+  and a caller whose write didn't keeps every other copy of what it was writing.
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
-  by entry. A row that no longer decodes costs its answer that row, never the turn.
+  by entry. A row that no longer decodes costs its answer that row, never the turn, and the read logs
+  how many went.
 - **Never written over.** The store writes back only the turns it was handed, so a thread read in part
   is first kept whole beside the thread as `ask-thread-original-<id>.json`, and a launch that reads all
   of it puts the rest back into its chat. If the original can't be kept, the thread is unreadable
   rather than cut down by the next save.
-- **An unreadable file** is one that is not a thread, or none of whose turns decode. It reads as
-  unreadable, never as empty, which would look like a fresh install and let the next answer write a
-  one-turn thread over it. It is set aside beside the thread as `ask-thread-unreadable-<id>.json`,
-  never overwritten, and the screen says so. A launch that can read it files it with the earlier chats.
+- **An unreadable file** is one that is not a thread, none of whose turns decode, or one past 64 MiB. It
+  reads as unreadable, never as empty, which would look like a fresh install and let the next answer
+  write a one-turn thread over it. It is set aside beside the thread as
+  `ask-thread-unreadable-<id>.json`, never overwritten, and the screen says so. A launch that can read it
+  files it with the earlier chats.
 - **A file that couldn't be read at all**, as on a locked device, stays in place, and nothing is written
   over it until it reads. It is read again as protected data comes back and as the screen does, and its
   turns go above any asked meanwhile. Until then New Chat sets it aside and Delete All Chats deletes it,
@@ -526,7 +561,8 @@ filing goes once that write took and every one of its turns decoded.
   All Chats' deletes are. If the archive refuses the chat (a locked device, a full disk), it is written
   as the thread and set aside, for the next launch to file; where it can't be set aside, the thread stays
   as the chat's last copy and nothing is written over it until it can be moved aside, so an unfiled chat
-  also blocks opening an earlier one. A chat it can write nowhere waits in memory to be filed.
+  also blocks opening an earlier one, and the turns asked meanwhile go into a provisional filing, as
+  beside a thread that couldn't be read. A chat it can write nowhere waits in memory to be filed.
 - Opening an earlier chat files the one on screen first, and does nothing if that fails. The chat it
   opens comes off the list only once it is written as the thread and every one of its turns decoded;
   otherwise its filing stays.
@@ -538,7 +574,8 @@ filing goes once that write took and every one of its turns decoded.
   earlier chats.
   - **The retry deletes by name.** It removes the set-aside files that were there when Delete All Chats
     ran and no other, so a chat a later New Chat set aside (the reader's chat, waiting for a launch to
-    file it) is spared.
+    file it) is spared. A folder that won't list owes every file that was in it, never none: the retry
+    lists it again, and spares those set aside since.
   - **Nothing owed outlives the process.** A marker saying what is owed would have to outlive the
     failure that blocked the write, and a marker file in the same folder fails under the same lock,
     permission or full disk. Kept anywhere else, such as the host's defaults, it would be storage of
@@ -553,22 +590,29 @@ before left.
 A tool may offer to do something rather than just read (`AskProposal`): the model proposes, the reader
 confirms, the app performs. The tool records the proposal with the collector and returns
 `AskProposal.modelReceipt`, which tells the model nothing has happened yet. The answer carries it to a
-card under it, in the host's words, never the model's, and only the reader's tap reaches
-`AskDomain.perform(_:)`. A `.handOff` proposal opens the host's own editor instead, through the
-`askDraftOpener` environment value, an `AskDraftOpenAction` over the host's `AskDraftRouter`: its tool
-returns `AskProposal.handOffReceipt`, `perform` is never called, and with no opener the card's action is
-disabled. (A hand-off has nothing to do with the hand-down between tiers.) A standalone turn has no card
-to confirm on, so a domain leaves proposing tools out of it.
+card under it, in the host's words, never the model's words about it: written from the row it acts on,
+or, with no row behind it, such as a reminder, showing what it will keep as it will keep it, the model's
+reading of the request clamped inside the host's own words. The button's label is the host's alone. Only
+the reader's tap reaches `AskDomain.perform(_:)`. A `.handOff` proposal opens the host's own editor
+instead, through the `askDraftOpener` environment value, an `AskDraftOpenAction` over the host's
+`AskDraftRouter`: its tool returns `AskProposal.handOffReceipt`, `perform` is never called, and with no
+opener the card's action is disabled. (A hand-off has nothing to do with the hand-down between tiers.) A
+standalone turn has no card to confirm on, so a domain leaves proposing tools out of it.
 
-A proposal is carried out at most once. The reader's yes is saved with the turn before `perform` is
-called (`AskProposalOutcome.performing`), and nothing waits for `perform`: New Chat and an earlier chat
-opening go ahead while it runs, so a hook that never returns holds up no chat. What came of it is written
-onto the turn wherever the turn is when `perform` returns: on screen, read back in its chat opened again
-(which shows the card carrying it out until then), or in the filing of a chat that has ended. A turn is
-known there by its question and when it was asked, as a join knows one, since a turn read back gets an
-identity of its own. A card read back with the yes still out where nothing in the process is carrying it
-out, as after an app quit, takes no tap and draws the proposal alone: what came of it is unknown, and
-confirmed again it could be done twice.
+A proposal is carried out at most once for each yes. The reader's yes is saved with the turn
+(`AskProposalOutcome.performing`), and `perform` is called only once that write has landed. A yes the
+disk refuses, or whose chat ends before it is saved (New Chat, Delete All Chats or an earlier chat
+opening at the same moment), is not carried out, and the card says it couldn't be done, as it does for a
+perform that failed, offering the action again on the newest turn. A thread kept for the process only
+saves nothing first, since no relaunch reads it back. `perform` runs off the main actor, and nothing
+waits for it: New Chat and an earlier chat opening go ahead while it runs, so a hook that never returns
+holds up no chat. What came of it is written onto the turn wherever the turn is when `perform` returns:
+on screen, read back in its chat opened again (which shows the card carrying it out until then), or in
+the filing of a chat that has ended. A turn is known there by its question and when it was asked, as a
+join knows one, since a turn read back gets an identity of its own. A card read back with the yes still
+out where nothing in the process is carrying it out, as after an app quit, takes no tap and draws the
+proposal alone: what came of it is unknown, and confirmed again it could be done twice. So does one whose
+outcome this build can't decode, such as a case a later AskKit wrote.
 
 ### Evaluation and diagnostics
 
@@ -601,19 +645,23 @@ Chats, when an earlier chat opens in its place, and at a `.perLaunch` domain's n
 `AskConversationStore` is the screen's state: `@Observable`, `@MainActor`, and one per app; a second
 alive over the same thread is logged as a fault. It turns engine events into `AskTurn`s, owns the draft,
 and persists, restores and archives the thread.
-- **Re-asking.** Try Again re-asks the newest failed turn only, and leaves the draft alone. Ask again
-  asks the question again over the thread as it stands, as a new turn. Another pick rerolls a pick.
-  Edit & Resend puts a question back in the composer.
+- **Re-asking.** Try Again re-asks the newest failed turn only, and leaves the draft alone. A turn that
+  failed before drawing anything gives its place to the re-ask; one that drew prose keeps it, and the
+  question is asked again below it. It isn't offered while a question waits to be asked, which is newer
+  though it has no turn yet. Ask again asks the question again over the thread as it stands, as a new
+  turn. Another pick rerolls a pick. Edit & Resend puts a question back in the composer.
 - **Stopping.** A stopped turn keeps its prose as its answer. A stop the reader asked for before the
   first word says so ("You stopped this answer") and offers Try Again, since `AskError.stopped`'s own
   line ("Couldn't answer that just now") would say the app failed; any other stop, such as a host's,
-  shows that line.
+  shows that line. A question stopped while it waited to be asked has no turn to keep it, and goes back
+  to the composer with its scope and its photo, unless the reader has begun another there.
 - **Order.** New Chat, Delete All Chats, an earlier chat opening and Stop's word to the engine go through
   one queue, and a question asked meanwhile waits for the last of them. Asked at once, it could land
   before the engine's `stop()` or `reset()`, or land on the chat being replaced. A question still waiting
   when an earlier chat opens is asked on the chat that opens.
 - **The warm session.** The store warms the engine only once the reader's own question has begun, on
-  the draft's empty-to-non-empty edge: typed, or put back by Edit & Resend. A prefill isn't that edge,
+  the draft's empty-to-non-empty edge: typed, or put back by Edit & Resend or by a Stop before it was
+  asked. A prefill isn't that edge,
   since a link can come from anywhere, but the reader's first edit of it is. Opening the screen warms
   nothing, because a Private Cloud Compute warm spends a request of the reader's daily quota. The
   engine holds a prewarm to the domain's turn deadline and drops a warm that lands once the last screen
@@ -752,17 +800,20 @@ is drawn, such as a photo still decoding, crosses its placeholder the same way (
 
 ### The composer and the keyboard
 
-`AskComposer` sits in the screen's bottom bar (`safeAreaBar(edge: .bottom)`): a glass capsule tinted
-with the host's accent, growing from one to four lines. As it grows its corners keep the radius they
-have at one line, centred on the circles at the bottom of the row, so the circles stay as far inside the
-edge at four lines as at one: a capsule four lines tall, with ends 57 pt round, ran them out over its
-rim.
+`AskComposer` sits in the screen's bottom bar (`safeAreaBar(edge: .bottom)`): a glass capsule tinted with
+the host's accent, growing from one to four lines. The host's hint wraps the same way, and sizes the
+field while the draft is empty, so at the accessibility sizes it shows whole, up to four lines. As it
+grows its corners keep the radius they have at one line, centred on the circles at the bottom of the row,
+so the circles stay as far inside the edge at four lines as at one: a capsule four lines tall, with ends
+57 pt round, ran them out over its rim.
 
-**Keys.** The software keyboard's Return inserts a newline, and the arrow sends. A hardware Return
-sends, Shift-Return inserts a newline, and a Return with nothing to send, or with a turn in flight,
-types nothing; a held Return's repeats are handled as the press is, so it sends once. ⌘Return sends,
-⌘. stops, and ⇧⌘N is New Chat. On the Mac, `AskCommands` in the host's `.commands` puts New Chat, Send
-and Stop in the menu bar, acting on the composer in the focused window.
+**Keys.** The software keyboard's Return inserts a newline, and the arrow sends. A hardware Return sends,
+Shift-Return inserts a newline, and a Return with nothing to send, or with a turn in flight, types
+nothing; a held Return's repeats are handled as the press is, so it sends once. A hardware Return that
+confirms what an input method is composing, typing Japanese, Chinese or Korean, should send nothing, and
+whether it does hasn't been watched: SwiftUI shows no field's marked text. ⌘Return sends, ⌘. stops, and
+⇧⌘N is New Chat. On the Mac, `AskCommands` in the host's `.commands` puts New Chat, Send and Stop in the
+menu bar, acting on the composer in the focused window.
 
 **The circle** at the trailing end of the field changes with the state:
 
@@ -827,10 +878,12 @@ away. Tapping the thread does the same, except on the Mac.
 
 ### The toolbar
 
-- **The tier caption** names the tier that is answering or will answer next: the navigation subtitle, or
-  leading the bar on visionOS and where a top tab bar hides the title. "Private Cloud Compute" is a name
-  and isn't translated; "On device" is. Its line is always reserved, so a caption appearing mid-turn
-  moves nothing.
+- **The tier caption** names the tier that is answering or will answer next: the navigation subtitle,
+  iPhone Duo's bar strip included, or leading the bar on visionOS and where a top tab bar hides the
+  title. "Private Cloud Compute" is a name and isn't translated; "On device" is. Its line is always
+  reserved, so a caption appearing mid-turn moves nothing. Leading an iPad's bar, it stops growing at the
+  largest size short of the accessibility sizes, as the bar's own items do, and a long press shows it
+  larger (the Large Content Viewer).
 - **New Chat** is pinned trailing, a high-priority primary action on the Mac. **History** sits beside it
   for a domain that keeps its thread, except beside iPhone Duo's fold, where the chats are on screen.
   **Done** shows on iOS while the reader types, and is the last of the screen's items to overflow; in
@@ -840,16 +893,23 @@ away. Tapping the thread does the same, except on the Mac.
   item is pushed (`askItemIsPushed`), and never for a scroll the screen makes itself, whose offset can't
   say whose scroll moved it (`AskNavigationBarMinimization`).
 - **The quota banner** over the thread says when Private Cloud Compute has spent its daily quota and
-  when it resets; "Show options" opens Apple's route to a higher limit when there is one.
+  when it resets: a reset later today as its time, one on a later day as its day and time, and one
+  already past not at all, in the words the settings card uses too. "Show options" opens Apple's route
+  to a higher limit when there is one. At the accessibility sizes the banners over the thread, this one
+  and the unreadable chat's, take at most half the screen's height, and scroll in it
+  (`AskScreenBanners`).
 - **`AskPrivateCloudCard`**, a settings card made from the store alone, says where answers come from and
   why. It is derived from the mirror, never probed itself, and says nothing about the tier until the
   mirror has heard from its seam: an unpublished mirror reads as a tier serving. It has no toggle.
 
 ### Accessibility
 
-- **Every terminal state is announced** at high priority (`AskAnnouncement`): an answer, one cut short by
-  the deadline, one the reader stopped ("You stopped this answer", the line it shows), a failure, and an
-  answer to a question asked with a photo that no model saw ("Answer ready. It read your words only.").
+- **Every terminal state is announced** at high priority (`AskAnnouncement`), once however many windows
+  show the store: an answer, one cut short by the deadline, one the reader stopped ("You stopped this
+  answer", the line it shows), a failure, and an answer to a question asked with a photo that no model
+  saw ("Answer ready. It read your words only."). A failure waits a beat, about a second, since its line
+  may take VoiceOver's focus from the wait row and be read there: it is announced only if no line has
+  claimed it by then (`AskUnclaimedEnding`), so it is heard once either way.
 - **VoiceOver's focus follows what the reader did.** The control they tapped often goes as they tap it,
   and the element that should have the focus is often not in the accessibility tree yet, where a focus
   set goes nowhere. So the screen leaves a request (`AskVoiceOverTarget`, `AskWaitRowFocus`) that the
@@ -858,16 +918,24 @@ away. Tapping the thread does the same, except on the Mac.
     host's own `startOver()` or `deleteAllThreads()` to every window's, and to the field where none
     shows.
   - A turn begun from a control that goes as it starts (a starter, a chip, Another pick, Try Again)
-    sends it to the new turn's wait row; a question typed in the field leaves it with the reader.
+    sends it to the new turn's wait row, Try Again under prose a failed turn keeps to the wait row of
+    the question asked below it; a question typed in the field leaves it with the reader.
   - A wait row that has it as it goes hands it to what replaces it (`AskWaitRowHandoff`): the prose at
-    its first word or, for a turn that ended before one, the failure line.
+    its first word or, for a turn that ended before one, the failure line. The other way too: when a
+    hand-down or a rollover takes away the prose VoiceOver was on, the wait row that comes back takes
+    the focus, and hands it on again at the new attempt's first word.
+  - Opening an earlier chat moves no focus. In the pane beside iPhone Duo's fold the reader stays on
+    the row they tapped, which becomes the open chat; from the sheet the focus goes back to the
+    History button. VoiceOver hears "Opening “…”", the chat's title, from either.
   - Edit & Resend sends it to the field, and so does a tap on the face in a host's slot, held until the
     composer comes up over the face, which goes out of VoiceOver's way under it.
   - The card moves it to its outcome line after the reader's own yes or not now, once that line is in the
-    tree, and VoiceOver reads the outcome there; a hand-off moves nothing, since the host's editor takes
-    the focus. That request is the store's (`proposalOutcomeFocus`), not the card's, so a question asked
-    while the app works drops it, and a card the thread rebuilt meanwhile still takes it. The store still publishes `proposalAnnouncement` for a host whose own control confirms or
-    declines a proposal.
+    tree, and VoiceOver reads the outcome there; where the focus hasn't landed on the line a beat after
+    the outcome came, the screen announces it instead. A hand-off moves nothing and announces nothing,
+    since the host's editor takes the focus. That request is the store's (`proposalOutcomeFocus`), not
+    the card's, so a question asked while the app works drops it, and a card the thread rebuilt
+    meanwhile still takes it. The store still publishes `proposalAnnouncement`, which the screen speaks
+    for nothing else, for a host whose own control confirms or declines a proposal.
 - **Identifiers.** Every control has an `ask.*` identifier (`AskAccessibility`), so one UI-test recipe
   drives every host, the history sheet's search field excepted, since `searchable` takes none.
 - **Dynamic Type.** The mark scales with it, and a control's frame grows by what its glyph grows, not in
@@ -876,27 +944,32 @@ away. Tapping the thread does the same, except on the Mac.
 - **Contrast.** Text and glyphs on glass are held to a contrast bar against an estimated ground, 4.5:1
   for text and 3:1 for a glyph (`AskGlassForeground`): secondary only where it clears the bar, else
   primary. Where primary itself falls short, the glass gives way and the words stay hierarchical: on a
-  light accent in dark mode the composer's capsule wears less than half of it, 0.43 of yellow and 0.45
-  of mint, where white words keep 4.5:1 (`AskComposer.tint(for:isLight:)`). The question bubble is no
-  glass but a fill of the accent at 60% on the content layer, its ground worked out flat over the
-  screen, and its words primary, or black on a light accent in dark mode, where white falls under 4.5:1
-  and black does better: white is 3.29:1 on yellow there and black 6.38:1 (`AskOnFill`). On the host's
-  accent, glyphs and words are the system's white, as its own prominent buttons
-  draw them, and black only where white falls under 3:1 and black does better (`AskOnAccent`,
-  `AskOnAccentLabel`). The send circle is filled with the accent flat, not its `Color.gradient`, whose
-  lighter top would leave white short of what it was judged on (`AskSendFill`). On a host's spectrum the
-  send circle's glyph follows the same rule against the
-  lightest color the circle is filled with, since no point between two stops is lighter than the
-  lighter of them (`AskSendGlyph`); `.aurora`'s circle runs from its blue to its violet, where white
-  holds 3.81:1, because its cyan (1.65:1), coral (2.39:1) and magenta (3.05:1) leave white no margin.
-  Apple's audit reads white on the system blue as "nearly passed", and that is accepted; the confirmation card's "Not now" is `.primary` on its gray (`.tint(.primary)`). Deemphasized
-  text on an opaque ground (`askDeemphasizedText`) is the secondary hue at 76% in light mode, 5.31:1 on
-  white where `.secondary` is 3.44:1, `.secondary` in dark mode, which the audit passes, and `.primary`
-  under Increase Contrast. The audit's contrast check runs in a call of its own, because combined with
-  `.dynamicType` and another check it fails text in both appearances at any strength; the demo's UI suite
-  audits the screen, the card, the nothing-to-ask button and the empty composer so, light and dark, and
-  the first screen, an answer with its tiles, a failure with Try Again and the card by every other check
-  in a second call.
+  light accent in dark mode the composer's capsule wears less than half of it, 0.43 of yellow and 0.45 of
+  mint, where white words keep 4.5:1 (`AskComposer.tint(for:isLight:)`), worked out on the accent as the
+  screen resolves it, its High Contrast variant included. The question bubble is no glass but a fill of
+  the accent at 60% on the content layer, its ground worked out flat over the screen, and its words
+  primary, or black on a light accent in dark mode, where white falls under 4.5:1 and black does better:
+  white is 3.29:1 on yellow there and black 6.38:1 (`AskOnFill`). On the host's accent, a glyph is the
+  system's white, as its own prominent buttons draw it, and black only where white falls under 3:1 and
+  black does better (`AskOnAccent`). Words on a button filled with the accent, the confirmation card's
+  Confirm and the nothing-to-ask action, are held to text's 4.5:1, so they are black on the system blue
+  (5.97:1, where white is 3.52:1), on #007AFF and on the system red, and white on a dark accent
+  (`AskOnAccentLabel`); the button wears the accent they were judged on. On visionOS, whose prominent
+  button is a platter with no fill of the accent, the label is the style's own. The send circle is filled
+  with the accent flat, not its `Color.gradient`, whose lighter top would leave white short of what it
+  was judged on (`AskSendFill`). On a host's spectrum the send circle's glyph follows a glyph's rule
+  against the lightest color the circle is filled with, since no point between two stops is lighter than
+  the lighter of them (`AskSendGlyph`); `.aurora`'s circle runs from its blue to its violet, where white
+  holds 3.81:1, because its cyan (1.65:1), coral (2.39:1) and magenta (3.05:1) leave white no margin. The
+  confirmation card's "Not now", Try Again, and "Show options" on the settings card and the quota banner
+  are `.primary` on their style's ground (`.tint(.primary)`), where the accent fell under 4.5:1; the
+  banner's is semibold, so it still stands apart from its sentence. Deemphasized text on an opaque ground
+  (`askDeemphasizedText`) is the secondary hue at 76% in light mode, 5.31:1 on white where `.secondary`
+  is 3.44:1, `.secondary` in dark mode, which the audit passes, and `.primary` under Increase Contrast.
+  The audit's contrast check runs in a call of its own, because combined with `.dynamicType` and another
+  check it fails text in both appearances at any strength; the demo's UI suite audits the screen, the
+  card, the nothing-to-ask button and the empty composer so, light and dark, and the first screen, an
+  answer with its tiles, a failure with Try Again and the card by every other check in a second call.
 - **Copying.** The question's Copy and Copy answer stay on the device, since either can quote the
   reader's own data: on iOS and visionOS `.localOnly`, expiring after 120 s, and on the Mac
   `prepareForNewContents(with: .currentHostOnly)`, which has no expiry. Text selected and copied with
@@ -918,8 +991,10 @@ comments and the types they name carry each case and its measurements):
   (`AskChatsPane`) and the conversation the trailing one, each as wide as its side, so the conversation
   lays out at compact width, as it does closed; the toolbar drops History, and the composer stays in the
   conversation's pane rather than in a host's slot. The open chat's mark is a wash of the accent, about
-  1.2:1, so its title is heavier too, carries a check under Differentiate Without Color, and is heard as
-  selected. Before the reader has a chat, a first screen with two halves takes both panes, what only
+  1.2:1, so its title is heavier too, carries a check under Differentiate Without Color and under Bold
+  Text, and is heard as selected. Every row is one button, the open chat's disabled, and a row stays
+  the same element for as long as it lists the same chat, so the row the reader taps is the row that
+  opens. Before the reader has a chat, a first screen with two halves takes both panes, what only
   informs leading and what to ask trailing (`AskFirstScreenArrangement.takesBothPanes`). The system
   reports the fold a frame late at launch, so where one is on its way the screen stands in two even panes
   (`AskFoldArrangement.awaitingFold(width:)`), and nothing waits on a clock. The panes keep to the width
@@ -945,10 +1020,10 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
 
 1. **Private Cloud Compute answers every turn it can, and the on-device model answers the rest. The
    reader gets no switch.** The tier is chosen once a turn, from one read of every tier's state; an
-   outage on Private Cloud Compute (unreachable, offline, rate-limited, over quota, or stopped by its
-   context gate) hands the turn down once; with nowhere to hand it, it is the turn's error, which Try
-   Again retries. Refusals, overflows and ungrounded answers are never handed down, and the caption names
-   the tier answering.
+   outage on Private Cloud Compute (unreachable, offline, rate-limited, timed out, over quota, or stopped
+   by its context gate) hands the turn down once; with nowhere to hand it, it is the turn's error, which
+   Try Again retries, though a spent quota is asked nothing until its reset. Refusals, overflows and
+   ungrounded answers are never handed down, and the caption names the tier answering.
 
    *Why:* the larger model answers better and reads photos, so it should serve whenever it can. A toggle
    would be a second, contradictory answer to a question the engine decides on every turn, and a reader
@@ -992,13 +1067,13 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
    *Why:* long instructions drown the one instruction that matters, such as to search before
    answering, and text the host didn't write must never be able to speak as the host.
 4. **Nothing animates on tokens or tool payloads.** Layout's only animation keys are `AskStage` and the
-   keyboard's two, though a reader's tap may animate its own change, as New Chat takes the thread away
-   as one piece. Glass that comes and goes (the jump pill and the two banners) animates on its own show
-   flag, on `AskStage.animation` in its own glass group, and moves no other frame. The reveal paints ink
-   over text already laid out and never holds text back. What an answer brings besides words arrives
-   once, without moving a frame: tiles only through `AskTileGrid`, a late picture only through
-   `AskPictureArrival`, everything else through `askArrival`. The wait row shows the turn's real tool
-   events, never an invented delay, and a new phrase there is the one thing a tool event animates: a
+   keyboard's two, though a reader's tap may animate its own change, as New Chat takes the thread away as
+   one piece. Glass that comes and goes (the jump pill, the two banners and the photo chip) animates on
+   its own show flag, on `AskStage.animation` in its own glass group, and moves no other frame. The
+   reveal paints ink over text already laid out and never holds text back. What an answer brings besides
+   words arrives once, without moving a frame: tiles only through `AskTileGrid`, a late picture only
+   through `AskPictureArrival`, everything else through `askArrival`. The wait row shows the turn's real
+   tool events, never an invented delay, and a new phrase there is the one thing a tool event animates: a
    0.2 s cross-fade in a row that reserves both its lines from its first frame.
 
    *Why:* a stream produces about thirty snapshots a second, and a layout animation keyed to any of them
@@ -1128,8 +1203,9 @@ Each of these is the obvious thing to try, and each was ruled out for the reason
 
 Each term below has one meaning in AskKit's docs and comments. A comment using one otherwise is a bug.
 
-- **bank**: a set of chips in one glass container (the starters, the follow-ups, the coaching), or the
-  tiles under an answer (`AskTileGrid`). Each tile is the host's view; the bank is AskKit's.
+- **bank**: a set of chips laid out together, the first screen's starters on glass in a container of
+  their own and the thread's follow-ups and coaching on fills (`AskChipRow`), or the tiles under an
+  answer (`AskTileGrid`). Each tile is the host's view; the bank is AskKit's.
 - **bar strip**: iPhone Duo's vertical bar column, where the system lays out the tab bar and the
   navigation bar's items along a side of the display (`AskBarStripReader`). The keyboard shortens it,
   and it reports `.bottomBar` as the tab bar's placement.
@@ -1212,6 +1288,8 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
 - **fold**: only iPhone Duo's hinge. The bars **minimize**, the SDK's word.
 - **overflow menu**: the toolbar's menu for items that don't fit.
 - **bottom edge**: the bottom of the viewport.
-- **merge**: in the reveal, what settled chunks do.
+- **merge**: in prose, only what settled chunks do in the reveal. Two copies of one chat made one are
+  **joined** ([Persistence and history](#persistence-and-history)). Identifiers keep the word
+  (`AskThreadArchive.merge`, `AskThreadEntry.merging`, `AskCollector.mergePayload`).
 - **gate**: always named: the generation gate (`AskGenerationGate`), Private Cloud Compute's context
   gate, the push gate (`scripts/git-hooks/pre-push`), or a platform gate (an `#if` condition).

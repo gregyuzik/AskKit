@@ -68,8 +68,12 @@ nonisolated public enum AskUnavailability: String, Sendable, Equatable, Codable,
 nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// No tier can serve the question right now, for the reason given.
     case modelUnavailable(AskUnavailability)
-    /// A tier was available and tried, but timed out or returned nothing
-    /// usable.
+    /// A tier was available and tried, but returned nothing usable or ran
+    /// out of time: the turn's deadline passed, or the on-device model timed
+    /// out. On Private Cloud Compute a timeout is an outage,
+    /// `privateCloudUnreachable`. A question with nothing left in it once
+    /// what the reader can't see is dropped and it is trimmed fails with this
+    /// too, before any tier is asked.
     case couldNotAnswer
     /// The tier answered without reading anything, so whatever it said came
     /// from its own weights rather than the reader's own data. When every
@@ -93,12 +97,14 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// about the question, so asking it again only refuses again.
     case refused
     /// Private Cloud Compute couldn't be reached: a network failure, the
-    /// service unavailable, a rate limit, or its context gate. The turn is
-    /// handed down to the on-device model when that model can serve, so this
-    /// is the turn's error only when it can't. Either way the engine tells the
-    /// seam (`AskModelSeam.noteTransportFailure(on:)`), and `AppleModelSeam`
-    /// cools the tier for 60 s, or until a later reset a rate limit named, so
-    /// the next question goes to the on-device model when it can serve.
+    /// service unavailable, a rate limit, a timeout, or its context gate. The
+    /// turn is handed down to the on-device model when that model can serve,
+    /// so this is the turn's error only when it can't. Either way the engine
+    /// tells the seam (`AskModelSeam.noteTransportFailure(on:)`), and
+    /// `AppleModelSeam` cools the tier for 60 s, or until a later reset a rate
+    /// limit named, so the next question goes to the on-device model when it
+    /// can serve. When it can't, the next question, Try Again's included, asks
+    /// Private Cloud Compute all the same, cooling or not.
     case privateCloudUnreachable
     /// The turn outgrew the model's window, even on a fresh session: a
     /// follow-up that overflows rolls over to one once before this is its
@@ -110,7 +116,12 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     case photosNotSupported
     /// The daily Private Cloud Compute quota is spent. `resetDate` is when it
     /// resets, when that is known. The turn is handed down to the on-device
-    /// model when that model can serve.
+    /// model when that model can serve, and this is the turn's error when it
+    /// can't. Once the quota is known to be spent, a question with nothing
+    /// below to serve it fails with this at once, asking Private Cloud Compute
+    /// nothing and spending no request, with the reset date the mirror holds
+    /// (`AskModelStatus.resetDate`). Retryable: Try Again asks once the quota
+    /// has reset.
     case quotaReached(resetDate: Date?)
     /// An unclassified model failure, carrying a tag for the log
     /// (`AskTriage.tag(for:)`): the error's case name, its domain and code,
@@ -170,7 +181,7 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
                           comment: "Shown when a question was asked with a photo and the model answering it can't take photos. Not retryable: asking again with the photo fails the same way, so the reader is told to ask without it.")
         case .quotaReached:
             return String(localized: "Private Cloud Compute has reached today's limit.", bundle: #bundle,
-                          comment: "Shown when the daily per-user Private Cloud Compute quota is spent. The reset time is shown separately by the quota banner.")
+                          comment: "Shown when Private Cloud Compute's daily quota, the reader's iCloud account's, is spent. When it comes back is a sentence of its own after this one, on the quota banner and on the settings card, as a time or as a day and a time.")
         }
     }
 

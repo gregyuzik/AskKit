@@ -8,7 +8,8 @@ Deeper notes: `.claude/references/`.
   `#available`. Compile for all five, though Ask shows only on iOS, macOS and visionOS. A host's
   shared package links AskCore on tvOS and watchOS too, so a wrong platform gate breaks the host; the
   push gate builds all five. Foundation Models files take `#if canImport(FoundationModels) && !os(tvOS)`,
-  plus `&& !os(watchOS)` around `SystemLanguageModel` (`platform-gates.md`).
+  plus `&& !os(watchOS)` around `SystemLanguageModel` and `LanguageModelSession.ToolCallError`
+  (`platform-gates.md`).
 - **`nonisolated` public API.** Spell every public value type, protocol and extension in AskCore
   `nonisolated`. Otherwise `InferIsolatedConformances` gives it a main-actor conformance that a host
   without AskKit's posture can't use. A host's "call to main actor-isolated … in a synchronous
@@ -47,7 +48,7 @@ Deeper notes: `.claude/references/`.
   requires, still reports on a pull request), weekly on main and on `gh workflow run ci.yml`; main
   also takes a PR only once CodeQL reports no new high alert. It runs on the image's newest Xcode
   release or release candidate, 27.2 or later (a beta, with a warning, only when neither exists),
-  and fails at setup with none. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
+  and fails at setup with none, or on a runner that isn't GitHub-hosted. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
   tests without running them, with a warning. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
   runs them in order; both scripts stay mode `100755`, since a hook dispatcher skips a non-executable
   hook silently. The push gate refuses an untracked file under `Sources/`, `Tests/` or `Demo/` or at
