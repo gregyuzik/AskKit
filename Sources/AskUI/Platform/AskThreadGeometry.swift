@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// What the thread reads off its scroll view, in one value because
 /// `onScrollGeometryChange` tracks one.

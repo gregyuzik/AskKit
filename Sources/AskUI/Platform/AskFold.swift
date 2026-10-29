@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// iPhone Duo's fold where it runs through the Ask screen: its frame in the
 /// screen's own space, and whether the device is bent along it.

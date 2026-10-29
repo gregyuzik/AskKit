@@ -2,9 +2,14 @@
 import PackageDescription
 
 // The posture every target here builds under except `AskCrossPostureTests`:
-// main-actor default isolation, the two upcoming features Approachable
+// the Swift 6 language mode with main-actor default isolation, plus all six
+// upcoming features this compiler has from Swift 7. Two are what Approachable
 // Concurrency adds to Swift 6 (`NonisolatedNonsendingByDefault` and
-// `InferIsolatedConformances`), `MemberImportVisibility` and `ExistentialAny`.
+// `InferIsolatedConformances`); the other four are `MemberImportVisibility`,
+// `ExistentialAny`, `InternalImportsByDefault` (an `import` is internal, so a
+// file writes `public import` only for a module a public or `@inlinable`
+// signature names, and `package import` for one only a `package` signature
+// does) and `ImmutableWeakCaptures` (a `weak` capture is a `let`).
 // Consumers need not share the posture: AskCore's public API states its
 // isolation explicitly (actors, `nonisolated`, `@Sendable` closures, `Sendable`
 // values), so a package that leaves `NonisolatedNonsendingByDefault` off still
@@ -15,8 +20,18 @@ let approachable: [SwiftSetting] = [
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
     .enableUpcomingFeature("InferIsolatedConformances"),
     .enableUpcomingFeature("MemberImportVisibility"),
-    .enableUpcomingFeature("ExistentialAny")
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("ImmutableWeakCaptures")
 ]
+
+// AskKit's own code, the libraries and their tests, also builds with strict
+// memory safety: each unsafe use is marked `unsafe`, with why it is sound, and
+// an unmarked one is a warning the push gate fails on. Not the README's
+// samples in `AskReadmeApproachableTests`: they are a host's code, Xcode's app
+// template doesn't turn it on, and their `String(format:)` would take an
+// `unsafe` no adopter needs.
+let memorySafe: [SwiftSetting] = approachable + [.strictMemorySafety()]
 
 // All five platforms, even though only iOS, macOS and visionOS ever show Ask:
 // a host's shared package that builds for tvOS or watchOS still depends on
@@ -38,26 +53,26 @@ let package = Package(
             name: "AskCore",
             path: "Sources/AskCore",
             resources: [.process("Resources")],
-            swiftSettings: approachable
+            swiftSettings: memorySafe
         ),
         .target(
             name: "AskUI",
             dependencies: ["AskCore"],
             path: "Sources/AskUI",
             resources: [.process("Resources")],
-            swiftSettings: approachable
+            swiftSettings: memorySafe
         ),
         .testTarget(
             name: "AskCoreTests",
             dependencies: ["AskCore"],
             path: "Tests/AskCoreTests",
-            swiftSettings: approachable
+            swiftSettings: memorySafe
         ),
         .testTarget(
             name: "AskUITests",
             dependencies: ["AskUI"],
             path: "Tests/AskUITests",
-            swiftSettings: approachable
+            swiftSettings: memorySafe
         ),
         // **No `swiftSettings`, deliberately.** Nonisolated default isolation,
         // none of the upcoming features — the posture a consumer that does not

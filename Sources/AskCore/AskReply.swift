@@ -1,6 +1,6 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
-import FoundationModels
+public import FoundationModels
 
 /// What one turn asks the model to write, unless its domain's reply shape is
 /// `.prose` (`AskProseReply`).

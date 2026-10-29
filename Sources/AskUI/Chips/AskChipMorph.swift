@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The chip a reader tapped traveling to where their question lands, rather
 /// than vanishing while a bubble appears somewhere else.

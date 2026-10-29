@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Why no tier can serve.
 ///

@@ -1,5 +1,5 @@
 import Foundation
-import Observation
+public import Observation
 import StoreKit
 
 /// Whether this build may show developer rows.

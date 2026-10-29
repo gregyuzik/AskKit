@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The banners over the conversation, the quota's and the unreadable chat's,
 /// and the first screen or the thread under them (`AskScreen.conversation`).

@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import Foundation
+public import AskCore
+public import Foundation
 
 /// Accessibility identifiers for the Ask screen.
 ///

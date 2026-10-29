@@ -1,5 +1,5 @@
-import Foundation
-import Observation
+public import Foundation
+public import Observation
 
 /// Whether one tier can serve, and why not when it can't.
 ///

@@ -106,8 +106,11 @@ import Testing
 
         /// One row's pixels, and how many bytes of them there are, without
         /// the padding a row may end in.
+        ///
+        /// `unsafe` here and where a row is read: a pointer into `image`'s own
+        /// bitmap, read for at most `rowLength` bytes while `image` holds it.
         private func pixels(row: Int) -> UnsafePointer<UInt8>? {
-            image.bitmapData.map { UnsafePointer($0 + row * image.bytesPerRow) }
+            unsafe image.bitmapData.map { unsafe UnsafePointer($0 + row * image.bytesPerRow) }
         }
 
         private var rowLength: Int { image.pixelsWide * image.bitsPerPixel / 8 }
@@ -119,8 +122,8 @@ import Testing
             let length = rowLength
             let white = [UInt8](repeating: 0xFF, count: length)
             return (0..<height).filter { row in
-                guard let mine = pixels(row: row), memcmp(mine, white, length) != 0 else { return false }
-                for offset in 0..<length where mine[offset] < 0xF0 { return true }
+                guard let mine = unsafe pixels(row: row), unsafe memcmp(mine, white, length) != 0 else { return false }
+                for offset in 0..<length where unsafe mine[offset] < 0xF0 { return true }
                 return false
             }
         }
@@ -149,9 +152,9 @@ import Testing
             }
             let length = rowLength
             return (0..<height).filter { row in
-                guard let mine = pixels(row: row), let theirs = other.pixels(row: row) else { return true }
-                guard memcmp(mine, theirs, length) != 0 else { return false }
-                for offset in 0..<length where abs(Int(mine[offset]) - Int(theirs[offset])) > Self.grain {
+                guard let mine = unsafe pixels(row: row), let theirs = unsafe other.pixels(row: row) else { return true }
+                guard unsafe memcmp(mine, theirs, length) != 0 else { return false }
+                for offset in 0..<length where unsafe abs(Int(mine[offset]) - Int(theirs[offset])) > Self.grain {
                     return true
                 }
                 return false

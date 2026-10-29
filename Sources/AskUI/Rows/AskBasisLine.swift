@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// Why an answer chose what it shows, in one factual line between the tiles and
 /// the evidence line: "Your highest-rated jazz record".

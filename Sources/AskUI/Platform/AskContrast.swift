@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 extension View {
     /// Deemphasized text that stays readable: a step below `.primary`, and clear

@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// The reader's chats as the list in the sheet the toolbar's button opens
 /// (`AskThreadHistorySheet`): the one on screen, and the ones New Chat put

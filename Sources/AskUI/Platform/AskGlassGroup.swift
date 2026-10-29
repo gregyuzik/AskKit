@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 // Why AskUI wraps SwiftUI's glass API rather than calling it: AskGlass.swift.
 
@@ -75,7 +75,7 @@ extension View {
     @ViewBuilder
     func askGlassTransition(reduceMotion: Bool) -> some View {
         #if os(visionOS)
-        transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
+        transition(reduceMotion ? AnyTransition(.opacity) : AnyTransition(.blurReplace))
         #else
         askGlassMaterialize()
         #endif

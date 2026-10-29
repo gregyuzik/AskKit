@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// What confirming a proposal does.
 ///

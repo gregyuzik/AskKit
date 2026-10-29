@@ -1,8 +1,8 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import CoreGraphics
-import Foundation
+public import AskCore
+public import CoreGraphics
+public import Foundation
 
 /// Where a question came from: what the screen draws for it, and how Try
 /// Again asks it again.

@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 extension EnvironmentValues {
     /// Whether the host rests the composer in its tab view's bottom accessory

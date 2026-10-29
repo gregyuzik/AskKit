@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The card under an answer, whatever sits in it (a host's payload view, such
 /// as a chart or a status strip, or the confirmation card for something the

@@ -1,8 +1,8 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import CoreGraphics
-import SwiftUI
+public import AskCore
+public import CoreGraphics
+public import SwiftUI
 
 /// A photo waiting in the composer for the question it will go with
 /// (`AskConversationStore.attachPhoto`).

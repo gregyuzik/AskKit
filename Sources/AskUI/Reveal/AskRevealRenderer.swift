@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import Foundation
-import SwiftUI
+public import Foundation
+public import SwiftUI
 
 /// The instant a run of answer text arrived, on the reveal clock, stamped on
 /// the piece of text that carries it so the renderer can fade it by run.

@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// The nothing-to-ask first screen's button: its label, in the host's words,
 /// and what a tap on it does, such as opening the host's sheet for adding a
@@ -81,8 +81,8 @@ public struct AskFirstScreen<Mark: View>: View {
     /// when the column's own animation is off.
     private static var makingRoom: AnyTransition {
         .asymmetric(
-            insertion: .opacity.animation(.easeIn(duration: 0.2).delay(0.12)),
-            removal: .opacity.animation(.easeOut(duration: 0.1))
+            insertion: AnyTransition(.opacity).animation(.easeIn(duration: 0.2).delay(0.12)),
+            removal: AnyTransition(.opacity).animation(.easeOut(duration: 0.1))
         )
     }
 

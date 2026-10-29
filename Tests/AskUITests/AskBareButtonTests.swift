@@ -98,7 +98,8 @@ import Testing
     private func alpha(in image: CGImage, x: Int, y: Int) -> Double {
         var pixel: [UInt8] = [0, 0, 0, 0]
         let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
-            guard let context = CGContext(
+            // `unsafe`: the context draws into `pixel`'s four bytes, and only inside this closure.
+            guard let context = unsafe CGContext(
                 data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
                 space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             ) else { return false }

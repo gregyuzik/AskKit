@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 import Synchronization
 
 /// One answer: the prose, the rows behind it, the rows to show, what kind of

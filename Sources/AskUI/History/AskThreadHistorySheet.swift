@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 
 /// The reader's chats in a sheet, from the toolbar's button: the list
 /// (`AskThreadHistoryList`), a search field, and Delete All Chats in the bar.

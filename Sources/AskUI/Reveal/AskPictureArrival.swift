@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// A picture that can land after the view it sits in is already drawn (a photo
 /// still decoding, an icon still on its way, a thumbnail read back from disk)
@@ -72,7 +72,7 @@ public struct AskPictureArrival<Value, Picture: View, Placeholder: View>: View {
     /// How the picture and its placeholder cross: a piece's own blur, scale and
     /// fade, run as a transition, or the fade alone under Reduce Motion.
     private var crossing: AnyTransition {
-        guard !reduceMotion else { return .opacity }
+        guard !reduceMotion else { return AnyTransition(.opacity) }
         return .modifier(
             active: AskPictureCrossing(blur: AskArrival.blur(for: .piece), scale: AskArrival.scale, opacity: 0),
             identity: AskPictureCrossing(blur: 0, scale: 1, opacity: 1)

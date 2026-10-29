@@ -823,7 +823,8 @@ import SwiftUI
         let (width, height) = (800, 320)
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         let drawn = bytes.withUnsafeMutableBytes { buffer in
-            guard let context = CGContext(
+            // `unsafe`: the context draws into `bytes`, sized for it, and only inside this closure.
+            guard let context = unsafe CGContext(
                 data: buffer.baseAddress,
                 width: width,
                 height: height,

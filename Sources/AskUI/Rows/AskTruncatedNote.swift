@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import AskCore
-import SwiftUI
+public import SwiftUI
 
 /// The one-line note under an answer that didn't finish. Not a failure: the
 /// prose above it is real, kept by the rule a finished answer is kept by, just

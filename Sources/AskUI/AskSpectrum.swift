@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// A run of colors the Ask screen wears where a host asks for it: the spectrum
 /// look, `AskScreen(store:spectrum:)`.

@@ -25,6 +25,12 @@ Deeper notes: `.claude/references/`.
   text; log `AskTriage.tag(for:)`, never the error. The push gate fails on any `warning:` that names a
   file under `Sources/`, `Tests/` or `Demo/` (catalogs, plists and assets as well as Swift),
   `Package.swift`, a macro's expansion buffer or one of AskKit's targets, untagged ones included.
+- **Imports and `unsafe`.** Under `InternalImportsByDefault` an `import` is internal: a module a
+  public or `@inlinable` signature names takes `public import`, one only a `package` signature names
+  `package import`, and either one left where nothing needs it is a warning, on each platform that
+  compiles the file. Strict memory safety makes an unmarked unsafe construct a warning too: mark it
+  `unsafe` with a line on why it is sound, or use a safe API (`AnyTransition(.opacity)`, not
+  `AnyTransition.opacity`, which SwiftUI declares `nonisolated(unsafe)`).
 - **Soft deprecations** (`deprecated: 100000`) never warn, so the push gate can't see them.
   `scripts/soft-deprecation-check.sh` lists every one AskKit calls (`soft-deprecations.md`).
 - **Strings.** Package strings need `bundle: #bundle`, or lookups fall through to the host's bundle.

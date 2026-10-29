@@ -1,8 +1,10 @@
 # Concurrency posture
 
 - **AskKit's posture, and a host's.** AskKit builds with `.defaultIsolation(MainActor.self)`,
-  `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility` and
-  `ExistentialAny`. A host needn't: its package may keep nonisolated default isolation, or leave
+  `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility`,
+  `ExistentialAny`, `InternalImportsByDefault` and `ImmutableWeakCaptures`, and the libraries and their
+  tests with `.strictMemorySafety()` too (`Package.swift`'s `approachable` and `memorySafe`). A host
+  needn't: its package may keep nonisolated default isolation, or leave
   `NonisolatedNonsendingByDefault` off. A host compiles against AskCore only while AskCore's public API
   states its isolation explicitly: actors, `nonisolated`, `@Sendable` closures and `Sendable` values.
 - **`nonisolated` everywhere public.** Every public enum, struct, protocol and extension in AskCore is

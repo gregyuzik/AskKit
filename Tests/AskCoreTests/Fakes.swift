@@ -588,7 +588,8 @@ nonisolated struct ShapelessSession: AskSession {
 
 /// One opaque pixel, for the paths that need a `CGImage` and never look at it.
 func onePixel() -> CGImage {
-    let context = CGContext(
+    // `unsafe`: `data:` is a raw pointer even when nil, and nil has Core Graphics allocate the buffer.
+    let context = unsafe CGContext(
         data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 0,
         space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(alpha: .premultipliedLast)
     )

@@ -1,7 +1,7 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
 import Foundation
-import FoundationModels
+public import FoundationModels
 
 /// The process's model facts, behind one protocol: which tiers can serve and
 /// why not, building sessions, the cooldown after a transport failure, the

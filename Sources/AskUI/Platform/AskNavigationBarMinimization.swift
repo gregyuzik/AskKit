@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 extension EnvironmentValues {
     /// Whether the host has pushed an item over the Ask screen, from the

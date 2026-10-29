@@ -1,7 +1,7 @@
 #if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
 
 import Foundation
-import FoundationModels
+public import FoundationModels
 import Network
 import os
 import Synchronization

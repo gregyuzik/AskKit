@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The banner over the first screen when the chat saved last time couldn't be
 /// read, so an empty screen where the reader's chat used to be says why.

@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// A bank of result tiles under an answer (the pictures it stood on), laid out
 /// in AskKit's columns and brought in a tile at a time, the way the answer's

@@ -1,5 +1,5 @@
 import Foundation
-import os
+public import os
 
 /// What the snapshot loop measured, gathered inside the streaming closure and
 /// read once it returns.

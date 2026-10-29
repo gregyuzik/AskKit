@@ -1,6 +1,6 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import SwiftUI
+public import SwiftUI
 
 /// The measures the Ask screen is laid out to: the reading width, how many
 /// starters the first screen offers, and the columns of a bank of tiles.

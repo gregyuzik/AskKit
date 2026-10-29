@@ -1,7 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
-import AskCore
-import SwiftUI
+public import AskCore
+public import SwiftUI
 #if !os(macOS)
 // For the pasteboard item's type identifier: `setItems(_:options:)` takes a
 // dictionary keyed by type, where `.string` takes a bare string.
@@ -391,7 +391,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 Color.clear
             case .about:
                 firstScreenAbout
-                    .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
+                    .transition(reduceMotion ? AnyTransition(.opacity) : AnyTransition(.blurReplace))
             case .chats:
                 chatsPane
                     .transition(.opacity)
@@ -985,7 +985,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             thread
         } else if stage.firstScreenIsKnown {
             firstScreen
-                .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
+                .transition(reduceMotion ? AnyTransition(.opacity) : AnyTransition(.blurReplace))
         } else {
             // No first screen until the library has been read, while every
             // library reads as empty (`AskStage.firstScreenIsKnown`). Clear
@@ -1645,7 +1645,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             follow.scrollPhaseChanged(phase)
         }
         #endif
-        .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
+        .transition(reduceMotion ? AnyTransition(.opacity) : AnyTransition(.blurReplace))
     }
 
     /// Edit & Resend: the question goes back in the composer with what it was
