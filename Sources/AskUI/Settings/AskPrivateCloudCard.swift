@@ -124,7 +124,7 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
             return AskQuotaBanner.line(resetDate: resetDate)
         case .notEntitled:
             return String(localized: "Private Cloud Compute isn't enabled in this build.", bundle: #bundle,
-                          comment: "Settings line: the running app does not carry the Private Cloud Compute entitlement, so answers come from the on-device model.")
+                          comment: "Settings line: this build of the app sends Private Cloud Compute nothing, so answers come from the on-device model. Either the app doesn't hold the Private Cloud Compute entitlement, or it is a development build kept off Private Cloud Compute to save the developer's daily quota.")
         case .deviceNotEligible:
             return String(localized: "Private Cloud Compute isn't available on this device.", bundle: #bundle,
                           comment: "Settings line: the hardware cannot use Private Cloud Compute.")

@@ -1143,11 +1143,12 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// What came of a proposal, as VoiceOver words it, new each time an
     /// outcome is set.
     ///
-    /// The screen doesn't announce it: the card moves VoiceOver's focus to
-    /// the same line where the reader said yes or not now, and the host's
-    /// editor takes the focus on a hand-off, so an announcement would say it
-    /// twice (`AskScreen`). A host whose own control confirms or declines a
-    /// proposal can speak it.
+    /// The card moves VoiceOver's focus to the same line where the reader
+    /// said yes or not now, and the screen speaks this only where that line
+    /// hasn't claimed it a beat after it came (`AskUnclaimedEnding`). Nothing
+    /// speaks it for a hand-off, where the host's editor takes the focus, nor
+    /// for an outcome nobody waited on at the card. A host whose own control
+    /// confirms or declines a proposal can speak it.
     public private(set) var proposalAnnouncement: AskProposalAnnouncement?
 
     /// The turn whose card the reader said yes or not now on, while they wait

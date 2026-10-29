@@ -117,7 +117,11 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// The daily Private Cloud Compute quota is spent. `resetDate` is when it
     /// resets, when that is known. The turn is handed down to the on-device
     /// model when that model can serve, and this is the turn's error when it
-    /// can't, which Try Again retries: the quota may have come back.
+    /// can't. Once the quota is known to be spent, a question with nothing
+    /// below to serve it fails with this at once, asking Private Cloud Compute
+    /// nothing and spending no request, with the reset date the mirror holds
+    /// (`AskModelStatus.resetDate`). Retryable: Try Again asks once the quota
+    /// has reset.
     case quotaReached(resetDate: Date?)
     /// An unclassified model failure, carrying a tag for the log
     /// (`AskTriage.tag(for:)`): the error's case name, its domain and code,

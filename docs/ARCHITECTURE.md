@@ -169,10 +169,12 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
 5. **The tier.** The engine reads every tier's state once (`AskModelSeam.tierStates()`). A tier is
    servable when it is available, speaks the answer language, has quota left and isn't cooling down
    after a failure. Private Cloud Compute is listed first, so it serves whenever it can. With nothing
-   servable, a Private Cloud Compute held off only by its cooldown or a spent quota takes the turn all
-   the same, since the outage that held it was a turn's error, which Try Again retries ([house rule
-   1](#5-the-house-rules)); otherwise the turn fails with the reason (`AskError.modelUnavailable`). The
-   first event is `.tier`.
+   servable, a Private Cloud Compute held off only by its cooldown takes the turn all the same, since
+   the outage that cooled it was a turn's error, which Try Again retries ([house rule
+   1](#5-the-house-rules)). One whose quota is spent is the turn's too, and asked nothing: the turn fails
+   at once as `AskError.quotaReached`, with the reset date the mirror holds, since until then every
+   request would fail the same way and spend one. Otherwise the turn fails with the reason
+   (`AskError.modelUnavailable`). The first event is `.tier`, the spent tier's included.
 6. **The session.**
    - **Continuing.** The question continues the thread's kept conversation when that conversation is on
      this tier, under the domain's turn limit, not flagged for a fresh session and not due to roll over.
@@ -361,16 +363,17 @@ failure, the service unavailable, a rate limit, a timeout, being offline, or the
   the thread's tail, so a handed-down follow-up or "Another pick" still has the last exchanges.
 
 With nothing to hand down to, the outage is the turn's error, and Try Again retries it: on Private Cloud
-Compute, which takes the turn though it is cooling, since nothing else can (§2, step 5). **Nor with no
-time to answer:** a turn that has drawn prose hands down only while at least 10 s of its deadline are
-left (`AskEngine.restartFloor`), since a fallback with less is likelier to draw nothing than something,
-and the reader would lose the prose for an empty turn. Below that the outage is the turn's error,
-rendered under the prose, and the tier still cools. A turn that has drawn nothing hands down however
-little is left. The 10 s is bounded by measurements (Private Cloud Compute's first word at 5 to 20 s, an
-on-device answer at about 13 s whole), not one itself. Nothing is handed down twice. A refusal, an
-overflowing context or an ungrounded answer is never handed down, since the other model would reach the
-same verdict, only later. Nor is a failure of the host's own search (`AskDomain.search`): it fails the
-turn as `.model(tag:)` and cools nothing, since a host's network error isn't Private Cloud Compute's.
+Compute, which takes the turn though it is cooling, since nothing else can, while a spent quota is asked
+nothing until its reset, and the turn fails at once as the quota (§2, step 5). **Nor with no time to
+answer:** a turn that has drawn prose hands down only while at least 10 s of its deadline are left
+(`AskEngine.restartFloor`), since a fallback with less is likelier to draw nothing than something, and
+the reader would lose the prose for an empty turn. Below that the outage is the turn's error, rendered
+under the prose, and the tier still cools. A turn that has drawn nothing hands down however little is
+left. The 10 s is bounded by measurements (Private Cloud Compute's first word at 5 to 20 s, an on-device
+answer at about 13 s whole), not one itself. Nothing is handed down twice. A refusal, an overflowing
+context or an ungrounded answer is never handed down, since the other model would reach the same verdict,
+only later. Nor is a failure of the host's own search (`AskDomain.search`): it fails the turn as
+`.model(tag:)` and cools nothing, since a host's network error isn't Private Cloud Compute's.
 
 ### Continuation: tail, referent, recap, rollover
 
@@ -875,11 +878,12 @@ away. Tapping the thread does the same, except on the Mac.
 
 ### The toolbar
 
-- **The tier caption** names the tier that is answering or will answer next: the navigation subtitle, or
-  leading the bar on visionOS and where a top tab bar hides the title. "Private Cloud Compute" is a name
-  and isn't translated; "On device" is. Its line is always reserved, so a caption appearing mid-turn
-  moves nothing. Leading an iPad's bar, it stops growing at the largest size short of the accessibility
-  sizes, as the bar's own items do, and a long press shows it larger (the Large Content Viewer).
+- **The tier caption** names the tier that is answering or will answer next: the navigation subtitle,
+  iPhone Duo's bar strip included, or leading the bar on visionOS and where a top tab bar hides the
+  title. "Private Cloud Compute" is a name and isn't translated; "On device" is. Its line is always
+  reserved, so a caption appearing mid-turn moves nothing. Leading an iPad's bar, it stops growing at the
+  largest size short of the accessibility sizes, as the bar's own items do, and a long press shows it
+  larger (the Large Content Viewer).
 - **New Chat** is pinned trailing, a high-priority primary action on the Mac. **History** sits beside it
   for a domain that keeps its thread, except beside iPhone Duo's fold, where the chats are on screen.
   **Done** shows on iOS while the reader types, and is the last of the screen's items to overflow; in
@@ -900,9 +904,12 @@ away. Tapping the thread does the same, except on the Mac.
 
 ### Accessibility
 
-- **Every terminal state is announced** at high priority (`AskAnnouncement`): an answer, one cut short by
-  the deadline, one the reader stopped ("You stopped this answer", the line it shows), a failure, and an
-  answer to a question asked with a photo that no model saw ("Answer ready. It read your words only.").
+- **Every terminal state is announced** at high priority (`AskAnnouncement`), once however many windows
+  show the store: an answer, one cut short by the deadline, one the reader stopped ("You stopped this
+  answer", the line it shows), a failure, and an answer to a question asked with a photo that no model
+  saw ("Answer ready. It read your words only."). A failure waits a beat, about a second, since its line
+  may take VoiceOver's focus from the wait row and be read there: it is announced only if no line has
+  claimed it by then (`AskUnclaimedEnding`), so it is heard once either way.
 - **VoiceOver's focus follows what the reader did.** The control they tapped often goes as they tap it,
   and the element that should have the focus is often not in the accessibility tree yet, where a focus
   set goes nowhere. So the screen leaves a request (`AskVoiceOverTarget`, `AskWaitRowFocus`) that the
@@ -923,10 +930,12 @@ away. Tapping the thread does the same, except on the Mac.
   - Edit & Resend sends it to the field, and so does a tap on the face in a host's slot, held until the
     composer comes up over the face, which goes out of VoiceOver's way under it.
   - The card moves it to its outcome line after the reader's own yes or not now, once that line is in the
-    tree, and VoiceOver reads the outcome there; a hand-off moves nothing, since the host's editor takes
-    the focus. That request is the store's (`proposalOutcomeFocus`), not the card's, so a question asked
-    while the app works drops it, and a card the thread rebuilt meanwhile still takes it. The store still publishes `proposalAnnouncement` for a host whose own control confirms or
-    declines a proposal.
+    tree, and VoiceOver reads the outcome there; where the focus hasn't landed on the line a beat after
+    the outcome came, the screen announces it instead. A hand-off moves nothing and announces nothing,
+    since the host's editor takes the focus. That request is the store's (`proposalOutcomeFocus`), not
+    the card's, so a question asked while the app works drops it, and a card the thread rebuilt
+    meanwhile still takes it. The store still publishes `proposalAnnouncement`, which the screen speaks
+    for nothing else, for a host whose own control confirms or declines a proposal.
 - **Identifiers.** Every control has an `ask.*` identifier (`AskAccessibility`), so one UI-test recipe
   drives every host, the history sheet's search field excepted, since `searchable` takes none.
 - **Dynamic Type.** The mark scales with it, and a control's frame grows by what its glyph grows, not in
@@ -1013,8 +1022,8 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
    reader gets no switch.** The tier is chosen once a turn, from one read of every tier's state; an
    outage on Private Cloud Compute (unreachable, offline, rate-limited, timed out, over quota, or stopped
    by its context gate) hands the turn down once; with nowhere to hand it, it is the turn's error, which
-   Try Again retries. Refusals, overflows and ungrounded answers are never handed down, and the caption
-   names the tier answering.
+   Try Again retries, though a spent quota is asked nothing until its reset. Refusals, overflows and
+   ungrounded answers are never handed down, and the caption names the tier answering.
 
    *Why:* the larger model answers better and reads photos, so it should serve whenever it can. A toggle
    would be a second, contradictory answer to a question the engine decides on every turn, and a reader

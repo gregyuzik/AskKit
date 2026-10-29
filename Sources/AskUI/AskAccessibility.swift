@@ -288,9 +288,10 @@ nonisolated public struct AskProposalAnnouncement: Equatable, Sendable {
 /// announcement of the same words would be heard twice, or cut into that
 /// reading. Claimed when the move was asked for, a move that missed left the
 /// ending claimed and never spoken (house rule 8). Claimed as it lands, it
-/// comes after the screen's claim, a main-actor turn after the turn ends, so
-/// until the screen waits longer than a move takes before it claims, a failure
-/// line that takes the focus is announced and then read.
+/// would come after a claim the screen made as the turn ended, so the screen
+/// waits a beat before it speaks a failure or an outcome the reader waited
+/// on, and speaks only what no line has claimed by then
+/// (`AskUnclaimedEnding`): a line that takes the focus is read once.
 nonisolated struct AskSpeechLedger {
     /// Something VoiceOver is told once.
     enum Line: Hashable {

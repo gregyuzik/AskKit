@@ -3,7 +3,12 @@
 /// then the finished answer.
 nonisolated public enum AskTurnEvent<Row: AskRow>: Sendable, Equatable {
     /// The tier this turn runs on, chosen once at its start, and again for
-    /// the tier a hand-down moves it to.
+    /// the tier a hand-down moves it to, or for the tier a host's session
+    /// runs on where that isn't the one asked for (`AskSessionBox.tier`).
+    ///
+    /// A Private Cloud Compute whose quota is spent, with no tier below that
+    /// can serve, is yielded too: the turn is its, and fails at once as
+    /// `AskError.quotaReached`, having asked it nothing.
     case tier(AskTier)
     /// What the turn is doing right now.
     case activity(AskActivity)

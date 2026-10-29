@@ -8,7 +8,8 @@ Deeper notes: `.claude/references/`.
   `#available`. Compile for all five, though Ask shows only on iOS, macOS and visionOS. A host's
   shared package links AskCore on tvOS and watchOS too, so a wrong platform gate breaks the host; the
   push gate builds all five. Foundation Models files take `#if canImport(FoundationModels) && !os(tvOS)`,
-  plus `&& !os(watchOS)` around `SystemLanguageModel` (`platform-gates.md`).
+  plus `&& !os(watchOS)` around `SystemLanguageModel` and `LanguageModelSession.ToolCallError`
+  (`platform-gates.md`).
 - **`nonisolated` public API.** Spell every public value type, protocol and extension in AskCore
   `nonisolated`. Otherwise `InferIsolatedConformances` gives it a main-actor conformance that a host
   without AskKit's posture can't use. A host's "call to main actor-isolated … in a synchronous

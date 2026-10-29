@@ -27,6 +27,8 @@ The public API is unchanged.
   engine finds as it is built are faults.
 - **`AskAsking.recordFeedback`'s `isLatestTurn` is false while diagnostics are off**, and
   `declinedStarters` no longer holds declined follow-ups.
+- **An `AskComposer` a host draws outside `AskScreen` puts its keyboard away from the chevron by
+  writing its focus binding**, rather than resigning the key window's first responder.
 - **The push gate fails when fewer than 1,350 package tests run**, where it was 600, and `ci.sh
   test-ios` when fewer than 1,320 pass, so an over-tight `#if` can no longer compile out most of
   AskUI's tests unnoticed.
@@ -34,9 +36,11 @@ The public API is unchanged.
 ### Fixed
 
 - **The engine and the seam.**
-  - When Private Cloud Compute is held off only by its cooldown or a spent quota and nothing below
-    can serve, Try Again asks it again, instead of failing with the on-device model's reason and no
-    Try Again, and New Chat no longer shows the can't-serve screen for it.
+  - When Private Cloud Compute is held off only by its cooldown and nothing below can serve, Try Again
+    asks it again, instead of failing with the on-device model's reason and no Try Again. When its
+    day's quota is spent and nothing below can serve, a question fails at once with the quota's line
+    and the reset the banner shows, and spends no request; Try Again asks once the quota resets. Either
+    way New Chat no longer shows the can't-serve screen for it.
   - A timeout on Private Cloud Compute is an outage: the turn is handed down and the tier cools.
   - A session a host's router answers with on another tier decides the turn's photos and the triage
     of its failures, so an on-device session answering for Private Cloud Compute is sent no photo and
@@ -73,8 +77,10 @@ The public API is unchanged.
     question waits to be asked. A question stopped before it was asked goes back to the composer. A
     follow-up and a starter with matching words and id no longer hide each other.
   - A screen built while an answer is streaming, in a second window or a rebuilt split view's detail,
-    follows the answer and offers Jump to latest. Putting the keyboard away resigns only in the
-    screen's own window, so it can't take another window's keyboard.
+    follows the answer and offers Jump to latest. Putting the keyboard away, as a question starts, from
+    Done, the composer's chevron or a tap on the thread, resigns only in the screen's own window, so it
+    can't take another window's keyboard, and AskKit no longer reaches for `UIApplication.shared` to
+    put it away.
   - The composer's hint wraps to as many lines as the field grows to, four at most, and the capsule
     grows to hold it, so it no longer ends in an ellipsis at the accessibility sizes. The capsule's
     tint is worked out on the accent as the screen resolves it, its High Contrast variant included.
@@ -88,12 +94,15 @@ The public API is unchanged.
     it no longer starts over and spends Private Cloud Compute's quota again. A chat's "when" in the
     list of chats stays current while it's on screen.
   - The thread's follow-up and coaching chips and Try Again are fills rather than glass, so they read
-    cleanly under the glass bar. The nothing-to-ask button is tinted with the color its label is judged
-    on, so a host's `.tint` around the screen can't put the label on a fill it wasn't checked against.
+    cleanly under the glass bar. The nothing-to-ask button wears the accent the host handed
+    `AskScreen`, not the app's, as the tint its label is judged on, so a host's `.tint` around the
+    screen can't put the label on a fill it wasn't checked against.
 - **Accessibility.**
   - VoiceOver stays on the turn when Private Cloud Compute hands down or the conversation rolls over,
     and Try Again under prose a failed turn keeps takes it to the wait row of the question asked below.
-    A failure or a proposal's outcome is claimed as heard only once VoiceOver's focus reaches its line.
+    A failure, or a proposal's outcome the reader waited on, is heard once: read where VoiceOver's focus
+    lands on its line, or announced about a second after it lands where the focus never reached it,
+    rather than announced and then read.
   - Opening an earlier chat from the pane beside iPhone Duo's fold keeps VoiceOver on the row tapped,
     which becomes the open chat, and VoiceOver says which chat is opening, from the pane and from the
     sheet. The open chat's check shows under Bold Text too.
@@ -108,8 +117,9 @@ The public API is unchanged.
 - **Scripts.** `scripts/normalize-catalogs.py` writes a catalog whole or not at all, so an interrupted
   run no longer leaves it truncated.
 - **The documentation.** `AskBrand.logSubsystem` and `AskGenerationGate` no longer suggest building a
-  generation gate to log under the brand's subsystem, which split the process's one gate:
-  `AskGenerationGate.shared` is the gate a host's generations and its seam wait at. The README and
+  generation gate to log under the brand's subsystem, which split the process's one gate, and
+  `AppleModelSeam`'s `gate:` says to leave it at `AskGenerationGate.shared`, the gate a host's own
+  on-device generations wait at too. The README and
   `docs/ARCHITECTURE.md` say what this release changed, among them that a proposal runs at most once
   for each yes, and that `starters(overview:window:)`'s `window` is a maximum.
 - **README and demo.** README.md's sample search lists the whole shelf when no word of the question
