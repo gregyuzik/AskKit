@@ -66,6 +66,7 @@ import FoundationModels
         // What an app's URL router and its widgets call, off any actor.
         let link = try #require(AskLink.url(scheme: "demo", question: "hi"))
         #expect(AskLink.question(from: link, scheme: "demo") == "hi")
+        #expect(URLComponents(url: link, resolvingAgainstBaseURL: false)?.queryItems?.first?.name == AskLink.questionItem)
         let verdict = AskFeedback(
             sentiment: .positive, tier: .onDevice, questionKind: nil,
             tilesShown: 0, rowsRead: 2, wasTruncated: false
@@ -207,6 +208,18 @@ import FoundationModels
         #expect(AskAccessibility.privateCloudRunEval == "ask.privateCloud.runEval")
         #expect(AskAccessibility.privateCloudShareResults == "ask.privateCloud.shareResults")
         #expect(AskAccessibility.privateCloudShareFeedback == "ask.privateCloud.shareFeedback")
+        #expect(AskAccessibility.thinking == "ask.thinking")
+        #expect(AskAccessibility.results == "ask.results")
+        #expect(AskAccessibility.jumpToLatest == "ask.jumpToLatest")
+        #expect(AskAccessibility.coaching == "ask.coaching")
+        #expect(AskAccessibility.feedbackNegative == "ask.feedback.negative")
+        #expect(AskAccessibility.historyList == "ask.history.list")
+        #expect(AskAccessibility.historyCurrent == "ask.history.current")
+        #expect(AskAccessibility.historyDeleteAll == "ask.history.deleteAll")
+        #expect(AskAccessibility.historyPane == "ask.history.pane")
+        #expect(AskAccessibility.proposalConfirm == "ask.proposal.confirm")
+        #expect(AskAccessibility.proposalDecline == "ask.proposal.decline")
+        #expect(AskAccessibility.proposalOutcome == "ask.proposal.outcome")
     }
 
     /// Two turns compared off any actor, as a host's own view builder or a
@@ -227,14 +240,26 @@ import FoundationModels
         let phase = AskStage.Phase.cannotServe(.deviceNotEligible)
         #expect(phase != .ready)
         #expect(phase == .cannotServe(.deviceNotEligible))
+        #expect(AskStage.Phase.nothingToAskAbout != .ready)
         #expect(AskProposalPhase.awaiting.takesATap)
         #expect(!AskProposalPhase.done(nil).takesATap)
         #expect(AskProposalPhase.failed(nil, canRetry: true) != .notDone)
         #expect(!AskProposalPhase.outcomeUnknown.takesATap)
+        #expect(!AskProposalPhase.handedOff(nil).takesATap && !AskProposalPhase.declined.takesATap)
         let state = AskPrivateCloudState.of(quotaReached: false, quotaApproaching: false, unavailability: .notEntitled)
         #expect(state == .notEntitled)
         #expect(!state.isServing)
         #expect(!state.message().isEmpty)
+        // Every other state the card can be in, worked out as it works them out.
+        let states = [
+            AskPrivateCloudState.of(quotaReached: false, quotaApproaching: true, unavailability: nil),
+            .of(quotaReached: true, quotaApproaching: false, unavailability: nil),
+            .of(quotaReached: false, quotaApproaching: false, unavailability: .offline),
+            .of(quotaReached: false, quotaApproaching: false, unavailability: .languageNotSupported),
+            .of(quotaReached: false, quotaApproaching: false, unavailability: .systemNotReady)
+        ]
+        #expect(states == [.approachingLimit, .limitReached, .offline, .languageNotSupported, .unavailable])
+        #expect(states.map(\.isServing) == [true, false, false, false, false])
     }
 
     /// The mirror's own flag for having heard from its seam, read where the
@@ -443,6 +468,279 @@ extension CrossPostureTests {
         #expect(AskModelStatus.Snapshot(nextTier: .onDevice) != AskModelStatus.Snapshot())
     }
 }
+
+// MARK: - The rest of the public API, named
+
+/// Public members nothing above names, each called the way a host calls it.
+/// A member this target never calls can lose the isolation it spells with
+/// nothing here to notice (AGENTS.md), so each one a host reaches for off any
+/// actor gets a line.
+extension CrossPostureTests {
+    /// What a host's own sink reads of a turn before it logs it its own way:
+    /// every field, and the two lines AskKit's sink builds from them.
+    @Test func aTurnsStatsAreReadWithoutThePosture() {
+        var stats = AskTurnStats(tier: .onDevice)
+        stats.snapshots = 4
+        stats.growths = 2
+        stats.characters = 40
+        stats.toolCalls = 1
+        stats.rowsRead = 3
+        stats.msToFirstTool = 120
+        stats.msToFirstWord = 300
+        stats.msToLastWord = 900
+        stats.msTotal = 1_000
+        stats.grounding = .appRetrieved
+        stats.retried = true
+        #expect(stats.meanDelta == 20)
+        #expect(stats.streamLine == "[stream] onDevice snapshots=4 growths=2 firstWord=300ms proseSpan=600ms "
+            + "chars=40 meanDelta=20 firstTool=120ms tools=1 rows=3 grounding=app retrieved retried total=1000ms")
+        #expect(stats.usageLine == nil)
+        stats.inputTokens = 120
+        stats.outputTokens = 30
+        #expect(stats.usageLine == "[usage] onDevice input=120 cached=– output=30 reasoning=–")
+        #expect(AskDiscard.Reason.deadlineWithNothingToKeep.rawValue == "deadline with nothing to keep")
+    }
+
+    /// What a seam of a host's own says of each tier, and the rest of what
+    /// it publishes, built and read off any actor.
+    @Test func aTiersStateIsReadWithoutThePosture() {
+        let cooled = AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true)
+        #expect(cooled.isCooled && !cooled.isServable)
+        #expect(AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: true).isServable)
+        var snapshot = AskModelStatus.Snapshot(hasLimitIncreaseSuggestion: true, privateCloudUnavailability: .offline)
+        #expect(snapshot.hasLimitIncreaseSuggestion && snapshot.privateCloudUnavailability == .offline)
+        snapshot.privateCloudUnavailability = nil
+        #expect(snapshot != AskModelStatus.Snapshot(hasLimitIncreaseSuggestion: true, privateCloudUnavailability: .offline))
+    }
+
+    /// What a host's diagnostics read on the main actor, where the mirror and
+    /// the app's switch live: what the seam last published, and whether the
+    /// app turned diagnostics on.
+    @MainActor
+    @Test func aMirrorsPrivateCloudFieldsAreReadWhereItLives() {
+        let status = AskModelStatus()
+        status.apply(.init(nextTier: .onDevice, hasLimitIncreaseSuggestion: true, privateCloudUnavailability: .notEntitled))
+        #expect(status.hasLimitIncreaseSuggestion)
+        #expect(status.privateCloudUnavailability == .notEntitled)
+        #expect(AskDiagnostics.enabledByApp || !AskDiagnostics.enabledByApp)
+        #expect(AskDiagnostics.isDebugBuild || !AskDiagnostics.isDebugBuild)
+    }
+
+    /// What an answer says about itself, read off any actor, as a host's own
+    /// footer reads the answer it is handed: whether it was cut short, the
+    /// rows its prose names, and the bounds on its tiles.
+    @Test func anAnswersOwnReadingsAreMadeWithoutThePosture() {
+        let rows = [CrossPosturePlainRow(id: "Dune"), CrossPosturePlainRow(id: "Emma")]
+        let answer = AskAnswer(text: "Dune is the longer one.", matches: rows, isTruncated: true)
+        #expect(answer.isTruncated)
+        #expect(answer.mentioned == [rows[0]])
+        #expect(AskAnswer<CrossPosturePlainRow>.maxTiles == 24)
+        #expect(AskAnswer<CrossPosturePlainRow>.wholeWordBelow == 4)
+    }
+
+    /// What a domain's overview and brand say, built and read off any actor.
+    @Test func anOverviewsOrderAndABrandsActionAreReadWithoutThePosture() {
+        let overview = AskOverview(
+            scopes: [AskOverview.Scope(id: "albums", name: "Albums", count: 2), AskOverview.Scope(id: "books", name: "Books", count: 5)],
+            total: 7
+        )
+        #expect(overview.byCount.map(\.id) == ["books", "albums"])
+        let brand = AskBrand(
+            title: "Ask", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+            logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
+            firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
+            nothingToAskCopy: "Nothing to ask about yet.", nothingToAskActionLabel: "Add a row",
+            disclosureSentence: "Answers come from your rows.", scopeCaveat: "Only your rows."
+        )
+        #expect(brand.nothingToAskActionLabel == "Add a row")
+    }
+
+    /// A proposal's detail, the bound on its payload and the lines the model
+    /// reads once it has proposed, off any actor, and the two outcomes the
+    /// tests above don't keep, as the thread file keeps them.
+    @Test func aProposalsDetailAndReceiptsAreReadWithoutThePosture() throws {
+        let proposal = AskProposal(title: "Lend The Peregrine", detail: "To Sam, until June", actionLabel: "Lend")
+        #expect(proposal.detail == "To Sam, until June")
+        #expect(AskProposal.maxPayloadBytes == 4_096)
+        #expect(AskProposal.modelReceipt.hasPrefix("Proposed, not done"))
+        #expect(AskProposal.handOffReceipt.hasPrefix("Proposed, not done"))
+        for outcome in [AskProposalOutcome.handedOff("Opened the form."), .declined] {
+            let kept = try JSONEncoder().encode(outcome)
+            #expect(try JSONDecoder().decode(AskProposalOutcome.self, from: kept) == outcome)
+        }
+    }
+
+    /// The line under every failure, read off any actor as a host's own
+    /// screen or Siri intent says it.
+    @Test func everyErrorsLineIsReadWithoutThePosture() {
+        let errors: [AskError] = [
+            .modelUnavailable(.offline), .couldNotAnswer, .ungrounded, .refused, .privateCloudUnreachable,
+            .contextTooLarge, .photosNotSupported, .quotaReached(resetDate: nil), .stopped
+        ]
+        #expect(errors.allSatisfy { !($0.errorDescription ?? "").isEmpty })
+        #expect(AskError.modelUnavailable(.offline).errorDescription == AskError.unavailableMessage(.offline))
+        #expect(AskUnavailability.allCases.allSatisfy { !AskError.unavailableMessage($0).isEmpty })
+        let reasons: [AskUnavailability] = [.appleIntelligenceOff, .systemNotReady, .languageNotSupported, .offline]
+        #expect(Set(reasons.map(\.rawValue)).count == 4)
+    }
+
+    /// One entry's failure, date and photo fields, read off any actor as a
+    /// host's own archive reads the thread file.
+    @Test func aThreadEntrysOtherFieldsAreReadWithoutThePosture() {
+        let asked = Date(timeIntervalSinceReferenceDate: 0)
+        let entry = AskThreadEntry<CrossPosturePlainRow>(
+            question: "What is this?", text: "", answer: nil,
+            failureMessage: "Couldn't answer that just now.", failure: .couldNotAnswer, failureIsRetryable: true,
+            askedAt: asked, summarizedBefore: true, proposalOutcome: .declined,
+            photo: AskQuestionPhoto(label: "A record sleeve", reference: "asset-1"), answerSawPhoto: true
+        )
+        #expect(entry.failureMessage == "Couldn't answer that just now." && entry.failureIsRetryable)
+        #expect(entry.askedAt == asked && entry.summarizedBefore)
+        #expect(entry.proposalOutcome == .declined && entry.answerSawPhoto)
+    }
+
+    /// What bounds the thread, the archive and the feedback attachments, and
+    /// what each reads where nothing has been written, asked off any actor.
+    /// Under a folder nobody creates, as the store's are above.
+    @Test func theStoresBoundsAndFirstReadsAreUsableWithoutThePosture() async {
+        #expect(AskThreadStore<CrossPosturePlainRow>.maxPersistedTurns == 50)
+        #expect(AskThreadArchive<CrossPosturePlainRow>.maxThreads == 50)
+        #expect(AskFeedbackAttachments.maxKept == 10)
+        let folder = FileManager.default.temporaryDirectory
+            .appending(path: "AskKitCrossPosture-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let thread = AskThreadStore<CrossPosturePlainRow>(
+            appDirectory: "AskKitCrossPosture", url: folder.appending(path: "thread.json"),
+            logSubsystem: "askkit.crossposture"
+        )
+        guard case .empty = await thread.load() else {
+            Issue.record("a thread never written reads as none")
+            return
+        }
+        let archive = AskThreadArchive<CrossPosturePlainRow>(
+            appDirectory: "AskKitCrossPosture", directory: folder.appending(path: "threads"),
+            logSubsystem: "askkit.crossposture"
+        )
+        #expect(await archive.summaries().isEmpty)
+        let attachments = AskFeedbackAttachments(
+            appDirectory: "AskKitCrossPosture", directory: folder.appending(path: "feedback"),
+            logSubsystem: "askkit.crossposture"
+        )
+        #expect(await attachments.urls().isEmpty)
+    }
+
+    /// A host's own on-device generation, through the one gate the process
+    /// shares, from its own nonisolated code.
+    @Test func aHostsOwnGenerationWaitsAtTheSharedGateWithoutThePosture() async throws {
+        #expect(try await AskGenerationGate.run { 42 } == 42)
+        #expect(try await AskGenerationGate.run(gate: .shared, deadline: .seconds(5)) { "done" } == "done")
+    }
+}
+
+#if os(iOS) || os(macOS) || os(visionOS)
+/// AskUI's `nonisolated` values a host's own views and announcements read: a
+/// turn and its failure, what VoiceOver is told, how a piece arrives and the
+/// layout's measures.
+extension CrossPostureTests {
+    fileprivate typealias PlainTurn = AskTurn<CrossPosturePlainRow>
+
+    /// What VoiceOver is told as a turn ends and as a proposal comes to
+    /// something, worked out off any actor, as a host's own view announcing
+    /// it would.
+    @Test func whatVoiceOverIsToldIsWorkedOutWithoutThePosture() {
+        #expect(AskAnnouncement.terminal(for: PlainTurn?.none) == nil)
+        #expect(AskAnnouncement.terminal(for: PlainTurn(question: "How many?", origin: .typed)) == nil)
+        let failed = PlainTurn(entry: AskThreadEntry(
+            question: "How many?", text: "", answer: nil, failureMessage: "Not now.", failureIsRetryable: true
+        ))
+        #expect(AskAnnouncement.terminal(for: failed) == "Not now.")
+        let answered = PlainTurn(entry: AskThreadEntry(question: "How many?", text: "Two.", answer: AskAnswer(text: "Two.")))
+        #expect(AskAnnouncement.terminal(for: answered)?.isEmpty == false)
+
+        #expect(AskAnnouncement.proposal(.confirmed("Lent.")) == "Lent.")
+        #expect(AskAnnouncement.proposal(.handedOff("Opened the form.")) == "Opened the form.")
+        #expect(AskAnnouncement.proposal(.failed("Not reachable")) == "Not reachable")
+        #expect(AskAnnouncement.proposal(.declined)?.isEmpty == false)
+        #expect(AskAnnouncement.proposal(.performing) == nil)
+
+        // Each announcement is one of its own, so the same line twice is
+        // spoken twice.
+        let lent = AskProposalAnnouncement(line: "Lent.")
+        #expect(lent == lent && lent.line == "Lent.")
+        #expect(lent != AskProposalAnnouncement(line: "Lent."))
+    }
+
+    /// A turn's failure, built, compared and read off any actor, as a host's
+    /// own view builder reads the turn it is handed.
+    @Test func aTurnsFailureIsBuiltAndReadWithoutThePosture() {
+        let coaching = [AskStarter(text: "How many books do I own?")]
+        let failure = PlainTurn.Failure(message: "Not now.", retryable: false, error: .refused, coaching: coaching)
+        #expect(failure == PlainTurn.Failure(message: "Not now.", retryable: false, error: .refused, coaching: coaching))
+        #expect(!failure.retryable && failure.error == .refused && failure.coaching == coaching)
+        #expect(failure != PlainTurn.Failure(message: "Not now.", retryable: true))
+    }
+
+    /// What a host's view builder reads of the turn it is handed beyond its
+    /// question, off any actor: when it was asked, whether it has ended or
+    /// written anything, and what came of its photo and its proposal.
+    @Test func aTurnsStateIsReadWithoutThePosture() {
+        let asked = Date(timeIntervalSinceReferenceDate: 0)
+        let photo = AskQuestionPhoto(label: "A record sleeve", reference: "asset-1")
+        let fresh = PlainTurn(question: "What is this?", origin: .typed, askedAt: asked, photo: photo)
+        #expect(fresh.askedAt == asked && fresh.photoImage == nil)
+        #expect(!fresh.isComplete && !fresh.hasContent && !fresh.answeredWithoutPhoto)
+        #expect(!fresh.isPerformingProposal && !fresh.summarizedBefore && fresh.proposalOutcome == nil)
+
+        let read = PlainTurn(entry: AskThreadEntry(
+            question: "What is this?", text: "A record.", answer: AskAnswer(text: "A record."),
+            summarizedBefore: true, proposalOutcome: .declined, photo: photo
+        ))
+        #expect(read.isComplete && read.hasContent && read.summarizedBefore)
+        #expect(read.proposalOutcome == .declined)
+        #expect(!read.answerSawPhoto && read.answeredWithoutPhoto)
+    }
+
+    /// How a host's own piece under an answer comes up, and the measures it
+    /// lays its own views out to, compared and worked out off any actor.
+    @Test func theArrivalsKindsAndTheLayoutsMeasuresAreReadWithoutThePosture() {
+        #expect(AskArrival.Kind.line != .piece)
+        #expect(AskLayout.readingWidth == 680)
+        #if os(macOS) || os(visionOS)
+        #expect(AskLayout.starterBank == 8)
+        #else
+        #expect(AskLayout.starterBank == 3)
+        #endif
+        #expect(AskLayout.tileColumns(for: 1) == .adaptive(minimum: 150, maximum: 160, spacing: 8))
+        #expect(AskLayout.tileColumns(for: 2, tallestAspect: 0.5, spacing: 10) == .adaptive(minimum: 65, maximum: 70, spacing: 10))
+        #expect(AskLayout.tileColumns(for: 7).fit(in: 366).count == 4)
+    }
+
+    /// The pieces a host mounts on their own rather than through the screen,
+    /// and the modifiers it puts on views of its own, built on the main actor,
+    /// where each is isolated.
+    @MainActor
+    @Test func theScreensOtherPiecesAreBuiltWithoutThePosture() {
+        _ = AskHistoryButton {}
+        _ = AskNewChatButton(isEnabled: true) {}
+        _ = AskJumpToLatestPill {}
+        _ = AskQuotaBanner(resetDate: nil, canRequestMore: true) {}
+        let brand = AskBrand(
+            title: "Ask", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+            logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
+            firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
+            disclosureSentence: "Answers come from your rows.", scopeCaveat: "Only your rows."
+        )
+        _ = AskFirstScreen(
+            phase: .ready, brand: brand, starters: [AskStarter(text: "How many?")],
+            onStarter: { _ in }, mark: { AskDefaultMark(isLit: $0) }
+        )
+        _ = AskPictureArrival(Optional("Kind of Blue")) { Text(verbatim: $0) } placeholder: { Color.gray }
+        _ = Text(verbatim: "A tile of the host's own").askArrival(1, as: .line).askReadingColumn().askTierCaption(.onDevice)
+        _ = EmptyView().modifier(AskTierCaption(tier: nil)).environment(\.askItemIsPushed, true)
+        #expect(AskTierCaption.name(nil) == nil)
+        #expect(AskTierCaption.name(.privateCloud) == "Private Cloud Compute")
+    }
+}
+#endif
 
 #if canImport(FoundationModels) && !os(tvOS)
 /// A row and an envelope as a consumer without the posture declares them:
@@ -748,6 +1046,11 @@ extension CrossPostureTests {
         let origin = try JSONEncoder().encode(AskOrigin.reroll)
         #expect(try JSONDecoder().decode(AskOrigin.self, from: origin) == .reroll)
         #expect(AskOrigin.standalone.rawValue == "standalone")
+        #expect(AskOrigin.prefilled.rawValue == "prefilled")
+
+        // The levels a host's own session maps onto its model's.
+        let levels: [AskReasoningLevel] = [.light, .moderate, .deep]
+        #expect(levels.map(\.rawValue) == ["light", "moderate", "deep"])
     }
 
     /// The reply the model fills in, as a host's own session builds it from
@@ -783,6 +1086,96 @@ extension CrossPostureTests {
     }
 }
 
+extension CrossPostureTests {
+    /// The rest of what `AskDomain` defaults, heard off any actor by a
+    /// consumer that writes none of it.
+    @Test func theDomainsOtherDefaultsServeAConsumerThatWritesNone() async {
+        let domain = CrossPostureDomain()
+        #expect(domain.turnDeadline == .seconds(45))
+        #expect(domain.questionKinds == AskQuestionKind.default)
+        #expect(domain.maxTurns(for: .privateCloud) == 8 && domain.maxTurns(for: .onDevice) == 3)
+        #expect(domain.scopeLine(for: "albums") == nil)
+        #expect(domain.rerollableKinds.isEmpty)
+        let answer = AskAnswer(text: "Dune.", matches: [CrossPostureRow(id: "Dune")], questionKind: AskQuestionKind.pick)
+        #expect(!domain.isRerollable(answer, question: "Pick one for tonight"))
+        #expect(domain.evidenceScope(from: answer) == nil)
+        #expect(!domain.implementsDeterministicAnswer)
+        #expect(await domain.deterministicAnswer(for: "How many?") == nil)
+        #expect(await domain.photoThumbnail(for: AskQuestionPhoto(label: "A record sleeve", reference: "asset-1")) == nil)
+    }
+
+    /// What an engine answers a caller outside the thread, such as a Siri
+    /// intent, and what the store asks of it as the screen goes and a verdict
+    /// comes in, asked off any actor. The question is empty, so it throws
+    /// before any tier is asked.
+    @Test func anEnginesOtherCallsAreMadeWithoutThePosture() async {
+        let status = await MainActor.run { AskModelStatus() }
+        let engine = AskEngine(domain: CrossPostureDomain(), seam: CrossPostureSeam(status: status), log: CrossPostureQuietSink())
+        await #expect(throws: AskError.couldNotAnswer) { try await engine.answerOnce("  ") }
+        await engine.forgetWarmIfEmpty()
+        let verdict = AskFeedback(
+            sentiment: .negative, tier: .onDevice, questionKind: nil,
+            tilesShown: 0, rowsRead: 0, wasTruncated: false
+        )
+        #expect(await engine.recordFeedback(verdict, isLatestTurn: true) == nil)
+        let events: [AskEngine<CrossPostureDomain>.Event] = [.summarized, .refining]
+        #expect(events.first == .summarized)
+    }
+
+    /// A scenario's expectations and every field of its outcome, as a host's
+    /// own eval test sets and reads them, off any actor.
+    @Test func aScenariosExpectationsAndAnOutcomesFieldsAreReadWithoutThePosture() {
+        let scenario = AskScenario(
+            id: "count", question: "How many?", expectedKinds: [AskQuestionKind.count],
+            expectedTitles: ["Dune"], expectsNoTiles: true
+        )
+        #expect(scenario.expectedKinds == ["count"] && scenario.expectedTitles == ["Dune"] && scenario.expectsNoTiles)
+        var outcome = AskOutcome(id: scenario.id)
+        outcome.toolCalls = 2
+        outcome.milliseconds = 1_400
+        outcome.restarts = 1
+        outcome.isUngrounded = true
+        outcome.invented = ["Emma"]
+        outcome.proposed = true
+        outcome.misses = [.unexpectedProposal]
+        #expect(!outcome.isGood)
+        #expect(outcome.toolCalls == 2 && outcome.milliseconds == 1_400 && outcome.restarts == 1)
+        #expect(outcome.isUngrounded && outcome.invented == ["Emma"] && outcome.proposed)
+        #expect(outcome.misses.map(\.line) == ["CARD, expected none"])
+    }
+
+    /// The question kinds a domain lists in `questionKinds` and matches in
+    /// `rerollableKinds`, read off any actor.
+    @Test func everyQuestionKindIsReadWithoutThePosture() {
+        let kinds = [
+            AskQuestionKind.totalValue, AskQuestionKind.everyMatch, AskQuestionKind.yesNo,
+            AskQuestionKind.wear, AskQuestionKind.pairing, AskQuestionKind.suggestion
+        ]
+        #expect(Set(kinds).count == 6)
+        #expect(Set(kinds).isSubset(of: AskQuestionKind.all))
+        #expect(AskQuestionKind.showNoTiles == [AskQuestionKind.count, AskQuestionKind.totalValue, AskQuestionKind.yesNo])
+    }
+
+    /// A failure a host's own router hears from its sessions, triaged off any
+    /// actor: AskKit's own errors as they are, and a stop as one.
+    @Test func aHostsOwnFailureIsTriagedWithoutThePosture() {
+        #expect(AskTriage.askError(from: AskError.refused, tier: .onDevice) == .refused)
+        #expect(AskTriage.askError(from: CancellationError(), tier: .privateCloud) == .stopped)
+    }
+
+    /// What bounds a collector, and the rows and proposal it holds for the
+    /// turn, read by a host's own tool or test.
+    @Test func aCollectorsBoundsAndReadingsAreReadWithoutThePosture() async {
+        #expect(AskCollector<CrossPostureRow>.maxTurnRows == 80)
+        #expect(AskCollector<CrossPostureRow>.maxThreadRows == 200)
+        #expect(AskCollector<CrossPostureRow>.maxPayloadBytes == 16_384)
+        let collector = AskCollector<CrossPostureRow>()
+        await collector.record(rows: [CrossPostureRow(id: "Dune")])
+        #expect(await collector.groundingRows == [CrossPostureRow(id: "Dune")])
+        #expect(await collector.turnProposal == nil)
+    }
+}
+
 #if os(iOS) || os(macOS) || os(visionOS)
 extension CrossPostureTests {
     /// What a host whose own router builds its sessions wraps each one in.
@@ -815,13 +1208,20 @@ extension CrossPostureTests {
         let domain = CrossPostureDomain()
         // Both ways an app builds the seam, each with the declaration it must
         // make. Undeclared: this process holds no Private Cloud Compute. The
-        // second logs where the domain's own lines go.
+        // second logs where the domain's own lines go, a generation presumed
+        // wedged included, and waits at the one gate the process shares,
+        // spelled out as a host may spell the default.
         _ = AppleModelSeam(status: AskModelStatus(), privateCloudCompute: .undeclared)
         let engine = AskEngine(domain: domain, seam: AppleModelSeam.make(
             privateCloudCompute: .undeclared,
-            gate: AskGenerationGate(logSubsystem: domain.brand.logSubsystem),
+            gate: .shared,
             logSubsystem: domain.brand.logSubsystem
         ))
+        // A gate of its own, built and handed to no seam, which is how it
+        // stays: a seam waiting at one runs its generations beside every one
+        // at `shared`. Its initializer is public for tests until 0.3.0 takes
+        // it away.
+        _ = AskGenerationGate(logSubsystem: domain.brand.logSubsystem)
         let folder = FileManager.default.temporaryDirectory
             .appending(path: "AskKitCrossPosture-\(UUID().uuidString)", directoryHint: .isDirectory)
         let directory = domain.brand.appDirectory
@@ -905,6 +1305,7 @@ extension CrossPostureTests {
         #expect(stage.turns.isEmpty)
         #expect(stage == stage)
         #expect(!stage.firstScreenIsKnown)
+        #expect(!stage.lastHasText && !stage.lastIsComplete)
         #expect(pending?.photo.label == "A record sleeve")
         #expect(pending?.image.width == 1)
     }
@@ -923,6 +1324,35 @@ extension CrossPostureTests {
         let status = await MainActor.run { AskModelStatus() }
         let asker: any AskAsking<CrossPostureRow> = CrossPostureAsker(status: status, keeps: true)
         #expect(await asker.hasKeptConversation)
+    }
+
+    /// How long Apple's seam serves a probe from cache and holds a tier after
+    /// a transport failure, read off any actor by a host's own diagnostics.
+    @Test func theSeamsIntervalsAreReadWithoutThePosture() {
+        #expect(AppleModelSeam.reprobeInterval == 60)
+        #expect(AppleModelSeam.transportCooldown == 60)
+    }
+
+    /// What `AskAsking` defaults, asked off any actor of an engine of a
+    /// host's own that writes none of it, as the store asks it: a question
+    /// with a photo fails as one no model here takes, a scope goes as the
+    /// question would without it, and the rest do nothing.
+    @Test func whatAskAskingDefaultsServesAnEngineOfAHostsOwn() async throws {
+        let status = await MainActor.run { AskModelStatus() }
+        let asker = CrossPostureAsker(status: status, keeps: false)
+        await asker.forgetWarmIfEmpty()
+        await asker.showLimitIncrease()
+        await asker.resume(from: [])
+        let verdict = AskFeedback(
+            sentiment: .positive, tier: .onDevice, questionKind: nil,
+            tilesShown: 0, rowsRead: 0, wasTruncated: false
+        )
+        #expect(await asker.recordFeedback(verdict, isLatestTurn: true) == nil)
+        let photo = AskImageAttachment(label: "A record sleeve", image: crossPosturePixel())
+        await #expect(throws: AskError.photosNotSupported) {
+            for try await _ in asker.ask("What is this?", origin: .typed, images: [photo]) {}
+        }
+        for try await _ in asker.ask("How many?", origin: .prefilled, images: [], scope: "albums") {}
     }
 }
 
