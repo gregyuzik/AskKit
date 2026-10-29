@@ -71,6 +71,12 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   everything AskKit and the demo write already lives: Application Support.
 - **`INFOPLIST_FILE = AskKitDemo/Info.plist`** is a base plist that `GENERATE_INFOPLIST_FILE`'s keys
   are combined with. It carries the locale list and the URL scheme, and its comments say why.
+- **`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad`** lists all four orientations, upside
+  down included, on `AskKitDemo_iOS`. An iPad app that takes part in multitasking has to support
+  every one, and without them a device build warns "All interface orientations must be supported
+  unless the app requires full screen". The demo doesn't set `UIRequiresFullScreen` to quiet it:
+  AskKit lays out by size class and measured size, so the app stays resizable, as a host's should.
+  The iPhone's list is left unset: the check is the iPad's.
 - **The launch arguments.** Every `DemoLaunchArgument` but `-askAssistant` and `-askHoldTurn` is in
   each app scheme's Run arguments, off, so the scheme launches the demo plainly; tick one to use it. A
   flag for one platform alone, such as `-askTabs` or `-askCaptureWindow`, is listed in every scheme all
