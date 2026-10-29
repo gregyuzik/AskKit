@@ -68,6 +68,9 @@ public struct AskDefaultTiles<Row: AskRow>: View {
         }
     }
 
+    /// The radius of a card's corners.
+    private static var corner: CGFloat { 12 }
+
     @ViewBuilder
     private func card(_ row: Row, opener: AskItemOpenAction?, lineLimit: Int?) -> some View {
         let title = Text(verbatim: row.displayTitle)
@@ -80,10 +83,13 @@ public struct AskDefaultTiles<Row: AskRow>: View {
             // whole card is what a tap lands on.
             .frame(minHeight: AskGrowth.touchTarget)
             // A fill, not glass: tiles are content.
-            .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+            .background(.fill.tertiary, in: .rect(cornerRadius: Self.corner))
         if let opener {
             Button { opener.open(row.id) } label: { title }
                 .buttonStyle(.plain)
+                // Lit in the card's own corners. The fill is the card's
+                // shape, so Button Shapes adds none.
+                .askHoverEffect(in: .rect(cornerRadius: Self.corner))
         } else {
             title
         }

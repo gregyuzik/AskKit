@@ -1826,7 +1826,7 @@
       }
     },
     "Ask again" : {
-      "comment" : "Menu item that asks the same Ask question over, for a different answer.",
+      "comment" : "Menu item that asks the same Ask question over, for a different answer; and the Mac menu item, in the File menu, that asks the newest question over.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -2869,7 +2869,7 @@
       }
     },
     "Copy" : {
-      "comment" : "Menu item that copies the reader's own Ask question to the clipboard.",
+      "comment" : "Menu item that copies the reader's own Ask question to the clipboard; and the Mac menu item, in the File menu, that copies the newest question.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3018,7 +3018,7 @@
       }
     },
     "Copy answer" : {
-      "comment" : "Menu item that copies the answer to the reader's Ask question to the clipboard.",
+      "comment" : "Menu item that copies the answer to the reader's Ask question to the clipboard; and the Mac menu item, in the File menu, that copies the newest answer.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -4514,7 +4514,7 @@
       }
     },
     "Edit & Resend" : {
-      "comment" : "Menu item that puts the reader's Ask question back in the composer to change and send again.",
+      "comment" : "Menu item that puts the reader's Ask question back in the composer to change and send again; and the Mac menu item, in the File menu, that does it to the newest question.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

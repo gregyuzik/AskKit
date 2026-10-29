@@ -249,6 +249,10 @@ public struct AskChipRow: View {
                         .contentShape(outline)
                 }
                 .buttonStyle(.plain)
+                // Lit in the chip's own outline, not the rectangle round its
+                // frame. On visionOS the capsule is a fill on the window's
+                // glass (`askGlass`), which answers no gaze of its own.
+                .askHoverEffect(in: outline)
                 // **Inside the surface, not outside it.** Interactive
                 // glass takes the touches under it for its own press
                 // effect, so a menu attached outside the capsule never
@@ -294,6 +298,7 @@ public struct AskChipRow: View {
             .contentShape(outline)
         }
         .buttonStyle(.plain)
+        .askHoverEffect(in: outline)
         .modifier(AskChipSurface(surface: surface, outline: outline, id: "ask.chip.action", in: glass))
         .accessibilityHint(action.hint)
         .accessibilityIdentifier(action.identifier)

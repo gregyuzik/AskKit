@@ -3,7 +3,8 @@
 import AskCore
 import SwiftUI
 
-/// New Chat, Send and Stop in the Mac menu bar.
+/// New Chat, Send and Stop in the Mac menu bar, and the newest turn's Copy,
+/// Copy answer, Edit & Resend and Ask again.
 ///
 /// A Mac app's File menu is where a new-anything belongs, and a toolbar
 /// button alone leaves ⇧⌘N working only while the window has focus, and the
@@ -41,12 +42,24 @@ import SwiftUI
 /// keystroke. Send is enabled while that composer has a question and no turn
 /// in flight, and Stop while a turn is in flight; with no Ask window focused,
 /// both are disabled.
+///
+/// **The newest turn's four after them**, the items of its question's menu,
+/// which a long press or a right-click reaches and a keyboard alone doesn't
+/// (`AskQuestionBubble`). They act on the newest turn of the thread in the
+/// focused window, which its screen hands up (`AskNewestTurnCommand`), and
+/// look it up as they run. Enabled while that thread has a turn, and Copy
+/// answer once the turn's answer has words, as the bubble's menu offers it.
+/// No shortcuts: ⌘C is the system's Copy, and the keys left free are a
+/// host's to give. In the File menu rather than Edit, where a second Copy
+/// beside the system's would read as the same item.
 public struct AskCommands: Commands {
     private let isEnabled: Bool
     private let action: () -> Void
 
     /// The focused window's composer, if it has one.
     @FocusedValue(\.askComposer) private var composer
+    /// The newest turn of the focused window's thread, if it has a screen.
+    @FocusedValue(\.askNewestTurn) private var newestTurn
 
     /// Creates New Chat with an action of the host's own.
     ///
@@ -94,6 +107,31 @@ public struct AskCommands: Commands {
             }
             .keyboardShortcut(".", modifiers: .command)
             .disabled(composer?.stops != true)
+            Divider()
+            Button {
+                newestTurn?.copy()
+            } label: {
+                AskQuestionBubble.copyTitle
+            }
+            .disabled(newestTurn?.hasTurn != true)
+            Button {
+                newestTurn?.copyAnswer()
+            } label: {
+                AskQuestionBubble.copyAnswerTitle
+            }
+            .disabled(newestTurn?.hasAnswerText != true)
+            Button {
+                newestTurn?.edit()
+            } label: {
+                AskQuestionBubble.editTitle
+            }
+            .disabled(newestTurn?.hasTurn != true)
+            Button {
+                newestTurn?.askAgain()
+            } label: {
+                AskQuestionBubble.askAgainTitle
+            }
+            .disabled(newestTurn?.hasTurn != true)
         }
     }
 }

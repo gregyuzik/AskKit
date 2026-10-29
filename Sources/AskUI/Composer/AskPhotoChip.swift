@@ -121,12 +121,18 @@ struct AskPhotoChip: View {
                 .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        // The disc is the button's shape, so Button Shapes adds none.
+        .askHoverEffect(in: .circle)
         // On the chip's own glass, which wears no tint.
         .foregroundStyle(AskGlassForeground(minimum: AskGlassForeground.glyph))
-        .accessibilityLabel(
-            Text("Remove photo", bundle: #bundle, comment: "VoiceOver label for the button on the chip above the Ask composer that takes the waiting photo back out.")
-        )
+        .accessibilityLabel(Self.removeLabel)
+        .askHelp(Self.removeLabel)
         .accessibilityIdentifier(AskAccessibility.removePhoto)
+    }
+
+    /// What VoiceOver calls the remove button, and the Mac's help tag on it.
+    static var removeLabel: Text {
+        Text("Remove photo", bundle: #bundle, comment: "VoiceOver label for the button on the chip above the Ask composer that takes the waiting photo back out.")
     }
 }
 
