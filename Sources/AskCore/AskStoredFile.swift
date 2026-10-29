@@ -45,14 +45,21 @@ nonisolated enum AskStoredFile {
     /// `CompleteUntilFirstUserAuthentication`, keeps it readable from the
     /// first unlock until reboot.
     ///
-    /// **Never on a Mac.** The native macOS leg has always written without
-    /// it, and an iPhone or iPad app on a Mac or a Catalyst build runs on the
-    /// same Mac, so it gets the same posture, never a weaker one. Whether the
-    /// option fails a write on a Mac is unsettled: this package's tests pass
-    /// with it on macOS 27.2 outside the sandbox, and a sandboxed app, a
-    /// Catalyst build and an iPad app on a Mac haven't been measured. Were
-    /// it to fail there, it would fail every write, and every chat would be
-    /// gone at quit with nothing on screen to say so.
+    /// **Never on a Mac**, where a file keeps the system's default class.
+    /// macOS 27.2 fails every write under complete protection while the Mac
+    /// is locked, sandboxed or not. Measured with it on a locked Mac, the
+    /// signed, sandboxed demo's thread write failed (`NSCocoaErrorDomain` 513,
+    /// POSIX 1) and the chat was gone at relaunch, and outside the sandbox
+    /// `swift test` failed three of `AskStoredFileTests`' seven at their
+    /// writes, which pass with the Mac unlocked. Without it, the same locked
+    /// demo wrote its thread and read it back at relaunch, the file's class
+    /// `NSFileProtectionCompleteUntilFirstUserAuthentication`. And a Mac has
+    /// no moment to write again: the store tries a refused write again as
+    /// protected data comes back on iOS and visionOS alone
+    /// (`AskConversationStore`), so on a Mac every turn written while it was
+    /// locked would be lost. An iPhone or iPad app on a Mac or a Catalyst
+    /// build runs on the same Mac, so it takes the same posture, never a
+    /// weaker one.
     static func writingOptions(onAMac: Bool) -> Data.WritingOptions {
         onAMac ? [.atomic] : [.atomic, .completeFileProtection]
     }

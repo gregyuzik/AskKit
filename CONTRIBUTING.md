@@ -53,7 +53,7 @@ If you can't write all 24 translations, add the English key and say so in the pu
 - **No trailing commas** (SwiftLint's `trailing_comma`, `Package.swift` included), and **Swift Testing** for the package's tests. A change in behaviour comes with a test that fails without it.
 - **Comments keep what the code can't say:** the invariant, the failure it prevents, the measurement behind a number. Not its history. A change fixes the comments and docs it makes untrue, and uses the glossary's terms in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - **Never interpolate a Foundation Models error into text the reader sees**: log `AskTriage.tag(for:)` instead.
-- **`Tests/AskCrossPostureTests/ReadmeDomain.swift` and `ReadmeAssistantDomain.swift` are the code README.md shows,** word for word: `scripts/ci.sh checks` runs `python3 -I scripts/check-readme-sample.py`, which fails with a diff when a Swift block in README's Adopt section isn't a run of one file's lines, and fails when a file has no block there. Change them together.
+- **`Tests/AskCrossPostureTests/ReadmeDomain.swift` and `ReadmeAssistantDomain.swift` are the code README.md shows,** word for word: `scripts/ci.sh checks` runs `python3 -I scripts/check-readme-sample.py`, which fails with a diff when a Swift block in README's Adopt section isn't a run of one file's lines, and fails when a file has no block there. Change them together. `Tests/AskReadmeApproachableTests` links to both, and builds and runs them again under the package's own settings, whose main-actor default isolation a host on Xcode's app template has too.
 
 ## Pull requests
 

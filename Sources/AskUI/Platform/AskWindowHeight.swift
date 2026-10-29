@@ -69,14 +69,17 @@ struct AskWindowHeightReader: UIViewRepresentable {
 
 /// The window an `AskScreen` is in, as `AskWindowHeightReader`'s probe finds
 /// it: where the keyboard's change lays out
-/// (`AskKeyboard.change(_:to:duration:curve:in:)`), and where the screen
-/// puts its keyboard away (`AskKeyboard.putAway(_:in:)`).
+/// (`AskKeyboard.change(_:to:duration:curve:in:)`), where the screen
+/// puts its keyboard away (`AskKeyboard.putAway(_:in:)`), and where its
+/// composer looks for the first responder's marked text as a hardware Return
+/// comes in (`AskMarkedText`).
 ///
 /// **A reference the keyboard's observers hold**, since they are made once,
 /// as the screen first appears, and read the window when the keyboard moves,
-/// which is after it has joined one. A put-away reads it as it resigns. **Weak**, because the window holds the
-/// screen's hosting view, and so the state that holds this: held strongly, a
-/// closed window would never go.
+/// which is after it has joined one. A put-away reads it as it resigns, and
+/// the composer as the Return comes in. **Weak**, because the window holds
+/// the screen's hosting view, and so the state that holds this: held
+/// strongly, a closed window would never go.
 final class AskScreenWindow {
     weak var window: UIWindow?
 }

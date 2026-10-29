@@ -294,14 +294,16 @@ step_test() {
   fi
   # The tests the test targets' runs report, summed, must reach 1,350. The
   # count is of tests run, a skipped one included, so it is the count of what
-  # compiled in: 1,417 when the minimum was set (AskCoreTests 730, AskUITests
-  # 629, AskCrossPostureTests 58). The 67 between them leave room for a
-  # deliberate deletion, and fail a run that lost more: a big file's
-  # over-tight `#if` (AskConversationStoreTests holds 226), or the platform
-  # line every AskUI test file opens with, edited across them. A smaller file
-  # can still go unnoticed, and so can all of AskCrossPostureTests (1,359
-  # would pass). Raise the minimum as the suite grows, or the widening gap
-  # lets more of the suite go missing unnoticed.
+  # compiled in: 1,417 when the minimum was set, and 1,603 on main as of #36
+  # (AskCoreTests 797, AskUITests 721, AskCrossPostureTests 82,
+  # AskReadmeApproachableTests 3). The 253 between 1,603 and the minimum leave
+  # room for a deliberate deletion, and fail a run that lost more, such as the
+  # platform line every AskUI test file opens with, edited across them. A
+  # single file can go unnoticed, the biggest included
+  # (AskConversationStoreTests holds 236, AskEngineTests 223), and so can both
+  # posture targets together (1,518 would pass). Raise the minimum as the
+  # suite grows, or the widening gap lets more of the suite go missing
+  # unnoticed.
   ran=$(sed -nE 's/.*Test run with ([0-9]+) tests.*/\1/p' "$log" | awk '{ s += $1 } END { print s + 0 }')
   if [ "$ran" -lt 1350 ]; then
     say "only $ran tests ran (minimum 1,350), so part of the suite likely didn't compile in — $log"
@@ -391,11 +393,13 @@ step_api() {
 #
 # The minimum is lower than `step_test`'s, and counts tests passed, read from the
 # result bundle, since `-quiet` keeps the per-test lines out of the log. The
-# simulator compiles 1,382 of the Mac's 1,417, since 35 in AskUITests compile
-# for the Mac alone, and a result bundle from a tree two tests smaller passed
-# 1,380: AskCoreTests 728, AskUITests 594, AskCrossPostureTests 58. The twelve
-# tests that race the wall clock count as skipped, not passed, while the Mac is
-# under load, so 1,320 leaves room for them and for a deliberate deletion.
+# simulator compiles fewer of AskUITests' tests than the Mac does, since some
+# compile for the Mac alone. A result bundle from #35's branch, which had
+# neither #34's 23 cross-posture tests nor AskReadmeApproachableTests, passed
+# 1,533 where the Mac ran 1,577: AskCoreTests 797 of 797, AskUITests 677 of
+# 721 and AskCrossPostureTests 59 of 59. The twelve tests that race the wall
+# clock count as skipped, not passed, while the Mac is under load, so 1,320
+# leaves room for them and for a deliberate deletion.
 # Raise it with `step_test`'s.
 #
 # The bundle keeps each failure, so a failure collects no sysdiagnose: on a CI

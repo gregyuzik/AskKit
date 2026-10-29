@@ -10,9 +10,10 @@ change, allowed in a 0.x minor version, because it stops a host's exhaustive `sw
 ## [Unreleased]
 
 Fixes across the engine, the stored chats and the screen, many of them for VoiceOver and the
-accessibility sizes. Two change what a host sees: `AskDomain.perform(_:)` runs off the main actor, and
-the confirmation card's Confirm and the nothing-to-ask button are black on the system blue and red.
-The public API is unchanged.
+accessibility sizes, and for a reader on gaze, a pointer or a hardware keyboard. Three change what a
+host sees: `AskDomain.perform(_:)` runs off the main actor, the confirmation card's Confirm and the
+nothing-to-ask button are black on the system blue and red, and `AskCommands` puts the newest turn's
+Copy, Copy answer, Edit & Resend and Ask again in the Mac's File menu. The public API is unchanged.
 
 ### Changed
 
@@ -23,6 +24,10 @@ The public API is unchanged.
 - **Confirm and the nothing-to-ask button hold their words to 4.5:1 on the accent**, text's bar rather
   than a glyph's 3:1. On the system blue, #007AFF and the system red they are black, where white was
   3.2 to 4.0:1, and a dark accent keeps white. On visionOS the label is the bordered style's own.
+- **`AskCommands` adds the newest turn's Copy, Copy answer, Edit & Resend and Ask again** to the Mac's
+  File menu, after Stop: the items of a question's own menu, acting on the newest turn of the focused
+  window's thread, with no shortcuts. They are enabled while the thread has a turn, and Copy answer
+  once that turn's answer has words.
 - **Logging.** `AskOSLogSink` logs routing at notice, where it was info, and the domain mistakes the
   engine finds as it is built are faults.
 - **`AskAsking.recordFeedback`'s `isLatestTurn` is false while diagnostics are off**, and
@@ -32,6 +37,15 @@ The public API is unchanged.
 - **The push gate fails when fewer than 1,350 package tests run**, where it was 600, and `ci.sh
   test-ios` when fewer than 1,320 pass, so an over-tight `#if` can no longer compile out most of
   AskUI's tests unnoticed.
+- **README.md's two Adopt samples are built and run under the package's posture too**, in
+  `AskReadmeApproachableTests`, as well as under none in `AskCrossPostureTests`: a host on Xcode's app
+  template, with main-actor default isolation and `NonisolatedNonsendingByDefault`, copies code proven
+  under its own settings. The cross-posture tests call the public API they hadn't named.
+- **The demo builds with Enhanced Security on**: pointer authentication, which adds an arm64e slice on a
+  device and the Mac, and the hardened-process entitlements, which take effect in a signed build.
+  README's Install tells a host that turns Enhanced Security on to set `iOSPackagesShouldBuildARM64e`,
+  `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e` in its workspace settings;
+  without them the arm64e slice can't find AskCore and AskUI, and the build fails.
 
 ### Fixed
 
@@ -53,6 +67,10 @@ The public API is unchanged.
     deadline.
   - A stopped or timed-out turn holds the generation gate until its on-device generation has returned,
     the refine pass's included, so the next generation can't start beside one still unwinding.
+  - An on-device generation of `AppleModelSeam`'s that the generation gate presumes wedged is logged
+    under the seam's `logSubsystem`, beside its other lines, at `AskGenerationGate.shared` as at any
+    gate, so a host never builds a gate of its own to find the line there. A host's own generation
+    through `AskGenerationGate.run` is logged under the gate's subsystem, as before.
   - `AppleModelSeam`'s cooldowns, quota hold and availability cache run on the monotonic clock, and
     hold a reset date a day at most. An on-device language read made while the model was still
     downloading is read again, and overlapping status refreshes can't publish an older reading over
@@ -65,7 +83,10 @@ The public API is unchanged.
     a later AskKit wrote reads back as a perform nothing has answered, so its card takes no tap rather
     than offering the action again.
   - An iPhone or iPad app on a Mac and a Mac Catalyst build write without complete file protection, as
-    the native Mac build always has.
+    the native Mac build always has, so a chat on a Mac keeps the system's default class,
+    CompleteUntilFirstUserAuthentication. On macOS 27.2 complete protection fails every write while
+    the Mac is locked, sandboxed or not, and the native Mac build has no moment to try a refused write
+    again, so every turn written then would be lost; SECURITY.md and the README say so.
   - A folder or chat index that won't list no longer counts as empty, so Delete All Chats keeps owing
     what it couldn't delete. An earlier chat no longer opens over a chat New Chat couldn't file, and
     the turns asked while such a chat holds the thread's place are kept.
@@ -90,6 +111,12 @@ The public API is unchanged.
   - The quota's reset names its day: a reset later today as its time, one on a later day as its
     weekday, date and time, and one already past not at all, in the same words on the card and the
     banner.
+  - A hardware Return while an input method is composing, typing Japanese, Chinese or Korean, goes to
+    the input method to confirm its conversion and sends nothing, on the Mac and on iOS in
+    `AskScreen`. The draft holds the reading being converted, so that Return could send the question
+    unconverted, and with a turn in flight or nothing else to send the composer took the Return from
+    the input method. On visionOS, and on iOS in a composer a host draws outside `AskScreen`, a Return
+    is routed as before.
   - The evaluation row runs once per tap: scrolled away and back, or under a page pushed and popped,
     it no longer starts over and spends Private Cloud Compute's quota again. A chat's "when" in the
     list of chats stays current while it's on screen.
@@ -114,6 +141,15 @@ The public API is unchanged.
     themselves.
   - The photo above a question and the pending photo keep their colors under Smart Invert, the pending
     photo's Remove button holds 3:1, and the wait row's separator is translated.
+  - On visionOS and under an iPad's pointer, every bare button lights in its own shape as the reader
+    looks at it or points at it: the composer's circles and the face's, the chips, the thumbs, the
+    evidence line, the pill, the pending photo's Remove, the default tiles, and the chats pane's rows
+    and trash. None lights while it is disabled.
+  - On the Mac, the glyph-only buttons, the send circle, the accessory button, the pending photo's
+    Remove and the thumbs, show their label as a help tag.
+  - Under Button Shapes, a bare glyph wears a ring in its own color, and a bare line of words is
+    underlined: the accessory button and the face's, the thumbs and the chats pane's trash take the
+    ring, and the evidence line and the face's line the underline.
 - **Scripts.** `scripts/normalize-catalogs.py` writes a catalog whole or not at all, so an interrupted
   run no longer leaves it truncated.
 - **The documentation.** `AskBrand.logSubsystem` and `AskGenerationGate` no longer suggest building a
