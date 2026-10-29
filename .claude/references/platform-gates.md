@@ -29,7 +29,7 @@ in its file. Inside `AskTriage`, the `SystemLanguageModel.Error` branch and both
 `#if !os(watchOS)`s of their own.
 
 **Ungated:**
-- `AskTier`, `AskRow`, `AskAnswer`, `AskMarkdown`, `AskError` and `AskTurnEvent`;
+- `AskTier`, `AskRow`, `AskAnswer`, `AskQuestionKind`, `AskMarkdown`, `AskError` and `AskTurnEvent`;
 - `AskThreadStore`, `AskThreadArchive` and `AskFeedbackAttachments`;
 - `AskProposal`, `AskQuestionPhoto`, `AskLink` and `AskBrand`;
 - `AskDeadline`, `AskGenerationGate`, `AskLogSink`, `AskPrompt` and `AskActivity`;

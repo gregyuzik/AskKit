@@ -35,12 +35,9 @@ nonisolated public struct AskBrand: Sendable {
     /// keeps. The seam the host builds takes it too, as `AppleModelSeam`'s
     /// `logSubsystem`.
     ///
-    /// **No generation gate is built for it.** The process has one generation
-    /// gate, `AskGenerationGate.shared`, and an `AppleModelSeam`'s generation
-    /// it presumes wedged is logged under the seam's `logSubsystem`, so a seam
-    /// built with this subsystem logs that line here already. A gate built to
-    /// log under it would be a second gate, and on-device generations queued
-    /// at the two could run at once, the overlap the gate exists to prevent.
+    /// The process's one generation gate logs an `AppleModelSeam`'s
+    /// generation it presumes wedged under the seam's `logSubsystem`, so a
+    /// seam built with this subsystem logs that line here too.
     public let logSubsystem: String
     /// The placeholder shown while the draft is empty: in the screen's
     /// composer, and on the face in a host's slot.

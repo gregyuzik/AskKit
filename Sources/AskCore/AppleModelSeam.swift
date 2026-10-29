@@ -129,9 +129,10 @@ public actor AppleModelSeam: AskModelSeam {
     ///     (`AskDevelopmentPark`).
     ///   - logSubsystem: the subsystem the seam logs under: the domain's
     ///     `AskBrand.logSubsystem`, so its lines sit with the engine's. Its
-    ///     on-device generations wait at `AskGenerationGate.shared`, the
-    ///     process's one generation gate, which logs one of them presumed
-    ///     wedged under it too. Nil logs under the app's bundle identifier.
+    ///     on-device generations wait at the process's one generation gate,
+    ///     as `AskGenerationGate.run` does, and one of them the gate presumes
+    ///     wedged is logged under it too. Nil logs under the app's bundle
+    ///     identifier.
     public init(
         status: AskModelStatus,
         privateCloudCompute: AskPrivateCloudCompute,

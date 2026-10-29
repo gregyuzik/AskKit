@@ -307,7 +307,12 @@ nonisolated extension AskThreadEntry {
 /// fresh install, and the next finished turn would write a one-turn thread
 /// over the reader's whole conversation. The return type makes that
 /// unrepresentable.
-nonisolated public enum AskThreadRead<Row: AskRow>: Sendable {
+///
+/// **Package, not public.** Only the store's reads return it
+/// (`AskThreadStore.load()`, `AskThreadArchive.entries(for:)`), and they are
+/// AskKit's own, so a host has none to switch over. A host that reads chat
+/// files itself, as a widget might, decodes `[AskThreadEntry<Row>]`.
+nonisolated package enum AskThreadRead<Row: AskRow>: Sendable {
     /// Entries that decoded. `dropped` counts the ones beside them that
     /// didn't: a host can evolve a `Row` past what is on disk, and showing
     /// the turns that still decode beats showing none.
@@ -325,9 +330,9 @@ nonisolated public enum AskThreadRead<Row: AskRow>: Sendable {
     case unreadable
 
     /// The entries, or none, for a test that only wants to read what was
-    /// written. Package, not public: read as an empty array, a failed read
-    /// looks like a fresh install, and a save after it would write a
-    /// one-turn thread over the reader's whole conversation, the very
+    /// written. Never for a caller that writes: read as an empty array, a
+    /// failed read looks like a fresh install, and a save after it would
+    /// write a one-turn thread over the reader's whole conversation, the very
     /// confusion the three cases exist to prevent.
     package var entries: [AskThreadEntry<Row>] {
         if case .thread(let entries, _) = self { return entries }

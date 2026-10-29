@@ -1821,11 +1821,12 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
 
     /// `state` on screen in `appearance`, audited in two calls: every check
     /// but contrast, then contrast alone, which can't share a call
-    /// (`auditTheFirstScreen`). Two measured false positives are let through,
-    /// each on the elements it was measured on and nothing else: a partial
-    /// Dynamic Type verdict below the answer's words
-    /// (`grewOffScreen(_:below:)`), and contrast on a glass capsule's corners,
-    /// the chip rows' as in `auditTheFirstScreen` and Try Again's.
+    /// (`auditTheFirstScreen`). One measured false positive is let through,
+    /// on the elements it was measured on and nothing else: a partial Dynamic
+    /// Type verdict below the answer's words (`grewOffScreen(_:below:)`).
+    /// Contrast lets nothing through: the thread's chips and Try Again are
+    /// fills, not the glass capsules whose corners the audit misreads on the
+    /// first screen.
     @MainActor
     private func auditTheThread(_ state: AuditedThread, in appearance: XCUIDevice.Appearance) throws {
         continueAfterFailure = false
@@ -1863,15 +1864,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         try app.performAccessibilityAudit(for: Self.everyCheckButContrast) { issue in
             Self.grewOffScreen(issue, below: foot)
         }
-        let chipRows = chipRowFrames(in: app)
-        try app.performAccessibilityAudit(for: .contrast) { issue in
-            guard issue.auditType == .contrast, let element = issue.element else { return false }
-            // Try Again is a glass capsule as a chip is, and misread the same
-            // way, in light only: its label measured off the screenshot is
-            // #000000 on #FDFDFD, 20.6:1, and the capsule against the white
-            // its corners show is 1.02:1. Dark passes.
-            return element.identifier == Ids.retry || chipRows.contains { $0.intersects(element.frame) }
-        }
+        try app.performAccessibilityAudit(for: .contrast)
     }
 
     /// Whether `issue` is the Dynamic Type check's "partially unsupported" on
@@ -1906,15 +1899,6 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         addTeardownBlock { @MainActor in device.appearance = before }
     }
 
-    /// Whether the audit read an issue as "nearly passed", short of a failure.
-    ///
-    /// By the verdict's words, which are English on the simulators this suite
-    /// runs on: a suppression that rests on them stops matching, and the audit
-    /// fails loudly, if Apple rewords them.
-    private static func nearlyPassed(_ issue: XCUIAccessibilityAuditIssue) -> Bool {
-        issue.compactDescription.localizedCaseInsensitiveContains("nearly passed")
-    }
-
     /// The confirmation card, by Apple's audit: every check but contrast, then
     /// contrast alone, in light.
     @MainActor
@@ -1935,13 +1919,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// **The confirm button's words are black on the demo's accent**, the
     /// system blue, where white falls under text's 4.5:1: 3.52:1 in light and
     /// 3.23:1 in dark, to black's 5.97:1 and 6.49:1 (`AskOnAccentLabel`). The
-    /// audit read white there as "nearly passed". Black in a flat
-    /// `.borderedProminent` fill was measured passing in light
-    /// (`auditTheNothingToAskButton`), but not on this card, and not in dark.
-    /// So a "nearly passed" on the confirm button is still let through, only
-    /// that verdict on only that element, until a run shows the card passing
-    /// without it: a "failed" on it still fails the test, and "Not now" is
-    /// held to the audit as it is.
+    /// audit read white there as "nearly passed", and passes black in both
+    /// appearances, so it lets nothing through on the card: the confirm
+    /// button and "Not now" are held to it as they are.
     @MainActor
     private func auditTheConfirmationCard(in appearance: XCUIDevice.Appearance) throws {
         continueAfterFailure = false
@@ -1962,9 +1942,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         try app.performAccessibilityAudit(for: Self.everyCheckButContrast) { issue in
             Self.grewOffScreen(issue, below: foot)
         }
-        try app.performAccessibilityAudit(for: .contrast) { issue in
-            issue.element?.identifier == Ids.proposalConfirm && Self.nearlyPassed(issue)
-        }
+        try app.performAccessibilityAudit(for: .contrast)
     }
 
     /// The nothing-to-ask screen's button, by Apple's contrast audit alone, in
@@ -1987,10 +1965,8 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// **The button's words are black on the demo's accent**, the system blue,
     /// where white falls under text's 4.5:1 (`AskOnAccentLabel`). In dark the
     /// audit read white, 3.23:1 on the accent's #0091FF, as "nearly passed",
-    /// and said nothing more. Black, 6.49:1 on that accent, hasn't been
-    /// audited on the glass capsule, so in dark a "nearly passed" on this
-    /// element is still let through, that verdict on that element alone,
-    /// until a run shows the button passing without it.
+    /// and passes black, 6.49:1 on that accent, so in dark it lets nothing
+    /// through.
     ///
     /// **In light the audit says "failed", and that verdict doesn't read the
     /// label.** The button is a glass capsule, and its element screenshot had
@@ -2008,8 +1984,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons[Ids.nothingAction].waitForExistence(timeout: uiTimeout), "The screen offers its button.")
 
         try app.performAccessibilityAudit(for: .contrast) { issue in
-            guard issue.element?.identifier == Ids.nothingAction else { return false }
-            return appearance == .light || Self.nearlyPassed(issue)
+            appearance == .light && issue.element?.identifier == Ids.nothingAction
         }
     }
 
