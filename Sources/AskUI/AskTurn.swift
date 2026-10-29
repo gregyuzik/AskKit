@@ -9,6 +9,10 @@ import Foundation
 ///
 /// The engine is told only how to run the turn (`AskTurnMode`): Another pick
 /// as `.reroll`, and every other origin as `.conversation`.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskOrigin: Sendable, Equatable {
     /// Typed into the composer.
     case typed

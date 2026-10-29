@@ -20,6 +20,10 @@ nonisolated struct StreamMeasurements: Sendable {
 ///
 /// Its raw values are the log's words and the thread file's, so they don't
 /// change.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskGrounding: String, Sendable, Equatable, CaseIterable, Codable {
     /// The model called a tool.
     case toolCall = "tool call"
@@ -136,6 +140,10 @@ nonisolated extension Duration {
 /// as a verbose payload, never to the screen.
 nonisolated public struct AskDiscard: Sendable, Equatable {
     /// Why prose was written and then not shown.
+    ///
+    /// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+    /// `switch` over it takes `@unknown default`.
+    @nonexhaustive
     nonisolated public enum Reason: String, Sendable, Equatable, CaseIterable {
         /// The answer read nothing, under a policy that requires grounding,
         /// so it would have been invented (house rule 2).

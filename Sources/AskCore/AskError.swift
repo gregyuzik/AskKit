@@ -19,6 +19,10 @@ import Foundation
 /// `Codable` by raw value, which is the case name. A failed turn on disk
 /// holds one inside `AskError.modelUnavailable`, so a renamed case changes
 /// what a written thread decodes as.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskUnavailability: String, Sendable, Equatable, Codable, CaseIterable {
     /// The reader hasn't turned Apple Intelligence on.
     case appleIntelligenceOff
@@ -65,6 +69,10 @@ nonisolated public enum AskUnavailability: String, Sendable, Equatable, Codable,
 /// what a written thread decodes as: `AskTurn.init(entry:)` falls back to the
 /// stored line when the case doesn't decode, so the cost is a stale line
 /// rather than a lost turn.
+///
+/// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+/// `switch` over it takes `@unknown default`.
+@nonexhaustive
 nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// No tier can serve the question right now, for the reason given.
     case modelUnavailable(AskUnavailability)

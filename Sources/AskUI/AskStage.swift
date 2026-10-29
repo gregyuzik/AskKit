@@ -85,6 +85,10 @@ nonisolated public struct AskStage: Equatable, Sendable {
     public let firstScreenIsKnown: Bool
 
     /// Which screen shows: the thread, or one of the three first screens.
+    ///
+    /// **Open** (`@nonexhaustive`): a later version may add a case, so a host's
+    /// `switch` over it takes `@unknown default`.
+    @nonexhaustive
     nonisolated public enum Phase: Equatable, Sendable {
         /// The thread has turns.
         case thread
