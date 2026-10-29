@@ -55,6 +55,11 @@ public struct AskComposer: View {
     /// (`capsuleTint`): the whole environment, not the appearance alone, since
     /// an asset color's variants follow Increase Contrast as well.
     @Environment(\.self) private var environment
+    #if os(iOS)
+    /// The window `AskScreen` is in, where the chevron puts the keyboard away
+    /// (`askScreenWindow`): nil for a composer a host draws outside the screen.
+    @Environment(\.askScreenWindow) private var screenWindow
+    #endif
     #if os(macOS)
     /// What the menu bar's Send and Stop call (`AskComposerCommand`): one
     /// object for the composer's life, so the value handed up compares equal
@@ -417,12 +422,17 @@ public struct AskComposer: View {
             } else if trimmed.isEmpty {
                 // The action follows the glyph. An arrow focuses; the chevron
                 // dismisses, through `AskKeyboard` rather than by writing the
-                // binding (`AskKeyboard` says why). On the Mac the glyph is
+                // binding (`AskKeyboard` says why), on iOS in the screen's own
+                // window, as the screen's Done does. On the Mac the glyph is
                 // always an arrow, so a click on an empty field only ever puts
                 // the cursor in it, where a `toggle()` would take a Mac
                 // reader's focus away instead.
                 if dismissesKeyboard {
+                    #if os(iOS)
+                    AskKeyboard.putAway($isFocused, in: screenWindow)
+                    #else
                     AskKeyboard.putAway($isFocused)
+                    #endif
                 } else {
                     isFocused = true
                 }

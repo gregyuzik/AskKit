@@ -33,7 +33,8 @@ import UIKit
 /// Done and the tap took 283, 273 and 273 ms with no step over 20 pt, against
 /// 282 to 287 ms on the way up.
 ///
-/// Two alternatives also recorded smooth, and aren't taken. Writing the
+/// Two alternatives also recorded smooth, and aren't taken where there is a
+/// window to resign in. Writing the
 /// binding on the next turn depends on SwiftUI flushing that write from a
 /// run-loop observer rather than a render, which is SwiftUI's scheduling to
 /// decide. Resigning through UIKit in place animated from an update after the
@@ -47,12 +48,17 @@ import UIKit
 /// take the keyboard from a field the reader was typing in elsewhere, and
 /// Done tapped in the window at the back, which comes to the front only after
 /// the tap's action has run (`AskHostFocusHandOver`), could resign the field
-/// in front. Read from UIKit's documented behavior, not seen on a device.
-/// Where the caller has no window, as the composer's chevron doesn't, or
-/// before the probe has joined one, the action still goes to the key
-/// window's first responder.
+/// in front. Read from UIKit's documented behavior, not seen on a device. The
+/// composer's chevron is handed the window too (`askScreenWindow`).
 ///
-/// The recordings above were of that action, sent from
+/// **Where there is no window, the binding is written on that same turn**:
+/// a composer a host draws outside `AskScreen`, and a screen whose probe
+/// hasn't joined a window yet, where no keyboard can have come up. That is
+/// the first of the two alternatives above, and it resigns this field and no
+/// other. Nothing here reaches
+/// for `UIApplication.shared`, which an app extension can't use.
+///
+/// The recordings above were of the action sent to no target, from
 /// `DispatchQueue.main.async`. A main-actor `Task` is queued on the same main
 /// queue, and `endEditing(true)` resigns the same field; neither has been
 /// recorded.
@@ -62,14 +68,12 @@ import UIKit
 /// here was measured on it, and the Mac has no software keyboard to put away.
 enum AskKeyboard {
     #if os(iOS)
-    static func putAway(_ isFocused: FocusState<Bool>.Binding, in screenWindow: AskScreenWindow? = nil) {
+    static func putAway(_ isFocused: FocusState<Bool>.Binding, in screenWindow: AskScreenWindow?) {
         Task {
             if let window = screenWindow?.window {
                 window.endEditing(true)
             } else {
-                UIApplication.shared.sendAction(
-                    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
-                )
+                isFocused.wrappedValue = false
             }
         }
     }
@@ -126,20 +130,17 @@ enum AskKeyboard {
     /// scenes up, such as two windows on an iPad or iPhone Duo's inner
     /// display, the key window can be another scene's: the layout pass would
     /// run there, and this screen's column would land outside the keyboard's
-    /// animation. The key window, found across every connected scene, stands
-    /// in only where the caller has none, such as before the probe has joined
-    /// a window.
+    /// animation. With no window yet, before the probe has joined one, nothing
+    /// is laid out inside the block, and the change lands on the pass after
+    /// it; no keyboard of this screen's can have come up by then, since its
+    /// field isn't in a window to be focused.
     static func change(
         _ flag: Binding<Bool>,
         to value: Bool,
         duration: TimeInterval,
         curve: UIView.AnimationCurve,
-        in screenWindow: UIWindow? = nil
+        in window: UIWindow?
     ) {
-        let window = screenWindow ?? UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)
         UIView.animate(
             withDuration: duration,
             delay: 0,
