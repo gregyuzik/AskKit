@@ -61,7 +61,6 @@ import FoundationModels
         #expect(AskError.stopped.isRetryable)
         #expect(AskGrounding.toolCall.rawValue == "tool call")
         #expect(AskDiscard.Reason.ungrounded.rawValue == "ungrounded")
-        #expect(!AskDiagnostics.isTestFlight || AskDiagnostics.isTestFlight)
 
         // What an app's URL router and its widgets call, off any actor.
         let link = try #require(AskLink.url(scheme: "demo", question: "hi"))

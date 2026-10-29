@@ -133,12 +133,21 @@ import Testing
     @Test func theCardMakesNoClaimUntilTheMirrorHasHeardFromItsSeam() {
         let status = AskModelStatus()
         #expect(!status.hasHeardFromSeam)
-        #expect(AskPrivateCloudState.shown(for: status) == nil)
+        #expect(AskPrivateCloudState.of(status) == nil)
 
         status.apply(.init(nextTier: .onDevice, privateCloudUnavailability: .notEntitled))
-        #expect(AskPrivateCloudState.shown(for: status) == .notEntitled)
+        #expect(AskPrivateCloudState.of(status) == .notEntitled)
         status.apply(.init(nextTier: .privateCloud))
-        #expect(AskPrivateCloudState.shown(for: status) == .serving)
+        #expect(AskPrivateCloudState.of(status) == .serving)
+    }
+
+    /// Once it has heard, the mirror reads as its three fields do: the one
+    /// public accessor and the mapping can't disagree.
+    @MainActor
+    @Test func aMirrorThatHasHeardReadsAsItsFields() {
+        let status = AskModelStatus()
+        status.apply(.init(nextTier: .onDevice, privateCloudUnavailability: .offline))
+        #expect(AskPrivateCloudState.of(status) == .of(quotaReached: false, quotaApproaching: false, unavailability: .offline))
     }
 
     /// The diagnostics rows' *code* compiles in Release, and only whether they
@@ -150,6 +159,15 @@ import Testing
         // `swift test` is a Debug build, so the rows are on here, which is the
         // point: whether they show is read, not compiled away.
         #expect(AskDiagnostics.isDebugBuild)
+    }
+
+    /// A card the host left to itself follows `AskDiagnostics.isEnabled`,
+    /// read as it draws, so the rows come when StoreKit says this is a
+    /// TestFlight build; one the host decided keeps the host's word.
+    @Test func aCardLeftToItselfFollowsTheSwitch() {
+        #expect(AskPrivateCloudCard.showsDiagnostics(nil) == AskDiagnostics.isEnabled)
+        #expect(AskPrivateCloudCard.showsDiagnostics(true))
+        #expect(!AskPrivateCloudCard.showsDiagnostics(false))
     }
 }
 

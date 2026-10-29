@@ -1,5 +1,6 @@
 #if canImport(FoundationModels) && !os(tvOS)
 
+import CoreGraphics
 import Foundation
 import FoundationModels
 import Testing
@@ -72,6 +73,71 @@ import Testing
             AskTriage.askError(from: error, tier: .privateCloud)
                 == .modelUnavailable(.languageNotSupported)
         )
+    }
+
+    // MARK: - Verdicts on the request
+
+    /// A capability, a guide or content the model doesn't support fails the
+    /// same request the same way every time: a verdict, never the retryable
+    /// `.model(tag:)`, whose Try Again could only fail again, and never an
+    /// outage the turn is handed down from, on either tier.
+    @Test func whatTheModelCantTakeIsAVerdictOnTheRequest() {
+        let errors: [LanguageModelError] = [
+            .unsupportedCapability(.init(capability: .toolCalling, debugDescription: "no tools")),
+            .unsupportedCapability(.init(capability: .guidedGeneration, debugDescription: "no schema")),
+            .unsupportedCapability(.init(capability: .reasoning, debugDescription: "no reasoning")),
+            .unsupportedGenerationGuide(.init(schemaName: "AskReply", debugDescription: "that pattern")),
+            .unsupportedTranscriptContent(.init(unsupportedContent: [Self.wordsOnly], debugDescription: "unreadable"))
+        ]
+        for error in errors {
+            for tier in [AskTier.privateCloud, .onDevice] {
+                let ask = AskTriage.askError(from: error, tier: tier)
+                #expect(ask == .requestNotSupported, "\(AskTriage.tag(for: error)) on \(tier)")
+                #expect(!ask.isRetryable)
+                #expect(!askIsTierOutage(ask))
+            }
+        }
+    }
+
+    /// A model that can't see, asked with a photo, fails on the photo: the
+    /// line tells the reader to ask without it, which works, where the
+    /// request's line would leave them nothing to do. Read from the
+    /// capability the error names, not from whether the turn had a photo.
+    @Test func aModelThatCantSeeFailsOnThePhoto() {
+        let error = LanguageModelError.unsupportedCapability(.init(capability: .vision, debugDescription: "no vision"))
+        #expect(AskTriage.askError(from: error, tier: .privateCloud) == .photosNotSupported)
+        #expect(AskTriage.askError(from: error, tier: .onDevice) == .photosNotSupported)
+    }
+
+    /// A prompt carrying a picture among the entries the model can't process
+    /// fails on the photo too, as a corrupt or unreadable picture does. One
+    /// of words alone is the request's failure.
+    @Test func aPromptWithAPictureTheModelCantProcessFailsOnThePhoto() throws {
+        let image = try #require(Self.onePixel())
+        let photo = Transcript.Entry.prompt(Transcript.Prompt(segments: [
+            .text(.init(content: "What is this record?")),
+            .attachment(.init(content: .image(Transcript.ImageAttachment(image)), label: "photo"))
+        ]))
+        #expect(AskTriage.carriesAPhoto(photo))
+        #expect(!AskTriage.carriesAPhoto(Self.wordsOnly))
+        let withPhoto = LanguageModelError.unsupportedTranscriptContent(
+            .init(unsupportedContent: [Self.wordsOnly, photo], debugDescription: "unreadable")
+        )
+        #expect(AskTriage.askError(from: withPhoto, tier: .privateCloud) == .photosNotSupported)
+        #expect(AskTriage.askError(from: withPhoto, tier: .onDevice) == .photosNotSupported)
+    }
+
+    /// A prompt of words alone.
+    private static let wordsOnly = Transcript.Entry.prompt(
+        Transcript.Prompt(segments: [.text(.init(content: "Which records do I own?"))])
+    )
+
+    /// A one-pixel picture, the smallest a prompt can carry.
+    private static func onePixel() -> CGImage? {
+        CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )?.makeImage()
     }
 
     @Test func aTimeoutIsRetryable() {

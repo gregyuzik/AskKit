@@ -66,34 +66,28 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
     }
 
     /// The state for `status`, from its quota and the reason Private Cloud
-    /// Compute can't serve. On the main actor, where the mirror is read.
-    ///
-    /// A mirror its seam hasn't published to yet reads `.serving` here, since
-    /// it names no reason; the card shows no state until it has
-    /// (`shown(for:)`).
-    ///
-    /// - Parameter status: The mirror the engine's seam publishes.
-    /// - Returns: The state the card shows.
-    @MainActor
-    public static func of(_ status: AskModelStatus) -> AskPrivateCloudState {
-        of(
-            quotaReached: status.quotaReached,
-            quotaApproaching: status.quotaApproaching,
-            unavailability: status.privateCloudUnavailability
-        )
-    }
-
-    /// The state the card shows for `status`, or nil until its seam has
-    /// published to it (`AskModelStatus.hasHeardFromSeam`).
+    /// Compute can't serve, or nil until its seam has published to it
+    /// (`AskModelStatus.hasHeardFromSeam`). On the main actor, where the
+    /// mirror is read.
     ///
     /// **Nil, not `.serving`.** A mirror nobody has published to names no
     /// reason, and no reason is what a serving tier looks like: a settings
     /// screen opened before the Ask screen would say Private Cloud Compute is
     /// available, with a green dot, on a build that has no entitlement or is
-    /// parked off the tier.
+    /// parked off the tier. The card shows no state until there is one, and
+    /// a host's own settings row reads it here for the same reason.
+    ///
+    /// - Parameter status: The mirror the engine's seam publishes.
+    /// - Returns: The state the card shows, or nil while the mirror knows
+    ///   nothing.
     @MainActor
-    static func shown(for status: AskModelStatus) -> AskPrivateCloudState? {
-        status.hasHeardFromSeam ? of(status) : nil
+    public static func of(_ status: AskModelStatus) -> AskPrivateCloudState? {
+        guard status.hasHeardFromSeam else { return nil }
+        return of(
+            quotaReached: status.quotaReached,
+            quotaApproaching: status.quotaApproaching,
+            unavailability: status.privateCloudUnavailability
+        )
     }
 
     /// Whether the tier can take a question right now: `.serving` or
@@ -159,7 +153,7 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
 ///
 /// From the top, it shows:
 /// - a dot and a sentence for the state (`AskPrivateCloudState`), once the
-///   mirror has heard from its seam (`AskPrivateCloudState.shown(for:)`);
+///   mirror has heard from its seam (`AskPrivateCloudState.of(_:)`);
 /// - "Show options", once the day's quota is spent, where Apple offers a way
 ///   to ask for more;
 /// - a line on where answers come from;
@@ -169,7 +163,9 @@ nonisolated public enum AskPrivateCloudState: Sendable, Equatable {
 ///   thumbs under answers kept, where there are any.
 public struct AskPrivateCloudCard: View {
     private let status: AskModelStatus
-    private let showsDiagnostics: Bool
+    /// The host's word on the developer rows, or nil to follow
+    /// `AskDiagnostics.isEnabled` (`showsDiagnostics(_:)`).
+    private let diagnosticsChoice: Bool?
     /// What "Show options" does: the store's route to a higher limit.
     private let onShowOptions: @Sendable () async -> Void
     private let onRunEval: (@Sendable () async -> String)?
@@ -196,17 +192,19 @@ public struct AskPrivateCloudCard: View {
     ///   - store: The store whose mirror the card reads.
     ///   - showsDiagnostics: Whether the two developer rows can show, the
     ///     evaluation and the feedback attachments, whose copy is English
-    ///     alone. Defaults to `AskDiagnostics.isEnabled`.
+    ///     alone. Nil, the default, follows `AskDiagnostics.isEnabled` as the
+    ///     card draws, so a TestFlight build's rows come once StoreKit has
+    ///     said it is one (`AskDiagnostics.isTestFlight`).
     ///   - onRunEval: Runs the host's evaluation and returns its report, such
     ///     as `AskEval`'s table. The row shows the report monospaced and
     ///     selectable, and offers to share it. Nil for no row.
     public init<Domain: AskDomain>(
         store: AskConversationStore<Domain>,
-        showsDiagnostics: Bool = AskDiagnostics.isEnabled,
+        showsDiagnostics: Bool? = nil,
         onRunEval: (@Sendable () async -> String)? = nil
     ) {
         status = store.status
-        self.showsDiagnostics = showsDiagnostics
+        diagnosticsChoice = showsDiagnostics
         onShowOptions = { [store] in await store.showLimitIncrease() }
         self.onRunEval = onRunEval
         listFeedback = { [store] in await store.feedbackAttachmentURLs() }
@@ -214,12 +212,31 @@ public struct AskPrivateCloudCard: View {
     }
 
     /// The state the card shows, or nil while the mirror knows nothing.
-    private var state: AskPrivateCloudState? { .shown(for: status) }
+    private var state: AskPrivateCloudState? { .of(status) }
+
+    /// Whether the developer rows show: the host's word where it gave one,
+    /// and otherwise `AskDiagnostics.isEnabled`.
+    ///
+    /// **Read as the card draws, never once at its making.** Whether this is
+    /// a TestFlight build is StoreKit's answer, which lands after launch, so a
+    /// default read at `init` would keep the rows off for the card's life;
+    /// read in the body, the flag's change draws the card again.
+    static func showsDiagnostics(_ choice: Bool?) -> Bool {
+        choice ?? AskDiagnostics.isEnabled
+    }
+
+    /// What the feedback attachments are read again for: the store's count of
+    /// changes to them, and whether the row can show at all.
+    private struct FeedbackRead: Hashable {
+        let revision: Int
+        let shows: Bool
+    }
 
     public var body: some View {
+        let showsDiagnostics = Self.showsDiagnostics(diagnosticsChoice)
         VStack(alignment: .leading, spacing: 12) {
             // No line at all until the mirror knows something, rather than a
-            // claim it can't back (`AskPrivateCloudState.shown(for:)`).
+            // claim it can't back (`AskPrivateCloudState.of(_:)`).
             if let state {
                 statusLine(state)
             }
@@ -248,9 +265,10 @@ public struct AskPrivateCloudCard: View {
         }
         .accessibilityElement(children: .contain)
         // Read once the card is up, off the main actor, in the attachments'
-        // own actor, and again whenever the store adds or removes one. Only
-        // where the row can show, so a card with diagnostics off never looks.
-        .task(id: feedbackRevision()) {
+        // own actor, and again whenever the store adds or removes one or the
+        // rows turn on. Only where the row can show, so a card with
+        // diagnostics off never looks.
+        .task(id: FeedbackRead(revision: feedbackRevision(), shows: showsDiagnostics)) {
             guard showsDiagnostics else { return }
             feedbackAttachments = await listFeedback()
         }

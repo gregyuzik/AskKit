@@ -129,6 +129,7 @@ import Testing
         .privateCloudUnreachable,
         .contextTooLarge,
         .photosNotSupported,
+        .requestNotSupported,
         .quotaReached(resetDate: Date(timeIntervalSinceReferenceDate: 783_086_400)),
         .quotaReached(resetDate: nil),
         .model(tag: "offline"),

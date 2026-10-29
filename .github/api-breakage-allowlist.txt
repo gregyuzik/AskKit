@@ -25,3 +25,6 @@ API breakage: constructor AppleModelSeam.init(status:privateCloudCompute:gate:lo
 API breakage: func AppleModelSeam.make(privateCloudCompute:gate:logSubsystem:) has been renamed to func make(privateCloudCompute:logSubsystem:)
 API breakage: constructor AskGenerationGate.init(logSubsystem:) has been removed
 API breakage: func AskGenerationGate.run(isolation:gate:deadline:_:) has been renamed to func run(isolation:deadline:_:)
+API breakage: enumelement AskError.requestNotSupported has been added as a new enum case
+API breakage: func AskPrivateCloudState.of(_:) has return type change from AskUI.AskPrivateCloudState to AskUI.AskPrivateCloudState?
+API breakage: constructor AskPrivateCloudCard.init(store:showsDiagnostics:onRunEval:) has parameter 1 type change from Swift.Bool to Swift.Bool?

@@ -131,14 +131,16 @@ nonisolated func askHeldTier(from states: [AskTierState]) -> AskTierState? {
 /// Not out: a refusal (a smaller model reaches the same verdict), an overflow
 /// (the fallback's window is four times smaller, so it overflows harder), an
 /// ungrounded answer, a photo the session can't take (the tier below reads no
-/// photos at all), and `model(tag:)`, which is unclassified by definition and
-/// must not become a license to run every unknown failure again on a second
-/// model.
+/// photos at all), a request the model can't take (it fails on that tier
+/// every turn, so a hand-down would spend a request there before every
+/// answer, and hide the mismatch from the host), and `model(tag:)`, which is
+/// unclassified by definition and must not become a license to run every
+/// unknown failure again on a second model.
 nonisolated func askIsTierOutage(_ error: AskError) -> Bool {
     switch error {
     case .privateCloudUnreachable, .quotaReached: return true
     case .modelUnavailable, .couldNotAnswer, .ungrounded, .refused,
-         .contextTooLarge, .photosNotSupported, .model, .stopped: return false
+         .contextTooLarge, .photosNotSupported, .requestNotSupported, .model, .stopped: return false
     }
 }
 

@@ -24,6 +24,10 @@ import FoundationModels
 ///   context gate**, not rate limiting: a process outside an app's context gets
 ///   it every time, within milliseconds. It reads as the tier not serving,
 ///   never as raw text.
+/// - **A capability, a guide or content the model doesn't support is a
+///   verdict, never a passing fault.** Read as `.model(tag:)`, it would offer a
+///   Try Again that can only fail the same way. It is `.requestNotSupported`,
+///   or `.photosNotSupported` where the photo is what the model can't take.
 nonisolated public enum AskTriage {
 
     /// The `AskError` a raw failure reads as.
@@ -95,6 +99,21 @@ nonisolated public enum AskTriage {
                 return .contextTooLarge
             case .unsupportedLanguageOrLocale:
                 return .modelUnavailable(.languageNotSupported)
+            case .unsupportedCapability(let info):
+                // A verdict on the request, never a passing fault: the same
+                // request fails the same way on that model every time. Read
+                // from what the error names rather than from whether the turn
+                // had a photo: a model that can't see says `vision`, and one
+                // that can't reason, asked with a photo, isn't failing on it.
+                return info.capability == .vision ? .photosNotSupported : .requestNotSupported
+            case .unsupportedTranscriptContent(let info):
+                // A photo is the only thing besides words AskKit puts in a
+                // prompt, so a prompt carrying one among the entries the model
+                // can't process, as a corrupt or unreadable picture is, reads
+                // as the photo.
+                return info.unsupportedContent.contains(where: carriesAPhoto) ? .photosNotSupported : .requestNotSupported
+            case .unsupportedGenerationGuide:
+                return .requestNotSupported
             case .rateLimited:
                 // The tier saying "not now": the one below is unaffected.
                 return tier == .privateCloud ? .privateCloudUnreachable : .model(tag: tag(for: model))
@@ -149,6 +168,17 @@ nonisolated public enum AskTriage {
             return AskRetryAfter(date: date, isQuota: false)
         }
         return nil
+    }
+
+    /// Whether a transcript entry is a prompt with a picture in it: one of
+    /// the attachments a photo question puts after its words
+    /// (`AskSession.stream(prompt:images:…)`).
+    static func carriesAPhoto(_ entry: Transcript.Entry) -> Bool {
+        guard case .prompt(let prompt) = entry else { return false }
+        return prompt.segments.contains { segment in
+            guard case .attachment(let attachment) = segment, case .image = attachment.content else { return false }
+            return true
+        }
     }
 
     /// Whether the error is Private Cloud Compute's context gate on the tier

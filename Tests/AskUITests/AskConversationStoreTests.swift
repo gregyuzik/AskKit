@@ -887,7 +887,7 @@ import Testing
         let coached: [AskError] = [.refused, .ungrounded]
         let uncoached: [AskError] = [
             .couldNotAnswer, .stopped, .privateCloudUnreachable, .contextTooLarge, .photosNotSupported,
-            .quotaReached(resetDate: nil), .model(tag: "x"), .modelUnavailable(.offline)
+            .requestNotSupported, .quotaReached(resetDate: nil), .model(tag: "x"), .modelUnavailable(.offline)
         ]
         #expect(coached.map(\.isCoached) == [true, true])
         #expect(uncoached.filter(\.isCoached).isEmpty)
