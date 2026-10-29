@@ -501,9 +501,9 @@ extension CrossPostureTests {
     /// What a seam of a host's own says of each tier, and the rest of what
     /// it publishes, built and read off any actor.
     @Test func aTiersStateIsReadWithoutThePosture() {
-        let cooled = AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true)
+        let cooled = AskTierState(tier: .privateCloud, speaksLanguage: true, isCooled: true)
         #expect(cooled.isCooled && !cooled.isServable)
-        #expect(AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: true).isServable)
+        #expect(AskTierState(tier: .onDevice, speaksLanguage: true).isServable)
         var snapshot = AskModelStatus.Snapshot(hasLimitIncreaseSuggestion: true, privateCloudUnavailability: .offline)
         #expect(snapshot.hasLimitIncreaseSuggestion && snapshot.privateCloudUnavailability == .offline)
         snapshot.privateCloudUnavailability = nil
@@ -884,7 +884,7 @@ private struct CrossPostureSeam: AskModelSeam {
     let status: AskModelStatus
 
     func tierStates() async -> [AskTierState] {
-        [AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: true)]
+        [AskTierState(tier: .onDevice, speaksLanguage: true)]
     }
 
     func makeSession(tier: AskTier, tools: [any Tool], instructions: String) async throws -> AskSessionBox? {
@@ -996,8 +996,8 @@ extension CrossPostureTests {
     @Test func aRetryAfterIsReadableWithoutThePosture() {
         #expect(AskTriage.retryAfter(from: CancellationError()) == nil)
         let reset = Date(timeIntervalSinceReferenceDate: 0)
-        let retry = AskRetryAfter(date: reset, isQuota: true)
-        #expect(retry.date == reset && retry.isQuota)
+        let retry = AskRetryAfter.quotaReached(resetDate: reset)
+        #expect(retry == .quotaReached(resetDate: reset) && retry != .rateLimited(until: reset))
     }
 
     /// Whether an engine keeps a conversation, read off any actor as a host's
@@ -1130,13 +1130,13 @@ extension CrossPostureTests {
         outcome.toolCalls = 2
         outcome.duration = .milliseconds(1_400)
         outcome.restarts = 1
-        outcome.isUngrounded = true
+        outcome.failure = .error(.ungrounded)
         outcome.invented = ["Emma"]
         outcome.proposed = true
         outcome.misses = [.unexpectedProposal]
         #expect(!outcome.isGood)
         #expect(outcome.toolCalls == 2 && outcome.duration == .milliseconds(1_400) && outcome.restarts == 1)
-        #expect(outcome.isUngrounded && outcome.invented == ["Emma"] && outcome.proposed)
+        #expect(outcome.failure?.isUngrounded == true && outcome.invented == ["Emma"] && outcome.proposed)
         #expect(outcome.misses.map(\.line) == ["CARD, expected none"])
     }
 

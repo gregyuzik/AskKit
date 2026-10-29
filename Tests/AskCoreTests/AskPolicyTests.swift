@@ -7,12 +7,12 @@ import Testing
 /// the three decisions a turn makes before it sends anything.
 @Suite(.timeLimit(.minutes(1))) struct AskPolicyTests {
 
+    /// A tier's state: up unless `why` says why not.
     private func state(
-        _ tier: AskTier, available: Bool = true, language: Bool = true,
+        _ tier: AskTier, language: Bool = true,
         quota: Bool = false, cooled: Bool = false, why: AskUnavailability? = nil
     ) -> AskTierState {
-        AskTierState(tier: tier, isAvailable: available, speaksLanguage: language,
-                     quotaReached: quota, isCooled: cooled, unavailability: why)
+        AskTierState(tier: tier, speaksLanguage: language, quotaReached: quota, isCooled: cooled, unavailability: why)
     }
 
     // MARK: - Servability
@@ -31,9 +31,7 @@ import Testing
         // A quota excludes Private Cloud Compute only once it is reached.
         // Demoting on an approaching one would be the same downgrade one step
         // earlier, while the tier could still answer.
-        let approaching = AskTierState(
-            tier: .privateCloud, isAvailable: true, speaksLanguage: true, quotaReached: false
-        )
+        let approaching = AskTierState(tier: .privateCloud, speaksLanguage: true, quotaReached: false)
         #expect(askServableTiers(from: [approaching, state(.onDevice)]).first == .privateCloud)
     }
 
@@ -49,8 +47,8 @@ import Testing
 
     @Test func nothingServesWhenBothAreDown() {
         #expect(askServableTiers(from: [
-            state(.privateCloud, available: false, why: .systemNotReady),
-            state(.onDevice, available: false, why: .appleIntelligenceOff)
+            state(.privateCloud, why: .systemNotReady),
+            state(.onDevice, why: .appleIntelligenceOff)
         ]).isEmpty)
     }
 
@@ -70,8 +68,8 @@ import Testing
         // Private Cloud Compute can be out for reasons of its own that say
         // nothing about whether Ask could work at all.
         let why = askUnavailability(from: [
-            state(.privateCloud, available: false, why: .notEntitled),
-            state(.onDevice, available: false, why: .deviceNotEligible)
+            state(.privateCloud, why: .notEntitled),
+            state(.onDevice, why: .deviceNotEligible)
         ])
         #expect(why == .deviceNotEligible)
     }
@@ -79,8 +77,8 @@ import Testing
     @Test func eachOnDeviceReasonSurvives() {
         for reason in [AskUnavailability.appleIntelligenceOff, .deviceNotEligible, .modelNotReady] {
             let why = askUnavailability(from: [
-                state(.privateCloud, available: false, why: .systemNotReady),
-                state(.onDevice, available: false, why: reason)
+                state(.privateCloud, why: .systemNotReady),
+                state(.onDevice, why: reason)
             ])
             #expect(why == reason)
         }

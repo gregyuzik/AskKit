@@ -107,11 +107,10 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     /// and no scenario is a follow-up.)
     public var restarts = 0
     /// What the turn failed with: the `AskError`, a tag for any other error,
-    /// or "no answer" for a turn whose stream ended with neither, as one let
-    /// go before its answer does. Nil when it answered.
-    public var failure: String?
-    /// The turn failed as ungrounded.
-    public var isUngrounded = false
+    /// or no answer for a turn whose stream ended with neither, as one let go
+    /// before its answer does. Nil when it answered. Whether it failed as
+    /// ungrounded is read off it (`Failure.isUngrounded`).
+    public var failure: Failure?
     /// The expected titles the answer named.
     public var named: [String] = []
     /// A title from **this scenario's `expectedTitles`** that the prose names
@@ -142,21 +141,49 @@ nonisolated public struct AskOutcome: Sendable, Identifiable {
     /// An outcome for scenario `id`, before the turn has run.
     public init(id: String) { self.id = id }
 
-    /// Whether the turn answered, without failing as ungrounded, invented
-    /// nothing and missed nothing. An answer nothing grounded, which only a
-    /// domain whose policy keeps such answers is given, is good unless its
-    /// scenario says otherwise (`AskScenario.expectsGrounding`).
+    /// Whether the turn answered, invented nothing and missed nothing. An
+    /// answer nothing grounded, which only a domain whose policy keeps such
+    /// answers is given, is good unless its scenario says otherwise
+    /// (`AskScenario.expectsGrounding`).
     public var isGood: Bool {
-        failure == nil && !isUngrounded && invented.isEmpty && misses.isEmpty
+        failure == nil && invented.isEmpty && misses.isEmpty
     }
 
     /// The table's last column: the failure, else what the answer invented
     /// and missed, else ok.
     var verdict: String {
-        if let failure { return failure }
+        if let failure { return failure.description }
         var faults = invented.isEmpty ? [] : ["INVENTED \(invented.joined(separator: ", "))"]
         faults += misses.map(\.line)
         return faults.isEmpty ? "ok" : faults.joined(separator: "; ")
+    }
+
+    /// What a turn failed with: one value, so a failure can't be ungrounded
+    /// without saying so, nor say so without having failed.
+    nonisolated public enum Failure: Sendable, Equatable, CustomStringConvertible {
+        /// The engine's error.
+        case error(AskError)
+        /// Any other error, by its tag (`AskTriage.tag(for:)`), never its
+        /// description.
+        case untyped(tag: String)
+        /// The stream ended with neither an answer nor an error, as one let go
+        /// before its answer does.
+        case noAnswer
+
+        /// The turn failed as ungrounded.
+        public var isUngrounded: Bool {
+            if case .error(.ungrounded) = self { true } else { false }
+        }
+
+        /// The failure as the table spells it: the error as Swift describes
+        /// it, the tag, or "no answer".
+        public var description: String {
+            switch self {
+            case .error(let error): String(describing: error)
+            case .untyped(let tag): tag
+            case .noAnswer: "no answer"
+            }
+        }
     }
 
     /// One way an answer differed from its scenario's shape.
@@ -273,14 +300,13 @@ nonisolated public struct AskEval<Domain: AskDomain>: Sendable {
                 }
             }
         } catch let error as AskError {
-            outcome.failure = String(describing: error)
-            if case .ungrounded = error { outcome.isUngrounded = true }
+            outcome.failure = .error(error)
         } catch {
-            outcome.failure = AskTriage.tag(for: error)
+            outcome.failure = .untyped(tag: AskTriage.tag(for: error))
         }
         // A stream that ends with neither an answer nor an error, as one let
         // go before its answer does, answered nothing, and is no "ok".
-        if !answered, outcome.failure == nil { outcome.failure = "no answer" }
+        if !answered, outcome.failure == nil { outcome.failure = .noAnswer }
         outcome.duration = ContinuousClock().now - started
         // The engine's count, not the tools' activity: a tool says what it is
         // doing however its domain likes, and counting `.searching` would read

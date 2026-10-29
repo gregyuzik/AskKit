@@ -101,3 +101,15 @@ API breakage: var AskQuestionKind.showNoTiles has declared type change from Swif
 API breakage: accessor AskQuestionKind.showNoTiles.Get() has return type change from Swift.Set<Swift.String> to Swift.Set<AskCore.AskQuestionKind>
 API breakage: func AskQuestionKind.unrecognized(in:) has return type change from [Swift.String] to [AskCore.AskQuestionKind]
 API breakage: func AskQuestionKind.unrecognized(in:) has parameter 0 type change from [Swift.String] to [AskCore.AskQuestionKind]
+API breakage: var AskOutcome.failure has declared type change from Swift.String? to AskCore.AskOutcome.Failure?
+API breakage: accessor AskOutcome.failure.Get() has return type change from Swift.String? to AskCore.AskOutcome.Failure?
+API breakage: accessor AskOutcome.failure.Set() has parameter 0 type change from Swift.String? to AskCore.AskOutcome.Failure?
+API breakage: var AskTierState.isAvailable is now with nonisolated
+API breakage: struct AskRetryAfter has been changed to a enum
+API breakage: enumelement AskRetryAfter.rateLimited has been added as a new enum case
+API breakage: enumelement AskRetryAfter.quotaReached has been added as a new enum case
+API breakage: var AskOutcome.isUngrounded has been removed
+API breakage: constructor AskTierState.init(tier:isAvailable:speaksLanguage:quotaReached:isCooled:unavailability:) has been removed
+API breakage: var AskRetryAfter.date has been removed
+API breakage: var AskRetryAfter.isQuota has been removed
+API breakage: constructor AskRetryAfter.init(date:isQuota:) has been removed

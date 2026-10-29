@@ -43,7 +43,6 @@ import Testing
         #expect(outcome.id == "names")
         #expect(outcome.tier == .privateCloud)
         #expect(outcome.failure == nil)
-        #expect(!outcome.isUngrounded)
         #expect(Set(outcome.named) == ["Rumours", "Blue"])
         #expect(outcome.text == "You own Rumours and Blue.")
     }
@@ -336,7 +335,7 @@ import Testing
         #expect(outcome.failure != nil)
         #expect(outcome.misses.isEmpty)
         #expect(outcome.grounding == nil)
-        #expect(outcome.verdict == outcome.failure)
+        #expect(outcome.verdict == outcome.failure?.description)
     }
 
     // MARK: - What grounded the answer

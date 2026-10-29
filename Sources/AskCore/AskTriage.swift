@@ -141,8 +141,8 @@ nonisolated public enum AskTriage {
         return .model(tag: tag(for: error))
     }
 
-    /// When a failure says the tier can be tried again, and whether it was the
-    /// day's quota: nil for a failure that says neither.
+    /// When a failure says the tier can be tried again: a rate limit that
+    /// named its reset, or the day's quota. Nil for a failure that is neither.
     ///
     /// **Read from the raw error, because `askError(from:tier:)` drops it.** A
     /// rate limit triages to `.privateCloudUnreachable`, which carries no date
@@ -160,12 +160,12 @@ nonisolated public enum AskTriage {
     public static func retryAfter(from error: any Error) -> AskRetryAfter? {
         if let pcc = error as? PrivateCloudComputeLanguageModel.Error,
            case .quotaLimitReached(let info) = pcc {
-            return AskRetryAfter(date: info.resetDate, isQuota: true)
+            return .quotaReached(resetDate: info.resetDate)
         }
         if let model = error as? LanguageModelError,
            case .rateLimited(let info) = model,
            let date = info.resetDate {
-            return AskRetryAfter(date: date, isQuota: false)
+            return .rateLimited(until: date)
         }
         return nil
     }
@@ -344,17 +344,16 @@ nonisolated public enum AskTriage {
 }
 
 /// When a tier said it can be tried again: `AskTriage.retryAfter(from:)`.
-nonisolated public struct AskRetryAfter: Sendable, Equatable {
-    /// Nil only for a quota that gave no date.
-    public let date: Date?
-    /// The day's quota, as against a rate limit that lifts on its own.
-    public let isQuota: Bool
-
-    /// A reading of when the tier can be tried again.
-    public init(date: Date?, isQuota: Bool) {
-        self.date = date
-        self.isQuota = isQuota
-    }
+///
+/// **One of two readings, each with what it carries.** A rate limit is one
+/// only when it named its reset (without one it is an ordinary outage, and
+/// no reading at all), so its date is never missing; only a quota's can be.
+nonisolated public enum AskRetryAfter: Sendable, Equatable {
+    /// A rate limit that named when it lifts.
+    case rateLimited(until: Date)
+    /// The day's quota, with its reset when the tier gave one. Without one,
+    /// the seam falls back to the reset the model's quota usage reports.
+    case quotaReached(resetDate: Date?)
 }
 
 #endif

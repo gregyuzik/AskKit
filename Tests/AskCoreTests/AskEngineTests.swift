@@ -115,8 +115,8 @@ private extension Trait where Self == ConditionTrait {
 
     @Test func hebrewReadsAsALanguageProblemNotAnOffSwitch() async {
         let (engine, _, _) = makeEngine(states: [
-            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: false),
-            AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: false)
+            AskTierState(tier: .privateCloud, speaksLanguage: false),
+            AskTierState(tier: .onDevice, speaksLanguage: false)
         ])
         let recording = await record(engine.ask("q"))
         #expect(recording.askError == .modelUnavailable(.languageNotSupported))
@@ -1162,7 +1162,7 @@ private extension Trait where Self == ConditionTrait {
         await eventually { seam.transportFailures.withLock { $0 } == [.privateCloud] }
         // The seam cools the tier, as `AppleModelSeam` does for a minute.
         seam.set([
-            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true),
+            AskTierState(tier: .privateCloud, speaksLanguage: true, isCooled: true),
             .down(.onDevice, .modelNotReady)
         ])
         session.script(grounded("Back again."))
@@ -1178,7 +1178,7 @@ private extension Trait where Self == ConditionTrait {
     /// retryably, and cools the tier again: it was asked, and it failed.
     @Test func tryAgainOnACooledTierThatIsStillOutFailsRetryably() async {
         let (engine, seam, _) = makeEngine(states: [
-            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true),
+            AskTierState(tier: .privateCloud, speaksLanguage: true, isCooled: true),
             .down(.onDevice, .modelNotReady)
         ])
         seam.session(for: .privateCloud).script(FakeSession.Script(error: AskError.privateCloudUnreachable))
@@ -1201,7 +1201,7 @@ private extension Trait where Self == ConditionTrait {
     @Test func aSpentQuotaWithNothingBelowFailsAtOnceAskingNothing() async {
         for cooled in [false, true] {
             let (engine, seam, log) = makeEngine(states: [
-                AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, quotaReached: true, isCooled: cooled),
+                AskTierState(tier: .privateCloud, speaksLanguage: true, quotaReached: true, isCooled: cooled),
                 .down(.onDevice, .modelNotReady)
             ])
             let reset = Date(timeIntervalSinceNow: 3_600)
@@ -1237,19 +1237,19 @@ private extension Trait where Self == ConditionTrait {
     /// sends the turn there.
     @Test func aHoldOnATierThatCouldNotServeAnywayChangesNothing() async {
         let (down, _, _) = makeEngine(states: [
-            AskTierState(tier: .privateCloud, isAvailable: false, speaksLanguage: true, isCooled: true, unavailability: .offline),
+            AskTierState(tier: .privateCloud, speaksLanguage: true, isCooled: true, unavailability: .offline),
             .down(.onDevice, .modelNotReady)
         ])
         #expect(await record(down.ask("q")).askError == .modelUnavailable(.modelNotReady))
 
         let (foreign, _, _) = makeEngine(states: [
-            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: false, isCooled: true),
+            AskTierState(tier: .privateCloud, speaksLanguage: false, isCooled: true),
             .down(.onDevice, .modelNotReady)
         ])
         #expect(await record(foreign.ask("q")).askError == .modelUnavailable(.languageNotSupported))
 
         let (below, seam, _) = makeEngine(states: [
-            AskTierState(tier: .privateCloud, isAvailable: true, speaksLanguage: true, isCooled: true),
+            AskTierState(tier: .privateCloud, speaksLanguage: true, isCooled: true),
             .serving(.onDevice)
         ])
         seam.session(for: .onDevice).script(grounded("From the device."))
@@ -1266,11 +1266,10 @@ private extension Trait where Self == ConditionTrait {
     @Test func aTurnRunsOnTheTierTheMirrorNamesAsNext() async {
         for flags in 0..<16 {
             for onDevice in [AskTierState.serving(.onDevice), .down(.onDevice, .modelNotReady)] {
-                let isAvailable = flags & 1 != 0
                 let cloud = AskTierState(
-                    tier: .privateCloud, isAvailable: isAvailable, speaksLanguage: flags & 2 != 0,
+                    tier: .privateCloud, speaksLanguage: flags & 2 != 0,
                     quotaReached: flags & 4 != 0, isCooled: flags & 8 != 0,
-                    unavailability: isAvailable ? nil : .offline
+                    unavailability: flags & 1 != 0 ? nil : .offline
                 )
                 let states = [cloud, onDevice]
                 let (engine, seam, _) = makeEngine(states: states)
