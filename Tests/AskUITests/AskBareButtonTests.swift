@@ -46,6 +46,13 @@ import Testing
         #expect(AskPhotoChip.removeLabel != Text("Remove photo", bundle: .main))
     }
 
+    /// The chats pane's trash, a glyph alone, is tagged in the words its
+    /// button and the dialog it opens say.
+    @Test func theChatsPanesTrashTagIsDeleteAllChatsFromAskUIsCatalog() {
+        #expect(AskDeleteAllChatsButton.title == Text("Delete All Chats", bundle: .module))
+        #expect(AskDeleteAllChatsButton.title != Text("Delete All Chats", bundle: .main))
+    }
+
     // MARK: Button Shapes
 
     /// **The ring is drawn only while Button Shapes is on**, round the frame

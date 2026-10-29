@@ -74,6 +74,11 @@ struct AskChatsPane: View {
                 AskDeleteAllChatsButton(onConfirm: onDeleteAll)
                     .labelStyle(.iconOnly)
                     .buttonStyle(AskQuietIconButtonStyle())
+                    // A glyph alone, so it carries the help tag every
+                    // glyph-only button does. The tag shows only on the Mac,
+                    // and the pane only beside iPhone Duo's fold, so it waits
+                    // for a Mac that lists the chats in a pane.
+                    .askHelp(AskDeleteAllChatsButton.title)
             }
         }
         // The title on the rows' edge, and the glyph centered on the edge
@@ -187,7 +192,8 @@ struct AskChatsPane: View {
 /// **A style of its own, so it says outright what a bare button says**: it
 /// lights under the reader's eyes and the pointer, in a circle round the
 /// target (`askHoverEffect(in:)`), and wears a ring round the glyph under
-/// Button Shapes (`AskBareButtonShape`).
+/// Button Shapes (`AskBareButtonShape`). The Mac's help tag is the button's
+/// (`header`), since the words are the button's and not the style's.
 private struct AskQuietIconButtonStyle: ButtonStyle {
     @Environment(\.accessibilityShowBorders) private var showsBorders
 
