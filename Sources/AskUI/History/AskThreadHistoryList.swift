@@ -236,7 +236,7 @@ struct AskDeleteAllChatsButton: View {
             confirms = true
         } label: {
             Label {
-                title
+                Self.title
             } icon: {
                 Image(systemName: "trash")
             }
@@ -250,7 +250,7 @@ struct AskDeleteAllChatsButton: View {
             Button(role: .destructive) {
                 onConfirm()
             } label: {
-                title
+                Self.title
             }
             .accessibilityIdentifier(AskAccessibility.historyDeleteAllConfirm)
         } message: {
@@ -258,8 +258,10 @@ struct AskDeleteAllChatsButton: View {
         }
     }
 
-    /// One key for the button and the dialog's, which say the same thing.
-    private var title: Text {
+    /// One key for the button and the dialog's, which say the same thing, and
+    /// for the Mac's help tag on the chats pane's trash, which shows the glyph
+    /// alone (`AskChatsPane`).
+    static var title: Text {
         Text("Delete All Chats", bundle: #bundle, comment: "Button that deletes every Ask chat, the one on screen included: in the bar of the list of chats, and again in the dialog that asks first.")
     }
 }
