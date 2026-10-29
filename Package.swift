@@ -63,8 +63,8 @@ let package = Package(
         // none of the upcoming features — the posture a consumer that does not
         // share ours compiles under.
         //
-        // Everything above carries the identical approachable posture, so this
-        // is the only target that fails to compile when public API it calls
+        // Every other target carries the identical approachable posture, so
+        // this is the only one that fails to compile when public API it calls
         // loses its explicit isolation. Without it an AskCore change could pass
         // here and fail only in a consumer's build. Giving this target settings
         // stops it testing anything.
@@ -72,6 +72,30 @@ let package = Package(
             name: "AskCrossPostureTests",
             dependencies: ["AskCore", "AskUI"],
             path: "Tests/AskCrossPostureTests"
+        ),
+        // README.md's two samples, built and run again under the approachable
+        // posture, which a host on Xcode's app template has too (main-actor
+        // default isolation, `NonisolatedNonsendingByDefault`), so the code an
+        // adopter copies is proven in that posture as well as in none.
+        //
+        // The folder holds two symlinks to `AskCrossPostureTests`'
+        // `ReadmeDomain.swift` and `ReadmeAssistantDomain.swift`, so the
+        // README's word-for-word check still compares one file each. SwiftPM
+        // reads `sources:` only inside a target's own path, and a target at
+        // `Tests/` overlaps every other. A link that stops reaching its file
+        // is a warning that names the package, which the push gate fails on.
+        //
+        // It doesn't prove that the samples need their `nonisolated` or
+        // `@concurrent`: with either taken off any one type or `call`, this
+        // target and `AskCrossPostureTests` still build and pass. Under Swift
+        // 6.4 a type conforming to a `nonisolated` protocol such as `AskRow` is
+        // `nonisolated` without the keyword, and a `call` that isn't
+        // `@concurrent` still satisfies `Tool`.
+        .testTarget(
+            name: "AskReadmeApproachableTests",
+            dependencies: ["AskCore", "AskUI"],
+            path: "Tests/AskReadmeApproachableTests",
+            swiftSettings: approachable
         )
     ]
 )

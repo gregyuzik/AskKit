@@ -1,6 +1,7 @@
 // README.md's Adopt section shows this file's code word for word, and
 // scripts/check-readme-sample.py fails when its copy differs, so the two change
-// together.
+// together. AskReadmeApproachableTests builds it too, under the approachable
+// posture, through a symlink to this path (Package.swift).
 #if canImport(FoundationModels) && !os(tvOS)
 
 import AskCore
