@@ -426,7 +426,6 @@ extension CrossPostureTests {
     /// A deadline raced from a host's own nonisolated code, as it might bound
     /// a lookup of its own.
     @Test func aDeadlineIsRacedWithoutThePosture() async throws {
-        #expect(try await AskDeadline.run(seconds: 5) { 42 } == 42)
         #expect(try await AskDeadline.run(.seconds(5)) { "done" } == "done")
     }
 
@@ -483,10 +482,10 @@ extension CrossPostureTests {
         stats.characters = 40
         stats.toolCalls = 1
         stats.rowsRead = 3
-        stats.msToFirstTool = 120
-        stats.msToFirstWord = 300
-        stats.msToLastWord = 900
-        stats.msTotal = 1_000
+        stats.timeToFirstTool = .milliseconds(120)
+        stats.timeToFirstWord = .milliseconds(300)
+        stats.timeToLastWord = .milliseconds(900)
+        stats.duration = .milliseconds(1_000)
         stats.grounding = .appRetrieved
         stats.retried = true
         #expect(stats.meanDelta == 20)
@@ -1129,14 +1128,14 @@ extension CrossPostureTests {
         #expect(scenario.expectedKinds == ["count"] && scenario.expectedTitles == ["Dune"] && scenario.expectsNoTiles)
         var outcome = AskOutcome(id: scenario.id)
         outcome.toolCalls = 2
-        outcome.milliseconds = 1_400
+        outcome.duration = .milliseconds(1_400)
         outcome.restarts = 1
         outcome.isUngrounded = true
         outcome.invented = ["Emma"]
         outcome.proposed = true
         outcome.misses = [.unexpectedProposal]
         #expect(!outcome.isGood)
-        #expect(outcome.toolCalls == 2 && outcome.milliseconds == 1_400 && outcome.restarts == 1)
+        #expect(outcome.toolCalls == 2 && outcome.duration == .milliseconds(1_400) && outcome.restarts == 1)
         #expect(outcome.isUngrounded && outcome.invented == ["Emma"] && outcome.proposed)
         #expect(outcome.misses.map(\.line) == ["CARD, expected none"])
     }
@@ -1319,8 +1318,8 @@ extension CrossPostureTests {
     /// How long Apple's seam serves a probe from cache and holds a tier after
     /// a transport failure, read off any actor by a host's own diagnostics.
     @Test func theSeamsIntervalsAreReadWithoutThePosture() {
-        #expect(AppleModelSeam.reprobeInterval == 60)
-        #expect(AppleModelSeam.transportCooldown == 60)
+        #expect(AppleModelSeam.reprobeInterval == .seconds(60))
+        #expect(AppleModelSeam.transportCooldown == .seconds(60))
     }
 
     /// What `AskAsking` defaults, asked off any actor of an engine of a

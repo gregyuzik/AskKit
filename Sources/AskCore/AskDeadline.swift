@@ -14,19 +14,19 @@ import Foundation
 /// than fixed: the alternative is a caller held past its deadline.
 nonisolated public enum AskDeadline {
 
-    /// Run `operation`, giving up after `seconds`.
+    /// Run `operation`, giving up after `duration`, the length of time
+    /// `AskDomain.turnDeadline` speaks.
     ///
-    /// A deadline of zero or less, `-infinity` included, sets its timer for no
-    /// time. One that is no number (`nan`), `infinity`, or further off than a
-    /// timer can count (past about 68 years) sets no timer, and the operation
-    /// runs as long as it takes.
+    /// A deadline of zero or less sets its timer for no time. One further off
+    /// than a timer can count (past about 68 years) sets no timer, and the
+    /// operation runs as long as it takes.
     ///
     /// - Returns: the operation's value, or `nil` when the deadline won.
     /// - Throws: whatever `operation` throws, or `CancellationError` when the
     ///   *caller's* task was cancelled, so a caller can tell its own
     ///   cancellation from a deadline that passed.
     public static func run<T: Sendable>(
-        seconds: TimeInterval,
+        _ duration: Duration,
         _ operation: @escaping @Sendable () async throws -> T
     ) async throws -> T? {
         // A one-shot relay: whichever racer reports first is the answer.
@@ -43,8 +43,8 @@ nonisolated public enum AskDeadline {
             }
         }
         let timer = Task {
-            // No timer for a deadline `Duration` can't hold: it traps on one.
-            guard let wait = timerWait(seconds) else { return }
+            // No timer for a deadline a sleep can't count: it traps on one.
+            guard let wait = timerWait(duration) else { return }
             try? await Task.sleep(for: wait)
             relay.yield(nil)
             relay.finish()
@@ -65,26 +65,16 @@ nonisolated public enum AskDeadline {
     }
 
     /// The longest wait a deadline sets a timer for: about 68 years, far past
-    /// any budget and well inside what a sleep can count.
-    static let longestWait: TimeInterval = Double(Int32.max)
+    /// any budget and well inside what a sleep can count. A `Duration` holds
+    /// far more (`.seconds(Int.max)`), and a sleep traps on what it can't count.
+    static let longestWait: Duration = .seconds(Int(Int32.max))
 
-    /// The timer's wait for `seconds`: none for zero or less, and no timer at
-    /// all for a value that is no number or past `longestWait`.
-    static func timerWait(_ seconds: TimeInterval) -> Duration? {
-        guard !seconds.isNaN else { return nil }
-        guard seconds > 0 else { return .zero }
-        guard seconds <= longestWait else { return nil }
-        return .seconds(seconds)
-    }
-
-    /// The same race, in `Duration`, which `AskDomain.turnDeadline` speaks.
-    public static func run<T: Sendable>(
-        _ duration: Duration,
-        _ operation: @escaping @Sendable () async throws -> T
-    ) async throws -> T? {
-        let seconds = Double(duration.components.seconds)
-            + Double(duration.components.attoseconds) * 1e-18
-        return try await run(seconds: seconds, operation)
+    /// The timer's wait for `duration`: none for zero or less, and no timer at
+    /// all for one past `longestWait`.
+    static func timerWait(_ duration: Duration) -> Duration? {
+        guard duration > .zero else { return .zero }
+        guard duration <= longestWait else { return nil }
+        return duration
     }
 
     /// The same race against an instant: what is left of a budget begun

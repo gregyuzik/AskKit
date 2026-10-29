@@ -43,3 +43,13 @@ API breakage: var AskBrand.shortLabel has been removed
 API breakage: constructor AskBrand.init(title:shortLabel:appDirectory:logSubsystem:help:firstScreenHeadline:firstScreenSentence:nothingToAskCopy:nothingToAskActionLabel:disclosureSentence:scopeCaveat:) has been removed
 API breakage: var AskStarter.bank has been removed
 API breakage: constructor AskStarter.init(id:text:bank:) has been removed
+API breakage: var AppleModelSeam.reprobeInterval has declared type change from Foundation.TimeInterval to Swift.Duration
+API breakage: accessor AppleModelSeam.reprobeInterval.Get() has return type change from Foundation.TimeInterval to Swift.Duration
+API breakage: var AppleModelSeam.transportCooldown has declared type change from Foundation.TimeInterval to Swift.Duration
+API breakage: accessor AppleModelSeam.transportCooldown.Get() has return type change from Foundation.TimeInterval to Swift.Duration
+API breakage: func AskDeadline.run(seconds:_:) has been removed
+API breakage: var AskOutcome.milliseconds has been removed
+API breakage: var AskTurnStats.msToFirstTool has been removed
+API breakage: var AskTurnStats.msToFirstWord has been removed
+API breakage: var AskTurnStats.msToLastWord has been removed
+API breakage: var AskTurnStats.msTotal has been removed

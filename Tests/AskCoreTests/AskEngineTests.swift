@@ -2115,9 +2115,9 @@ private extension Trait where Self == ConditionTrait {
         await engine.stop()
         // Both bounded: a turn or a generation gate that never lets go fails
         // the test instead of holding the run.
-        let stopped = try await AskDeadline.run(seconds: 5) { await turn.value.error is CancellationError }
+        let stopped = try await AskDeadline.run(.seconds(5)) { await turn.value.error is CancellationError }
         #expect(stopped == true)
-        let passed = try await AskDeadline.run(seconds: 5) { try await next.value }
+        let passed = try await AskDeadline.run(.seconds(5)) { try await next.value }
         #expect(passed == "through")
     }
 
@@ -2135,7 +2135,7 @@ private extension Trait where Self == ConditionTrait {
         await session.generationIsHeld()
         await engine.stop()
         session.releaseGeneration()
-        let answer = try await AskDeadline.run(seconds: 5) { try await siri.value }
+        let answer = try await AskDeadline.run(.seconds(5)) { try await siri.value }
         #expect(answer?.text == "Standalone.")
         #expect(session.generationsCancelled.withLock { $0 } == 0)
     }
@@ -2440,6 +2440,16 @@ private extension Trait where Self == ConditionTrait {
         #expect(stats.first?.streamLine.contains("[stream] privateCloud") == true)
     }
 
+    @Test func aTurnsTimesRunFromItsStartInOrder() async throws {
+        let (engine, seam, log) = makeEngine()
+        seam.session(for: .privateCloud).script(grounded("Answer."))
+        _ = await record(engine.ask("q"))
+        let stats = try #require(log.turns.withLock { $0 }.first)
+        let firstWord = try #require(stats.timeToFirstWord)
+        let lastWord = try #require(stats.timeToLastWord)
+        #expect(.zero <= firstWord && firstWord <= lastWord && lastWord <= stats.duration)
+    }
+
     @Test func theStatusMirrorIsRefreshedAfterATurn() async {
         let (engine, seam, _) = makeEngine()
         seam.session(for: .privateCloud).script(grounded("Answer."))
@@ -2602,7 +2612,7 @@ private extension Trait where Self == ConditionTrait {
             domain.deadlineOverride.set(.milliseconds(200))
             hold.arm(once: true)
             defer { hold.release() }
-            let gaveUp = try await AskDeadline.run(seconds: 5) {
+            let gaveUp = try await AskDeadline.run(.seconds(5)) {
                 await engine.prewarm()
                 return true
             }
@@ -2627,7 +2637,7 @@ private extension Trait where Self == ConditionTrait {
         let session = seam.session(for: .privateCloud)
         session.holdsPrewarm.withLock { $0 = true }
         defer { session.releasePrewarm() }
-        let gaveUp = try await AskDeadline.run(seconds: 5) {
+        let gaveUp = try await AskDeadline.run(.seconds(5)) {
             await engine.prewarm()
             return true
         }
@@ -3354,7 +3364,7 @@ private extension Trait where Self == ConditionTrait {
             try await Task.sleep(for: .milliseconds(20))
             session.countRead.release()
 
-            let newest = try #require(try await AskDeadline.run(seconds: 5) { await b.value })
+            let newest = try #require(try await AskDeadline.run(.seconds(5)) { await b.value })
             #expect(newest.error == nil, "round \(round): the newest question was stopped")
             #expect(newest.answer?.text == "Answer.", "round \(round)")
             #expect(await x.value.error is CancellationError)
@@ -3380,7 +3390,7 @@ private extension Trait where Self == ConditionTrait {
         await engine.reset()
         session.countRead.release()
 
-        let stoodDown = try #require(try await AskDeadline.run(seconds: 5) { await waiting.value })
+        let stoodDown = try #require(try await AskDeadline.run(.seconds(5)) { await waiting.value })
         #expect(stoodDown.error is CancellationError)
         #expect(stoodDown.answer == nil)
         #expect(await first.value.error is CancellationError)
@@ -3434,7 +3444,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .privateCloud).script(grounded("Answer.", followUps: ["What else?"]))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) })
+        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
         #expect(recording.answer?.text == "Answer.")
         #expect(recording.error == nil)
         // What the chips wait on is settled before the stream ends.
@@ -3453,7 +3463,7 @@ private extension Trait where Self == ConditionTrait {
         ))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) })
+        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
         #expect(recording.askError == .privateCloudUnreachable)
         await eventually { seam.transportFailures.withLock { $0 } == [.privateCloud] }
         #expect(seam.transportFailures.withLock { $0 } == [.privateCloud])
@@ -3470,7 +3480,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .onDevice).script(grounded("From the device."))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) })
+        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
         #expect(recording.restarts == [.onDevice])
         #expect(recording.answer?.text == "From the device.")
     }
@@ -3484,7 +3494,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .privateCloud).script(grounded("Answer."))
         seam.languageHold.arm()
         defer { seam.languageHold.release() }
-        let recording = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) })
+        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
         #expect(recording.askError == .couldNotAnswer)
     }
 
@@ -3495,7 +3505,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .privateCloud).script(grounded("Answer."))
         seam.tierStatesHold.arm()
         defer { seam.tierStatesHold.release() }
-        let recording = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) })
+        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
         #expect(recording.askError == .couldNotAnswer)
     }
 
@@ -3512,7 +3522,7 @@ private extension Trait where Self == ConditionTrait {
         session.countRead.arm()
         defer { session.countRead.release() }
         let hung = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("first")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("first")) },
             "the turn waited on a count that never came"
         )
         #expect(hung.askError == .couldNotAnswer)
@@ -3520,7 +3530,7 @@ private extension Trait where Self == ConditionTrait {
 
         session.countRead.release()
         domain.deadlineOverride.set(nil)
-        let next = try #require(try await AskDeadline.run(seconds: 5) { await record(engine.ask("second")) })
+        let next = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) })
         #expect(next.answer?.text == "Answer.")
     }
 
@@ -3537,7 +3547,7 @@ private extension Trait where Self == ConditionTrait {
         session.usageHold.arm()
         defer { session.usageHold.release() }
         let recording = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("q")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) },
             "the turn waited on usage that never came"
         )
         #expect(recording.answer?.text == "Answer.")
@@ -3557,7 +3567,7 @@ private extension Trait where Self == ConditionTrait {
         session.contextSizeHold.arm()
         defer { session.contextSizeHold.release() }
         let hung = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("second")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) },
             "the follow-up waited on a window size that never came"
         )
         #expect(hung.askError == .couldNotAnswer)
@@ -3582,14 +3592,14 @@ private extension Trait where Self == ConditionTrait {
         hook.arm(once: true)
         defer { hook.release() }
         let hung = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("first")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("first")) },
             "the turn outlived its deadline", sourceLocation: sourceLocation
         )
         #expect(hung.askError == .couldNotAnswer, sourceLocation: sourceLocation)
         #expect(log.routings.withLock { $0 }.contains(line), sourceLocation: sourceLocation)
         domain.deadlineOverride.set(nil)
         let next = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("second")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) },
             "the next question waited", sourceLocation: sourceLocation
         )
         #expect(next.answer?.text == "Answer.", sourceLocation: sourceLocation)
@@ -3611,7 +3621,7 @@ private extension Trait where Self == ConditionTrait {
         let first = Task { await record(engine.ask("first")) }
         await hook.isReached()
         let next = try #require(
-            try await AskDeadline.run(seconds: 5) { await record(engine.ask("second")) },
+            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) },
             "the newer question waited on the turn it stopped", sourceLocation: sourceLocation
         )
         #expect(next.answer?.text == "Answer.", sourceLocation: sourceLocation)
