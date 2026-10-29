@@ -15,7 +15,7 @@ import Testing
     @Test func aDomainNamingNeitherTypeGetsTheStandIns() {
         #expect(NoRowDomain.Row.self == AskNoRow.self)
         #expect(NoRowDomain.SearchArguments.self == AskNoSearchArguments.self)
-        #expect(NoRowDomain().firstScreenPolicy == .openSubject)
+        #expect(!NoRowDomain().answersWithoutModel)
         #expect(NoRowDomain().brand.nothingToAskCopy == nil)
     }
 
@@ -68,7 +68,7 @@ import Testing
         #expect(events.contains(.partial(NoRowSession.unaided)))
         #expect(!events.contains { if case .restarted = $0 { true } else { false } })
         #expect(NoRowChatDomain().grounding == .notRequired)
-        #expect(NoRowChatDomain().firstScreenPolicy == .openSubject)
+        #expect(NoRowChatDomain().brand.nothingToAskCopy == nil)
     }
 
     /// The policy, what an answer records, and what an evaluation asks of it,
@@ -128,9 +128,8 @@ import Testing
         #expect(NoRowChatDomain().evidence(for: ungrounded) == AskEvidencePresentation.hidden)
     }
 
-    /// The stand-ins and the policy, built, compared and decoded off any
-    /// actor, and the planner's empty arguments made as a host's own session
-    /// makes them.
+    /// The stand-ins, built, compared and decoded off any actor, and the
+    /// planner's empty arguments made as a host's own session makes them.
     @Test func theStandInsAreUsableWithoutThePosture() throws {
         let row = AskNoRow(id: "Lisbon")
         #expect(row.displayTitle == "Lisbon")
@@ -138,7 +137,6 @@ import Testing
         _ = AskNoSearchArguments.generationSchema
         _ = try AskNoSearchArguments(GeneratedContent(properties: [:]))
         _ = AskNoSearchArguments()
-        #expect(AskFirstScreenPolicy.openSubject == AskFirstScreenPolicy(answersWithoutModel: false, needsOwnedRows: false))
     }
 }
 
@@ -165,8 +163,8 @@ private struct NoRowClockTool: Tool {
 }
 
 /// The smallest domain without rows: the three members left without a
-/// default, and the first-screen policy for a subject that isn't the
-/// reader's rows.
+/// default, with no nothing-to-ask copy in its brand, since its subject
+/// isn't the reader's rows.
 private struct NoRowDomain: AskDomain {
     let brand = AskBrand(
         title: "Ask the Clock", appDirectory: "AskKitCrossPostureNoRow",
@@ -174,8 +172,6 @@ private struct NoRowDomain: AskDomain {
         firstScreenHeadline: "Ask the time anywhere", firstScreenSentence: "Any city, any time zone.",
         disclosureSentence: "Questions are answered on this device.", scopeCaveat: "It can be wrong."
     )
-
-    var firstScreenPolicy: AskFirstScreenPolicy { .openSubject }
 
     func makeTools(_ context: AskToolContext<AskNoRow>) -> [any Tool] {
         [NoRowClockTool(context: context)]
@@ -187,8 +183,8 @@ private struct NoRowDomain: AskDomain {
 }
 
 /// A domain whose answers needn't be grounded and which has no tools: a
-/// chat over what the model knows. It names its grounding policy and leaves
-/// its first screen to follow from it, and words its own evidence line: none
+/// chat over what the model knows. It names its grounding policy, gives no
+/// nothing-to-ask copy, and words its own evidence line: none
 /// under an answer nothing grounded, and its own under one a tool did.
 private struct NoRowChatDomain: AskDomain {
     static let toolLine = "From the clock, read just now"

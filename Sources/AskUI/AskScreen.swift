@@ -96,7 +96,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
 
     private var accent: Color { configuration.accent }
     private var spectrum: AskSpectrum? { configuration.spectrum }
-    private var onNothingAction: (() -> Void)? { configuration.onNothingAction }
+    private var nothingToAskAction: AskNothingToAskAction? { configuration.nothingToAskAction }
     private var onAttach: (() -> Void)? { configuration.onAttach }
     private var composerAccessory: AskComposerAccessory? { configuration.composerAccessory }
     private var buildersToken: AskBuildersToken? { configuration.buildersToken }
@@ -1187,14 +1187,14 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             phase: stage.phase,
             brand: store.brand,
             starters: store.availableStarters,
-            policy: store.domain.firstScreenPolicy,
+            answersWithoutModel: store.domain.answersWithoutModel,
             isMakingRoom: firstScreenIsMakingRoom,
             windowHeight: windowHeight,
             onStarter: { starter in
                 starterFocusesWaitRow = true
                 store.ask(starter)
             },
-            onNothingAction: onNothingAction,
+            nothingToAskAction: nothingToAskAction,
             onDecline: { store.decline($0) },
             mark: mark
         )
@@ -1253,7 +1253,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     private var firstScreenHasTwoHalves: Bool {
         AskFirstScreenArrangement.hasTwoHalves(
             phase: stage.phase,
-            answersWithoutModel: store.domain.firstScreenPolicy.answersWithoutModel,
+            answersWithoutModel: store.domain.answersWithoutModel,
             hasStarters: !store.availableStarters.isEmpty
         )
     }
@@ -2293,10 +2293,10 @@ where Mark == AskDefaultMark, Tiles == AskDefaultTiles<Domain.Row>, Disclosure =
     ///     gradient of it in place of the accent, the send circle on the face
     ///     in a host's slot too. Everything else keeps the accent, and so do
     ///     those two under Increase Contrast. Nil by default, for none.
-    ///   - onNothingAction: What the button on the nothing-to-ask first screen
-    ///     does, such as opening the host's sheet for adding something. The
-    ///     button shows only when this is set and the brand has a
-    ///     `nothingToAskActionLabel`; without it the screen shows the brand's
+    ///   - nothingToAskAction: The button on the nothing-to-ask first screen,
+    ///     its label and what it does, such as opening the host's sheet for
+    ///     adding something (`AskNothingToAskAction`). The button shows
+    ///     exactly when this is set; without it the screen shows the brand's
     ///     copy alone.
     ///   - onAttach: What the composer's photo button does: present the host's
     ///     picker, then hand the photo to
@@ -2314,14 +2314,14 @@ where Mark == AskDefaultMark, Tiles == AskDefaultTiles<Domain.Row>, Disclosure =
         store: AskConversationStore<Domain>,
         accent: Color = .accentColor,
         spectrum: AskSpectrum? = nil,
-        onNothingAction: (() -> Void)? = nil,
+        nothingToAskAction: AskNothingToAskAction? = nil,
         onAttach: (() -> Void)? = nil,
         composerAccessory: AskComposerAccessory? = nil
     ) {
         self.init(
             store: store,
             configuration: AskScreenConfiguration(
-                accent: accent, spectrum: spectrum, onNothingAction: onNothingAction,
+                accent: accent, spectrum: spectrum, nothingToAskAction: nothingToAskAction,
                 onAttach: onAttach, composerAccessory: composerAccessory
             ),
             mark: { AskDefaultMark(isLit: $0) },
@@ -2493,8 +2493,8 @@ extension AskScreen {
 }
 
 /// What `AskScreen` is handed besides its store and the host's four views:
-/// the accent and the spectrum, what the nothing-to-ask button and the photo
-/// button do, the accessory button, and what the builders depend on.
+/// the accent and the spectrum, the nothing-to-ask button, what the photo
+/// button does, the accessory button, and what the builders depend on.
 ///
 /// **One value, so a modifier that replaces one view carries the rest over
 /// whole.** Each of `mark(_:)`, `tiles(_:)`, `evidenceDisclosure(_:)` and
@@ -2509,9 +2509,10 @@ struct AskScreenConfiguration {
     /// What the composer's send circle and the reveal's caret wear in place
     /// of the accent, or nil for the accent alone (`AskSpectrum`).
     var spectrum: AskSpectrum?
-    /// What the button on the nothing-to-ask first screen does, or nil for no
-    /// button. Only the host knows where adding something goes.
-    var onNothingAction: (() -> Void)?
+    /// The button on the nothing-to-ask first screen, its label and what it
+    /// does, or nil for no button. Only the host knows where adding something
+    /// goes.
+    var nothingToAskAction: AskNothingToAskAction?
     /// What the composer's photo button does, and whether there is one (the
     /// initializer's `onAttach`).
     var onAttach: (() -> Void)?

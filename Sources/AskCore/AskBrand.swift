@@ -50,19 +50,23 @@ nonisolated public struct AskBrand: Sendable {
     /// The ready first screen's sentence under the headline, saying what Ask
     /// is. It goes while the screen is making room.
     public let firstScreenSentence: String
-    /// What the nothing-to-ask first screen says when the reader has nothing
-    /// to ask about yet, or nil for a host that never shows that screen, one
-    /// whose `AskFirstScreenPolicy.needsOwnedRows` is false.
+    /// What the nothing-to-ask first screen says. Its presence is the
+    /// policy: with copy, an empty overview (`AskOverview.isEmpty`) shows that
+    /// screen, for a host whose every question is about rows the reader owns;
+    /// nil, the default, shows the ready screen whatever the overview counts,
+    /// for one whose subject exists whether or not the reader has collected
+    /// any of it, such as a guide to a city's parks.
     ///
-    /// **No copy, no nothing-to-ask screen.** A host that needs owned rows
-    /// and gives none gets the ready first screen for an empty overview, as
-    /// one that doesn't need them does, and `AskEngine` logs the mismatch
-    /// when it is built.
+    /// **Nil where the overview is always empty**: a domain that doesn't
+    /// retrieve, whose overview is usually the default `.empty`, and one
+    /// whose tools read no rows (`AskNoRow`), under any grounding policy.
+    /// With copy, every reader would be told there is nothing to ask about.
+    /// `AskEngine` logs copy from a domain that doesn't retrieve when it is
+    /// built.
+    ///
+    /// The screen's button, if any, is the host's to hand `AskScreen`, its
+    /// label and what it does in one value (`AskNothingToAskAction`).
     public let nothingToAskCopy: String?
-    /// The label of the nothing-to-ask screen's button, or nil for no button.
-    /// The button shows only when the host also passes `AskScreen` an action
-    /// for it.
-    public let nothingToAskActionLabel: String?
     /// One sentence naming what leaves the device, shown last on the ready
     /// and can't-serve first screens.
     public let disclosureSentence: String
@@ -82,7 +86,6 @@ nonisolated public struct AskBrand: Sendable {
         firstScreenHeadline: String,
         firstScreenSentence: String,
         nothingToAskCopy: String? = nil,
-        nothingToAskActionLabel: String? = nil,
         disclosureSentence: String,
         scopeCaveat: String
     ) {
@@ -93,7 +96,6 @@ nonisolated public struct AskBrand: Sendable {
         self.firstScreenHeadline = firstScreenHeadline
         self.firstScreenSentence = firstScreenSentence
         self.nothingToAskCopy = nothingToAskCopy
-        self.nothingToAskActionLabel = nothingToAskActionLabel
         self.disclosureSentence = disclosureSentence
         self.scopeCaveat = scopeCaveat
         if !Self.isOneFolder(appDirectory), Self.reportedFolders.withLock({ $0.insert(appDirectory).inserted }) {
@@ -145,8 +147,7 @@ nonisolated extension AskBrand {
 /// their sizes. The starters (`AskDomain.starters(overview:window:)`) and the
 /// domain's prompt lines are written from it, so a first screen names
 /// something the reader really has, and an empty one shows the nothing-to-ask
-/// first screen where the policy needs owned rows
-/// (`AskFirstScreenPolicy.needsOwnedRows`) and the brand has words for it.
+/// first screen where the brand has words for it (`AskBrand.nothingToAskCopy`).
 nonisolated public struct AskOverview: Sendable, Equatable {
     /// One scope the reader has things in: its display name and how many.
     nonisolated public struct Scope: Sendable, Equatable, Identifiable {
@@ -180,9 +181,8 @@ nonisolated public struct AskOverview: Sendable, Equatable {
     /// Nothing to ask about: no scopes, and a total of zero.
     public static let empty = AskOverview(scopes: [], total: 0)
 
-    /// Whether there is nothing to ask about: a total of zero. With
-    /// `AskFirstScreenPolicy.needsOwnedRows` and the brand's
-    /// `nothingToAskCopy`, it shows the nothing-to-ask first screen.
+    /// Whether there is nothing to ask about: a total of zero. With the
+    /// brand's `nothingToAskCopy`, it shows the nothing-to-ask first screen.
     public var isEmpty: Bool { total == 0 }
 
     /// The scopes, largest first: the order a domain usually names them in.

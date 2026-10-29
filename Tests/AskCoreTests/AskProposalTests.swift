@@ -123,10 +123,10 @@ import Testing
         #expect(entry.proposalOutcome == .performing)
     }
 
-    @Test func everyCopyOfAnAnswerKeepsItsProposal() {
+    @Test func everyCopyOfAnAnswerKeepsItsProposal() throws {
         let answer = AskAnswer<FakeRow>(text: "The Peregrine is on your shelf.", proposal: Self.lend)
         #expect(answer.replacing(basis: "b").proposal == Self.lend)
-        #expect(answer.replacing(payload: Data("p".utf8)).proposal == Self.lend)
+        #expect(try answer.replacing(payload: "p").proposal == Self.lend)
         #expect(answer.replacing(proposal: nil).proposal == nil)
     }
 

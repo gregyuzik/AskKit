@@ -52,7 +52,7 @@ nonisolated enum AskFirstScreenArrangement {
     ///
     /// **The one that can't serve has while it keeps starters**: for a host
     /// that answers them without a model
-    /// (`AskFirstScreenPolicy.answersWithoutModel`), and while it has one to
+    /// (`AskDomain.answersWithoutModel`), and while it has one to
     /// offer. The reason is the first half, and the starters and the
     /// disclosure the second. Without starters it is a mark, a reason and a
     /// disclosure, one thing to read, as the nothing-to-ask screen is: a

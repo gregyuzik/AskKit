@@ -90,10 +90,9 @@ nonisolated public struct AskStage: Equatable, Sendable {
         case thread
         /// Nothing asked yet, and something to ask about.
         case ready
-        /// Nothing to ask about yet: an empty library, under a first-screen
-        /// policy that needs the reader's own rows
-        /// (`AskFirstScreenPolicy.needsOwnedRows`), from a host with words
-        /// for it (`AskBrand.nothingToAskCopy`).
+        /// Nothing to ask about yet: an empty library, from a host with words
+        /// for it (`AskBrand.nothingToAskCopy`), whose presence says that
+        /// every question is about rows the reader owns.
         case nothingToAskAbout
         /// No tier can serve, with the reason. It outranks an empty library.
         case cannotServe(AskUnavailability)
@@ -128,7 +127,6 @@ nonisolated public struct AskStage: Equatable, Sendable {
         isThinking: Bool,
         overview: AskOverview,
         unavailability: AskUnavailability?,
-        policy: AskFirstScreenPolicy = .ownedLibrary,
         hasNothingToAskCopy: Bool = true,
         overviewIsRead: Bool = true,
         overviewIsOverdue: Bool = false,
@@ -139,7 +137,7 @@ nonisolated public struct AskStage: Equatable, Sendable {
             lastHasText: !(turns.last?.text.isEmpty ?? true),
             lastIsComplete: turns.last?.isComplete ?? false,
             isThinking: isThinking, overview: overview,
-            unavailability: unavailability, policy: policy,
+            unavailability: unavailability,
             hasNothingToAskCopy: hasNothingToAskCopy,
             overviewIsRead: overviewIsRead, overviewIsOverdue: overviewIsOverdue,
             statusIsRead: statusIsRead
@@ -159,8 +157,7 @@ nonisolated public struct AskStage: Equatable, Sendable {
         isThinking: Bool,
         overview: AskOverview,
         unavailability: AskUnavailability?,
-        policy: AskFirstScreenPolicy,
-        hasNothingToAskCopy: Bool = true,
+        hasNothingToAskCopy: Bool,
         overviewIsRead: Bool = true,
         overviewIsOverdue: Bool = false,
         statusIsRead: Bool = true
@@ -172,16 +169,14 @@ nonisolated public struct AskStage: Equatable, Sendable {
             // The reason outranks an empty library: a reader who can't be
             // served needs to know that before being told they own nothing.
             phase = .cannotServe(unavailability)
-        } else if overview.isEmpty, overviewIsRead, policy.needsOwnedRows, hasNothingToAskCopy {
-            // Only where an empty library really is an empty Ask. A domain
-            // whose subject is public, such as a guide to a city's parks, can be
-            // asked about before the reader keeps anything of it, and telling
-            // them there is nothing to ask about would be false.
-            //
-            // And only where the host has words for it. A brand with no
-            // `nothingToAskCopy` gets the ready screen, as a policy that
-            // doesn't need owned rows does, rather than a mark with nothing
-            // under it; the engine logs the mismatch as it is built.
+        } else if overview.isEmpty, overviewIsRead, hasNothingToAskCopy {
+            // Only where an empty library really is an empty Ask, which the
+            // host says by giving words for it. A domain whose subject is
+            // public, such as a guide to a city's parks, can be asked about
+            // before the reader keeps anything of it, and telling them there
+            // is nothing to ask about would be false: it gives no
+            // `nothingToAskCopy`, and gets the ready screen rather than a mark
+            // with nothing under it.
             //
             // And only for an overview that was read: one that never came
             // back says nothing about the library.

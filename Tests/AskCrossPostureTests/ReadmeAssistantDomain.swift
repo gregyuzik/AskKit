@@ -93,7 +93,7 @@ import Testing
         #expect(AssistantDomain.SearchArguments.self == AskNoSearchArguments.self)
         #expect(domain.grounding == .notRequired)
         #expect(domain.replyShape == .prose)
-        #expect(domain.firstScreenPolicy == .openSubject)
+        #expect(!domain.answersWithoutModel)
         #expect(domain.brand.nothingToAskCopy == nil)
         #expect(await domain.overview() == .empty)
         let instructions = domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: "French")

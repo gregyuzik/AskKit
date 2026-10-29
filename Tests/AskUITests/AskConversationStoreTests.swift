@@ -5107,7 +5107,7 @@ import Testing
         // when the overview arrives.
         let stage = AskStage.of(
             turnIDs: [UUID()], lastHasText: true, lastIsComplete: true, isThinking: false,
-            overview: .empty, unavailability: nil, policy: .ownedLibrary, overviewIsRead: false
+            overview: .empty, unavailability: nil, hasNothingToAskCopy: true, overviewIsRead: false
         )
         #expect(stage.phase == .thread)
         #expect(stage.firstScreenIsKnown)

@@ -185,8 +185,6 @@ nonisolated struct DemoYearSpan: Codable, Sendable, Equatable {
         self.newest = newest
         self.count = rows.count
     }
-
-    var encoded: Data? { try? JSONEncoder().encode(self) }
 }
 
 /// The arguments, shared by the tool and the planner.
@@ -283,12 +281,19 @@ nonisolated struct DemoDomain: AskDomain {
         return await DemoPhoto.drawn()
     }
 
-    /// A fixed answer under `-askScriptedAnswer`, so the UI smoke suite can
-    /// assert on tiles, a pick's basis line and "Another pick", and a
-    /// proposal's card, rather than skipping when the model chooses none of
-    /// them; and under `-askHoldTurn` one that never comes. Off by default:
-    /// the demo's whole point is a real turn.
-    var implementsDeterministicAnswer: Bool {
+    /// Under `-askScriptedAnswer` or `-askHoldTurn` the demo answers every
+    /// question itself (`deterministicAnswer(for:)`), so it says so: on a Mac
+    /// or simulator without Apple Intelligence, the first screen keeps its
+    /// starters and a live composer under the reason, and the scripted paths
+    /// run. Off by default, as the protocol's is: the demo's whole point is a
+    /// real turn.
+    ///
+    /// One flag for the screen and the hook: `deterministicAnswer(for:)`
+    /// answers exactly when this is true, so the promise and what keeps it
+    /// can't disagree. Only a device that can't serve reads it on the first
+    /// screen, so with Apple Intelligence on the demo's first screen is as it
+    /// is without the flags.
+    var answersWithoutModel: Bool {
         CommandLine.arguments.contains(DemoLaunchArgument.scriptedAnswer) || Self.holdsTurns
     }
 
@@ -304,30 +309,25 @@ nonisolated struct DemoDomain: AskDomain {
         Self.holdsTurns ? .seconds(600) : .seconds(45)
     }
 
-    /// Under `-askScriptedAnswer` or `-askHoldTurn` the demo answers every
-    /// question itself, so it says so: on a Mac or simulator without Apple
-    /// Intelligence, the first screen keeps its starters and a live composer
-    /// under the reason, and the scripted paths run. Otherwise it is
-    /// `.ownedLibrary`, the default.
+    /// A fixed answer under `-askScriptedAnswer`, so the UI smoke suite can
+    /// assert on tiles, a pick's basis line and "Another pick", and a
+    /// proposal's card, rather than skipping when the model chooses none of
+    /// them; and under `-askHoldTurn` one that never comes.
     ///
-    /// The same flags as `implementsDeterministicAnswer`, never others: the
-    /// promise and the hook that keeps it can't disagree. Only a device that
-    /// can't serve reads `answersWithoutModel`, so with Apple Intelligence on
-    /// the demo behaves as it does without the flags.
-    var firstScreenPolicy: AskFirstScreenPolicy {
-        AskFirstScreenPolicy(answersWithoutModel: implementsDeterministicAnswer)
-    }
-
     /// The English phrases matched here choose which fixture stands in for the
     /// model, before anything is generated. None decides what becomes of an
     /// answer (house rule 7): "Another pick" under the scripted pick comes
     /// from its kind, as it would under a turn the model wrote.
-    func deterministicAnswer(for question: String) async -> AskAnswer<DemoRow>? {
-        guard implementsDeterministicAnswer else { return nil }
+    ///
+    /// Throws what a payload or a proposal that doesn't encode throws, which
+    /// fails the turn with the error's tag in the log rather than drawing an
+    /// answer without its card.
+    func deterministicAnswer(for question: String) async throws -> AskAnswer<DemoRow>? {
+        guard answersWithoutModel else { return nil }
         // Held until Stop, which cancels the wait, or the deadline, which
         // abandons it.
         if Self.holdsTurns {
-            try? await Task.sleep(for: .seconds(3600))
+            try await Task.sleep(for: .seconds(3600))
             return nil
         }
         // An answer that offers to do something, for the smoke test of the
@@ -339,9 +339,7 @@ nonisolated struct DemoDomain: AskDomain {
                 matches: [book],
                 tiles: [book],
                 questionKind: AskQuestionKind.lookup,
-                // `try?` only because this answer can't throw: a string id
-                // always encodes.
-                proposal: try? AskProposal(
+                proposal: try AskProposal(
                     title: "Mark \(book.displayTitle) as lent",
                     detail: "It stays with your books, marked as out on loan.",
                     actionLabel: "Mark as lent",
@@ -358,16 +356,15 @@ nonisolated struct DemoDomain: AskDomain {
         if question.localizedCaseInsensitiveContains("read tonight"),
            let book = DemoRow.all.first(where: { $0.id == "b6" }) {
             let books = DemoRow.all.filter { $0.kind == .book }
-            return AskAnswer(
+            return try Self.spanning(AskAnswer(
                 text: "Try \(book.displayTitle) tonight — you reread it every autumn.",
                 matches: books,
                 tiles: [book],
-                questionKind: AskQuestionKind.pick,
-                payload: DemoYearSpan(books)?.encoded
-            )
+                questionKind: AskQuestionKind.pick
+            ))
         }
         let shown = Array(DemoRow.all.prefix(2))
-        return AskAnswer(
+        return try Self.spanning(AskAnswer(
             text: "You own \(DemoRow.all.count) things. Two of them are \(shown[0].displayTitle) "
                 + "and \(shown[1].displayTitle).",
             matches: DemoRow.all,
@@ -375,9 +372,16 @@ nonisolated struct DemoDomain: AskDomain {
             // No follow-ups: a deterministic answer never establishes a kept
             // conversation, and `AskConversationStore.followUps` is empty
             // without one, so any listed here would be built and never shown.
-            questionKind: AskQuestionKind.lookup,
-            payload: DemoYearSpan(DemoRow.all)?.encoded
-        )
+            questionKind: AskQuestionKind.lookup
+        ))
+    }
+
+    /// `answer` carrying the years its rows span (`DemoYearSpan`), as the
+    /// search tool's turns carry them, for `DemoSpanCard` to draw: the value
+    /// itself, which AskKit encodes, and throws for if it can't.
+    private static func spanning(_ answer: AskAnswer<DemoRow>) throws -> AskAnswer<DemoRow> {
+        guard let span = DemoYearSpan(answer.matches) else { return answer }
+        return try answer.replacing(payload: span)
     }
 
     /// Why these tiles, in the demo's plainest terms: which shelves, which
@@ -424,7 +428,6 @@ nonisolated struct DemoDomain: AskDomain {
             firstScreenHeadline: "Ask about your things",
             firstScreenSentence: "Books, records, tools and clothes — thirty of them, made up for this demo.",
             nothingToAskCopy: "Nothing to ask about yet.",
-            nothingToAskActionLabel: Self.offersFirstItem ? "Add Your First Item" : nil,
             disclosureSentence: "Questions are answered on this device.",
             scopeCaveat: "Ask reads only what you own — it can't search the web, and it can be wrong."
         )
@@ -437,9 +440,8 @@ nonisolated struct DemoDomain: AskDomain {
     }
 
     /// `DemoLaunchArgument.emptyLibrary` with `button` after it: the
-    /// nothing-to-ask screen has its button. The brand's label and the
-    /// screen's action (`ContentView`) both read this, since the button
-    /// shows only with both.
+    /// nothing-to-ask screen has its button, which `ContentView` hands the
+    /// screen, its label and its action in one value.
     static var offersFirstItem: Bool {
         DemoLaunchArgument.value(after: DemoLaunchArgument.emptyLibrary) == "button"
     }

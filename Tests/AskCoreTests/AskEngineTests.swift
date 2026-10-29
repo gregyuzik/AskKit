@@ -423,25 +423,20 @@ private extension Trait where Self == ConditionTrait {
         ])
     }
 
-    /// A policy that needs owned rows, from a brand with no words for the
-    /// nothing-to-ask screen, is logged once the engine is built: the reader
-    /// gets the ready screen in its place.
-    @Test func aPolicyNeedingOwnedRowsFromABrandWithNoCopyIsLoggedOnceTheEngineIsBuilt() {
-        let line = "firstScreenPolicy.needsOwnedRows is set and brand.nothingToAskCopy is nil — an empty overview "
-            + "shows the ready first screen"
-        func routings(_ domain: RowlessDomain) -> [String] {
+    /// A domain that retrieves and gives no words for the nothing-to-ask
+    /// screen has chosen the ready screen for an empty overview: the copy's
+    /// presence is the whole policy, so there is nothing for it to disagree
+    /// with, and nothing about the first screen is logged.
+    @Test func aDomainThatRetrievesWithNoNothingToAskCopyIsNotLogged() {
+        func routings(_ copy: String?) -> [String] {
+            var domain = RowlessDomain()
+            domain.nothingToAskCopy = copy
             let log = FakeLogSink()
             _ = AskEngine(domain: domain, seam: FakeSeam(status: AskModelStatus()), log: log)
             return log.routings.withLock { $0 }
         }
-        var owned = RowlessDomain()
-        owned.firstScreenPolicy = .ownedLibrary
-        #expect(routings(owned).contains(line))
-
-        // The controls: copy for the screen, or a policy that never shows it.
-        owned.nothingToAskCopy = "Nothing to ask about yet."
-        #expect(!routings(owned).contains(line))
-        #expect(!routings(RowlessDomain()).contains(line))
+        #expect(!routings(nil).contains { $0.contains("nothingToAskCopy") })
+        #expect(!routings("Nothing to ask about yet.").contains { $0.contains("nothingToAskCopy") })
     }
 
     /// Every event a turn sends, and the error it ended on, for a domain of
@@ -735,37 +730,37 @@ private extension Trait where Self == ConditionTrait {
         #expect(!routings(.notRequired).contains(line))
     }
 
-    /// A domain that doesn't retrieve, under a first-screen policy that reads
-    /// an empty overview as nothing to ask about: probably a policy set by
-    /// hand and left behind.
-    @Test func aDomainThatDoesNotRetrieveUnderAPolicyNeedingOwnedRowsIsLogged() {
+    /// A domain that doesn't retrieve, with words for the nothing-to-ask
+    /// screen, whose presence asks for it: probably copy left behind from
+    /// `.retrieval`, and with the default overview every reader would be
+    /// told there is nothing to ask about.
+    @Test func aDomainThatDoesNotRetrieveWithNothingToAskCopyIsLogged() {
         func line(_ grounding: AskGroundingPolicy) -> String {
-            "firstScreenPolicy.needsOwnedRows is set and grounding is \(grounding.rawValue) — an empty overview "
+            "brand.nothingToAskCopy is set and grounding is \(grounding.rawValue) — an empty overview "
                 + "shows the nothing-to-ask first screen to a domain that doesn't retrieve"
         }
-        func routings(_ grounding: AskGroundingPolicy, _ policy: AskFirstScreenPolicy) -> [String] {
+        func routings(_ grounding: AskGroundingPolicy, copy: String?) -> [String] {
             var domain = RowlessDomain()
             domain.grounding = grounding
-            domain.firstScreenPolicy = policy
-            domain.nothingToAskCopy = "Nothing to ask about yet."
+            domain.nothingToAskCopy = copy
             let log = FakeLogSink()
             _ = AskEngine(domain: domain, seam: FakeSeam(status: AskModelStatus()), log: log)
             return log.routings.withLock { $0 }
         }
-        #expect(routings(.toolCall, .ownedLibrary).contains(line(.toolCall)))
-        #expect(routings(.notRequired, .ownedLibrary).contains(line(.notRequired)))
+        #expect(routings(.toolCall, copy: "Nothing to ask about yet.").contains(line(.toolCall)))
+        #expect(routings(.notRequired, copy: "Nothing to ask about yet.").contains(line(.notRequired)))
 
-        // The controls: a domain that retrieves, and policies that never show it.
-        #expect(!routings(.retrieval, .ownedLibrary).contains { $0.hasPrefix("firstScreenPolicy.needsOwnedRows is set and grounding") })
-        #expect(!routings(.toolCall, .openSubject).contains(line(.toolCall)))
-        #expect(!routings(.notRequired, .openSubject).contains(line(.notRequired)))
+        // The controls: a domain that retrieves, and domains that give no copy.
+        #expect(!routings(.retrieval, copy: "Nothing to ask about yet.").contains { $0.hasPrefix("brand.nothingToAskCopy is set") })
+        #expect(!routings(.toolCall, copy: nil).contains(line(.toolCall)))
+        #expect(!routings(.notRequired, copy: nil).contains(line(.notRequired)))
 
-        // And the default policy, which follows the grounding.
+        // And a domain whose copy follows its grounding logs nothing at all.
         var derived = FakeDomain()
         derived.grounding = .notRequired
         let log = FakeLogSink()
         _ = AskEngine(domain: derived, seam: FakeSeam(status: AskModelStatus()), log: log)
-        #expect(derived.firstScreenPolicy == .openSubject)
+        #expect(derived.brand.nothingToAskCopy == nil)
         #expect(log.routings.withLock { $0 }.isEmpty)
     }
 
@@ -2313,6 +2308,71 @@ private extension Trait where Self == ConditionTrait {
         #expect(recording.answer?.text == "Hello.")
     }
 
+    /// A payload the domain's own answer carries is encoded as a tool's is,
+    /// and reaches the turn's answer as those bytes.
+    @Test func aDeterministicAnswersPayloadReachesTheAnswer() async throws {
+        var domain = FakeDomain()
+        domain.deterministic = try AskAnswer(text: "Six records.", payload: ["oldest": 1959])
+        let (engine, _, _) = makeEngine(domain: domain)
+        let answer = try #require(await record(engine.ask("hi")).answer)
+        #expect(answer.payload(as: [String: Int].self) == ["oldest": 1959])
+        let collector = AskCollector<FakeRow>()
+        try await collector.record(payload: ["oldest": 1959])
+        #expect(await collector.turnPayload == answer.payload)
+    }
+
+    /// A hook that throws has taken the question and failed it: the turn
+    /// fails as the domain's failure, logged by its tag, with no tier read,
+    /// none cooled and no model asked, and Try Again retries it. Never a
+    /// model in its place, which would answer without the card the domain
+    /// meant the answer to carry: here, a payload that doesn't encode.
+    @Test func aDeterministicAnswerThatThrowsFailsTheTurnAsTheDomains() async throws {
+        let thrown: any Error
+        do {
+            _ = try AskAnswer<FakeRow>(text: "Hello.", payload: Double.nan)
+            Issue.record("a NaN payload encoded")
+            return
+        } catch {
+            thrown = error
+        }
+        #expect(thrown is EncodingError)
+        let tag = AskTriage.tag(for: thrown)
+        for states: [AskTierState] in [
+            [.serving(.privateCloud), .serving(.onDevice)],
+            [.down(.privateCloud, .notEntitled), .down(.onDevice, .deviceNotEligible)]
+        ] {
+            var domain = FakeDomain()
+            domain.deterministicError = thrown
+            let (engine, seam, log) = makeEngine(domain: domain, states: states)
+            seam.session(for: .privateCloud).script(grounded("A model's answer."))
+            let recording = await record(engine.ask("hi"))
+            #expect(recording.askError == .model(tag: tag))
+            #expect(recording.askError?.isRetryable == true)
+            #expect(recording.events.isEmpty)
+            #expect(seam.session(for: .privateCloud).prompts.withLock { $0 }.isEmpty)
+            #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+            #expect(log.routings.withLock { $0 }.contains("the domain's answer without a model failed: \(tag)"))
+        }
+    }
+
+    /// An `AskError` the hook throws is the turn's error as it is, and a
+    /// `CancellationError` is a stop, as from the domain's search.
+    @Test func anAskErrorTheHookThrowsIsTheTurnsOwn() async {
+        var domain = FakeDomain()
+        domain.deterministicError = AskError.refused
+        let (engine, seam, log) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).script(grounded("A model's answer."))
+        let refused = await record(engine.ask("hi"))
+        #expect(refused.askError == .refused)
+        #expect(!log.routings.withLock { $0 }.contains { $0.hasPrefix("the domain's answer without a model failed") })
+
+        domain.deterministicError = CancellationError()
+        let (stopping, _, _) = makeEngine(domain: domain)
+        let stopped = await record(stopping.ask("hi"))
+        #expect(stopped.error is CancellationError)
+        #expect(stopped.answer == nil)
+    }
+
     // MARK: - Refinement
 
     @Test func aRefinementReplacesTheAnswerAndAnnouncesItself() async throws {
@@ -3856,7 +3916,7 @@ private extension Trait where Self == ConditionTrait {
         var domain = FakeDomain()
         domain.deterministic = AskAnswer(
             text: "Hello.", matches: (0..<300).map { FakeRow("Row \($0)") },
-            payload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
+            encodedPayload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
             proposal: AskProposal(
                 title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: AskProposal.maxPayloadBytes + 1)
             )
@@ -3873,7 +3933,7 @@ private extension Trait where Self == ConditionTrait {
         // Within every limit, it is passed on as it is.
         let proposal = AskProposal(title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: 10))
         domain.deterministic = AskAnswer(
-            text: "Hello.", matches: [FakeRow("Rumours")], payload: Data(count: 10), proposal: proposal
+            text: "Hello.", matches: [FakeRow("Rumours")], encodedPayload: Data(count: 10), proposal: proposal
         )
         let (kept, _, _) = makeEngine(domain: domain)
         let whole = try #require(await record(kept.ask("hi")).answer)
@@ -3889,7 +3949,7 @@ private extension Trait where Self == ConditionTrait {
         var domain = FakeDomain()
         domain.refinement = AskAnswer(
             text: "Refined.", matches: (0..<300).map { FakeRow("Row \($0)") },
-            payload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
+            encodedPayload: Data(count: AskCollector<FakeRow>.maxPayloadBytes + 1),
             proposal: AskProposal(
                 title: "Lend it", actionLabel: "Lend", encodedPayload: Data(count: AskProposal.maxPayloadBytes + 1)
             )

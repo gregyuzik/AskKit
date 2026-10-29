@@ -442,14 +442,15 @@ import Testing
 
     /// Every `replacing` rebuilds the answer, and none may drop what grounded
     /// it: the engine writes the grounding, then replaces the basis.
-    @Test func everyReplacementKeepsTheGrounding() {
+    @Test func everyReplacementKeepsTheGrounding() throws {
         let answer = Answer(
             text: "a", matches: [FakeRow("Rumours")], tiles: [FakeRow("Rumours")], followUps: ["Why?"],
-            questionKind: AskQuestionKind.pick, basis: "b", payload: Data("p".utf8),
+            questionKind: AskQuestionKind.pick, basis: "b", encodedPayload: Data("p".utf8),
             proposal: AskProposal(title: "Lend it", actionLabel: "Lend"), grounding: .toolCall
         )
         #expect(answer.replacing(basis: "c").grounding == .toolCall)
-        #expect(answer.replacing(payload: nil).grounding == .toolCall)
+        #expect(answer.replacing(encodedPayload: nil).grounding == .toolCall)
+        #expect(try answer.replacing(payload: "q").grounding == .toolCall)
         #expect(answer.replacing(proposal: nil).grounding == .toolCall)
         #expect(answer.replacing(followUps: []).grounding == .toolCall)
         #expect(answer.replacing(tiles: []).grounding == .toolCall)

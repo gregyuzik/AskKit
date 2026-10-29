@@ -83,12 +83,12 @@ import FoundationModels
         #expect(domain.maxTurns(for: .onDevice) > 0)
     }
 
-    @Test func aBareDomainAnswersNothingDeterministicallyAndSaysSo() {
-        // The pairing `AskEngine` checks at construction: a domain that has
-        // not implemented the hook must not claim it has.
+    @Test func aBareDomainAnswersNothingWithoutAModelAndSaysSo() async throws {
+        // The hook answers nothing, so the first screen that can't serve
+        // mustn't keep starters that would fail.
         let domain = BareDomain()
-        #expect(!domain.implementsDeterministicAnswer)
-        #expect(!domain.firstScreenPolicy.answersWithoutModel)
+        #expect(try await domain.deterministicAnswer(for: "How many records do I own?") == nil)
+        #expect(!domain.answersWithoutModel)
     }
 
     @Test func theDefaultQuestionKindsAreAllInTheSchemaVocabulary() {
@@ -225,14 +225,13 @@ extension AskDomainDefaultsTests {
     }
 
     /// The defaults a rowless domain leaves alone are every other domain's:
-    /// the ones it would want to change are its grounding policy, which
-    /// stays `.retrieval`, and with it a first-screen policy of
-    /// `.ownedLibrary`, until it names another, and its brand's copy, which
-    /// it may leave out.
+    /// the one it would want to change is its grounding policy, which stays
+    /// `.retrieval` until it names another, and its brand's copy, which it
+    /// leaves out, so its empty overview shows the ready first screen.
     @Test func aRowlessDomainKeepsTheOtherDefaults() {
         let domain = BareRowlessDomain()
         #expect(domain.grounding == .retrieval)
-        #expect(domain.firstScreenPolicy == .ownedLibrary)
+        #expect(!domain.answersWithoutModel)
         #expect(domain.brand.nothingToAskCopy == nil)
         #expect(domain.referent(from: AskAnswer<AskNoRow>(text: "It is 14:05 in Lisbon.")).isEmpty)
         #expect(domain.evidence(for: AskAnswer<AskNoRow>(text: "It is 14:05 in Lisbon.")) == .counted)
@@ -265,8 +264,8 @@ extension AskDomainDefaultsTests {
 // MARK: - The grounding policy
 
 extension AskDomainDefaultsTests {
-    /// A rowless domain naming its grounding policy and nothing else, so its
-    /// first-screen policy is the default's to derive.
+    /// A rowless domain naming its grounding policy and nothing else, so
+    /// every other member is the default's.
     private struct GroundingOnlyDomain: AskDomain {
         let grounding: AskGroundingPolicy
 
@@ -282,19 +281,20 @@ extension AskDomainDefaultsTests {
         func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String { "" }
     }
 
-    /// Every domain written before the policy keeps today's grounding rule,
-    /// and the first screen that goes with it.
-    @Test func aBareDomainRetrievesAndOwnsItsLibrary() {
+    /// Every domain written before the policy keeps today's grounding rule.
+    @Test func aBareDomainRetrieves() {
         #expect(BareDomain().grounding == .retrieval)
-        #expect(BareDomain().firstScreenPolicy == .ownedLibrary)
     }
 
-    /// The default first screen follows the grounding: only a domain that
-    /// retrieves reads an empty overview as nothing to ask about.
-    @Test func theDefaultFirstScreenFollowsTheGroundingPolicy() {
-        #expect(GroundingOnlyDomain(grounding: .retrieval).firstScreenPolicy == .ownedLibrary)
-        #expect(GroundingOnlyDomain(grounding: .toolCall).firstScreenPolicy == .openSubject)
-        #expect(GroundingOnlyDomain(grounding: .notRequired).firstScreenPolicy == .openSubject)
+    /// Nothing on the first screen follows the grounding: under every policy
+    /// the starters need a model until the domain says otherwise, and whether
+    /// an empty overview is the nothing-to-ask screen is the brand's copy
+    /// alone, which this domain leaves out.
+    @Test func theFirstScreenDoesNotFollowTheGroundingPolicy() {
+        for grounding: AskGroundingPolicy in [.retrieval, .toolCall, .notRequired] {
+            #expect(!GroundingOnlyDomain(grounding: grounding).answersWithoutModel, "\(grounding)")
+            #expect(GroundingOnlyDomain(grounding: grounding).brand.nothingToAskCopy == nil, "\(grounding)")
+        }
     }
 
     /// The policy's raw values are what a host's own settings or tests would

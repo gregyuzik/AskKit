@@ -42,7 +42,7 @@ To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xco
 - **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4.
 - **A deployment target of 27.2** on every platform you build for.
 - **Platforms.** Both products build for iOS, macOS, visionOS, tvOS and watchOS, so a shared package can depend on them. The screen, and so Ask itself, exists on iOS, macOS and visionOS. On tvOS, AskCore's Foundation Models half (`AskDomain` and the engine with it) is compiled out, and on watchOS so is whatever names `SystemLanguageModel`, such as `AppleModelSeam`; `AppleAskSession` names nothing the watch lacks, and builds there.
-- **Apple Intelligence** on the reader's device, for the on-device model. When no model can serve, the first screen says why and the composer is off, unless your domain's `firstScreenPolicy` says it can answer without one.
+- **Apple Intelligence** on the reader's device, for the on-device model. When no model can serve, the first screen says why and the composer is off, unless your domain's `answersWithoutModel` says it can answer without one.
 - **For Private Cloud Compute, which is optional:** the managed entitlement `com.apple.developer.private-cloud-compute`, which Apple grants to eligible developers on request ([Accessing Private Cloud Compute](https://developer.apple.com/private-cloud-compute/), [the entitlement](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.developer.private-cloud-compute)); your declaration of it to AskKit, `AskPrivateCloudCompute.declared`; a network connection; and some of the reader's daily quota. Without the entitlement, every question goes to the on-device model.
 
 ## Install
@@ -256,7 +256,7 @@ Everything else on `AskDomain` has a default, and each member's doc comment says
 | `promptPrefix` | empty | Fixed words that open every prompt. Keep them byte-stable: a warm session caches them. |
 | `phrase(for:)`, `basis(for:)`, `evidenceScope(from:)` | none | The wait row's words for a tool event, a factual line under an answer's tiles, and the part of your data the evidence line names. |
 | `perform(_:)` | throws | Carries out a proposal the reader confirmed. |
-| `deterministicAnswer(for:)`, `implementsDeterministicAnswer` | none, false | An answer with no model: small talk, or a starter on a device where nothing can serve. |
+| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, and whether it answers your starters, which a device where nothing can serve then keeps under its reason, with the composer. A payload goes in as your own type, and a throw fails the turn. |
 | `turnDeadline` | 45 seconds | How long one turn may run, counted from the question. |
 | `rowLimit(for:)`, `maxTurns(for:)` | 40 and 8 on Private Cloud Compute, 12 and 3 on the device | The rows a tool result may show, and the turns a session carries before it rolls over. |
 
@@ -306,7 +306,7 @@ struct AskTab: View {
 }
 ```
 
-`AskScreen(store:)` takes the store and the screen's options (`accent:`, `spectrum:`, `onNothingAction:`, `onAttach:` and `composerAccessory:`, which takes the photo button's place and leaves `onAttach:` unused), and draws AskKit's own mark and tiles. Your views replace them with modifiers, in any order: `mark(_:)`, `tiles(_:)`, `evidenceDisclosure(_:)` and `answerFooter(_:)`. These are the only way to set your views: the initializer takes the store and the screen's options alone. A `tiles` builder is handed the rows; the turn and the rows; or the turn, the rows and an `open` closure, nil where nothing opens. Return an `AskTileGrid`, so the tiles arrive one at a time. A value a builder captures reaches answers already on screen only through `buildersDepend(on:)`. On iPhone Duo's inner display the screen arranges itself around the fold, with nothing for you to wire.
+`AskScreen(store:)` takes the store and the screen's options (`accent:`, `spectrum:`, `nothingToAskAction:`, `onAttach:` and `composerAccessory:`, which takes the photo button's place and leaves `onAttach:` unused), and draws AskKit's own mark and tiles. An empty overview shows the nothing-to-ask screen only when your brand gives `nothingToAskCopy`, and that screen has a button only when you pass `nothingToAskAction:`, an `AskNothingToAskAction` holding its label and what it does. Your views replace them with modifiers, in any order: `mark(_:)`, `tiles(_:)`, `evidenceDisclosure(_:)` and `answerFooter(_:)`. These are the only way to set your views: the initializer takes the store and the screen's options alone. A `tiles` builder is handed the rows; the turn and the rows; or the turn, the rows and an `open` closure, nil where nothing opens. Return an `AskTileGrid`, so the tiles arrive one at a time. A value a builder captures reaches answers already on screen only through `buildersDepend(on:)`. On iPhone Duo's inner display the screen arranges itself around the fold, with nothing for you to wire.
 
 ### 5. Wire the optional pieces
 
