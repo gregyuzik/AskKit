@@ -32,7 +32,10 @@ public actor AskGenerationGate {
     /// The generation gate the process shares: the default for `run` and for
     /// `AppleModelSeam`. A host's own on-device generations go through it
     /// too. It is the only gate a host's generations and its seam should wait
-    /// at, since one at another gate can run beside one at this.
+    /// at, since one at another gate can run beside one at this. An
+    /// `AppleModelSeam`'s generation presumed wedged here is logged under the
+    /// seam's `logSubsystem`, and a host's own under the app's bundle
+    /// identifier.
     ///
     /// Readable from any actor, and as a default argument on another one,
     /// such as `AppleModelSeam`'s initializer. That holds without the
@@ -49,7 +52,12 @@ public actor AskGenerationGate {
     private var currentOwner: UInt64?
     private var waiters: [(id: UInt64, continuation: CheckedContinuation<Void, any Error>)] = []
     private var nextID: UInt64 = 0
-    private let logger: Logger
+    /// The subsystem a wedged holder is logged under when its caller named
+    /// none of its own.
+    private let logSubsystem: String
+    /// Writes the line for a holder presumed wedged, under the subsystem
+    /// given: `os.Logger` at error level, unless a test records it.
+    private let logWedge: @Sendable (_ subsystem: String, _ deadline: Duration) -> Void
 
     /// A generation gate of its own, which serializes only what runs through
     /// it.
@@ -58,15 +66,30 @@ public actor AskGenerationGate {
     /// gate never waits for one holding another, so a seam given a gate of
     /// its own while the host's other on-device generations go through
     /// `shared` lets two run at once. Never build one only to log under the
-    /// brand's subsystem (`AskBrand.logSubsystem`): `shared` logs a wedged
-    /// holder under the app's bundle identifier, and that is the price of
-    /// one gate. A gate of its own suits a test, or a process whose every
-    /// on-device generation goes through it.
+    /// brand's subsystem (`AskBrand.logSubsystem`): an `AppleModelSeam`'s
+    /// generation presumed wedged is logged under the seam's `logSubsystem`,
+    /// whichever gate it waited at. A gate of its own suits a test, or a
+    /// process whose every on-device generation goes through it.
     ///
     /// - Parameter logSubsystem: the subsystem a wedged holder is logged
-    ///   under. Nil logs under the app's bundle identifier.
+    ///   under when it came through `run`, as a host's own generation does.
+    ///   Nil logs under the app's bundle identifier.
     public init(logSubsystem: String? = nil) {
-        logger = Logger(subsystem: AskBrand.subsystem(logSubsystem), category: "gate")
+        self.init(logSubsystem: logSubsystem) { subsystem, deadline in
+            Logger(subsystem: subsystem, category: "gate").error(
+                "generation held the gate past \(deadline.components.seconds, privacy: .public)s — presumed wedged; releasing"
+            )
+        }
+    }
+
+    /// A generation gate whose wedged holders' lines go to `logWedge`: the
+    /// log in the public initializer, a test's record here.
+    init(
+        logSubsystem: String?,
+        logWedge: @escaping @Sendable (_ subsystem: String, _ deadline: Duration) -> Void
+    ) {
+        self.logSubsystem = AskBrand.subsystem(logSubsystem)
+        self.logWedge = logWedge
     }
 
     private func acquire() async throws -> UInt64 {
@@ -101,9 +124,11 @@ public actor AskGenerationGate {
         admitNext()
     }
 
-    private func expire(owner id: UInt64, after deadline: Duration) {
+    /// Let the next caller in past a holder presumed wedged, and log it under
+    /// the subsystem its caller named, or the generation gate's own.
+    private func expire(owner id: UInt64, after deadline: Duration, loggingUnder subsystem: String?) {
         guard currentOwner == id else { return }
-        logger.error("generation held the gate past \(deadline.components.seconds, privacy: .public)s — presumed wedged; releasing")
+        logWedge(subsystem ?? logSubsystem, deadline)
         admitNext()
     }
 
@@ -152,6 +177,22 @@ public actor AskGenerationGate {
         deadline: Duration = holderDeadline,
         _ body: () async throws -> T
     ) async throws -> T {
+        try await run(isolation: isolation, gate: gate, deadline: deadline, logSubsystem: nil, body)
+    }
+
+    /// `run`, for a caller whose wedged holder is logged under a subsystem of
+    /// its own: `AppleModelSeam` names its `logSubsystem`, so a host that
+    /// logs the seam under its brand finds the line there, at `shared`.
+    ///
+    /// `logSubsystem` has no default, so a call that names none is the
+    /// public `run`. Nil logs under the generation gate's own subsystem.
+    static func run<T>(
+        isolation: isolated (any Actor)? = #isolation,
+        gate: AskGenerationGate = .shared,
+        deadline: Duration = holderDeadline,
+        logSubsystem: String?,
+        _ body: () async throws -> T
+    ) async throws -> T {
         let id = try await gate.acquire()
         // The holder's time starts here, for the watchdog and for the wait on
         // its producers alike.
@@ -162,7 +203,7 @@ public actor AskGenerationGate {
         let watchdog = Task.detached(priority: .utility) {
             try? await Task.sleep(for: deadline)
             guard !Task.isCancelled else { return }
-            await gate.expire(owner: id, after: deadline)
+            await gate.expire(owner: id, after: deadline, loggingUnder: logSubsystem)
         }
         let producers = AskGenerationProducers()
         // However the body ends, in this order: the generations it started
