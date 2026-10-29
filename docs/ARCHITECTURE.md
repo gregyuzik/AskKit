@@ -859,8 +859,9 @@ is drawn, such as a photo still decoding, crosses its placeholder the same way (
 ### The composer and the keyboard
 
 `AskComposer` sits in the screen's bottom bar (`safeAreaBar(edge: .bottom)`): a glass capsule tinted with
-the host's accent, growing from one to four lines. The host's hint wraps the same way, and sizes the
-field while the draft is empty, so at the accessibility sizes it shows whole, up to four lines. As it
+the host's accent, growing from one to four lines as the draft does. The host's hint takes one line,
+ending in an ellipsis when it is longer than the field is wide, so an empty field is always one line
+tall; VoiceOver reads the hint whole. As it
 grows its corners keep the radius they have at one line, centred on the circles at the bottom of the row,
 so the circles stay as far inside the edge at four lines as at one: a capsule four lines tall, with ends
 57 pt round, ran them out over its rim.
