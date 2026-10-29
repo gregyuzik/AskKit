@@ -13,10 +13,10 @@ import Testing
     /// Plain return sends a question, and shift-return keeps its newline
     /// whatever else is going on.
     @Test func returnSendsAndShiftReturnKeepsItsNewline() {
-        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: false) == .send)
-        #expect(AskComposerReturn.of(shift: true, draft: "What's the oldest?", isThinking: false) == .newline)
-        #expect(AskComposerReturn.of(shift: true, draft: "", isThinking: false) == .newline)
-        #expect(AskComposerReturn.of(shift: true, draft: "What's the oldest?", isThinking: true) == .newline)
+        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: false, isComposing: false) == .send)
+        #expect(AskComposerReturn.of(shift: true, draft: "What's the oldest?", isThinking: false, isComposing: false) == .newline)
+        #expect(AskComposerReturn.of(shift: true, draft: "", isThinking: false, isComposing: false) == .newline)
+        #expect(AskComposerReturn.of(shift: true, draft: "What's the oldest?", isThinking: true, isComposing: false) == .newline)
     }
 
     /// **Taken, not let through.** Let through, a return the composer can't
@@ -25,13 +25,66 @@ import Testing
     /// session for, and under a turn in flight a line break the reader never
     /// meant to type.
     @Test func returnWithNothingToSendTypesNothing() {
-        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: false) == .nothing)
-        #expect(AskComposerReturn.of(shift: false, draft: " \n ", isThinking: false) == .nothing)
+        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: false, isComposing: false) == .nothing)
+        #expect(AskComposerReturn.of(shift: false, draft: " \n ", isThinking: false, isComposing: false) == .nothing)
     }
 
     @Test func returnWhileATurnIsInFlightTypesNothing() {
-        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: true) == .nothing)
-        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: true) == .nothing)
+        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: true, isComposing: false) == .nothing)
+        #expect(AskComposerReturn.of(shift: false, draft: "What's the oldest?", isThinking: true, isComposing: false) == .nothing)
+    }
+
+    /// The handler takes the key to send or to type nothing, and lets it
+    /// through to the field for Shift's newline.
+    @Test func sendingAndNothingTakeTheKeyAndANewlineLetsItThrough() {
+        #expect(AskComposerReturn.send.result == .handled)
+        #expect(AskComposerReturn.nothing.result == .handled)
+        #expect(AskComposerReturn.newline.result == .ignored)
+    }
+}
+
+/// A hardware Return while an input method is composing in the field: typing
+/// Japanese, Chinese or Korean, the Return that confirms the conversion
+/// (`AskMarkedText`).
+@Suite(.timeLimit(.minutes(1))) struct AskComposerCompositionTests {
+    /// **Composing beats sending.** Taken to send, the Return never reaches
+    /// the input method, and the question goes half composed while the
+    /// conversion is left in the field.
+    @Test func aReturnWhileComposingConfirmsRatherThanSends() {
+        let route = AskComposerReturn.of(shift: false, draft: "日本の", isThinking: false, isComposing: true)
+        #expect(route == .composing)
+        #expect(route.result == .ignored)
+    }
+
+    /// **Composing beats nothing to send**, whatever the draft holds. Taken
+    /// as nothing to send, the Return that confirms a conversion would be
+    /// swallowed, and the conversion couldn't be confirmed from the keyboard.
+    /// On iOS SwiftUI's draft holds the marked text too (measured on the 27.2
+    /// simulator), so this is the order pinned for a draft that doesn't.
+    @Test func aReturnWhileComposingInAnEmptyFieldIsNotSwallowed() {
+        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: false, isComposing: true) == .composing)
+        #expect(AskComposerReturn.of(shift: false, draft: " ", isThinking: false, isComposing: true) == .composing)
+    }
+
+    /// **Composing beats a turn in flight**, which takes a Return so it types
+    /// nothing, and would take the one that confirms the next question's
+    /// first word.
+    @Test func aReturnWhileComposingUnderATurnInFlightIsNotSwallowed() {
+        #expect(AskComposerReturn.of(shift: false, draft: "", isThinking: true, isComposing: true) == .composing)
+        #expect(AskComposerReturn.of(shift: false, draft: "日本の", isThinking: true, isComposing: true) == .composing)
+    }
+
+    /// Shift-Return is let through whether or not anything is being
+    /// composed: to the field for its newline, or to the input method.
+    @Test func shiftReturnIsLetThroughWhileComposing() {
+        #expect(AskComposerReturn.of(shift: true, draft: "日本の", isThinking: false, isComposing: true).result == .ignored)
+        #expect(AskComposerReturn.of(shift: true, draft: "日本の", isThinking: false, isComposing: false) == .newline)
+    }
+
+    /// Once the conversion is confirmed, the next Return sends what it
+    /// confirmed, as it would have without an input method.
+    @Test func theReturnAfterTheConversionSends() {
+        #expect(AskComposerReturn.of(shift: false, draft: "日本の首都は", isThinking: false, isComposing: false) == .send)
     }
 }
 
