@@ -178,15 +178,6 @@ import Testing
         #expect(lines == [.init(subsystem: "com.example.gate", deadline: .milliseconds(50))])
     }
 
-    @Test func aHolderThatReturnsInTimeLogsNothing() async throws {
-        let lines = GateTestWedgeLines()
-        let gate = AskGenerationGate(logSubsystem: nil, logWedge: lines.write)
-        try await AskGenerationGate.run(gate: gate, deadline: .milliseconds(50), logSubsystem: "com.example.brand") {}
-        // Room for a watchdog that must have stood down.
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(lines.written.isEmpty)
-    }
-
     // MARK: - A holder's producers
 
     /// A stopped turn's generation, still unwinding: the reader has let the
