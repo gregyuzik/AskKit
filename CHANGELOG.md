@@ -12,6 +12,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
 The public API's shape, and fixes across the engine, the stored chats and the screen, many of them for
 VoiceOver and the accessibility sizes, and for a reader on gaze, a pointer or a hardware keyboard.
 
@@ -456,6 +458,7 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/gregyuzik/AskKit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gregyuzik/AskKit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/gregyuzik/AskKit/releases/tag/v0.1.0

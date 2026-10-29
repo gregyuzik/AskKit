@@ -49,7 +49,7 @@ To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xco
 
 ```swift
 platforms: [.iOS("27.2"), .macOS("27.2"), .visionOS("27.2")],
-dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.2.0")],
+dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.3.0")],
 // and in the target that shows the screen:
 dependencies: [.product(name: "AskCore", package: "AskKit"), .product(name: "AskUI", package: "AskKit")]
 ```
@@ -58,7 +58,7 @@ Those are lines of a `Package.swift` of yours: a shared package that also builds
 
 **Enhanced Security.** A target with Enhanced Security on (`ENABLE_ENHANCED_SECURITY`) builds an arm64e slice for a device and the Mac, and Xcode builds a package arm64e only when the workspace asks it to. Unasked, the arm64e slice can't find AskCore and AskUI, and the build fails. Set `iOSPackagesShouldBuildARM64e`, `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e` to `YES` in `WorkspaceSettings.xcsettings`, under your project's `project.xcworkspace/xcshareddata/` or your workspace's `xcshareddata/`, as the demo does ([docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md)).
 
-**Versions.** AskKit is at 0.x, and a minor version may break the API. `from: "0.2.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.2.0")` holds you to 0.2.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
+**Versions.** AskKit is at 0.x, and a minor version may break the API. `from: "0.3.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.3.0")` holds you to 0.3.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
 
 **Switching over AskKit's enums.** An enum that grows is open (`@nonexhaustive`): a `switch` of yours over one ends in `@unknown default`, or it doesn't compile, and a case a later version adds goes there instead of breaking your build. The open ones are `AskError`, `AskUnavailability`, `AskTier`, `AskActivity`, `AskTurnEvent`, `AskReasoningLevel`, `AskGrounding`, `AskDiscard.Reason`, `AskRetryAfter`, `AskProposalKind`, `AskProposalOutcome` and `AskOutcome.Miss`, and in AskUI `AskOrigin`, `AskStage.Phase`, `AskProposalPhase` and `AskPrivateCloudState`. The rest are closed, a set fixed by what it is, which a `switch` covers case by case with no default: `AskTurnMode`, `AskOutcome.Failure`, `AskGroundingPolicy`, `AskReplyShape`, `AskEvidencePresentation`, `AskPersistence`, `AskPrivateCloudCompute`, `AskFeedback.Sentiment`, `AskChipRow.Kind` and `AskArrival.Kind`. A new case in a closed one is a breaking change, allowed in a 0.x minor version.
 
@@ -70,7 +70,7 @@ To adopt AskKit with a coding assistant, such as Claude Code, Xcode's coding int
 Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
 data in their own words.
 
-1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.2.0" to the app target, and
+1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.3.0" to the app target, and
    link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
    imports both.
 2. Before writing code, read README.md and docs/ARCHITECTURE.md in that repository, and use only the
