@@ -113,10 +113,10 @@ Copy, Copy answer, Edit & Resend and Ask again in the Mac's File menu. The publi
     banner.
   - A hardware Return while an input method is composing, typing Japanese, Chinese or Korean, goes to
     the input method to confirm its conversion and sends nothing, on the Mac and on iOS in
-    `AskScreen`. The draft holds the reading being converted, so that Return could send the question
-    unconverted, and with a turn in flight or nothing else to send the composer took the Return from
-    the input method. On visionOS, and on iOS in a composer a host draws outside `AskScreen`, a Return
-    is routed as before.
+    `AskScreen`. The composer could take that Return before the input method had it, as a send or as
+    nothing to send, and on iOS, whose draft holds the reading being converted, the send was the
+    question unconverted. On visionOS, and on iOS in a composer a host draws outside `AskScreen`, a
+    Return is routed as before.
   - The evaluation row runs once per tap: scrolled away and back, or under a page pushed and popped,
     it no longer starts over and spends Private Cloud Compute's quota again. A chat's "when" in the
     list of chats stays current while it's on screen.

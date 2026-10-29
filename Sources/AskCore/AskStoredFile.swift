@@ -47,12 +47,13 @@ nonisolated enum AskStoredFile {
     ///
     /// **Never on a Mac**, where a file keeps the system's default class.
     /// macOS 27.2 fails every write under complete protection while the Mac
-    /// is locked, sandboxed or not. Measured with it on a locked Mac, the
-    /// signed, sandboxed demo's thread write failed (`NSCocoaErrorDomain` 513,
-    /// POSIX 1) and the chat was gone at relaunch, and outside the sandbox
-    /// `swift test` failed three of `AskStoredFileTests`' seven at their
-    /// writes, which pass with the Mac unlocked. Without it, the same locked
-    /// demo wrote its thread and read it back at relaunch, the file's class
+    /// is locked, sandboxed or not. Measured on a locked Mac in a probe build
+    /// that forced the option on there, the signed, sandboxed demo's thread
+    /// write failed (`NSCocoaErrorDomain` 513, POSIX 1) and the chat was gone
+    /// at relaunch, and outside the sandbox `swift test` failed three of
+    /// `AskStoredFileTests`' seven at their writes, which pass with the Mac
+    /// unlocked. With the Mac's options as they are, the same locked demo
+    /// wrote its thread and read it back at relaunch, the file's class
     /// `NSFileProtectionCompleteUntilFirstUserAuthentication`. And a Mac has
     /// no moment to write again: the store tries a refused write again as
     /// protected data comes back on iOS and visionOS alone
