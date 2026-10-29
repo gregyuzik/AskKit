@@ -3,30 +3,28 @@
 import Foundation
 import Synchronization
 
-/// Where a question came from.
+/// How the engine runs one turn: on the thread, on the thread for another
+/// pick, or apart from it.
 ///
-/// Two origins change how the engine runs the turn: `.standalone` shares
-/// nothing with the thread, and `.reroll` asks for a different pick. The
-/// others tell the screen where the question came from, and the engine treats
-/// them alike.
-nonisolated public enum AskOrigin: String, Sendable, Equatable, Codable {
-    /// Typed into the composer.
-    case typed
-    /// A starter chip, from the first screen or from the coaching under a
-    /// failure.
-    case starter
-    /// A follow-up chip under the last answer, or Ask again.
-    case followUp
-    /// Sent at once by the host, through
-    /// `AskConversationStore.prefill(_:scope:send:)` with `send: true`.
-    case prefilled
+/// Where the question came from is the screen's to know (AskUI's
+/// `AskOrigin`). The store runs Another pick as `.reroll` and every other
+/// question on the thread as `.conversation`.
+nonisolated public enum AskTurnMode: Sendable, Equatable {
+    /// On the thread's kept conversation, the default.
+    case conversation
+    /// On the thread too: "Another pick", the last question again, asking for
+    /// something other than what the last answer chose. The prompt names what
+    /// not to choose again, and the turn runs at a higher temperature, so the
+    /// model has room to choose differently.
+    case reroll
     /// A one-shot turn, such as a Siri intent's (`AskEngine.answerOnce(_:)`),
     /// that neither reads nor replaces the kept conversation.
     case standalone
-    /// "Another pick": the last question again, over the thread as it stands,
-    /// asking for something other than what the last answer chose, at a
-    /// higher temperature, so the model has room to choose differently.
-    case reroll
+
+    /// Whether the turn joins the thread: every mode but `.standalone`. A
+    /// turn that joins it continues the kept conversation, keeps what it
+    /// says for the next, and waits for the turn in flight.
+    public var joinsThread: Bool { self != .standalone }
 }
 
 /// Drives one question through a tier's model with the domain's tools
@@ -435,13 +433,13 @@ public actor AskEngine<Domain: AskDomain> {
     /// letting its stream go does.
     public nonisolated func ask(
         _ question: String,
-        origin: AskOrigin = .typed
+        mode: AskTurnMode = .conversation
     ) -> AsyncThrowingStream<Event, any Error> {
-        ask(question, origin: origin, images: [])
+        ask(question, mode: mode, images: [])
     }
 
     /// Ask a question the reader attached photos to. The stream ends as
-    /// `ask(_:origin:)`'s does.
+    /// `ask(_:mode:)`'s does.
     ///
     /// **The photos go only to a tier that reads them** (`AskTier.readsPhotos`),
     /// on a fresh session, a continued one and a rolled-over one alike, with a
@@ -454,28 +452,28 @@ public actor AskEngine<Domain: AskDomain> {
     /// its own, is sent none.
     public nonisolated func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment]
     ) -> AsyncThrowingStream<Event, any Error> {
-        ask(question, origin: origin, images: images, scope: nil)
+        ask(question, mode: mode, images: images, scope: nil)
     }
 
     /// Ask a question a host asked from one part of what the app holds, such
     /// as a shelf or a category (`AskConversationStore.prefill(_:scope:send:)`).
-    /// The stream ends as `ask(_:origin:)`'s does.
+    /// The stream ends as `ask(_:mode:)`'s does.
     ///
     /// `scope` reaches the model only as the line `AskDomain.scopeLine(for:)`
     /// writes for it, in the prompts that requirement lists; a domain that
     /// writes none asks the question as it would unscoped.
     public nonisolated func ask(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?
     ) -> AsyncThrowingStream<Event, any Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
-                await self.run(question, origin: origin, images: images, scope: scope, continuation: continuation)
+                await self.run(question, mode: mode, images: images, scope: scope, continuation: continuation)
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -483,7 +481,7 @@ public actor AskEngine<Domain: AskDomain> {
 
     private func run(
         _ question: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?,
         continuation: AsyncThrowingStream<Event, any Error>.Continuation
@@ -495,7 +493,7 @@ public actor AskEngine<Domain: AskDomain> {
             continuation.finish(throwing: CancellationError())
             return
         }
-        if origin != .standalone {
+        if mode.joinsThread {
             newestQuestion &+= 1
             let ticket = newestQuestion
             await settleTurn(for: ticket)
@@ -518,10 +516,10 @@ public actor AskEngine<Domain: AskDomain> {
         let chat = self.chat
         let work = Task {
             try await self.turn(
-                question, origin: origin, images: images, scope: scope, chat: chat, continuation: continuation
+                question, mode: mode, images: images, scope: scope, chat: chat, continuation: continuation
             )
         }
-        if origin != .standalone { inFlight = (id, work) }
+        if mode.joinsThread { inFlight = (id, work) }
         // The turn runs in a task of its own, so `stop()` and a newer question
         // can cancel it, and that task is no child of this one: a reader
         // letting the stream go cancels only this task, so this passes it on.
@@ -550,11 +548,11 @@ public actor AskEngine<Domain: AskDomain> {
     /// stops the turn, and this throws `CancellationError`; a stop from
     /// anywhere else, such as the framework's, is no cancellation of the
     /// caller's, and throws `AskError.couldNotAnswer`. So does a question
-    /// with nothing in it once `ask(_:origin:)` has dropped what the reader
+    /// with nothing in it once `ask(_:mode:)` has dropped what the reader
     /// can't see and trimmed it, before any tier is asked.
     public func answerOnce(_ question: String) async throws -> AskAnswer<Row> {
         var answer: AskAnswer<Row>?
-        let stream = ask(question, origin: .standalone)
+        let stream = ask(question, mode: .standalone)
         do {
             for try await event in stream {
                 if case .answer(let value) = event { answer = value }
@@ -573,7 +571,7 @@ public actor AskEngine<Domain: AskDomain> {
 
     private func turn(
         _ rawQuestion: String,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?,
         chat: Int,
@@ -674,14 +672,14 @@ public actor AskEngine<Domain: AskDomain> {
         // either path the first attempt takes gives it up before a hand-down
         // can ask: a kept session is dropped with it, and a fresh one drops the
         // kept session before it streams.
-        let threadTail = origin == .standalone ? [] : (conversation?.recapTail ?? restoredTail)
+        let threadTail = mode.joinsThread ? (conversation?.recapTail ?? restoredTail) : []
         // What the turn has on the reader's screen: the prose and the rows its
         // attempt has sent since the last `.restarted`.
         let drawn = AskDrawn<Row>()
 
         do {
             try await attempt(
-                question, tier: tier, origin: origin, images: images, scope: scope,
+                question, tier: tier, mode: mode, images: images, scope: scope,
                 chat: chat, started: started, deadline: deadline, drawn: drawn, continuation: continuation
             )
         } catch let stop as CancellationError {
@@ -692,7 +690,7 @@ public actor AskEngine<Domain: AskDomain> {
             // the reader saw of this turn, which they keep as its answer. A
             // standalone turn's generation was on a session of its own, and a
             // turn from a chat that has ended leaves the next chat alone.
-            if origin != .standalone, isCurrent(chat) {
+            if mode.joinsThread, isCurrent(chat) {
                 dropSession(adding: stoppedExchange(question, on: tier, drawn: drawn))
             }
             throw CancellationError()
@@ -752,7 +750,7 @@ public actor AskEngine<Domain: AskDomain> {
             // "Another pick" handed down still knows what it follows.
             // A standalone turn never held the thread's session, so it has none
             // to give up.
-            if origin != .standalone, isCurrent(chat) {
+            if mode.joinsThread, isCurrent(chat) {
                 restoredTail = threadTail
                 conversation = nil
             }
@@ -764,12 +762,12 @@ public actor AskEngine<Domain: AskDomain> {
             continuation.yield(.tier(fallback))
             do {
                 try await attempt(
-                    question, tier: fallback, origin: origin, images: images, scope: scope,
+                    question, tier: fallback, mode: mode, images: images, scope: scope,
                     chat: chat, started: started, deadline: deadline, drawn: drawn, continuation: continuation
                 )
             } catch let stop as CancellationError {
                 logIfCancelledFromBelow(stop, on: fallback)
-                if origin != .standalone, isCurrent(chat) {
+                if mode.joinsThread, isCurrent(chat) {
                     dropSession(adding: stoppedExchange(question, on: fallback, drawn: drawn))
                 }
                 throw CancellationError()
@@ -915,7 +913,7 @@ public actor AskEngine<Domain: AskDomain> {
     private func attempt(
         _ question: String,
         tier: AskTier,
-        origin: AskOrigin,
+        mode: AskTurnMode,
         images: [AskImageAttachment],
         scope: String?,
         chat: Int,
@@ -927,7 +925,7 @@ public actor AskEngine<Domain: AskDomain> {
         let scopeLine = scope.flatMap { domain.scopeLine(for: $0) }
 
         // A standalone turn always builds its own session.
-        if origin != .standalone,
+        if mode.joinsThread,
            var kept = conversation,
            AskContinuation.shouldContinue(
                keptTier: kept.tier,
@@ -944,7 +942,7 @@ public actor AskEngine<Domain: AskDomain> {
             var prompt = AskContinuation.followUpPrompt(
                 question: question, referentTitles: kept.lastReferent
             )
-            if origin == .reroll {
+            if mode == .reroll {
                 prompt = AskContinuation.rerollSteer(excluding: kept.lastReferent) + prompt
             }
             // Ahead of the question, as it rides a fresh prompt: a shelf's
@@ -956,7 +954,7 @@ public actor AskEngine<Domain: AskDomain> {
                     question: question, prompt: prompt, images: sentPhotos,
                     box: kept.box, collector: kept.collector, relay: kept.relay,
                     isFollowUp: true, appRetrieved: kept.appRetrieved,
-                    temperature: Self.temperature(for: origin),
+                    temperature: Self.temperature(for: mode),
                     started: started, deadline: deadline, drawn: drawn, continuation: continuation
                 )
                 kept.turns += 1
@@ -1008,19 +1006,19 @@ public actor AskEngine<Domain: AskDomain> {
         // said so far. The tail survives the session it was built on, and a
         // thread read back from disk carries the tail it had before this
         // process began.
-        let carried = origin == .standalone ? [] : (conversation?.recapTail ?? restoredTail)
+        let carried = mode.joinsThread ? (conversation?.recapTail ?? restoredTail) : []
         let recap = AskContinuation.recap(from: carried, tier: tier)
         let wasSummarized = recap != nil
         if wasSummarized { continuation.yield(.summarized) }
         // The session goes before the fresh one is built, and the tail it
         // carried waits in `restoredTail`: if the fresh one fails, Try Again
         // still starts from what the thread said.
-        if origin != .standalone, isCurrent(chat) { dropSession() }
+        if mode.joinsThread, isCurrent(chat) { dropSession() }
 
         let collector: AskCollector<Row>
         let relay: AskActivityRelay
         let box: AskSessionBox
-        if origin != .standalone, isCurrent(chat), let warmed = takeWarm(for: tier) {
+        if mode.joinsThread, isCurrent(chat), let warmed = takeWarm(for: tier) {
             // The warm session's tools hold the warm session's relay. Minting a
             // new one here would leave every tool reporting into an object
             // nobody listens to.
@@ -1029,7 +1027,7 @@ public actor AskEngine<Domain: AskDomain> {
             let fresh = AskCollector<Row>()
             let freshRelay = AskActivityRelay()
             guard let made = try await makeSession(
-                tier: tier, collector: fresh, relay: freshRelay, isConversation: origin != .standalone,
+                tier: tier, collector: fresh, relay: freshRelay, isConversation: mode.joinsThread,
                 deadline: deadline
             ) else {
                 // The seam reported this tier servable and then handed back no
@@ -1077,7 +1075,7 @@ public actor AskEngine<Domain: AskDomain> {
         // "Another pick" on a session that could not be continued: the steer
         // rides the fresh prompt instead, naming what the last answer chose —
         // and still asking for another when nothing it chose was carried.
-        if origin == .reroll {
+        if mode == .reroll {
             lines.append(AskContinuation.rerollSteer(excluding: carried.last?.rowTitles ?? []))
         }
         lines.append(contentsOf: photoLines)
@@ -1091,7 +1089,7 @@ public actor AskEngine<Domain: AskDomain> {
                 question: question, prompt: prompt, images: sentPhotos,
                 box: box, collector: collector, relay: relay,
                 isFollowUp: false, appRetrieved: false,
-                temperature: Self.temperature(for: origin),
+                temperature: Self.temperature(for: mode),
                 started: started, deadline: deadline, drawn: drawn, continuation: continuation
             )
         } catch let error as AskError where error == .ungrounded && grounding == .retrieval {
@@ -1115,7 +1113,7 @@ public actor AskEngine<Domain: AskDomain> {
             appRetrieved = true
             let retryPrompt = try await plannedPrompt(
                 question: question, domainLines: domainLines, tier: served,
-                isConversation: origin != .standalone,
+                isConversation: mode.joinsThread,
                 box: box, collector: collector, relay: relay,
                 deadline: deadline, continuation: continuation
             )
@@ -1127,12 +1125,12 @@ public actor AskEngine<Domain: AskDomain> {
                 question: question, prompt: retryPrompt, images: [],
                 box: box, collector: collector, relay: relay,
                 isFollowUp: false, appRetrieved: true,
-                temperature: Self.temperature(for: origin), rowsAlreadyRecorded: true,
+                temperature: Self.temperature(for: mode), rowsAlreadyRecorded: true,
                 started: started, deadline: deadline, drawn: drawn, continuation: continuation, retried: true
             )
         }
 
-        if origin != .standalone, isCurrent(chat) {
+        if mode.joinsThread, isCurrent(chat) {
             // Kept for its tail even when the deadline gave up on a generation
             // on it: the next question starts a fresh session with the recap.
             // Kept under the tier asked for, which is what the next turn asks
@@ -1801,8 +1799,8 @@ public actor AskEngine<Domain: AskDomain> {
     /// same question, and at 0.4 the first choice tends to come straight back:
     /// the steer says what to avoid, and 0.8 gives the model room to find
     /// something else.
-    nonisolated static func temperature(for origin: AskOrigin) -> Double {
-        origin == .reroll ? 0.8 : 0.4
+    nonisolated static func temperature(for mode: AskTurnMode) -> Double {
+        mode == .reroll ? 0.8 : 0.4
     }
 
     /// The domain's basis line for an answer that chose something to show —

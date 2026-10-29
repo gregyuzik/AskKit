@@ -127,7 +127,7 @@ import Testing
     /// The coaching under a failure is a bank in the thread too.
     @Test func theCoachingUnderAFailureSitsOnAFill() throws {
         let failure = AskFailureRow(
-            message: "Couldn't answer that.", retryable: false,
+            message: "Couldn't answer that.", isRetryable: false,
             coaching: [AskStarter(text: "What do I own?")], onRetry: {}
         )
         #expect(try drawsAFill(failure))

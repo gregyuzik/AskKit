@@ -36,7 +36,7 @@ import Testing
 
         #expect(turn.failure?.message == AskError.contextTooLarge.errorDescription)
         #expect(turn.failure?.message != entry.failureMessage)
-        #expect(turn.failure?.retryable == false)
+        #expect(turn.failure?.isRetryable == false)
         // Carried, not consumed — a second restore re-renders again.
         #expect(turn.failure?.error == .contextTooLarge)
         // House rule 5: the prose the turn had already written survives.
@@ -58,7 +58,7 @@ import Testing
         let turn = AskTurn(entry: entry)
 
         #expect(turn.failure?.message == "Couldn't answer that just now.")
-        #expect(turn.failure?.retryable == true)
+        #expect(turn.failure?.isRetryable == true)
         #expect(turn.failure?.error == nil)
     }
 
@@ -76,7 +76,7 @@ import Testing
             failureIsRetryable: true
         ))
         #expect(turn.failure?.message == AskError.requestNotSupported.errorDescription)
-        #expect(turn.failure?.retryable == false)
+        #expect(turn.failure?.isRetryable == false)
         #expect(AskError.requestNotSupported.isCoached == false)
     }
 
@@ -98,8 +98,8 @@ import Testing
 
         #expect(restored(stoppedByReader: true)?.message == AskAnnouncement.stoppedByReader)
         #expect(restored(stoppedByReader: false)?.message == AskError.stopped.errorDescription)
-        #expect(restored(stoppedByReader: true)?.retryable == true)
-        #expect(restored(stoppedByReader: false)?.retryable == true)
+        #expect(restored(stoppedByReader: true)?.isRetryable == true)
+        #expect(restored(stoppedByReader: false)?.isRetryable == true)
     }
 
     /// The warning beside a failure goes only for the reader's own stop, read

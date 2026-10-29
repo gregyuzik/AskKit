@@ -670,10 +670,10 @@ extension CrossPostureTests {
     /// own view builder reads the turn it is handed.
     @Test func aTurnsFailureIsBuiltAndReadWithoutThePosture() {
         let coaching = [AskStarter(text: "How many books do I own?")]
-        let failure = PlainTurn.Failure(message: "Not now.", retryable: false, error: .refused, coaching: coaching)
-        #expect(failure == PlainTurn.Failure(message: "Not now.", retryable: false, error: .refused, coaching: coaching))
-        #expect(!failure.retryable && failure.error == .refused && failure.coaching == coaching)
-        #expect(failure != PlainTurn.Failure(message: "Not now.", retryable: true))
+        let failure = PlainTurn.Failure(message: "Not now.", isRetryable: false, error: .refused, coaching: coaching)
+        #expect(failure == PlainTurn.Failure(message: "Not now.", isRetryable: false, error: .refused, coaching: coaching))
+        #expect(!failure.isRetryable && failure.error == .refused && failure.coaching == coaching)
+        #expect(failure != PlainTurn.Failure(message: "Not now.", isRetryable: true))
     }
 
     /// What a host's view builder reads of the turn it is handed beyond its
@@ -934,7 +934,7 @@ extension CrossPostureTests {
     }
 
     /// What an engine of a host's own is handed to resume a saved thread
-    /// (`AskAsking.resume(from:)`), built and compared off any actor.
+    /// (`AskAnswering.resume(from:)`), built and compared off any actor.
     @Test func aThreadTailIsUsableWithoutThePosture() {
         let tail = AskThreadTail(question: "How many?", answer: "Two.", rowTitles: ["Dune"])
         #expect(tail == AskThreadTail(question: "How many?", answer: "Two.", rowTitles: ["Dune"]))
@@ -1029,8 +1029,8 @@ extension CrossPostureTests {
         #expect(await collector.toolCallCount == 1)
     }
 
-    /// What a host's own session reports and streams, and where a question
-    /// came from, built and compared off any actor.
+    /// What a host's own session reports and streams, and how the engine
+    /// runs a turn, built and compared off any actor.
     @Test func aSessionsValuesAreUsableWithoutThePosture() throws {
         let usage = AskUsage(inputTokens: 120, cachedTokens: 100, outputTokens: 30)
         #expect(usage != AskUsage())
@@ -1040,10 +1040,8 @@ extension CrossPostureTests {
         #expect(snapshot == AskReplySnapshot(answer: "Two.", questionKind: "count"))
         #expect(snapshot.tiles == nil)
 
-        let origin = try JSONEncoder().encode(AskOrigin.reroll)
-        #expect(try JSONDecoder().decode(AskOrigin.self, from: origin) == .reroll)
-        #expect(AskOrigin.standalone.rawValue == "standalone")
-        #expect(AskOrigin.prefilled.rawValue == "prefilled")
+        #expect(AskTurnMode.conversation.joinsThread && AskTurnMode.reroll.joinsThread)
+        #expect(!AskTurnMode.standalone.joinsThread)
 
         // The levels a host's own session maps onto its model's.
         let levels: [AskReasoningLevel] = [.light, .moderate, .deep]
@@ -1307,11 +1305,11 @@ extension CrossPostureTests {
     }
 
     /// An engine of a host's own behind the store, written with only what
-    /// `AskAsking` requires, and asked off any actor, as the store asks it,
+    /// `AskAnswering` requires, and asked off any actor, as the store asks it,
     /// whether it keeps a conversation.
     @Test func anEngineOfAHostsOwnSaysWhetherItKeepsAConversationWithoutThePosture() async {
         let status = await MainActor.run { AskModelStatus() }
-        let asker: any AskAsking<CrossPostureRow> = CrossPostureAsker(status: status, keeps: true)
+        let asker: any AskAnswering<CrossPostureRow> = CrossPostureAsker(status: status, keeps: true)
         #expect(await asker.hasKeptConversation)
     }
 
@@ -1322,11 +1320,11 @@ extension CrossPostureTests {
         #expect(AppleModelSeam.transportCooldown == .seconds(60))
     }
 
-    /// What `AskAsking` defaults, asked off any actor of an engine of a
+    /// What `AskAnswering` defaults, asked off any actor of an engine of a
     /// host's own that writes none of it, as the store asks it: a question
     /// with a photo fails as one no model here takes, a scope goes as the
     /// question would without it, and the rest do nothing.
-    @Test func whatAskAskingDefaultsServesAnEngineOfAHostsOwn() async throws {
+    @Test func whatAskAnsweringDefaultsServesAnEngineOfAHostsOwn() async throws {
         let status = await MainActor.run { AskModelStatus() }
         let asker = CrossPostureAsker(status: status, keeps: false)
         await asker.forgetWarmIfEmpty()
@@ -1339,19 +1337,19 @@ extension CrossPostureTests {
         #expect(await asker.recordFeedback(verdict, isLatestTurn: true) == nil)
         let photo = AskImageAttachment(label: "A record sleeve", image: crossPosturePixel())
         await #expect(throws: AskError.photosNotSupported) {
-            for try await _ in asker.ask("What is this?", origin: .typed, images: [photo]) {}
+            for try await _ in asker.ask("What is this?", mode: .conversation, images: [photo]) {}
         }
-        for try await _ in asker.ask("How many?", origin: .prefilled, images: [], scope: "albums") {}
+        for try await _ in asker.ask("How many?", mode: .conversation, images: [], scope: "albums") {}
     }
 }
 
-/// An engine of a host's own with only the members `AskAsking` has no
+/// An engine of a host's own with only the members `AskAnswering` has no
 /// default for, as a scripted one for previews is.
-private struct CrossPostureAsker: AskAsking {
+private struct CrossPostureAsker: AskAnswering {
     let status: AskModelStatus
     let keeps: Bool
 
-    func ask(_ question: String, origin: AskOrigin) -> AsyncThrowingStream<AskTurnEvent<CrossPostureRow>, any Error> {
+    func ask(_ question: String, mode: AskTurnMode) -> AsyncThrowingStream<AskTurnEvent<CrossPostureRow>, any Error> {
         AsyncThrowingStream { $0.finish() }
     }
 

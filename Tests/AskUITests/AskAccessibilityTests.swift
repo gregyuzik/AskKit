@@ -349,7 +349,7 @@ import Testing
     /// the row gets exactly what the row says.
     @Test func aFailureIsAnnouncedInItsOwnWords() {
         var failed = turn()
-        failed.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", retryable: true)
+        failed.failure = AskTurn<UIRow>.Failure(message: "Couldn't answer that.", isRetryable: true)
         #expect(AskAnnouncement.terminal(for: failed) == "Couldn't answer that.")
     }
 
@@ -358,7 +358,7 @@ import Testing
     @Test func aFailureBeneathProseAnnouncesTheFailure() {
         var failed = turn()
         failed.write("Going by what you own,", at: 0)
-        failed.failure = AskTurn<UIRow>.Failure(message: "Try again.", retryable: true)
+        failed.failure = AskTurn<UIRow>.Failure(message: "Try again.", isRetryable: true)
         #expect(AskAnnouncement.terminal(for: failed) == "Try again.")
     }
 }
