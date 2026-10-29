@@ -2,9 +2,10 @@
 
 `Demo/AskKitDemo.xcodeproj/project.xcproj` is the demo's project, in Xcode 27.2's JSON format (JSON5,
 which Xcode writes in one canonical form and which keeps no comments). It is committed with the four
-shared schemes (`xcshareddata/xcschemes/`) and `project.xcworkspace/contents.xcworkspacedata`;
-`xcuserdata/` is ignored. `Demo/AskKitDemo/Info.plist` and `Demo/Signing.xcconfig` are tracked, and
-are the source of their keys: nothing regenerates them.
+shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcworkspacedata` and
+`project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings`; `xcuserdata/` is ignored.
+`Demo/AskKitDemo/Info.plist`, the app targets' entitlements files beside it and
+`Demo/Signing.xcconfig` are tracked, and are the source of their keys: nothing regenerates them.
 
 ## Editing it
 
@@ -22,7 +23,8 @@ are the source of their keys: nothing regenerates them.
   synchronized folders, so a file in one joins its folder's targets, in the build phase its type picks:
   the three app targets for `AskKitDemo/`, those and `AskKitDemoUITests` for `Shared/`, and the UI-test
   target alone for `AskKitDemoUITests/`. `AskKitDemo/Info.plist` is excluded from the app targets,
-  being their `INFOPLIST_FILE`. A file that must stay out of a target takes
+  being their `INFOPLIST_FILE`. The entitlements files there need no exclusion: no build phase takes
+  one, so none is copied into an app. A file that must stay out of a target takes
   `xcrun xcodeproj group exclude <name> --group /<folder> --target <target>`, once per target; one in a
   subfolder is a hand edit of the folder's `membership-exceptions` (`"Sub/File.swift"`).
   `Signing.xcconfig` sits outside every folder, in the plain "Configuration" group, because
@@ -36,8 +38,8 @@ are the source of their keys: nothing regenerates them.
   sets `CODE_SIGNING_ALLOWED` or `DEVELOPMENT_TEAM`: a project or target setting outranks the
   xcconfig, so it would override device signing and the developer's team.
 - **What a shipping host turns on, and the demo leaves off:** the Mac app runs unsigned, so its App
-  Sandbox and hardened runtime take effect only once `Local.xcconfig` signs it; Enhanced Security is
-  off; and warnings aren't errors.
+  Sandbox, hardened runtime and Enhanced Security entitlements take effect only once `Local.xcconfig`
+  signs it; and warnings aren't errors.
 - **`EXCLUDED_ARCHS = x86_64`**, for the whole project: arm64 only. Every deployment target is 27.2, and
   no Intel Mac runs macOS 27, so the x86_64 half of a macOS or simulator build would be compiled and
   thrown away. Subtracting the one dead arch, rather than pinning `ARCHS = arm64`, stays right if
@@ -45,21 +47,28 @@ are the source of their keys: nothing regenerates them.
 - **`SWIFT_TREAT_WARNINGS_AS_ERRORS = NO`.** The push gate and CI fail on every warning in the demo's
   sources and AskKit's anyway, and someone trying the demo under a newer Xcode can still run it past a
   new deprecation. A host without such a gate turns it on, for Release at least.
-- **Enhanced Security is off.** It has two halves. `ENABLE_ENHANCED_SECURITY = YES` adds pointer
-  authentication, an arm64e slice beside arm64 on a device and the Mac. The runtime half is the
-  `com.apple.security.hardened-process` entitlements (the main key, `enhanced-security-version-string`,
-  `hardened-heap`, `dyld-ro` and `platform-restrictions-string`), in an entitlements file per app
-  target, live only in a signed build. The demo has neither: AskKit, a SwiftPM package, doesn't follow
-  the app to arm64e on its own, so an arm64e app slice can't find AskCore. A host that turns it on adds
-  the entitlements file and the workspace setting that builds its packages arm64e
-  (`iOSPackagesShouldBuildARM64e`, in `project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings`,
-  which covers visionOS too).
+- **Enhanced Security is on**, in each app target, in both its halves. `ENABLE_ENHANCED_SECURITY = YES`
+  adds pointer authentication, an arm64e slice beside arm64 on a device and the Mac; a simulator has
+  no arm64e and builds arm64 alone. A Debug run on My Mac builds the arm64e slice alone, and a generic
+  destination, the push gate's `generic/platform=macOS`, builds both. The runtime half is the
+  `com.apple.security.hardened-process` entitlements: the main key, `enhanced-security-version-string`
+  and `platform-restrictions-string` at `"2"`, `hardened-heap` and `dyld-ro`, in
+  `AskKitDemo/AskKitDemo_<platform>.entitlements` (`CODE_SIGN_ENTITLEMENTS`), a file per target so
+  that Xcode's Signing & Capabilities changes one target at a time. They are live only in a signed
+  build; the unsigned Mac app carries none and runs its arm64e slice without them.
+- **`WorkspaceSettings.xcsettings`** sets `iOSPackagesShouldBuildARM64e`,
+  `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e`. A SwiftPM package doesn't
+  follow the app to arm64e on its own: without them a Mac build stops at "Unable to resolve module
+  dependency: 'AskCore'", and a device build can't link AskCore and AskUI ("Undefined symbols for
+  architecture arm64e"). A host that turns Enhanced Security on needs the same keys, in its project's
+  `project.xcworkspace/xcshareddata/` or its workspace's `xcshareddata/` (README's Install).
 - **One target per platform**, `AskKitDemo_iOS`, `AskKitDemo_macOS` and `AskKitDemo_visionOS`, with a
   scheme apiece, each compiling `AskKitDemo/` and `Shared/` and linking AskCore and AskUI from the
   package at `..`. `AskKitDemo_macOS` is a plain window, not Catalyst, so it declares its own category
   (`INFOPLIST_KEY_LSApplicationCategoryType`), and it asks for the App Sandbox and the hardened runtime
-  (`ENABLE_APP_SANDBOX`, `ENABLE_HARDENED_RUNTIME`), as a shipping Mac app does. Signed, it runs in its
-  container, where everything AskKit and the demo write already lives: Application Support.
+  (`ENABLE_APP_SANDBOX`, `ENABLE_HARDENED_RUNTIME`), as a shipping Mac app does. Signed, it carries
+  those settings' entitlements and its entitlements file's together, and runs in its container, where
+  everything AskKit and the demo write already lives: Application Support.
 - **`INFOPLIST_FILE = AskKitDemo/Info.plist`** is a base plist that `GENERATE_INFOPLIST_FILE`'s keys
   are combined with. It carries the locale list and the URL scheme, and its comments say why.
 - **The launch arguments.** Every `DemoLaunchArgument` but `-askAssistant` and `-askHoldTurn` is in
