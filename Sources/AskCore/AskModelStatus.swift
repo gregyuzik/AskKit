@@ -63,7 +63,7 @@ nonisolated public struct AskTierState: Sendable, Equatable {
 /// back, with a recap, on the better model. `first` is what a turn runs on;
 /// the next is what an outage hands the turn down to. With none, a turn goes
 /// to the held tier, if there is one (`askHeldTier(from:)`).
-nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTier] {
+nonisolated func askServableTiers(from states: [AskTierState]) -> [AskTier] {
     states.filter(\.isServable).map(\.tier)
 }
 
@@ -84,7 +84,7 @@ nonisolated package func askServableTiers(from states: [AskTierState]) -> [AskTi
 /// by a cooldown or a spent quota takes the turn (`askHeldTier(from:)`), and
 /// the mirror names it: its reason would tell the reader to wait for a
 /// download, or that nothing can be done, with no Try Again.
-nonisolated package func askUnavailability(from states: [AskTierState]) -> AskUnavailability {
+nonisolated func askUnavailability(from states: [AskTierState]) -> AskUnavailability {
     if states.contains(where: { $0.isAvailable && !$0.speaksLanguage }) { return .languageNotSupported }
     let tier = states.first { $0.tier == .onDevice } ?? states.first
     return tier?.unavailability ?? .unknown
@@ -134,7 +134,7 @@ nonisolated func askHeldTier(from states: [AskTierState]) -> AskTierState? {
 /// photos at all), and `model(tag:)`, which is unclassified by definition and
 /// must not become a license to run every unknown failure again on a second
 /// model.
-nonisolated package func askIsTierOutage(_ error: AskError) -> Bool {
+nonisolated func askIsTierOutage(_ error: AskError) -> Bool {
     switch error {
     case .privateCloudUnreachable, .quotaReached: return true
     case .modelUnavailable, .couldNotAnswer, .ungrounded, .refused,

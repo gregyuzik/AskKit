@@ -148,6 +148,15 @@ nonisolated enum AskArchiveMerge: Equatable, Sendable {
 /// backup, and never past `AskStoredFile.maxBytes`. `threads/`, which is the
 /// archive's own, is made the same way.
 ///
+/// **A host only makes one, to hand to `AskConversationStore`,** as it does
+/// the thread's (`AskThreadStore`). The initializer, to file the chats
+/// somewhere of its own (`directory:`), and `maxThreads` are all that is
+/// public; filing, reading and deleting are AskKit's own (`package`).
+/// Whether a filing may be replaced or removed turns on what is on screen and
+/// in the thread, which only the conversation store knows, and even the list
+/// isn't a bare read: each read tries again the deletions that haven't taken.
+/// The list a host shows is the conversation store's `history`.
+///
 /// Behind no platform gate, like `AskThreadStore`: Foundation alone.
 public actor AskThreadArchive<Row: AskRow> {
     private let logger: Logger
@@ -210,7 +219,7 @@ public actor AskThreadArchive<Row: AskRow> {
     // MARK: - Reading
 
     /// Every earlier chat, newest first.
-    public func summaries() -> [AskThreadSummary] {
+    package func summaries() -> [AskThreadSummary] {
         readIndex().threads
     }
 
@@ -223,7 +232,7 @@ public actor AskThreadArchive<Row: AskRow> {
     /// (`dropped` above zero) must keep it filed rather than remove it; the
     /// filing of the chat it becomes then goes beside it, never over it
     /// (`archive(_:at:)`).
-    public func entries(for id: UUID) -> AskThreadRead<Row> {
+    package func entries(for id: UUID) -> AskThreadRead<Row> {
         guard !pendingDeletions.contains(id), let url = url(for: id) else { return .empty }
         let (read, failure, droppedRows) = contents(of: url)
         if let failure {
@@ -285,7 +294,7 @@ public actor AskThreadArchive<Row: AskRow> {
     /// (`AskThreadStore.save(_:)`). A summary means the chat file is written;
     /// the index may not be, and the next read lists the chat from its file.
     @discardableResult
-    public func archive(_ entries: [AskThreadEntry<Row>], at now: Date = .now) -> AskThreadSummary? {
+    package func archive(_ entries: [AskThreadEntry<Row>], at now: Date = .now) -> AskThreadSummary? {
         archive(entries, at: now, sparing: nil)
     }
 
@@ -302,7 +311,7 @@ public actor AskThreadArchive<Row: AskRow> {
     /// written over, it would take these entries with it, and the turns only
     /// it held would already be gone.
     @discardableResult
-    package func archive(_ entries: [AskThreadEntry<Row>], at now: Date, sparing spared: UUID?) -> AskThreadSummary? {
+    func archive(_ entries: [AskThreadEntry<Row>], at now: Date, sparing spared: UUID?) -> AskThreadSummary? {
         guard !entries.isEmpty else { return nil }
         let index = readIndex()
         let earlier = index.threads.first {
@@ -501,7 +510,7 @@ public actor AskThreadArchive<Row: AskRow> {
     /// deletion, in the index when it can be written, and tries the file
     /// again on every read. So a caller has nothing to undo.
     @discardableResult
-    public func remove(_ id: UUID) -> Bool {
+    package func remove(_ id: UUID) -> Bool {
         let fileGone = removeFile(for: id)
         if !fileGone { pendingDeletions.insert(id) }
         let (index, named) = loadIndex()
@@ -527,9 +536,9 @@ public actor AskThreadArchive<Row: AskRow> {
     /// the index, then the folder, but only once nothing else is in it.
     ///
     /// **Only the archive's own files.** The folder can be a host's
-    /// (`directory:`), such as an App Group container a widget reads, and
-    /// Delete All Chats is no licence to delete what else is there. The next
-    /// filing makes the folder afresh if it went.
+    /// (`directory:`), such as an App Group container that holds a widget's
+    /// files too, and Delete All Chats is no licence to delete what else is
+    /// there. The next filing makes the folder afresh if it went.
     ///
     /// On false, every chat left is remembered as deleted, as `remove(_:)`
     /// remembers one, and stays off the list. False too for a folder that
@@ -538,7 +547,7 @@ public actor AskThreadArchive<Row: AskRow> {
     /// back once the folder lists. The index stays, as the record of which
     /// chats were there.
     @discardableResult
-    public func removeAll() -> Bool {
+    package func removeAll() -> Bool {
         guard let directory else { return true }
         guard let chatFiles = chatFileIDs(in: directory) else {
             logger.error("the chat folder could not be listed, so every chat is remembered as deleted")

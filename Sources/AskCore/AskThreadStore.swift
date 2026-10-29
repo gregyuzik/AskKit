@@ -326,9 +326,9 @@ nonisolated public enum AskThreadRead<Row: AskRow>: Sendable {
 
     /// The entries, or none, for a test that only wants to read what was
     /// written. Package, not public: read as an empty array, a failed read
-    /// looks like a fresh install, and a host that saved after it would
-    /// write a one-turn thread over the reader's whole conversation, the
-    /// very confusion the three cases exist to prevent.
+    /// looks like a fresh install, and a save after it would write a
+    /// one-turn thread over the reader's whole conversation, the very
+    /// confusion the three cases exist to prevent.
     package var entries: [AskThreadEntry<Row>] {
         if case .thread(let entries, _) = self { return entries }
         return []
@@ -359,6 +359,17 @@ nonisolated public enum AskThreadRead<Row: AskRow>: Sendable {
 /// - the original of a thread this build read only in part, kept as
 ///   `ask-thread-original-<id>.json`, until a launch that reads it whole puts
 ///   the turns this one couldn't back into their chat.
+///
+/// **A host only makes one, to hand to `AskConversationStore`.** The
+/// initializer, to keep the thread somewhere of its own (`url:`), and
+/// `maxPersistedTurns` are all that is public; what reads, writes and deletes
+/// the files is AskKit's own (`package`). The rules that keep a reader's
+/// turns, that a thread read in part or not at all is never written over and
+/// that the only copy of a chat is never deleted, span this file and the
+/// archive, and only the conversation store keeps them: called from anywhere
+/// else, `clear()` alone could delete the one copy of a chat. Nor is a read a
+/// bare read: `load()` keeps a thread read in part whole beside it first. A
+/// host that takes AskCore alone keeps its thread its own way.
 public actor AskThreadStore<Row: AskRow> {
     private let logger: Logger
 
@@ -427,7 +438,7 @@ public actor AskThreadStore<Row: AskRow> {
     /// would cut down. A thread none of whose turns parse is `.unreadable`
     /// too: read as no turns, it would look like a fresh install, and the
     /// next answer would write a one-turn thread over all of it.
-    public func load() -> AskThreadRead<Row> {
+    package func load() -> AskThreadRead<Row> {
         guard let url else { return .empty }
         let data: Data
         do {
@@ -506,7 +517,7 @@ public actor AskThreadStore<Row: AskRow> {
     /// again once protected data is available
     /// (`UIApplication.protectedDataDidBecomeAvailableNotification`).
     @discardableResult
-    public func save(_ entries: [AskThreadEntry<Row>]) -> Bool {
+    package func save(_ entries: [AskThreadEntry<Row>]) -> Bool {
         guard let url else { return false }
         guard !entries.isEmpty else { return clear() }
         do {
@@ -532,7 +543,7 @@ public actor AskThreadStore<Row: AskRow> {
     /// false, a caller that filed the chat first has lost nothing, and one
     /// deleting it at the reader's word should try again.
     @discardableResult
-    public func clear() -> Bool {
+    package func clear() -> Bool {
         guard let url else { return true }
         do {
             try FileManager.default.removeItem(at: url)
