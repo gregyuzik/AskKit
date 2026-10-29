@@ -16,23 +16,23 @@ import Synchronization
 /// of.
 @Suite(.timeLimit(.minutes(1))) struct AppleModelSeamTests {
 
+    /// A tier's state: up unless `why` says why not.
     private func state(
-        _ tier: AskTier, available: Bool, speaks: Bool = true,
+        _ tier: AskTier, speaks: Bool = true,
         why: AskUnavailability? = nil, quota: Bool = false, cooled: Bool = false
     ) -> AskTierState {
-        AskTierState(tier: tier, isAvailable: available, speaksLanguage: speaks,
-                     quotaReached: quota, isCooled: cooled, unavailability: why)
+        AskTierState(tier: tier, speaksLanguage: speaks, quotaReached: quota, isCooled: cooled, unavailability: why)
     }
 
     @Test func theNextTierIsTheFirstThatCanServe() {
         let both = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: true), state(.onDevice, available: true)
+            state(.privateCloud), state(.onDevice)
         ])
         #expect(both.nextTier == .privateCloud)
         #expect(both.unavailability == nil)
 
         let handedDown = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: false, why: .offline), state(.onDevice, available: true)
+            state(.privateCloud, why: .offline), state(.onDevice)
         ])
         #expect(handedDown.nextTier == .onDevice)
         // Nothing to say at the top level: something IS serving.
@@ -41,8 +41,8 @@ import Synchronization
 
     @Test func theTopLevelReasonSpeaksOnlyWhenNothingCanServe() {
         let none = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: false, why: .offline),
-            state(.onDevice, available: false, why: .appleIntelligenceOff)
+            state(.privateCloud, why: .offline),
+            state(.onDevice, why: .appleIntelligenceOff)
         ])
         #expect(none.nextTier == nil)
         #expect(none.unavailability != nil)
@@ -53,8 +53,8 @@ import Synchronization
         // whenever anything serves, so without this the settings row would say
         // nothing about Private Cloud Compute while on-device answered happily.
         let snapshot = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: false, why: .notEntitled),
-            state(.onDevice, available: true)
+            state(.privateCloud, why: .notEntitled),
+            state(.onDevice)
         ])
         #expect(snapshot.nextTier == .onDevice)
         #expect(snapshot.unavailability == nil)
@@ -65,17 +65,22 @@ import Synchronization
         // The one way a tier reports itself available and still cannot serve
         // the reader — Hebrew on Private Cloud Compute.
         let snapshot = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: true, speaks: false),
-            state(.onDevice, available: true)
+            state(.privateCloud, speaks: false),
+            state(.onDevice)
         ])
         #expect(snapshot.privateCloudUnavailability == .languageNotSupported)
     }
 
-    @Test func anUnavailableTierWithNoStatedReasonIsUnknownRatherThanNil() {
-        let snapshot = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: false), state(.onDevice, available: true)
-        ])
-        #expect(snapshot.privateCloudUnavailability == .unknown)
+    /// A tier is down only with a reason, so the row never has a down tier
+    /// with none to call unknown: it says the reason given, `.unknown` only
+    /// when that is the reason, and a tier given none is up.
+    @Test func aDownTierGivesTheRowItsOwnReason() {
+        for reason in AskUnavailability.allCases {
+            let snapshot = AppleModelSeam.snapshot(from: [state(.privateCloud, why: reason), state(.onDevice)])
+            #expect(snapshot.privateCloudUnavailability == reason)
+        }
+        let up = AppleModelSeam.snapshot(from: [state(.privateCloud), state(.onDevice)])
+        #expect(up.privateCloudUnavailability == nil)
     }
 
     @Test func turnedOffAndIneligibleMapToReasonsTheReaderCanActOn() {
@@ -97,7 +102,7 @@ import Synchronization
         // With Private Cloud Compute out too, the on-device reason is the one
         // the screen shows.
         #expect(askUnavailability(from: [
-            state(.privateCloud, available: false, why: .offline), hebrew
+            state(.privateCloud, why: .offline), hebrew
         ]) == .languageNotSupported)
 
         let downloading = AppleModelSeam.unavailableOnDeviceState(.modelNotReady, speaksAppLanguage: true)
@@ -118,11 +123,11 @@ import Synchronization
         // turn's error, which Try Again retries: the mirror names the tier,
         // so New Chat doesn't put up the can't-serve first screen in the
         // on-device tier's words.
-        let device = state(.onDevice, available: false, why: .modelNotReady)
+        let device = state(.onDevice, why: .modelNotReady)
         for cloud in [
-            state(.privateCloud, available: true, cooled: true),
-            state(.privateCloud, available: true, quota: true),
-            state(.privateCloud, available: true, quota: true, cooled: true)
+            state(.privateCloud, cooled: true),
+            state(.privateCloud, quota: true),
+            state(.privateCloud, quota: true, cooled: true)
         ] {
             let snapshot = AppleModelSeam.snapshot(from: [cloud, device])
             #expect(snapshot.nextTier == .privateCloud)
@@ -131,20 +136,20 @@ import Synchronization
         }
         // While the device serves, it serves.
         let handedDown = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: true, cooled: true), state(.onDevice, available: true)
+            state(.privateCloud, cooled: true), state(.onDevice)
         ])
         #expect(handedDown.nextTier == .onDevice)
     }
 
     @Test func aHoldOnATierThatCannotServeAnywayNamesNothing() {
-        let device = state(.onDevice, available: false, why: .appleIntelligenceOff)
+        let device = state(.onDevice, why: .appleIntelligenceOff)
         let down = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: false, why: .offline, cooled: true), device
+            state(.privateCloud, why: .offline, cooled: true), device
         ])
         #expect(down.nextTier == nil)
         #expect(down.unavailability == .appleIntelligenceOff)
         let wrongLanguage = AppleModelSeam.snapshot(from: [
-            state(.privateCloud, available: true, speaks: false, quota: true), device
+            state(.privateCloud, speaks: false, quota: true), device
         ])
         #expect(wrongLanguage.nextTier == nil)
         #expect(wrongLanguage.unavailability == .languageNotSupported)
@@ -211,8 +216,8 @@ import Synchronization
         // language. Read as "no", it would hand every turn to the device or,
         // with no device tier, tell the reader their language is unsupported,
         // which no Try Again gets past.
-        let cloud = state(.privateCloud, available: true, speaks: AppleModelSeam.speaksLanguage(probed: nil))
-        let device = state(.onDevice, available: false, why: .appleIntelligenceOff)
+        let cloud = state(.privateCloud, speaks: AppleModelSeam.speaksLanguage(probed: nil))
+        let device = state(.onDevice, why: .appleIntelligenceOff)
         #expect(askServableTiers(from: [cloud, device]) == [.privateCloud])
         let snapshot = AppleModelSeam.snapshot(from: [cloud, device])
         #expect(snapshot.nextTier == .privateCloud)

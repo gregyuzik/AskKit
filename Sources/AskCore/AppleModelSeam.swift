@@ -210,12 +210,10 @@ public actor AppleModelSeam: AskModelSeam {
 
     private func privateCloudState() async -> AskTierState {
         guard mayReachPrivateCloud() else {
-            return AskTierState(tier: .privateCloud, isAvailable: false, speaksLanguage: true,
-                                unavailability: .notEntitled)
+            return AskTierState(tier: .privateCloud, speaksLanguage: true, unavailability: .notEntitled)
         }
         guard monitor.isConnected else {
-            return AskTierState(tier: .privateCloud, isAvailable: false, speaksLanguage: true,
-                                unavailability: .offline)
+            return AskTierState(tier: .privateCloud, speaksLanguage: true, unavailability: .offline)
         }
         let available = probeAvailability()
         var quotaReached = isQuotaHeld
@@ -224,7 +222,6 @@ public actor AppleModelSeam: AskModelSeam {
         }
         return AskTierState(
             tier: .privateCloud,
-            isAvailable: available,
             speaksLanguage: available ? Self.speaksLanguage(probed: await speaksAppLanguage(.privateCloud)) : true,
             quotaReached: quotaReached,
             isCooled: isHeld(cooledUntil),
@@ -286,7 +283,7 @@ public actor AppleModelSeam: AskModelSeam {
         keepLocaleReads(under: availability)
         switch availability {
         case .available:
-            return AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: await onDeviceSpeaks(locale))
+            return AskTierState(tier: .onDevice, speaksLanguage: await onDeviceSpeaks(locale))
         case .unavailable(let why):
             let reason = Self.reason(from: why)
             // Only a model that says it is not ready is asked about the
@@ -304,8 +301,7 @@ public actor AppleModelSeam: AskModelSeam {
             }
             return Self.unavailableOnDeviceState(reason, speaksAppLanguage: speaks)
         @unknown default:
-            return AskTierState(tier: .onDevice, isAvailable: false, speaksLanguage: true,
-                                unavailability: .unknown)
+            return AskTierState(tier: .onDevice, speaksLanguage: true, unavailability: .unknown)
         }
     }
 
@@ -343,11 +339,9 @@ public actor AppleModelSeam: AskModelSeam {
         _ reason: AskUnavailability, speaksAppLanguage: Bool
     ) -> AskTierState {
         guard reason == .modelNotReady, !speaksAppLanguage else {
-            return AskTierState(tier: .onDevice, isAvailable: false, speaksLanguage: true,
-                                unavailability: reason)
+            return AskTierState(tier: .onDevice, speaksLanguage: true, unavailability: reason)
         }
-        return AskTierState(tier: .onDevice, isAvailable: false, speaksLanguage: false,
-                            unavailability: .languageNotSupported)
+        return AskTierState(tier: .onDevice, speaksLanguage: false, unavailability: .languageNotSupported)
     }
 
     /// The one place `PrivateCloudComputeLanguageModel.availability` is read.
@@ -716,16 +710,17 @@ public actor AppleModelSeam: AskModelSeam {
         let now = now()
         let wallNow = Date.now
         let lifts: ContinuousClock.Instant?
-        if retry.isQuota {
-            let reset = Self.quotaReset(fromError: retry.date, fromUsage: model()?.quotaUsage.resetDate)
+        switch retry {
+        case .quotaReached(let resetDate):
+            let reset = Self.quotaReset(fromError: resetDate, fromUsage: model()?.quotaUsage.resetDate)
             quotaHeldUntil = Self.extendedHold(
                 quotaHeldUntil, to: Self.holdEnd(until: reset, wallNow: wallNow, now: now), now: now
             )
             lifts = quotaHeldUntil
             logger.notice("quota reached — holding private cloud until its reset")
-        } else {
+        case .rateLimited(let until):
             cooledUntil = Self.extendedHold(
-                cooledUntil, to: Self.holdEnd(until: retry.date, wallNow: wallNow, now: now), now: now
+                cooledUntil, to: Self.holdEnd(until: until, wallNow: wallNow, now: now), now: now
             )
             lifts = cooledUntil
             logger.notice("rate limited — cooling private cloud until the reset it named")
@@ -875,9 +870,8 @@ public actor AppleModelSeam: AskModelSeam {
         // it answers happily. The language case is included because it is the
         // one way a tier reports itself available and still can't write.
         if let cloud = states.first(where: { $0.tier == .privateCloud }) {
-            snapshot.privateCloudUnavailability = cloud.isAvailable
-                ? (cloud.speaksLanguage ? nil : .languageNotSupported)
-                : (cloud.unavailability ?? .unknown)
+            snapshot.privateCloudUnavailability = cloud.unavailability
+                ?? (cloud.speaksLanguage ? nil : .languageNotSupported)
         }
         return snapshot
     }

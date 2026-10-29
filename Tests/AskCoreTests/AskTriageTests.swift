@@ -189,19 +189,19 @@ import Testing
         let spent = PrivateCloudComputeLanguageModel.Error.quotaLimitReached(
             .init(resetDate: reset, debugDescription: "spent")
         )
-        #expect(AskTriage.retryAfter(from: spent) == AskRetryAfter(date: reset, isQuota: true))
+        #expect(AskTriage.retryAfter(from: spent) == .quotaReached(resetDate: reset))
         // No date is still a quota: the seam falls back to the reset date the
         // model's quota usage reports.
         let undated = PrivateCloudComputeLanguageModel.Error.quotaLimitReached(
             .init(resetDate: nil, debugDescription: "spent")
         )
-        #expect(AskTriage.retryAfter(from: undated) == AskRetryAfter(date: nil, isQuota: true))
+        #expect(AskTriage.retryAfter(from: undated) == .quotaReached(resetDate: nil))
     }
 
     @Test func aRateLimitSaysWhenItLiftsOnlyWhenItKnows() {
         let reset = Date(timeIntervalSince1970: 1_800_000_060)
         let dated = LanguageModelError.rateLimited(.init(resetDate: reset, debugDescription: "slow down"))
-        #expect(AskTriage.retryAfter(from: dated) == AskRetryAfter(date: reset, isQuota: false))
+        #expect(AskTriage.retryAfter(from: dated) == .rateLimited(until: reset))
         // Without a date it is an ordinary outage, and the minute's cooldown
         // is what the seam applies.
         let undated = LanguageModelError.rateLimited(.init(resetDate: nil, debugDescription: "slow down"))

@@ -140,7 +140,7 @@ private struct ProseSeam: AskModelSeam {
     let status: AskModelStatus
 
     func tierStates() async -> [AskTierState] {
-        [AskTierState(tier: .onDevice, isAvailable: true, speaksLanguage: true)]
+        [AskTierState(tier: .onDevice, speaksLanguage: true)]
     }
 
     func makeSession(tier: AskTier, tools: [any Tool], instructions: String) async throws -> AskSessionBox? {

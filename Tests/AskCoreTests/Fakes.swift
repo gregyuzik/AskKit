@@ -980,11 +980,11 @@ nonisolated final class FakeLogSink: AskLogSink, @unchecked Sendable {
 
 extension AskTierState {
     static func serving(_ tier: AskTier) -> AskTierState {
-        AskTierState(tier: tier, isAvailable: true, speaksLanguage: true)
+        AskTierState(tier: tier, speaksLanguage: true)
     }
 
     static func down(_ tier: AskTier, _ why: AskUnavailability) -> AskTierState {
-        AskTierState(tier: tier, isAvailable: false, speaksLanguage: true, unavailability: why)
+        AskTierState(tier: tier, speaksLanguage: true, unavailability: why)
     }
 }
 

@@ -7,11 +7,13 @@ import Observation
 /// chosen, the fallback that stands behind it and the reason the reader is
 /// told can't disagree with each other, as two reads of the system in the
 /// middle of a failure could.
+///
+/// **A tier is available unless there is a reason it isn't.** Availability is
+/// read from `unavailability` alone, so a tier can't be down with no reason
+/// to give the reader, nor up with one.
 nonisolated public struct AskTierState: Sendable, Equatable {
     /// The tier this state is for.
     public let tier: AskTier
-    /// The model itself reports it can serve.
-    public let isAvailable: Bool
     /// It can write in the app's language.
     public let speaksLanguage: Bool
     /// The daily quota is spent: Private Cloud Compute only.
@@ -19,21 +21,24 @@ nonisolated public struct AskTierState: Sendable, Equatable {
     /// A failure cooled this tier (a transport failure, or a rate limit until
     /// the reset it named), and the cooldown hasn't lifted.
     public let isCooled: Bool
-    /// Why not, when `isAvailable` is false.
+    /// Why the model itself reports it can't serve, or nil while it can: the
+    /// one field availability is read from.
     public let unavailability: AskUnavailability?
 
-    /// A tier's state with each field as given. A seam builds one per tier
-    /// for `AskModelSeam.tierStates()`.
+    /// The model itself reports it can serve: it gave no reason it can't.
+    public var isAvailable: Bool { unavailability == nil }
+
+    /// A tier's state with each field as given: available unless
+    /// `unavailability` says why not. A seam builds one per tier for
+    /// `AskModelSeam.tierStates()`.
     public init(
         tier: AskTier,
-        isAvailable: Bool,
         speaksLanguage: Bool,
         quotaReached: Bool = false,
         isCooled: Bool = false,
         unavailability: AskUnavailability? = nil
     ) {
         self.tier = tier
-        self.isAvailable = isAvailable
         self.speaksLanguage = speaksLanguage
         self.quotaReached = quotaReached
         self.isCooled = isCooled
@@ -84,6 +89,10 @@ nonisolated func askServableTiers(from states: [AskTierState]) -> [AskTier] {
 /// by a cooldown or a spent quota takes the turn (`askHeldTier(from:)`), and
 /// the mirror names it: its reason would tell the reader to wait for a
 /// download, or that nothing can be done, with no Try Again.
+///
+/// `.unknown` only where no tier gave a reason: an empty list, or a tier
+/// that is up and kept out by a hold of its own, which `AppleModelSeam`
+/// never reports for the device. A tier that is down always says why.
 nonisolated func askUnavailability(from states: [AskTierState]) -> AskUnavailability {
     if states.contains(where: { $0.isAvailable && !$0.speaksLanguage }) { return .languageNotSupported }
     let tier = states.first { $0.tier == .onDevice } ?? states.first
