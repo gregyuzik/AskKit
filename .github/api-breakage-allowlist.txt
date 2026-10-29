@@ -35,3 +35,11 @@ API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:syst
 API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:systemImage:payload:) has parameter 6 type change from Foundation.Data to some Swift.Encodable
 API breakage: constructor AskProposal.init(id:kind:title:detail:actionLabel:systemImage:payload:) has removed default argument from parameter 6
 API breakage: constructor AskEval.init(engine:) has been removed
+API breakage: enum AskPersistence has removed conformance to Decodable
+API breakage: enum AskPersistence has removed conformance to Encodable
+API breakage: enum AskGroundingPolicy has removed conformance to Decodable
+API breakage: enum AskGroundingPolicy has removed conformance to Encodable
+API breakage: var AskBrand.shortLabel has been removed
+API breakage: constructor AskBrand.init(title:shortLabel:appDirectory:logSubsystem:help:firstScreenHeadline:firstScreenSentence:nothingToAskCopy:nothingToAskActionLabel:disclosureSentence:scopeCaveat:) has been removed
+API breakage: var AskStarter.bank has been removed
+API breakage: constructor AskStarter.init(id:text:bank:) has been removed

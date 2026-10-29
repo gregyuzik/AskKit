@@ -81,7 +81,6 @@ nonisolated struct LibraryDomain: AskDomain {
 
     let brand = AskBrand(
         title: "Ask My Library",
-        shortLabel: "Ask",
         appDirectory: "MyLibrary",
         logSubsystem: "com.example.mylibrary",
         help: "Ask about your books",

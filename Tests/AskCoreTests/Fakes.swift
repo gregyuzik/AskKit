@@ -821,7 +821,7 @@ nonisolated struct FakeDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Fake", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask Fake", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: "nothing", disclosureSentence: "disclosure",
@@ -949,7 +949,7 @@ nonisolated struct RowlessDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Rowless", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask Rowless", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: nothingToAskCopy, disclosureSentence: "disclosure",

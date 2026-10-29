@@ -3978,7 +3978,7 @@ nonisolated private struct EverythingSearchDomain: AskDomain {
 
     var brand: AskBrand {
         AskBrand(
-            title: "Ask Everything", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask Everything", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "help",
             firstScreenHeadline: "headline", firstScreenSentence: "sentence",
             nothingToAskCopy: "nothing", disclosureSentence: "disclosure",

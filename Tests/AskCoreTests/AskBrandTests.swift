@@ -11,7 +11,7 @@ import Testing
     /// literal or with a `String` resolved from its own catalog, and keeps it.
     @Test func aBrandBuiltWithAStringKeepsIt() {
         let literal = AskBrand(
-            title: "Ask My Library", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask My Library", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "Ask about your books",
             firstScreenHeadline: "Ask about your books",
             firstScreenSentence: "Find, count and compare what is on your shelves.",
@@ -23,7 +23,7 @@ import Testing
 
         let resolved: String = "Add a record to start asking."
         let fromCatalog = AskBrand(
-            title: "Ask My Records", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask My Records", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "Ask about your records",
             firstScreenHeadline: "Ask about your records",
             firstScreenSentence: "Find, count and compare what is in your crates.",
@@ -39,7 +39,7 @@ import Testing
     /// A host that never shows the nothing-to-ask screen leaves the copy out.
     @Test func aBrandBuiltWithoutTheCopyHasNone() {
         let brand = AskBrand(
-            title: "Ask the Clock", shortLabel: "Ask", appDirectory: "AskKitTests",
+            title: "Ask the Clock", appDirectory: "AskKitTests",
             logSubsystem: "AskKit.tests", help: "Ask the time anywhere",
             firstScreenHeadline: "Ask the time anywhere",
             firstScreenSentence: "Any city, any time zone.",

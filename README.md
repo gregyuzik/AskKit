@@ -193,7 +193,6 @@ nonisolated struct LibraryDomain: AskDomain {
 
     let brand = AskBrand(
         title: "Ask My Library",
-        shortLabel: "Ask",
         appDirectory: "MyLibrary",
         logSubsystem: "com.example.mylibrary",
         help: "Ask about your books",
@@ -375,7 +374,6 @@ nonisolated struct ConvertDistance: Tool {
 nonisolated struct AssistantDomain: AskDomain {
     let brand = AskBrand(
         title: "Ask the Assistant",
-        shortLabel: "Ask",
         appDirectory: "MyAssistant",
         logSubsystem: "com.example.myassistant",
         help: "Ask anything",

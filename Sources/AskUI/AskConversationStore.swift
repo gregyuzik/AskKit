@@ -2943,7 +2943,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         // the way a declined starter does.
         return (last.answer?.followUps ?? [])
             .filter { !declinedFollowUps.contains($0) }
-            .map { AskStarter(text: $0, bank: "followUp") }
+            .map { AskStarter(text: $0) }
     }
 
     /// Whether the last answer offers "Another pick": its stream has ended, it

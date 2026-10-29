@@ -77,7 +77,7 @@ import Testing
         #expect(NoRowDomain().grounding == .retrieval)
         let policies: [AskGroundingPolicy] = [.retrieval, .toolCall, .notRequired]
         #expect(policies.map(\.rawValue) == ["retrieval", "toolCall", "notRequired"])
-        #expect(try JSONDecoder().decode([AskGroundingPolicy].self, from: JSONEncoder().encode(policies)) == policies)
+        #expect(policies.map(\.rawValue).compactMap(AskGroundingPolicy.init(rawValue:)) == policies)
 
         let grounding = try JSONEncoder().encode(AskGrounding.followUp)
         #expect(try JSONDecoder().decode(AskGrounding.self, from: grounding) == .followUp)
@@ -169,7 +169,7 @@ private struct NoRowClockTool: Tool {
 /// reader's rows.
 private struct NoRowDomain: AskDomain {
     let brand = AskBrand(
-        title: "Ask the Clock", shortLabel: "Ask", appDirectory: "AskKitCrossPostureNoRow",
+        title: "Ask the Clock", appDirectory: "AskKitCrossPostureNoRow",
         logSubsystem: "askkit.crossposture", help: "Ask the time anywhere.",
         firstScreenHeadline: "Ask the time anywhere", firstScreenSentence: "Any city, any time zone.",
         disclosureSentence: "Questions are answered on this device.", scopeCaveat: "It can be wrong."
@@ -194,7 +194,7 @@ private struct NoRowChatDomain: AskDomain {
     static let toolLine = "From the clock, read just now"
 
     let brand = AskBrand(
-        title: "Ask Anything", shortLabel: "Ask", appDirectory: "AskKitCrossPostureNoRowChat",
+        title: "Ask Anything", appDirectory: "AskKitCrossPostureNoRowChat",
         logSubsystem: "askkit.crossposture", help: "Ask anything.",
         firstScreenHeadline: "Ask anything", firstScreenSentence: "Answers come from the model.",
         disclosureSentence: "Questions are answered on this device.", scopeCaveat: "It can be wrong."

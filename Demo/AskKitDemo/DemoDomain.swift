@@ -418,7 +418,6 @@ nonisolated struct DemoDomain: AskDomain {
     var brand: AskBrand {
         AskBrand(
             title: "Ask the Demo",
-            shortLabel: "Ask",
             appDirectory: "AskKitDemo",
             logSubsystem: "com.example.askkitdemo",
             help: "Ask about your things",
@@ -508,11 +507,11 @@ nonisolated struct DemoDomain: AskDomain {
     /// starter that names an empty shelf is a question with no answer.
     func starters(overview: AskOverview, window: Int) -> [AskStarter] {
         let byScope = overview.byCount.prefix(window).map { scope in
-            AskStarter(id: "own.\(scope.id)", text: "What \(scope.name) do I own?", bank: "scope")
+            AskStarter(id: "own.\(scope.id)", text: "What \(scope.name) do I own?")
         }
         return byScope + [
-            AskStarter(id: "oldest", text: "What's the oldest thing I have?", bank: "cross"),
-            AskStarter(id: "count", text: "How many things do I own in total?", bank: "cross")
+            AskStarter(id: "oldest", text: "What's the oldest thing I have?"),
+            AskStarter(id: "count", text: "How many things do I own in total?")
         ]
     }
 

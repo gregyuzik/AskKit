@@ -213,7 +213,6 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     var brand: AskBrand {
         AskBrand(
             title: "Ask the Assistant",
-            shortLabel: "Ask",
             appDirectory: "AskKitDemoAssistant",
             logSubsystem: "com.example.askkitdemo",
             help: "Ask anything",

@@ -99,7 +99,7 @@ private struct SurfaceDomain: AskDomain {
     static let title = "Ask the Shelf"
 
     let brand = AskBrand(
-        title: SurfaceDomain.title, shortLabel: "Ask", appDirectory: "AskKitCrossPostureSurface",
+        title: SurfaceDomain.title, appDirectory: "AskKitCrossPostureSurface",
         logSubsystem: "askkit.crossposture", help: "Ask about the shelf.",
         firstScreenHeadline: "Ask about the shelf", firstScreenSentence: "Answers come from the model.",
         disclosureSentence: "Questions are answered on this device.", scopeCaveat: "It can be wrong."

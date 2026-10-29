@@ -12,9 +12,6 @@ nonisolated public struct AskBrand: Sendable {
     /// The screen's title, such as "Ask My Library", which the host gives its
     /// navigation container: `AskScreen` sets no title of its own.
     public let title: String
-    /// The short label for a tab or a sidebar row, such as "Ask". AskKit
-    /// doesn't read it; it is the host's, for its own navigation.
-    public let shortLabel: String
     /// The folder under `Application Support` the thread, the earlier chats
     /// and the feedback attachments are kept in: a name no other app keeps
     /// files under there.
@@ -79,7 +76,6 @@ nonisolated public struct AskBrand: Sendable {
     /// its own bundle.
     public init(
         title: String,
-        shortLabel: String,
         appDirectory: String,
         logSubsystem: String,
         help: String,
@@ -91,7 +87,6 @@ nonisolated public struct AskBrand: Sendable {
         scopeCaveat: String
     ) {
         self.title = title
-        self.shortLabel = shortLabel
         self.appDirectory = appDirectory
         self.logSubsystem = logSubsystem
         self.help = help
@@ -202,21 +197,16 @@ nonisolated public struct AskStarter: Sendable, Equatable, Identifiable {
     /// The question as the reader sees it on the chip, and in the thread once
     /// tapped.
     public let text: String
-    /// A tag for the bank the starter belongs to, such as `"followUp"`, which
-    /// the store gives an answer's follow-ups. AskKit doesn't read it; it is
-    /// there for a host's own use.
-    public let bank: String?
 
     /// A starter for `text`. A nil `id` takes the text as the id.
-    public init(id: String? = nil, text: String, bank: String? = nil) {
+    public init(id: String? = nil, text: String) {
         self.id = id ?? text
         self.text = text
-        self.bank = bank
     }
 }
 
 /// Whether a thread survives the process.
-nonisolated public enum AskPersistence: String, Sendable, Equatable, Codable {
+nonisolated public enum AskPersistence: String, Sendable, Equatable {
     /// Written to `Application Support/<appDirectory>/ask-thread.json` after
     /// every turn and restored on launch: a chat is expected to still be
     /// there. New Chat files it with the earlier chats (`AskThreadArchive`).

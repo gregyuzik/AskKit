@@ -438,8 +438,7 @@ extension CrossPostureTests {
         #expect(AskFirstScreenPolicy.ownedLibrary == AskFirstScreenPolicy())
         #expect(policy.answersWithoutModel && !policy.needsOwnedRows)
 
-        let persistence = try JSONEncoder().encode(AskPersistence.perLaunch)
-        #expect(try JSONDecoder().decode(AskPersistence.self, from: persistence) == .perLaunch)
+        #expect(AskPersistence(rawValue: "perLaunch") == .perLaunch)
         #expect(AskPersistence.thread.rawValue == "thread")
 
         let kind = try JSONEncoder().encode(AskProposalKind.handOff)
@@ -545,7 +544,7 @@ extension CrossPostureTests {
         )
         #expect(overview.byCount.map(\.id) == ["books", "albums"])
         let brand = AskBrand(
-            title: "Ask", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+            title: "Ask", appDirectory: "AskKitCrossPosture",
             logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
             firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
             nothingToAskCopy: "Nothing to ask about yet.", nothingToAskActionLabel: "Add a row",
@@ -723,7 +722,7 @@ extension CrossPostureTests {
         _ = AskJumpToLatestPill {}
         _ = AskQuotaBanner(resetDate: nil, canRequestMore: true) {}
         let brand = AskBrand(
-            title: "Ask", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+            title: "Ask", appDirectory: "AskKitCrossPosture",
             logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
             firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
             disclosureSentence: "Answers come from your rows.", scopeCaveat: "Only your rows."
@@ -782,7 +781,7 @@ private struct CrossPostureSearchTool: Tool {
 /// default.
 private struct CrossPostureDomain: AskDomain {
     let brand = AskBrand(
-        title: "Ask", shortLabel: "Ask", appDirectory: "AskKitCrossPosture",
+        title: "Ask", appDirectory: "AskKitCrossPosture",
         logSubsystem: "askkit.crossposture", help: "Ask about your rows.",
         firstScreenHeadline: "Ask", firstScreenSentence: "Ask about your rows.",
         nothingToAskCopy: "Nothing to ask about yet.",
