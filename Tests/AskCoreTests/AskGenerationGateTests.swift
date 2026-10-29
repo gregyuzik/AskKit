@@ -141,6 +141,43 @@ import Testing
         wedged.cancel()
     }
 
+    // MARK: - Where a wedged holder is logged
+
+    /// The line a gate whose own subsystem is `com.example.gate` writes for
+    /// a holder that never returns, run under `logSubsystem` or, for nil,
+    /// through the public `run`, once its 50 ms are up.
+    private func wedgedHolderLines(callerNamed logSubsystem: String?) async throws -> [GateTestWedgeLines.Line] {
+        let lines = GateTestWedgeLines()
+        let gate = AskGenerationGate(logSubsystem: "com.example.gate", logWedge: lines.write)
+        let hold = GateTestHold()
+        let holder = Task {
+            if let logSubsystem {
+                try await AskGenerationGate.run(
+                    gate: gate, deadline: .milliseconds(50), logSubsystem: logSubsystem
+                ) { await hold.hold() }
+            } else {
+                try await AskGenerationGate.run(gate: gate, deadline: .milliseconds(50)) { await hold.hold() }
+            }
+        }
+        try await spin("the gate to log the wedged holder") { !lines.written.isEmpty }
+        hold.release()
+        try await holder.value
+        return lines.written
+    }
+
+    @Test func aWedgedHolderIsLoggedUnderTheSubsystemItsCallerNamed() async throws {
+        // A seam's generation, at the process's one gate: its line goes where
+        // the seam's own lines go, not where the gate's do.
+        let lines = try await wedgedHolderLines(callerNamed: "com.example.brand")
+        #expect(lines == [.init(subsystem: "com.example.brand", deadline: .milliseconds(50))])
+    }
+
+    @Test func aWedgedHolderWhoseCallerNamedNoSubsystemIsLoggedUnderTheGates() async throws {
+        // A host's own generation through the public `run`.
+        let lines = try await wedgedHolderLines(callerNamed: nil)
+        #expect(lines == [.init(subsystem: "com.example.gate", deadline: .milliseconds(50))])
+    }
+
     // MARK: - A holder's producers
 
     /// A stopped turn's generation, still unwinding: the reader has let the
@@ -249,5 +286,23 @@ nonisolated final class GateTestHold: Sendable {
             return state.held
         }
         held?.resume()
+    }
+}
+
+/// The lines a generation gate wrote for holders presumed wedged, recorded
+/// rather than logged: `os.Logger` can't say which subsystem it writes
+/// under, and reading the log store back stalls the test process.
+nonisolated final class GateTestWedgeLines: Sendable {
+    struct Line: Equatable {
+        let subsystem: String
+        let deadline: Duration
+    }
+    private let lines = Mutex<[Line]>([])
+
+    var written: [Line] { lines.withLock { $0 } }
+
+    /// The gate's `logWedge`.
+    func write(_ subsystem: String, _ deadline: Duration) {
+        lines.withLock { $0.append(Line(subsystem: subsystem, deadline: deadline)) }
     }
 }

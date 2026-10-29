@@ -526,6 +526,46 @@ import Synchronization
             #expect(!AppleModelSeam.skipsPrivateCloudLocaleProbe(Locale(identifier: identifier)), "\(identifier)")
         }
     }
+
+    // MARK: - Where a wedged generation is logged
+
+    /// The line the generation gate writes for an on-device generation of a
+    /// seam built under `logSubsystem` that never returns, at a gate whose
+    /// own subsystem is another, once its 50 ms are up.
+    private func wedgedGenerationLines(
+        seamLogSubsystem logSubsystem: String?
+    ) async throws -> [GateTestWedgeLines.Line] {
+        let lines = GateTestWedgeLines()
+        let device = ScriptedOnDevice(.available, writes: true)
+        let seam = AppleModelSeam(
+            status: AskModelStatus(), privateCloudCompute: .undeclared,
+            gate: AskGenerationGate(logSubsystem: "com.example.gate", logWedge: lines.write),
+            logSubsystem: logSubsystem, holderDeadline: .milliseconds(50),
+            onDeviceAvailability: { await device.availability() },
+            onDeviceSupportsLocale: { _ in device.supportsLocale() },
+            now: { .now }
+        )
+        let hold = GateTestHold()
+        let generation = Task { try await seam.withGeneration(onDevice: true) { await hold.hold() } }
+        for _ in 0..<4_000 where lines.written.isEmpty {
+            try await Task.sleep(for: .microseconds(500))
+        }
+        hold.release()
+        try await generation.value
+        return lines.written
+    }
+
+    @Test func aWedgedOnDeviceGenerationIsLoggedUnderTheSeamsSubsystem() async throws {
+        // The brand's subsystem, at the process's one gate: a host never
+        // builds a gate of its own to find the line beside the seam's.
+        let lines = try await wedgedGenerationLines(seamLogSubsystem: "com.example.brand")
+        #expect(lines == [.init(subsystem: "com.example.brand", deadline: .milliseconds(50))])
+    }
+
+    @Test func aSeamWithNoSubsystemLogsItsWedgedGenerationWhereItsOtherLinesGo() async throws {
+        let lines = try await wedgedGenerationLines(seamLogSubsystem: nil)
+        #expect(lines == [.init(subsystem: AskBrand.subsystem(nil), deadline: .milliseconds(50))])
+    }
 }
 
 /// The seam's Private Cloud Compute reads, each a network call: the locale

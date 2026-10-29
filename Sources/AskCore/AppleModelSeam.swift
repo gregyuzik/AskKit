@@ -32,6 +32,9 @@ import Synchronization
 /// daily quota is the developer's own.
 public actor AppleModelSeam: AskModelSeam {
     private let logger: Logger
+    /// The subsystem `logger` writes under, which the generation gate logs
+    /// this seam's wedged generations under too.
+    private let logSubsystem: String
 
     /// How long a transient probe answer is served from cache before the next
     /// ask re-probes. A terminal one is never re-probed. A locale probe or a
@@ -89,6 +92,10 @@ public actor AppleModelSeam: AskModelSeam {
     private var refreshesBegun: UInt64 = 0
     private let newestRefreshApplied = Mutex<UInt64>(0)
     private let gate: AskGenerationGate
+    /// How long an on-device generation may hold the generation gate before
+    /// it is presumed wedged: `AskGenerationGate.holderDeadline`, unless a
+    /// test shortens it.
+    private let holderDeadline: Duration
     private let monitor = NetworkReachability()
 
     /// How long one of Private Cloud Compute's reads, the locale probe or the
@@ -120,12 +127,13 @@ public actor AppleModelSeam: AskModelSeam {
     ///   - gate: the generation gate on-device generations wait at. Leave it
     ///     at the default, `AskGenerationGate.shared`, the one the process's
     ///     other on-device generations wait at too: a gate of its own lets a
-    ///     generation here run beside one there. Never pass one only to log
-    ///     the gate under `logSubsystem`; `shared` logs a wedged holder under
-    ///     the app's bundle identifier.
+    ///     generation here run beside one there. Never pass one to log the
+    ///     gate under `logSubsystem`: at `shared` too, a generation of this
+    ///     seam's presumed wedged is logged under it.
     ///   - logSubsystem: the subsystem the seam logs under: the domain's
-    ///     `AskBrand.logSubsystem`, so its lines sit with the engine's. Nil
-    ///     logs under the app's bundle identifier.
+    ///     `AskBrand.logSubsystem`, so its lines sit with the engine's. The
+    ///     generation gate logs this seam's wedged generations under it too.
+    ///     Nil logs under the app's bundle identifier.
     public init(
         status: AskModelStatus,
         privateCloudCompute: AskPrivateCloudCompute,
@@ -140,13 +148,15 @@ public actor AppleModelSeam: AskModelSeam {
         )
     }
 
-    /// A seam whose on-device reads and clock are given: the system's in the
-    /// public initializer, a test's script here.
+    /// A seam whose on-device reads, clock and holder deadline are given:
+    /// the system's and the generation gate's in the public initializer, a
+    /// test's here.
     init(
         status: AskModelStatus,
         privateCloudCompute: AskPrivateCloudCompute,
         gate: AskGenerationGate,
         logSubsystem: String?,
+        holderDeadline: Duration = AskGenerationGate.holderDeadline,
         onDeviceAvailability: @escaping @Sendable () async -> SystemLanguageModel.Availability,
         onDeviceSupportsLocale: @escaping @Sendable (Locale) async -> Bool,
         now: @escaping @Sendable () -> ContinuousClock.Instant
@@ -154,10 +164,13 @@ public actor AppleModelSeam: AskModelSeam {
         self.status = status
         self.privateCloudCompute = privateCloudCompute
         self.gate = gate
+        self.holderDeadline = holderDeadline
         self.onDeviceAvailability = onDeviceAvailability
         self.onDeviceSupportsLocale = onDeviceSupportsLocale
         self.now = now
-        let logger = Logger(subsystem: AskBrand.subsystem(logSubsystem), category: "seam")
+        let subsystem = AskBrand.subsystem(logSubsystem)
+        self.logSubsystem = subsystem
+        let logger = Logger(subsystem: subsystem, category: "seam")
         self.logger = logger
         let memory = Duration.seconds(Self.reprobeInterval)
         localeProbes = AskSharedRead(
@@ -796,13 +809,17 @@ public actor AppleModelSeam: AskModelSeam {
     }
 
     /// An on-device generation waits its turn at this seam's generation gate,
-    /// first in, first out; a Private Cloud Compute one runs at once.
+    /// first in, first out; a Private Cloud Compute one runs at once. One
+    /// presumed wedged is logged under the seam's subsystem, beside its other
+    /// lines.
     public func withGeneration<T: Sendable>(
         onDevice: Bool,
         _ body: nonisolated(nonsending) @Sendable () async throws -> T
     ) async throws -> T {
         guard onDevice else { return try await body() }
-        return try await AskGenerationGate.run(gate: gate) { try await body() }
+        return try await AskGenerationGate.run(
+            gate: gate, deadline: holderDeadline, logSubsystem: logSubsystem
+        ) { try await body() }
     }
 
     /// Reads every tier's state and Private Cloud Compute's quota, and
