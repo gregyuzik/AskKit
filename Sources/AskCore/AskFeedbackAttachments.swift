@@ -14,6 +14,13 @@ import os
 /// from leaves the screen: New Chat, Delete All Chats, or an earlier chat
 /// opened in its place.
 ///
+/// **A host only makes one, to hand to `AskConversationStore`,** as it does
+/// the thread's (`AskThreadStore`). The initializer, to keep them somewhere of
+/// its own (`directory:`), and `maxKept` are all that is public; keeping,
+/// listing and removing them are AskKit's own (`package`). The conversation
+/// store keeps one per verdict and removes them with their chat, and the
+/// diagnostics row lists and shares them.
+///
 /// Behind no platform gate, like `AskThreadStore`: Foundation alone.
 public actor AskFeedbackAttachments {
     private let logger: Logger
@@ -58,7 +65,7 @@ public actor AskFeedbackAttachments {
     /// carries `date` and `sentiment`, and `urls()` reads the age back from
     /// it. Returns where it went, or nil when it couldn't be written.
     @discardableResult
-    public func save(_ data: Data, sentiment: AskFeedback.Sentiment, at date: Date = .now) -> URL? {
+    package func save(_ data: Data, sentiment: AskFeedback.Sentiment, at date: Date = .now) -> URL? {
         guard let directory else { return nil }
         let url = directory.appending(path: Self.unusedName(in: directory, at: date, sentiment: sentiment))
         // Before the write: a refused backup exclusion fails it with the
@@ -135,7 +142,7 @@ public actor AskFeedbackAttachments {
 
     /// Every attachment kept, newest first. None where the folder won't
     /// list.
-    public func urls() -> [URL] {
+    package func urls() -> [URL] {
         guard let directory, let names = attachmentNames() else { return [] }
         return names.sorted(by: Self.isNewer).map { directory.appending(path: $0) }
     }
@@ -151,7 +158,7 @@ public actor AskFeedbackAttachments {
     /// transcript of a chat no longer on screen shouldn't outlive it. On false
     /// a transcript is still on the device, and a caller tries again.
     @discardableResult
-    public func removeAll() -> Bool {
+    func removeAll() -> Bool {
         removeEvery().isEmpty
     }
 

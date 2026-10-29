@@ -132,7 +132,7 @@ nonisolated package enum AskContinuation {
     /// restored thread's tail by it (`tail(from:referent:)`), so a follow-up
     /// after a Stop is asked over the same recap whether the app relaunched
     /// in between or not.
-    package static func entersTail(tier: AskTier?, prose: String) -> Bool {
+    static func entersTail(tier: AskTier?, prose: String) -> Bool {
         tier != nil && !prose.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -140,7 +140,7 @@ nonisolated package enum AskContinuation {
     /// about (`AskDomain.referent(from:)`), each once, in that order. A count
     /// or a yes-or-no shows no tiles, and the rows its prose named are the
     /// only titles it has: kept to the tiles, its recap would name none.
-    package static func widened(_ titles: [String], with referent: [String]) -> [String] {
+    static func widened(_ titles: [String], with referent: [String]) -> [String] {
         var widened = titles
         for title in referent where !widened.contains(title) {
             widened.append(title)
