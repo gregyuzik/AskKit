@@ -145,7 +145,7 @@ import Testing
 
     /// The line a gate whose own subsystem is `com.example.gate` writes for
     /// a holder that never returns, run under `logSubsystem` or, for nil,
-    /// through the public `run`, once its 50 ms are up.
+    /// under none, as the public `run` runs one, once its 50 ms are up.
     private func wedgedHolderLines(callerNamed logSubsystem: String?) async throws -> [GateTestWedgeLines.Line] {
         let lines = GateTestWedgeLines()
         let gate = AskGenerationGate(logSubsystem: "com.example.gate", logWedge: lines.write)
@@ -173,7 +173,8 @@ import Testing
     }
 
     @Test func aWedgedHolderWhoseCallerNamedNoSubsystemIsLoggedUnderTheGates() async throws {
-        // A host's own generation through the public `run`.
+        // A host's own generation through the public `run`, which names no
+        // subsystem.
         let lines = try await wedgedHolderLines(callerNamed: nil)
         #expect(lines == [.init(subsystem: "com.example.gate", deadline: .milliseconds(50))])
     }
@@ -237,6 +238,28 @@ import Testing
         try await holder.value
         #expect(!wedged.hasLeft)
         wedged.release()
+    }
+
+    // MARK: - One gate per process
+
+    /// The public `run` takes no gate: it waits at `shared`, the process's
+    /// one, where `AppleModelSeam` waits too, so a host's own generation
+    /// never runs beside one there.
+    @Test func thePublicRunWaitsAtTheSharedGate() async throws {
+        let held = GateTestHold()
+        let holder = Task { try await AskGenerationGate.run(gate: .shared) { await held.hold() } }
+        try await spin("the holder to hold the shared gate") { held.hasArrived }
+        let entered = Mutex(false)
+        let host = Task { try await AskGenerationGate.run { entered.withLock { $0 = true } } }
+        try await spin("a caller to queue at the shared gate") { await AskGenerationGate.shared.queueDepth >= 1 }
+        // Room for an entry that must not happen: at a gate of its own, the
+        // host's body would have run by now.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(!entered.withLock { $0 })
+        held.release()
+        try await host.value
+        try await holder.value
+        #expect(entered.withLock { $0 })
     }
 
     @Test func theQueueEmptiesWhenEveryoneHasRun() async throws {
