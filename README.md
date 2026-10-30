@@ -111,7 +111,7 @@ Three members have no default. The two associated types, which name your row and
 |---|---|
 | `Row` | Your row, an `AskRow`: `Codable`, `Sendable`, `Identifiable` and `Equatable`, with a `displayTitle` that the model reads in tool output and writes back when it picks tiles. Rows are written into the thread file, so give a field you add later a default when it decodes. |
 | `SearchArguments` | A `@Generable` type, the arguments your tool takes, so that when the model won't call the tool, the app's own search chooses them the way the model would have. |
-| `brand` | An `AskBrand`: your copy, the Application Support folder the thread is kept in, and the log subsystem every AskKit logger writes under. |
+| `brand` | An `AskBrand`: your copy, the Application Support folder the thread is kept in, and the log subsystem every AskKit logger writes under. Keep `help`, the field's placeholder, to a few words: it is drawn on one line and cut off with an ellipsis where it is wider than the field. |
 | `overview()` | What the reader has to ask about: scopes and counts. |
 | `makeTools(_:)` | The tools a session offers the model, built around the `AskToolContext` it is handed. |
 | `instructions(tier:isConversation:answerLanguage:)` | The session's instructions: yours, and short. |

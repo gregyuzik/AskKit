@@ -41,6 +41,13 @@ nonisolated public struct AskBrand: Sendable {
     public let logSubsystem: String
     /// The placeholder shown while the draft is empty: in the screen's
     /// composer, and on the face in a host's slot.
+    ///
+    /// A few words, such as "Ask a question" or "Ask about your books": it is
+    /// drawn on one line and ends in an ellipsis where it is wider than the
+    /// field: on an iPhone, fewer than 30 characters at the default text size
+    /// with an accessory button beside it, and fewer at the larger sizes. The
+    /// headline (`firstScreenHeadline`) and sentence say what Ask is about.
+    /// VoiceOver reads it whole, as the field's hint.
     public let help: String
     /// The ready first screen's headline.
     public let firstScreenHeadline: String
