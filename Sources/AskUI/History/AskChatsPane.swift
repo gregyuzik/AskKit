@@ -162,11 +162,11 @@ struct AskChatsPane: View {
         // with no label before the button. Touches go through the tip, so
         // the swipe it describes works with it up.
         //
-        // **Under the row** (`arrowEdge: .top`): the first chat that can go
-        // sits near the top of its list, and left to choose, the system put
-        // the tip over the bar above it, Close and Delete All Chats included.
-        // There is always room below.
-        .askPopoverTip(AskChatDeleteTip(), isShown: showsDeleteTip, arrowEdge: .top)
+        // **Under the row**: the first chat that can go sits near the top of
+        // its list, and left to choose, the system put the tip over the bar
+        // above it, Close and Delete All Chats included. There is always room
+        // below.
+        .askPopoverTip(AskChatDeleteTip(), isShown: showsDeleteTip, side: .below)
     }
 
     /// Whether the open chat's row carries a check beside its title: where

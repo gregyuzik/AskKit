@@ -51,6 +51,9 @@ struct AskQuestionBubble: View {
     /// Where the bubble is in the thread's content
     /// (`AskScrollFollow.threadContent`), each time that changes.
     private let onPlaced: ((CGRect) -> Void)?
+    /// Whether the chats are beside the thread, by iPhone Duo's fold, where
+    /// the menu's tip stays above or below the bubble.
+    @Environment(\.askChatsAreBesideThread) private var chatsAreBesideThread
 
     init(
         question: String,
@@ -205,13 +208,23 @@ struct AskQuestionBubble: View {
                 // being it. Scrolled from between the bars, the bubble takes
                 // the tip with it (`AskScreen.tipGates`).
                 //
-                // **The system picks the side**, the one with room: under the
-                // first question, which sits just below the bar, and above a
-                // newest question low on a long thread, over the answer
-                // before it, which the reader has read (iPhone 18 Pro
-                // simulator, 2026-10-31). Either edge, fixed, would put the
-                // tip over the bar or the composer in the other case.
-                .askPopoverTip(AskQuestionMenuTip(), isShown: showsMenuTip)
+                // **The system picks the side** on iOS and visionOS, the one
+                // with room: under the first question, which sits just below
+                // the bar, and above a newest question low on a long thread,
+                // over the answer before it, which the reader has read
+                // (iPhone 18 Pro simulator, 2026-10-31). Either edge, fixed,
+                // would put the tip over the bar or the composer in the other
+                // case. The Mac's is fixed (`menuTipSide`).
+                //
+                // **Above or below alone beside the chats**, in the pane by
+                // iPhone Duo's fold: left to choose, the system stood the tip
+                // on the bubble's leading side, across the fold over the
+                // chats and their Delete All Chats (iPhone Duo simulator,
+                // open flat on its side, 2026-10-31).
+                .askPopoverTip(
+                    AskQuestionMenuTip(), isShown: showsMenuTip,
+                    side: chatsAreBesideThread ? .aboveOrBelow : Self.menuTipSide
+                )
                 // Where the bubble is in the thread, read in the content's own
                 // space, which a scroll doesn't change: it reports when the
                 // rows above it move, not at every frame of a scroll.
@@ -260,6 +273,23 @@ struct AskQuestionBubble: View {
     static let fillOpacity = 0.6
 
     private static let corner: CGFloat = 20
+
+    /// The side the menu's tip stands on, where nothing beside the thread
+    /// asks for one (`askPopoverTip`).
+    ///
+    /// **Under the bubble on the Mac.** Left to choose, the system stood it
+    /// above, over the toolbar and past the window's top edge, as it did
+    /// fixed above. Beside the bubble it stayed in a wide window, but in one
+    /// 380 points wide, where the popover keeps its width, it hung 250 points
+    /// off the window's leading edge; under it, 125 off the trailing one
+    /// (macOS 27.2, 2026-10-31).
+    private static var menuTipSide: AskTipSide {
+        #if os(macOS)
+        .below
+        #else
+        .any
+        #endif
+    }
 
     /// The bubble's fill: the accent at `fillOpacity`.
     private var fill: Color {

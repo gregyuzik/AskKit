@@ -22,9 +22,9 @@ import TipKit
 /// one a view is drawing. Each goes once its action has been done, from the
 /// menu, the swipe or VoiceOver, or once it's closed with its ×.
 ///
-/// **No tip moves a frame** (house rule 4): the question's and the chat's are
-/// popovers, and the starter's is drawn in an overlay beside the bank
-/// (`AskStarterTip`).
+/// **No tip moves a frame** (house rule 4): all three are popovers
+/// (`askPopoverTip`), the starter's on the "Try asking" heading, the
+/// question's on the newest question and the chat's on a row.
 @MainActor
 enum AskTips {
     /// The three, the question's first.
@@ -138,9 +138,10 @@ nonisolated struct AskQuestionMenuTip: Tip {
     }
 }
 
-/// "Don't suggest this" in a starter's menu. Drawn beside the first screen's
-/// bank (`AskStarterTip`), and retired as a starter or a follow-up is turned
-/// down, which is the same item under the same gesture.
+/// "Don't suggest this" in a starter's menu. A popover over the first
+/// screen's "Try asking" heading (`AskFirstScreen`), and retired as a starter
+/// or a follow-up is turned down, which is the same item under the same
+/// gesture.
 nonisolated struct AskStarterDeclineTip: Tip {
     var title: Text {
         Text("Hide a Suggestion", bundle: #bundle, comment: "Title of a tip that points at the suggested questions on the Ask first screen, any of which the reader can turn down.")
@@ -184,10 +185,47 @@ nonisolated struct AskChatDeleteTip: Tip {
     }
 }
 
+/// Which side of its anchor a popover tip stands on (`askPopoverTip`).
+///
+/// **The Mac reads an arrow edge the other way round.** On iOS and visionOS
+/// `arrowEdge` is the popover's own edge that carries the arrow, so `.top`
+/// stands the tip under its anchor: the chat tip under its row on the iPhone
+/// 18 Pro and Apple Vision Pro simulators. On macOS it is the anchor's side
+/// the popover opens on, so `.top` stood the chat tip above its row and the
+/// question tip above its bubble, `.bottom` stood the question tip under it,
+/// and `.leading` beside it (macOS 27.2, 2026-10-31). A side here means the
+/// same on all three.
+nonisolated enum AskTipSide: Equatable {
+    /// Whichever side the system finds room on.
+    case any
+    /// Above the anchor, the arrow pointing down at it.
+    case above
+    /// Below the anchor, the arrow pointing up at it.
+    case below
+    /// Above or below, whichever has room, never beside. The Mac has no
+    /// form of the popover that takes a set of edges, so there it is `any`.
+    case aboveOrBelow
+
+    /// The edge `popoverTip(_:arrowEdge:)` takes for this side, nil for the
+    /// system's choice.
+    var arrowEdge: Edge? {
+        switch self {
+        case .any, .aboveOrBelow: nil
+        #if os(macOS)
+        case .above: .top
+        case .below: .bottom
+        #else
+        case .above: .bottom
+        case .below: .top
+        #endif
+        }
+    }
+}
+
 extension View {
-    /// `tip` as a popover from this view while `isShown`, and nothing at all
-    /// while it isn't: a clear view behind this one, its size, that holds the
-    /// popover and comes and goes with it.
+    /// `tip` as a popover from this view while `isShown`, on `side` of it, and
+    /// nothing at all while it isn't: a clear view behind this one, its size,
+    /// that holds the popover and comes and goes with it.
     ///
     /// **Never a popover modifier handed nil with its tip up.** The question
     /// tip moves to the next question as one is asked, and the chat tip to
@@ -200,61 +238,45 @@ extension View {
     /// Chat with the tip up showed, so the anchor leaves instead.
     ///
     /// **Nothing while no tip is up**, so the view this is on has no
-    /// container of TipKit's around it then: one took a row's accessibility
-    /// identifier when it did (`AskChatsPane`).
+    /// container of TipKit's around it then. Put it outside the view's
+    /// accessibility identifier: the anchor is a container of its own, and
+    /// inside the identifier it took the identifier (`AskChatsPane`).
     ///
     /// **Touches go through the tip** (`tipBackgroundInteraction(_:)`), so the
     /// reader can scroll on, or do what it describes, with it up. Without it a
     /// popover tip lays a dismiss region over the window, and the first touch
     /// anywhere only closes the tip.
-    func askPopoverTip(_ tip: some Tip, isShown: Bool, arrowEdge: Edge? = nil) -> some View {
+    func askPopoverTip(_ tip: some Tip, isShown: Bool, side: AskTipSide = .any) -> some View {
         background {
             if isShown {
                 Color.clear
-                    .popoverTip(tip, arrowEdge: arrowEdge)
+                    .askPopoverTip(tip, side: side)
                     .tipBackgroundInteraction(.enabled)
             }
         }
     }
-}
 
-/// Where a tip's arrow points (`tipAnchor(_:)`).
-nonisolated enum AskTipAnchor: Hashable, Sendable {
-    /// A starter on the first screen, by its id (`AskStarterTipAnchor`).
-    case starter(String)
-}
-
-/// The starter tip, over "Try asking" and the bank under it, its arrow lined
-/// up on the first starter (`AskStarterDeclineTip`).
-///
-/// **Inline, aimed with an anchor, not a popover.** The starters are
-/// interactive glass, and a popover tip on a button in glass never presented
-/// (Compact, iPhone Duo and iPhone 18 Pro simulators, 2026-10-31): an inline
-/// tip with `anchorID` beside the glass did.
-///
-/// **In an overlay, grown up from the heading's top edge**, so it moves no
-/// frame (house rule 4): a frame of no height on the edge, the tip standing on
-/// it. It covers the copy above, which the reader has read by then, and
-/// neither the heading nor the chips, whose menu it asks the reader to open.
-/// Outside the bank's own accessibility container, whose first button the
-/// smoke suite and VoiceOver take for the first starter, and outside its glass
-/// group, since the tip is no capsule.
-///
-/// At most 340 pt wide, and less where the column is narrower, wrapping
-/// rather than cutting its words.
-struct AskStarterTip: View {
-    /// The starter the arrow points at: the first the bank shows.
-    let first: AskStarter?
-
-    var body: some View {
-        if let first, AskTips.isCurrent(AskStarterDeclineTip()) {
-            TipView(AskStarterDeclineTip(), arrowEdge: .bottom, anchorID: AskTipAnchor.starter(first.id))
-                .frame(maxWidth: 340)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
-                .frame(height: 0, alignment: .bottom)
+    /// The popover itself, in the form each platform has.
+    @ViewBuilder
+    private func askPopoverTip(_ tip: some Tip, side: AskTipSide) -> some View {
+        #if os(macOS)
+        popoverTip(tip, arrowEdge: side.arrowEdge)
+        #else
+        if side == .aboveOrBelow {
+            popoverTip(tip, arrowEdges: .vertical)
+        } else {
+            popoverTip(tip, arrowEdge: side.arrowEdge)
         }
+        #endif
     }
+}
+
+extension EnvironmentValues {
+    /// Whether the reader's chats are on screen beside the thread, in the pane
+    /// by iPhone Duo's fold, which `AskScreen` sets in the environment. The
+    /// question tip stays above or below its question there, in the thread's
+    /// own pane (`AskQuestionBubble`). False everywhere else.
+    @Entry var askChatsAreBesideThread = false
 }
 
 #endif

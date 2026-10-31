@@ -65,7 +65,7 @@ struct AskThreadHistoryList: View {
                         .askPopoverTip(
                             AskChatDeleteTip(),
                             isShown: summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()),
-                            arrowEdge: .top
+                            side: .below
                         )
                     }
                 } header: {
