@@ -154,11 +154,15 @@ struct AskChatsPane: View {
                 Button { onDelete(summary) } label: { AskChatDeleteButton.title }
             }
         }
-        // Touches go through, so the swipe the tip describes works with it up.
-        .popoverTip(showsDeleteTip ? AskChatDeleteTip() : nil)
-        .tipBackgroundInteraction(.enabled)
         .accessibilityAddTraits(row.isOpen ? .isSelected : [])
         .accessibilityIdentifier(row.identifier)
+        // **Outside the identifier.** The popover's anchor is a container of
+        // its own in the accessibility tree, and inside the identifier it
+        // took the row's, so a query for the open chat's row found a group
+        // with no label before the button. Touches go through the tip, so
+        // the swipe it describes works with it up.
+        .popoverTip(showsDeleteTip ? AskChatDeleteTip() : nil)
+        .tipBackgroundInteraction(.enabled)
     }
 
     /// Whether the open chat's row carries a check beside its title: where

@@ -57,13 +57,15 @@ struct AskThreadHistoryList: View {
                         // A swipe and a long press aren't gestures every
                         // reader can make.
                         .accessibilityAction(named: AskChatDeleteButton.title) { onDelete(summary) }
+                        .accessibilityIdentifier(AskAccessibility.historyRow)
                         // How to delete one, on the first while that tip is
                         // up, the same modifier on every row
-                        // (`AskChatDeleteTip`). Touches go through, so the
-                        // swipe it describes works with it up.
+                        // (`AskChatDeleteTip`). Outside the identifier, which
+                        // the popover's anchor, a container of its own, would
+                        // otherwise share (`AskChatsPane`). Touches go
+                        // through, so the swipe it describes works with it up.
                         .popoverTip(summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()) ? AskChatDeleteTip() : nil)
                         .tipBackgroundInteraction(.enabled)
-                        .accessibilityIdentifier(AskAccessibility.historyRow)
                     }
                 } header: {
                     Text("Earlier chats", bundle: #bundle, comment: "The reader's earlier Ask chats: the toolbar button that lists them, and the heading above them in that list.")
