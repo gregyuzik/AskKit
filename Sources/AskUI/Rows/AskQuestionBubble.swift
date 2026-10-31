@@ -97,16 +97,26 @@ struct AskQuestionBubble: View {
             Spacer(minLength: 48)
             Text(question)
                 .font(.body)
-                // Selectable and menu-bearing. On iOS 27 `textSelection` is
-                // system selection rather than a callout menu, so whether a
-                // long press reaches the menu is the system's decision.
-                // Measured on an iPhone 17 Pro simulator with SDK 27, it does.
-                // The demo's `testTheQuestionBubblesContextMenuIsReachable`
-                // keeps measuring it, because Copy, Copy answer, Edit & Resend
-                // and Ask again reach a reader's touch through this menu and
+                // Selectable and menu-bearing on iOS and visionOS. On iOS 27
+                // `textSelection` is system selection rather than a callout
+                // menu, so whether a long press reaches the menu is the
+                // system's decision. Measured on an iPhone 17 Pro simulator
+                // with SDK 27, it does. The demo's
+                // `testTheQuestionBubblesContextMenuIsReachable` keeps
+                // measuring it, because Copy, Copy answer, Edit & Resend and
+                // Ask again reach a reader's touch through this menu and
                 // nowhere else in AskUI; VoiceOver has them as actions too
                 // (below).
+                //
+                // **Not selectable on the Mac**, where a selectable text view
+                // takes the right-click and the Control-click for its own
+                // menu, Cut, Copy, Paste and Font: the question's opened only
+                // from the bubble's padding, the 14 by 10 points round the
+                // words (macOS 27.2, 2026-10-31). Its Copy copies the whole
+                // question, and the menu bar has all four (`AskCommands`).
+                #if !os(macOS)
                 .textSelection(.enabled)
+                #endif
                 // Black or white on the fill as contrast decides, not always
                 // `.primary` (`AskOnFill`).
                 .foregroundStyle(AskOnFill(fill: fill))
