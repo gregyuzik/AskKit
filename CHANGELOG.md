@@ -12,6 +12,16 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Added
+
+- Three tips on the Ask screen, shown through the host's TipKit: the menu on a question (Copy, Copy
+  answer, Edit & Resend and Ask again), "Don't suggest this" on a starter, and deleting one chat, each
+  worded for touch, Apple Vision Pro or the Mac's shortcut menu, in all 25 languages. AskKit never calls
+  `Tips.configure`, so a host that doesn't configure TipKit sees none, and one that hides its tips for
+  captures with `Tips.hideAllTipsForTesting()` hides these with them. One shows at a time, only while
+  its surface is on screen with nothing over it, and goes once the reader has done what it says or
+  closed it. No API changes.
+
 ## [0.3.1] - 2026-10-29
 
 The composer's hint no longer makes an empty field two lines tall.
