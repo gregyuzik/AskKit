@@ -61,6 +61,10 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
     /// focus to nothing.
     @State private var waitRowFocus: AskWaitRowFocus?
 
+    /// The tips' gates as the screen has settled them (`AskScreen`): the
+    /// question's tip shows only while its own is open.
+    @Environment(\.askTipGates) private var tipGates
+
     var body: some View {
         // Paired by the store, from one read, and never indexed back into
         // the live array from in here (`pairedTurns`).
@@ -149,8 +153,10 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 // while a turn is being asked, when the newest is a question
                 // with no answer yet and the screen's rule is about to take
                 // the tip down: it would flash up there for the frames
-                // TipKit takes to hear it.
-                showsMenuTip: isLast && !store.isThinking && AskTips.isCurrent(AskQuestionMenuTip()),
+                // TipKit takes to hear it. And only while the screen has the
+                // question's gate open, whatever TipKit says.
+                showsMenuTip: isLast && !store.isThinking && tipGates.questionMenu
+                    && AskTips.isCurrent(AskQuestionMenuTip()),
                 // Every row reports, and only the newest is heard, as with the
                 // row's height below: a report only the newest made would be a
                 // conditional modifier, rebuilding the bubble as it becomes

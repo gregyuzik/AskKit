@@ -220,6 +220,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     @State private var ownThreadScrolls = 0
     /// Whether the list of chats is up.
     @State private var showsHistory = false
+    /// The tips' gates as this screen last wrote them (`settleTipGates()`),
+    /// which the views drawing the tips read (`askTipGates`). All closed while
+    /// the window is at the back, so only the window the reader is in draws
+    /// a tip.
+    @State private var settledTipGates = AskTipGates.Reading()
     /// Where VoiceOver's focus goes next, until the element it names takes it
     /// (`AskVoiceOverTarget`): the first screen's headline after New Chat,
     /// and the composer's field after Edit & Resend or a tap on the face in a
@@ -483,6 +488,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         } conversation: {
             conversation
         }
+        // What the views drawing the tips read: each tip shows only while its
+        // gate is settled open here, whatever TipKit says (`settleTipGates()`).
+        .environment(\.askTipGates, settledTipGates)
         // Where the question tip stands beside iPhone Duo's fold
         // (`AskQuestionBubble`).
         .environment(\.askChatsAreBesideThread, foldArrangement.listsChats && leadingPaneContent == .chats)
@@ -596,6 +604,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                     withAnimation(reduceMotion ? .none : .snappy) { store.deleteAllThreads(from: screenID) }
                 }
             )
+            // Set again here: the sheet is presented from outside the
+            // modifier that sets it for the screen.
+            .environment(\.askTipGates, settledTipGates)
         }
         // Under the title beside iPhone Duo's bar strip as well, where the
         // title stands over the content, so it needs no `barsAreInStrip`
@@ -628,17 +639,14 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         .onAppear {
             writeSlotFaceStyle()
             updateSlotCover { $0.screenAppeared() }
-            // Back from a tab or a pushed item, with the gates its going
-            // closed, and a reading that may not have changed meanwhile.
-            if windowAppearsActive { tipGates.write() }
         }
-        // **The tips' gates, from the window the reader is in**
-        // (`tipGates`). They're the app's, not the window's, so a screen in
-        // a window at the back writes nothing, and the one coming to the
-        // front writes its own.
-        .onChange(of: windowAppearsActive ? tipGates : nil, initial: true) { _, gates in
-            gates?.write()
-        }
+        // **The tips' gates, from the window the reader is in** (`tipGates`),
+        // each opening only once it has held (`settleTipGates()`). They're the
+        // app's, not the window's, so a screen in a window at the back writes
+        // nothing, and the one coming to the front writes its own. A task, so
+        // it runs again as the screen comes back from a tab or a pushed item,
+        // with the gates its going closed.
+        .task(id: windowAppearsActive ? tipGates : nil) { await settleTipGates() }
         // A host's accent can change on screen, such as one that dims with
         // its window, and so can its spectrum and its accessory button.
         .onChange(of: AskComposerFaceLook(accent: accent, spectrum: spectrum, accessory: slotFaceAccessory)) { _, _ in
@@ -656,6 +664,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             // Its surfaces go with it, so no tip waits to point at a screen
             // nobody is on.
             if windowAppearsActive { AskTipGates.Reading().write() }
+            settledTipGates = AskTipGates.Reading()
             // Focus goes with the screen, and the task that would put a held-up
             // composer down is cancelled with it. Left up, the composer would
             // come back raised over a slot that forgot it as the tab went
@@ -2141,6 +2150,35 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 ? scenePhase == .active && !store.history.isEmpty
                 : uncovered && chatsPaneOffersDelete
         )
+    }
+
+    /// Writes `tipGates` to TipKit and to `settledTipGates`: a gate that
+    /// closes at once, so a tip goes as its surface is covered, and one that
+    /// opens only once it has held for `AskTipGates.settling`.
+    ///
+    /// **A screen built mid-change reads a gate open for a moment.** iPhone
+    /// Duo opened with the keyboard up builds a new screen, whose
+    /// `firstScreenMakesRoom` starts false and turns true as the keyboard's
+    /// show reaches it, 12 ms later. Written at once, the starter's gate
+    /// opened and closed again, and TipKit kept the tip current after its rule
+    /// had failed, up over the keyboard (iPhone Duo simulator, 2026-10-31,
+    /// two of two). The views draw a tip only while its settled gate is open
+    /// too (`askTipGates`), so a status TipKit hasn't caught up on draws
+    /// nothing either.
+    private func settleTipGates() async {
+        guard windowAppearsActive else {
+            settledTipGates = AskTipGates.Reading()
+            return
+        }
+        let gates = tipGates
+        let closed = gates.closing(settledTipGates)
+        settledTipGates = closed
+        closed.write()
+        guard closed != gates else { return }
+        try? await Task.sleep(for: AskTipGates.settling)
+        guard !Task.isCancelled else { return }
+        settledTipGates = gates
+        gates.write()
     }
 
     /// Whether the newest question is whole between the bars, over an answer

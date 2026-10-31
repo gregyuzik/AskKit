@@ -101,6 +101,9 @@ public struct AskFirstScreen<Mark: View>: View {
     /// nothing to ask about animate on it and lay nothing out by it
     /// (`onKeyboard`); the ready screen has `isMakingRoom`.
     @Environment(\.askFirstScreenKeyboardIsUp) private var keyboardIsUp
+    /// The tips' gates as `AskScreen` has settled them: the starter tip shows
+    /// only while its own is open (`tryAsking`).
+    @Environment(\.askTipGates) private var tipGates
     /// Whether the composer rests in a host's slot over a tab bar along the
     /// bottom, from `AskScreen` (`trimsOverSlot` says what it decides).
     @Environment(\.askFirstScreenIsOverSlot) private var isOverSlot
@@ -657,7 +660,7 @@ public struct AskFirstScreen<Mark: View>: View {
                 .accessibilityIdentifier(AskAccessibility.tryAsking)
                 // "Don't suggest this" is behind a long press, so a tip says
                 // so (`AskStarterDeclineTip`), only where the chips have the
-                // item.
+                // item and only while the screen has the bank uncovered.
                 //
                 // **A popover on the heading, not on a chip and not drawn
                 // in the column.** The chips are interactive glass, and a
@@ -676,7 +679,7 @@ public struct AskFirstScreen<Mark: View>: View {
                 // anchor would otherwise take (`askPopoverTip`).
                 .askPopoverTip(
                     AskStarterDeclineTip(),
-                    isShown: onDecline != nil && AskTips.isCurrent(AskStarterDeclineTip()),
+                    isShown: onDecline != nil && tipGates.starterDecline && AskTips.isCurrent(AskStarterDeclineTip()),
                     side: .above
                 )
             AskChipRow(

@@ -44,11 +44,15 @@ struct AskChatsPane: View {
 
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiatesWithoutColor
     @Environment(\.legibilityWeight) private var legibilityWeight
+    /// The tips' gates as the screen has settled them (`AskScreen`): the
+    /// chat's tip shows only while its own is open.
+    @Environment(\.askTipGates) private var tipGates
 
     var body: some View {
         let rows = AskChatsPaneRows.rows(current: current, history: history)
         // The row the delete tip points at: the first that can be deleted.
-        let tipped = AskTips.isCurrent(AskChatDeleteTip()) ? rows.first(where: \.offersDelete)?.id : nil
+        let tipped = tipGates.chatDelete && AskTips.isCurrent(AskChatDeleteTip())
+            ? rows.first(where: \.offersDelete)?.id : nil
         List {
             ForEach(rows) { row in
                 self.row(row, showsDeleteTip: row.id == tipped)

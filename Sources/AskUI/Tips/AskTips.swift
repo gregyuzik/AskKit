@@ -85,6 +85,12 @@ nonisolated enum AskTipGates {
     /// chat that can be deleted.
     static let chatDelete = Tips.Parameter(AskTipGates.self, "chatDelete", false, .transient)
 
+    /// How long a gate holds open on a screen before the screen writes it
+    /// (`AskScreen.settleTipGates()`): past the 12 ms a rebuilt screen took to
+    /// hear the keyboard already up, and the 438 ms a cold keyboard's show
+    /// trails the composer's focus (`AskScreen.composerHeldUp`).
+    static let settling = Duration.milliseconds(500)
+
     /// The three gates as one screen reads them, written together when any
     /// of them changes (`write()`).
     struct Reading: Equatable {
@@ -98,6 +104,16 @@ nonisolated enum AskTipGates {
             Self.write(questionMenu, to: AskTipGates.questionMenu)
             Self.write(starterDecline, to: AskTipGates.starterDecline)
             Self.write(chatDelete, to: AskTipGates.chatDelete)
+        }
+
+        /// This reading with each gate that isn't open in `settled` closed:
+        /// the part of it that closes gates, and opens none.
+        func closing(_ settled: Self) -> Self {
+            Self(
+                questionMenu: questionMenu && settled.questionMenu,
+                starterDecline: starterDecline && settled.starterDecline,
+                chatDelete: chatDelete && settled.chatDelete
+            )
         }
 
         /// Writes `value` through a copy of `gate`, whose setter is mutating
@@ -272,6 +288,14 @@ extension View {
 }
 
 extension EnvironmentValues {
+    /// The tips' gates as the screen has settled them, which `AskScreen` sets
+    /// in the environment (`settledTipGates`), so a view draws its tip only
+    /// while its own surface is uncovered as well as while TipKit has the tip
+    /// current. TipKit's status can lag a gate that has gone false, and kept
+    /// a starter tip up over the keyboard (iPhone Duo simulator, 2026-10-31).
+    /// All closed everywhere else.
+    @Entry var askTipGates = AskTipGates.Reading()
+
     /// Whether the reader's chats are on screen beside the thread, in the pane
     /// by iPhone Duo's fold, which `AskScreen` sets in the environment. The
     /// question tip stays above or below its question there, in the thread's
