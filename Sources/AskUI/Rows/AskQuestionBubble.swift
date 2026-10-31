@@ -3,6 +3,7 @@
 public import AskCore
 public import CoreGraphics
 public import SwiftUI
+import TipKit
 
 /// The reader's own question, trailing.
 ///
@@ -25,6 +26,12 @@ public import SwiftUI
 /// read back from disk (`AskDomain.photoThumbnail(for:)`), a glyph where there
 /// is neither. The frame is the same in each case, so a thumbnail that arrives
 /// late moves nothing under it.
+///
+/// **The newest question says the menu is there** (`AskQuestionMenuTip`): a
+/// popover from the bubble, never a view in the stack, so it moves no frame
+/// (house rule 4). It shows only while `AskScreen` has the bubble whole
+/// between the bars, which it learns from where the bubble says it is
+/// (`onPlaced`).
 struct AskQuestionBubble: View {
     private let question: String
     private let accent: Color
@@ -39,6 +46,12 @@ struct AskQuestionBubble: View {
     private let onCopyAnswer: (() -> Void)?
     private let onEdit: () -> Void
     private let onAskAgain: () -> Void
+    /// Whether the bubble points out its menu (`AskQuestionMenuTip`): the
+    /// newest question's, while that tip is the one up.
+    private let showsMenuTip: Bool
+    /// Where the bubble is in the thread's content
+    /// (`AskScrollFollow.threadContent`), each time that changes.
+    private let onPlaced: ((CGRect) -> Void)?
 
     init(
         question: String,
@@ -47,6 +60,8 @@ struct AskQuestionBubble: View {
         photo: AskQuestionPhoto? = nil,
         photoImage: CGImage? = nil,
         photoThumbnail: (@Sendable (AskQuestionPhoto) async -> CGImage?)? = nil,
+        showsMenuTip: Bool = false,
+        onPlaced: ((CGRect) -> Void)? = nil,
         onCopy: @escaping () -> Void,
         onCopyAnswer: (() -> Void)? = nil,
         onEdit: @escaping () -> Void,
@@ -58,6 +73,8 @@ struct AskQuestionBubble: View {
         self.photo = photo
         self.photoImage = photoImage
         self.photoThumbnail = photoThumbnail
+        self.showsMenuTip = showsMenuTip
+        self.onPlaced = onPlaced
         self.onCopy = onCopy
         self.onCopyAnswer = onCopyAnswer
         self.onEdit = onEdit
@@ -172,6 +189,28 @@ struct AskQuestionBubble: View {
                 // on iPad and the Mac while the phone kept them. Opting back
                 // in makes the code and what renders agree.
                 .labelStyle(.titleAndIcon)
+                // **The tip on the bubble, not the `HStack`**, whose spacer
+                // would put the arrow in the middle of the row. Nil on every
+                // bubble but the newest while its tip is up, the same
+                // modifier either way, so no bubble changes identity as a
+                // question becomes the newest or stops being it.
+                //
+                // **Touches go through it**, so the reader can scroll on, or
+                // press the bubble it points at, with it up: without this a
+                // popover tip lays a dismiss region over the window, and the
+                // first touch anywhere only closes the tip. Scrolled from
+                // between the bars, the bubble takes the tip with it
+                // (`AskScreen.tipGates`).
+                .popoverTip(showsMenuTip ? AskQuestionMenuTip() : nil)
+                .tipBackgroundInteraction(.enabled)
+                // Where the bubble is in the thread, read in the content's own
+                // space, which a scroll doesn't change: it reports when the
+                // rows above it move, not at every frame of a scroll.
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: AskScrollFollow.threadContent)
+                } action: { frame in
+                    onPlaced?(frame)
+                }
                 // On the bubble itself and not on the `HStack`, so the geometry
                 // that travels is the capsule's. The stack is full width with a
                 // `Spacer` holding the bubble trailing, so matching it would

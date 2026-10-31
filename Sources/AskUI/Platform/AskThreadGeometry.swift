@@ -52,6 +52,19 @@ nonisolated struct AskThreadGeometry: Equatable {
         contentHeight - containerHeight - insetTop - offset
     }
 
+    /// Whether the content from `top` to `bottom` is whole between the bars:
+    /// below the navigation bar and above the composer. A point's slack each
+    /// way, for frames that land in fractions.
+    ///
+    /// **The bars by the same two terms the foot is read by**: the space
+    /// between them starts `insetTop` below the offset, and is
+    /// `containerHeight` tall. Content under a bar's glass is drawn but
+    /// covered, and a tip pointing at it would point at the bar.
+    func shows(top: CGFloat, bottom: CGFloat) -> Bool {
+        let visibleTop = offset + insetTop
+        return top >= visibleTop - 1 && bottom <= visibleTop + containerHeight + 1
+    }
+
     /// Whether the reader moved the thread away from where it was, as opposed
     /// to the thread growing away from the reader.
     ///

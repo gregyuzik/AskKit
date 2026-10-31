@@ -9,11 +9,11 @@ import Foundation
 /// else entirely. In the project, it's in the Compile Sources of the three app
 /// targets and the UI-test target.
 ///
-/// Each one but `holdTurn` and `assistant` is also in the Run arguments of
-/// the three app schemes (`AskKitDemo_iOS`, `_macOS` and `_visionOS`), off, so
-/// it can be ticked in Xcode's scheme editor; those two are passed at launch,
-/// or added to a scheme by hand. A new one goes into all three, added there
-/// in Xcode.
+/// Each one but `holdTurn`, `assistant` and `hidesTips` is also in the Run
+/// arguments of the three app schemes (`AskKitDemo_iOS`, `_macOS` and
+/// `_visionOS`), off, so it can be ticked in Xcode's scheme editor; those
+/// three are passed at launch, or added to a scheme by hand. A new one goes
+/// into all three, added there in Xcode.
 nonisolated enum DemoLaunchArgument {
     /// Start with an empty thread: `AskPersistence.perLaunch` instead of
     /// `.thread`, so nothing is restored and nothing is saved.
@@ -132,6 +132,18 @@ nonisolated enum DemoLaunchArgument {
     /// `slot`, `push` and `emptyLibrary`, which are about the library's
     /// screen, do nothing.
     static let assistant = "-askAssistant"
+
+    /// Show no tips: `Tips.hideAllTipsForTesting()` before TipKit starts
+    /// (`AskKitDemoApp.startTips()`), so none of AskUI's tips comes up.
+    ///
+    /// **Every UI test launches with it.** A popover tip lays a dismiss
+    /// region over the whole window, and the tap a test meant for a button
+    /// lands on that instead. A walk of the tips themselves launches without
+    /// it, on a fresh install, since TipKit keeps what it has shown across
+    /// launches. A capture of the Mac's window hides them with or without it.
+    ///
+    /// Not in the schemes' Run arguments: pass it at launch.
+    static let hidesTips = "-askHidesTips"
 
     /// On the Mac, in a Debug build: write the window to a PNG at the path
     /// after this flag, then quit (`DemoWindowCapture`). How the README's Mac

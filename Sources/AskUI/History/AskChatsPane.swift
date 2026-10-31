@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 
 /// The reader's chats as the pane beside iPhone Duo's fold
 /// (`AskFoldArrangement`): on screen beside the conversation, where the sheet
@@ -46,9 +47,12 @@ struct AskChatsPane: View {
     @Environment(\.legibilityWeight) private var legibilityWeight
 
     var body: some View {
+        let rows = AskChatsPaneRows.rows(current: current, history: history)
+        // The row the delete tip points at: the first that can be deleted.
+        let tipped = AskTips.isCurrent(AskChatDeleteTip()) ? rows.first(where: \.offersDelete)?.id : nil
         List {
-            ForEach(AskChatsPaneRows.rows(current: current, history: history)) { row in
-                self.row(row)
+            ForEach(rows) { row in
+                self.row(row, showsDeleteTip: row.id == tipped)
                     .listRowBackground(mark(isOpen: row.isOpen))
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 10, leading: 28, bottom: 10, trailing: 28))
@@ -104,7 +108,11 @@ struct AskChatsPane: View {
     /// same button takes the open chat's state through its modifiers, and the
     /// delete is left out of their contents rather than off the row. The row
     /// keeps its identity through the open too (`AskChatsPaneRows.Identity`).
-    private func row(_ row: AskChatsPaneRows.Row) -> some View {
+    ///
+    /// **How to delete one is said on the first that can be**
+    /// (`showsDeleteTip`, `AskChatDeleteTip`): a popover, the same modifier
+    /// on every row, so no row changes identity as the tip comes or goes.
+    private func row(_ row: AskChatsPaneRows.Row, showsDeleteTip: Bool) -> some View {
         let summary = row.summary
         return Button {
             AskChatOpening.announce(summary)
@@ -146,6 +154,9 @@ struct AskChatsPane: View {
                 Button { onDelete(summary) } label: { AskChatDeleteButton.title }
             }
         }
+        // Touches go through, so the swipe the tip describes works with it up.
+        .popoverTip(showsDeleteTip ? AskChatDeleteTip() : nil)
+        .tipBackgroundInteraction(.enabled)
         .accessibilityAddTraits(row.isOpen ? .isSelected : [])
         .accessibilityIdentifier(row.identifier)
     }

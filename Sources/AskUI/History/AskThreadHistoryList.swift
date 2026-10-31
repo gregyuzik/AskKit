@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 
 /// The reader's chats as the list in the sheet the toolbar's button opens
 /// (`AskThreadHistorySheet`): the one on screen, and the ones New Chat put
@@ -56,6 +57,12 @@ struct AskThreadHistoryList: View {
                         // A swipe and a long press aren't gestures every
                         // reader can make.
                         .accessibilityAction(named: AskChatDeleteButton.title) { onDelete(summary) }
+                        // How to delete one, on the first while that tip is
+                        // up, the same modifier on every row
+                        // (`AskChatDeleteTip`). Touches go through, so the
+                        // swipe it describes works with it up.
+                        .popoverTip(summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()) ? AskChatDeleteTip() : nil)
+                        .tipBackgroundInteraction(.enabled)
                         .accessibilityIdentifier(AskAccessibility.historyRow)
                     }
                 } header: {

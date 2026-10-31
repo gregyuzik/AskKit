@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 #if !os(macOS)
 // For the pasteboard item's type identifier: `setItems(_:options:)` takes a
 // dictionary keyed by type, where `.string` takes a bare string.
@@ -364,7 +365,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             history: store.history,
             accent: accent,
             onOpen: { summary in Task { await store.openThread(summary) } },
-            onDelete: { summary in Task { await store.deleteThread(summary) } },
+            onDelete: deleteChat,
             // Animated as New Chat is, since the chat on screen ends here too.
             onDeleteAll: { withAnimation(reduceMotion ? .none : .snappy) { store.deleteAllThreads(from: screenID) } }
         )
@@ -511,7 +512,10 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // As the bubble's Edit & Resend: the reader goes to the field
                 // with the question, VoiceOver's focus included.
                 edit: { AskNewestTurn.turn(in: store).map(editAndResend) },
-                askAgain: { AskNewestTurn.askAgain(in: store) }
+                askAgain: {
+                    AskQuestionMenuTip().invalidate(reason: .actionPerformed)
+                    AskNewestTurn.askAgain(in: store)
+                }
             )
         ))
         #endif
@@ -582,7 +586,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 current: store.currentSummary,
                 history: store.history,
                 onOpen: { summary in Task { await store.openThread(summary) } },
-                onDelete: { summary in Task { await store.deleteThread(summary) } },
+                onDelete: deleteChat,
                 // Animated as New Chat is, since the chat on screen ends here too.
                 onDeleteAll: {
                     headlineAwaitsSheet = true
@@ -621,6 +625,16 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         .onAppear {
             writeSlotFaceStyle()
             updateSlotCover { $0.screenAppeared() }
+            // Back from a tab or a pushed item, with the gates its going
+            // closed, and a reading that may not have changed meanwhile.
+            if windowAppearsActive { tipGates.write() }
+        }
+        // **The tips' gates, from the window the reader is in**
+        // (`tipGates`). They're the app's, not the window's, so a screen in
+        // a window at the back writes nothing, and the one coming to the
+        // front writes its own.
+        .onChange(of: windowAppearsActive ? tipGates : nil, initial: true) { _, gates in
+            gates?.write()
         }
         // A host's accent can change on screen, such as one that dims with
         // its window, and so can its spectrum and its accessory button.
@@ -636,6 +650,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         // switch has already taken the cover away, and marks nothing.
         .onDisappear {
             updateSlotCover { $0.screenDisappeared() }
+            // Its surfaces go with it, so no tip waits to point at a screen
+            // nobody is on.
+            if windowAppearsActive { AskTipGates.Reading().write() }
             // Focus goes with the screen, and the task that would put a held-up
             // composer down is cancelled with it. Left up, the composer would
             // come back raised over a slot that forgot it as the tab went
@@ -1195,7 +1212,10 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 store.ask(starter)
             },
             nothingToAskAction: nothingToAskAction,
-            onDecline: { store.decline($0) },
+            onDecline: { starter in
+                AskStarterDeclineTip().invalidate(reason: .actionPerformed)
+                store.decline(starter)
+            },
             mark: mark
         )
         .environment(\.askFirstScreenPart, part)
@@ -1604,6 +1624,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             // nothing to reach for and has to blur the whole screen.
             .privacySensitive()
             .askDismissesKeyboardOnTap { putKeyboardAway() }
+            // The content's own space, the one `onScrollGeometryChange`'s
+            // offset counts in, where the newest question says where it is
+            // (`AskScrollFollow.questionPlaced(_:of:)`). On the whole of the
+            // content, paddings included, so its origin is the content's.
+            .coordinateSpace(AskScrollFollow.threadContent)
         }
         // The edge effect under the bar and the keyboard on a drag, each
         // platform's own (`askScreenScrollChrome()`).
@@ -1653,10 +1678,23 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// VoiceOver's focus included: the menu it was chosen from closes, and
     /// the focus would go wherever the system put it, not to the field
     /// holding the question to edit.
+    ///
+    /// One of the question's menu, so its tip goes (`AskQuestionMenuTip`):
+    /// from the menu, VoiceOver's action or the Mac's menu bar, which all
+    /// come here.
     private func editAndResend(_ turn: AskTurn<Row>) {
+        AskQuestionMenuTip().invalidate(reason: .actionPerformed)
         store.edit(turn)
         isComposerFocused = true
         voiceOverTarget = .field
+    }
+
+    /// Deletes one earlier chat, from the sheet or the pane beside iPhone
+    /// Duo's fold, by its swipe, its menu or VoiceOver's action, and retires
+    /// the tip that says how (`AskChatDeleteTip`).
+    private func deleteChat(_ summary: AskThreadSummary) {
+        AskChatDeleteTip().invalidate(reason: .actionPerformed)
+        Task { await store.deleteThread(summary) }
     }
 
     /// A host asked for the composer (`AskConversationStore.prefill` without
@@ -2074,6 +2112,68 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         }
     }
 
+    // MARK: - Tips
+
+    /// Each tip's surface as this screen has it now (`AskTipGates`): on
+    /// screen, with nothing over it.
+    ///
+    /// **Nothing over it** is the app in front, no item a host has pushed
+    /// over the screen, and no keyboard up for the composer, which takes half
+    /// a phone's screen and brings the composer up out of a host's slot
+    /// (`typingRaisesComposer`); and for the thread and the first screen, the
+    /// chats' sheet not up. Delete All Chats' confirmation is the one cover
+    /// the screen can't see: it belongs to the button.
+    ///
+    /// **Each surface as the view that draws its tip sees it.** Under
+    /// `.firstAvailable` a tip whose rule holds is the group's current one
+    /// whether or not a view draws it, and one nobody draws would hold the
+    /// others back (`AskTips.group`).
+    private var tipGates: AskTipGates.Reading {
+        let uncovered = scenePhase == .active && !itemIsPushed && !typingRaisesComposer
+        let screenUncovered = uncovered && !showsHistory
+        return AskTipGates.Reading(
+            questionMenu: screenUncovered && newestQuestionOffersItsMenu,
+            starterDecline: screenUncovered && firstScreenOffersStarters,
+            chatDelete: showsHistory
+                ? scenePhase == .active && !store.history.isEmpty
+                : uncovered && chatsPaneOffersDelete
+        )
+    }
+
+    /// Whether the newest question is whole between the bars, over an answer
+    /// that has ended with words in it, so its menu holds Copy answer, and
+    /// nothing is being asked. From the thread's shape and the follow, never
+    /// from `turns`, which would tie the screen to every streamed word.
+    ///
+    /// **Off screen after a long answer**, which the question leaves over the
+    /// top of (`AskScrollFollow.questionInView`): the tip waits for the reader
+    /// to scroll back to it.
+    private var newestQuestionOffersItsMenu: Bool {
+        guard case .thread = stage.phase, !store.isThinking, store.lastTurnEndedWithText,
+              let newest = store.lastTurnID else { return false }
+        return follow.questionInView == newest
+    }
+
+    /// Whether a first screen shows starters: the ready one with any, and the
+    /// one that can't serve while the domain answers them without a model
+    /// (`AskFirstScreen`).
+    private var firstScreenOffersStarters: Bool {
+        guard stage.firstScreenIsKnown, !store.availableStarters.isEmpty else { return false }
+        switch stage.phase {
+        case .ready: return true
+        case .cannotServe: return store.domain.answersWithoutModel
+        case .thread, .nothingToAskAbout: return false
+        }
+    }
+
+    /// Whether the chats are on screen beside iPhone Duo's fold with one that
+    /// can be deleted: any but the open one, from the rows the pane lists
+    /// (`AskChatsPaneRows`).
+    private var chatsPaneOffersDelete: Bool {
+        foldArrangement.listsChats && leadingPaneContent == .chats
+            && AskChatsPaneRows.rows(current: store.currentSummary, history: store.history).contains(where: \.offersDelete)
+    }
+
     // MARK: - Accessibility
 
     /// Posts `line` for VoiceOver at `priority`, which rides only on an
@@ -2101,7 +2201,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// which empties the pasteboard as `clearContents()` does and keeps what
     /// follows off Universal Clipboard. AppKit has no expiry to set, so there
     /// it stays until something else is copied.
+    ///
+    /// Copy and Copy answer are two of the question's menu, so its tip goes
+    /// here (`AskQuestionMenuTip`), whichever of the menu, VoiceOver's actions
+    /// or the Mac's menu bar the copy came from.
     private func copy(_ text: String) {
+        AskQuestionMenuTip().invalidate(reason: .actionPerformed)
         #if os(macOS)
         NSPasteboard.general.prepareForNewContents(with: .currentHostOnly)
         NSPasteboard.general.setString(text, forType: .string)

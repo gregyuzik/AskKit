@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 
 /// A bank of chips, each a question to ask with a tap: the first screen's
 /// starters, the follow-ups under an answer, or the coaching pair under a
@@ -86,6 +87,10 @@ public struct AskChipRow: View {
     private let surface: Surface
 
     @Namespace private var glass
+
+    /// Whether each chip marks itself as somewhere the starter tip's arrow
+    /// can point (`AskStarterTip`): the first screen's bank alone.
+    @Environment(\.askChipsAnchorStarterTip) private var anchorsStarterTip
 
     /// A line of a chip's words as the text size scales it: `.subheadline`,
     /// 20 pt at the default size.
@@ -264,6 +269,9 @@ public struct AskChipRow: View {
                 // change. No two banks share a namespace: a starter never
                 // morphs into a follow-up.
                 .modifier(AskChipSurface(surface: surface, outline: outline, id: starter.id, in: glass))
+                // Round the capsule, so the starter tip's arrow points at the
+                // glass and not at the words.
+                .modifier(AskStarterTipAnchor(starter: starter.id, isOn: anchorsStarterTip))
                 // **Outside the surface, not inside it.** The two effects
                 // answer different questions: `askGlassID` morphs a
                 // capsule into the next capsule *within this bank*, and
@@ -445,6 +453,34 @@ private struct AskChipDeclineMenu: ViewModifier {
     private static var title: Text {
         Text("Don't suggest this", bundle: #bundle, comment: "Menu item on a suggested Ask question that takes the suggestion away for the rest of this chat.")
     }
+}
+
+/// A starter as a place the starter tip's arrow can point
+/// (`AskTipAnchor.starter`), in the first screen's bank alone.
+///
+/// **Every chip, not the first**: which chip is first changes as one is
+/// turned down, and a mark applied to the first alone would rebuild the chip
+/// that takes its place. The tip names the one it points at. On or off for the
+/// life of the bank, as `AskChipDeclineMenu` is, so it doesn't churn a chip's
+/// identity either.
+private struct AskStarterTipAnchor: ViewModifier {
+    let starter: String
+    let isOn: Bool
+
+    func body(content: Content) -> some View {
+        if isOn {
+            content.tipAnchor(AskTipAnchor.starter(starter))
+        } else {
+            content
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// Whether a bank's chips mark themselves for the starter tip's arrow
+    /// (`AskStarterTipAnchor`), which the first screen sets on its bank. Off
+    /// everywhere else, a host's own bank included.
+    @Entry var askChipsAnchorStarterTip = false
 }
 
 #endif

@@ -61,8 +61,11 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         // The thread is persisted, so without this the first assertion of the
-        // run depends on what the test before it left on disk.
-        app.launchArguments = [DemoLaunchArgument.resetThread] + arguments
+        // run depends on what the test before it left on disk. And no tips,
+        // here and at every launch in this suite: a popover tip lays a
+        // dismiss region over the window, which takes the taps meant for the
+        // screen (`DemoLaunchArgument.hidesTips`).
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread] + arguments
         app.launch()
         // **Queried across every element type, not as an `otherElements`.**
         // Which XCUI type `ask.root` lands on is decided by what the thread's
@@ -86,7 +89,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     private func launchScripted(_ arguments: String...) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer] + arguments
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer] + arguments
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
         return app
@@ -847,7 +850,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         // A domain that keeps its chats, which is what puts History in the bar.
-        app.launchArguments = [DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
         try requireBarsAlongTheTopAndFoot(
@@ -1115,7 +1118,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let question = "What's the oldest thing I have?"
         let app = XCUIApplication()
         app.launchArguments = [
-            DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer,
+            DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer,
             DemoLaunchArgument.prefill, DemoLink.askLink(question: question)
         ]
         app.launch()
@@ -1152,7 +1155,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = [
-            DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.photos
+            DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.photos
         ]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
@@ -1325,7 +1328,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let app = XCUIApplication()
         // A domain that keeps its chats, starting from none: without the clean
         // slate the list holds whatever the run before this one filed.
-        app.launchArguments = [DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
 
@@ -1362,7 +1365,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     func testEveryChatCanBeDeleted() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
 
@@ -1427,7 +1430,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let app = XCUIApplication()
         // A domain that keeps its chats, starting from none.
         app.launchArguments = [
-            DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.fold, "book"
+            DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.fold, "book"
         ]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
@@ -1468,7 +1471,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = [
-            DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.fold, "book"
+            DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer, DemoLaunchArgument.fold, "book"
         ]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
@@ -1529,7 +1532,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         // A domain that keeps its chats, starting from none.
-        app.launchArguments = [DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
         app.launch()
         XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
         let pane = element(Ids.historyPane, in: app)
@@ -1723,7 +1726,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         continueAfterFailure = false
         use(appearance)
         let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.resetThread]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread]
         app.launch()
         // By identifier alone, for the reason `launch()` spells out: which XCUI
         // type `ask.root` lands on moves with the layout.
@@ -1843,7 +1846,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             XCTAssertTrue(element(Ids.evidence, in: app).waitForExistence(timeout: uiTimeout), "And its evidence line.")
         case .failureWithTryAgain:
             app = XCUIApplication()
-            app.launchArguments = [DemoLaunchArgument.resetThread, DemoLaunchArgument.holdTurn]
+            app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.holdTurn]
             app.launch()
             XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
             let starters = element(Ids.starters, in: app)
@@ -2002,7 +2005,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     func testTheEmptyComposerPassesTheContrastAudit() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.resetThread]
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread]
         app.launch()
         let field = app.textFields[Ids.field]
         // Empty at launch, since no draft outlives one, so the placeholder shows.

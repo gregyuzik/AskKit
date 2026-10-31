@@ -119,6 +119,14 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     let onCopyAnswer: () -> Void
     let onEdit: () -> Void
     let onAskAgain: () -> Void
+    /// Whether the question points out its menu (`AskQuestionMenuTip`): the
+    /// newest turn's, while that tip is the one up. Compared in `==`, so the
+    /// tip coming or going draws the row again.
+    var showsMenuTip = false
+    /// Where the question is in the thread's content, each time that changes,
+    /// which the screen reads to know whether it's on screen
+    /// (`AskScrollFollow.questionPlaced(_:of:)`).
+    var onQuestionPlaced: (CGRect) -> Void = { _ in }
     /// Whether this turn's evidence rows are open, as a binding into the
     /// screen's set of them (`AskScreen.expandedEvidence`), for the line to
     /// open and close. Made from a key path, so SwiftUI can compare it and the
@@ -171,6 +179,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
             && lhs.awaitsProposalOutcome == rhs.awaitsProposalOutcome
             && lhs.isEvidenceExpanded == rhs.isEvidenceExpanded
             && lhs.focusesWaitRow == rhs.focusesWaitRow
+            && lhs.showsMenuTip == rhs.showsMenuTip
             && lhs.accent == rhs.accent
             && lhs.spectrum == rhs.spectrum
             && lhs.morph == rhs.morph
@@ -258,7 +267,9 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
                     onCopy: { onCopy(turn.question) },
                     onCopyAnswer: onCopyAnswer,
                     onEdit: onEdit,
-                    onAskAgain: onAskAgain
+                    onAskAgain: onAskAgain,
+                    showsMenuTip: showsMenuTip,
+                    onPlaced: onQuestionPlaced
                 )
                 .equatable()
                 if turn.answeredWithoutPhoto {
@@ -562,7 +573,8 @@ nonisolated enum AskWaitRowHandoff: Equatable {
 /// it) would be formed again with every snapshot: counted beside the store's
 /// `shape`, a turn of 40 snapshots formed 45 bubble bodies inline, and 2
 /// compared. It is formed again when the question, its photo, the chip morph,
-/// the accent, or whether the answer has words yet changes.
+/// the accent, whether the answer has words yet, or whether it points out its
+/// menu changes.
 ///
 /// **So no closure here may hold a value that goes on changing.** A bubble
 /// SwiftUI skips keeps the closures it was built with, and "Copy answer" built
@@ -581,6 +593,13 @@ struct AskEquatableQuestionBubble: View, Equatable {
     let onCopyAnswer: () -> Void
     let onEdit: () -> Void
     let onAskAgain: () -> Void
+    /// Whether the bubble points out its menu (`AskQuestionMenuTip`).
+    var showsMenuTip = false
+    /// Where the bubble is in the thread's content, each time that changes.
+    /// Holds the turn's id and the screen's follow, neither of which changes
+    /// under a row: the screen makes a new follow only once the thread, and
+    /// every row with it, has gone.
+    var onPlaced: (CGRect) -> Void = { _ in }
 
     /// The values, and nothing else, as `AskThreadRow ==` is. The thumbnail
     /// loader asks the domain, which is the store's `let`.
@@ -591,6 +610,7 @@ struct AskEquatableQuestionBubble: View, Equatable {
             && lhs.photo == rhs.photo
             && lhs.photoImage === rhs.photoImage
             && lhs.hasAnswerText == rhs.hasAnswerText
+            && lhs.showsMenuTip == rhs.showsMenuTip
     }
 
     var body: some View {
@@ -601,6 +621,8 @@ struct AskEquatableQuestionBubble: View, Equatable {
             photo: photo,
             photoImage: photoImage,
             photoThumbnail: photoThumbnail,
+            showsMenuTip: showsMenuTip,
+            onPlaced: onPlaced,
             onCopy: onCopy,
             onCopyAnswer: hasAnswerText ? onCopyAnswer : nil,
             onEdit: onEdit,

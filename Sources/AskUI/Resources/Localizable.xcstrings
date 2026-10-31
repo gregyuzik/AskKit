@@ -3166,6 +3166,9 @@
         }
       }
     },
+    "Copy, Edit or Ask Again" : {
+      "comment" : "Title of a tip that points at the reader's own question in the Ask thread, whose menu copies the question or its answer, puts it back in the composer to edit, or asks it again."
+    },
     "Current chat" : {
       "comment" : "Heading above the chat on screen, at the top of the list of Ask chats.",
       "localizations" : {
@@ -3612,6 +3615,9 @@
           }
         }
       }
+    },
+    "Delete a Chat" : {
+      "comment" : "Title of a tip that points at one of the reader's earlier Ask chats in the list of chats, any of which can be deleted on its own."
     },
     "Delete all chats?" : {
       "comment" : "Title of the dialog that asks before every Ask chat is deleted, the one on screen included.",
@@ -6061,6 +6067,9 @@
         }
       }
     },
+    "Hide a Suggestion" : {
+      "comment" : "Title of a tip that points at the suggested questions on the Ask first screen, any of which the reader can turn down."
+    },
     "History" : {
       "comment" : "Voice Control name for the toolbar button that lists the reader's earlier Ask chats, beside its label 'Earlier chats'.",
       "localizations" : {
@@ -7706,6 +7715,39 @@
         }
       }
     },
+    "Open a chat's shortcut menu to delete it." : {
+      "comment" : "Tip on the Mac under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a chat’s shortcut menu to delete it."
+          }
+        }
+      }
+    },
+    "Open a question's shortcut menu to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on the Mac under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a question’s shortcut menu to copy it or its answer, edit it, or ask it again."
+          }
+        }
+      }
+    },
+    "Open a suggestion's shortcut menu to stop seeing it." : {
+      "comment" : "Tip on the Mac under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a suggestion’s shortcut menu to stop seeing it."
+          }
+        }
+      }
+    },
     "Opened in the app" : {
       "comment" : "Line on the card under an Ask answer once the reader confirmed and the app opened its own form for them to finish, when the app gave no line of its own. Never says the thing was done: nothing is saved until they finish. Also spoken by VoiceOver.",
       "localizations" : {
@@ -8301,6 +8343,15 @@
           }
         }
       }
+    },
+    "Pinch and hold a chat to delete it." : {
+      "comment" : "Tip on Apple Vision Pro under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats."
+    },
+    "Pinch and hold a question to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on Apple Vision Pro under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread: what pinching and holding it offers."
+    },
+    "Pinch and hold a suggestion to stop seeing it." : {
+      "comment" : "Tip on Apple Vision Pro under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen."
     },
     "Private Cloud Compute" : {
       "comment" : "Apple's product name. Not translated.",
@@ -10565,6 +10616,9 @@
         }
       }
     },
+    "Swipe across a chat, or touch and hold it, to delete it." : {
+      "comment" : "Tip on iPhone and iPad under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats."
+    },
     "That didn't work" : {
       "comment" : "Line on the card under an Ask answer when the app could not do what the answer offered. Also spoken by VoiceOver.",
       "localizations" : {
@@ -11470,6 +11524,12 @@
           }
         }
       }
+    },
+    "Touch and hold a question to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on iPhone and iPad under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread: what touching and holding it offers."
+    },
+    "Touch and hold a suggestion to stop seeing it." : {
+      "comment" : "Tip on iPhone and iPad under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen."
     },
     "Try Again" : {
       "comment" : "Button under a failed Ask answer that asks the same question again.",

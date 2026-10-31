@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 
 /// The thread's rows: the one view on the screen that reads `turns`.
 ///
@@ -108,7 +109,12 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                     waitRowFocus = AskWaitRowFocus(after: pair.turn.id)
                     store.ask($0)
                 },
-                onDecline: { store.decline($0) },
+                // A follow-up turned down is the starter tip's action too:
+                // the same item under the same gesture (`AskStarterDeclineTip`).
+                onDecline: {
+                    AskStarterDeclineTip().invalidate(reason: .actionPerformed)
+                    store.decline($0)
+                },
                 onRerollPick: {
                     waitRowFocus = AskWaitRowFocus(after: pair.turn.id)
                     store.rerollPick(pair.turn)
@@ -132,7 +138,23 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 onCopy: onCopy,
                 onCopyAnswer: { copyAnswer(of: pair.turn.id) },
                 onEdit: { onEdit(pair.turn) },
-                onAskAgain: { store.askAgain(pair.turn) },
+                // Ask again is the one item of the question's menu that never
+                // passes through the screen, so its tip goes here; the screen
+                // retires it for the other three (`AskScreen.copy(_:)`).
+                onAskAgain: {
+                    AskQuestionMenuTip().invalidate(reason: .actionPerformed)
+                    store.askAgain(pair.turn)
+                },
+                // The newest question's own: the bubble the tip is on.
+                showsMenuTip: isLast && AskTips.isCurrent(AskQuestionMenuTip()),
+                // Every row reports, and only the newest is heard, as with the
+                // row's height below: a report only the newest made would be a
+                // conditional modifier, rebuilding the bubble as it becomes
+                // the newest.
+                onQuestionPlaced: { frame in
+                    guard pair.turn.id == store.lastTurnID else { return }
+                    follow.questionPlaced(frame, of: pair.turn.id)
+                },
                 evidenceExpansion: $expandedEvidence[contains: pair.turn.id],
                 // The card's own yes and not now wait on the outcome for
                 // VoiceOver's focus; a host's control confirming leaves it.
