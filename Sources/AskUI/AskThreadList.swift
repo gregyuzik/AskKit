@@ -145,8 +145,12 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                     AskQuestionMenuTip().invalidate(reason: .actionPerformed)
                     store.askAgain(pair.turn)
                 },
-                // The newest question's own: the bubble the tip is on.
-                showsMenuTip: isLast && AskTips.isCurrent(AskQuestionMenuTip()),
+                // The newest question's own: the bubble the tip is on. Not
+                // while a turn is being asked, when the newest is a question
+                // with no answer yet and the screen's rule is about to take
+                // the tip down: it would flash up there for the frames
+                // TipKit takes to hear it.
+                showsMenuTip: isLast && !store.isThinking && AskTips.isCurrent(AskQuestionMenuTip()),
                 // Every row reports, and only the newest is heard, as with the
                 // row's height below: a report only the newest made would be a
                 // conditional modifier, rebuilding the bubble as it becomes

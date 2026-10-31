@@ -3,7 +3,6 @@
 public import AskCore
 public import CoreGraphics
 public import SwiftUI
-import TipKit
 
 /// The reader's own question, trailing.
 ///
@@ -190,19 +189,19 @@ struct AskQuestionBubble: View {
                 // in makes the code and what renders agree.
                 .labelStyle(.titleAndIcon)
                 // **The tip on the bubble, not the `HStack`**, whose spacer
-                // would put the arrow in the middle of the row. Nil on every
-                // bubble but the newest while its tip is up, the same
-                // modifier either way, so no bubble changes identity as a
-                // question becomes the newest or stops being it.
+                // would put the arrow in the middle of the row. Its anchor
+                // comes and goes behind the bubble (`askPopoverTip`), so the
+                // bubble keeps its identity as it becomes the newest or stops
+                // being it. Scrolled from between the bars, the bubble takes
+                // the tip with it (`AskScreen.tipGates`).
                 //
-                // **Touches go through it**, so the reader can scroll on, or
-                // press the bubble it points at, with it up: without this a
-                // popover tip lays a dismiss region over the window, and the
-                // first touch anywhere only closes the tip. Scrolled from
-                // between the bars, the bubble takes the tip with it
-                // (`AskScreen.tipGates`).
-                .popoverTip(showsMenuTip ? AskQuestionMenuTip() : nil)
-                .tipBackgroundInteraction(.enabled)
+                // **The system picks the side**, the one with room: under the
+                // first question, which sits just below the bar, and above a
+                // newest question low on a long thread, over the answer
+                // before it, which the reader has read (iPhone 18 Pro
+                // simulator, 2026-10-31). Either edge, fixed, would put the
+                // tip over the bar or the composer in the other case.
+                .askPopoverTip(AskQuestionMenuTip(), isShown: showsMenuTip)
                 // Where the bubble is in the thread, read in the content's own
                 // space, which a scroll doesn't change: it reports when the
                 // rows above it move, not at every frame of a scroll.

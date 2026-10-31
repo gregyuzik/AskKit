@@ -2,7 +2,6 @@
 
 public import AskCore
 public import SwiftUI
-import TipKit
 
 /// The reader's chats as the pane beside iPhone Duo's fold
 /// (`AskFoldArrangement`): on screen beside the conversation, where the sheet
@@ -110,8 +109,9 @@ struct AskChatsPane: View {
     /// keeps its identity through the open too (`AskChatsPaneRows.Identity`).
     ///
     /// **How to delete one is said on the first that can be**
-    /// (`showsDeleteTip`, `AskChatDeleteTip`): a popover, the same modifier
-    /// on every row, so no row changes identity as the tip comes or goes.
+    /// (`showsDeleteTip`, `AskChatDeleteTip`): a popover whose anchor comes
+    /// and goes behind the row (`askPopoverTip`), so no row changes identity
+    /// as the tip comes, goes or moves to another row.
     private func row(_ row: AskChatsPaneRows.Row, showsDeleteTip: Bool) -> some View {
         let summary = row.summary
         return Button {
@@ -166,8 +166,7 @@ struct AskChatsPane: View {
         // sits near the top of its list, and left to choose, the system put
         // the tip over the bar above it, Close and Delete All Chats included.
         // There is always room below.
-        .popoverTip(showsDeleteTip ? AskChatDeleteTip() : nil, arrowEdge: .top)
-        .tipBackgroundInteraction(.enabled)
+        .askPopoverTip(AskChatDeleteTip(), isShown: showsDeleteTip, arrowEdge: .top)
     }
 
     /// Whether the open chat's row carries a check beside its title: where

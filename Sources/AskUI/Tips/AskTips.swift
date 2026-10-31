@@ -184,6 +184,40 @@ nonisolated struct AskChatDeleteTip: Tip {
     }
 }
 
+extension View {
+    /// `tip` as a popover from this view while `isShown`, and nothing at all
+    /// while it isn't: a clear view behind this one, its size, that holds the
+    /// popover and comes and goes with it.
+    ///
+    /// **Never a popover modifier handed nil with its tip up.** The question
+    /// tip moves to the next question as one is asked, and the chat tip to
+    /// the next row that can go. Handed nil in the update that took the tip's
+    /// rule away, `.popoverTip` let go of the tip before TipKit had taken the
+    /// popover down, and it stayed up over the old question for as long as
+    /// the screen did, while the new question never got one (iPhone 18 Pro
+    /// simulator, 2026-10-31: Ask again, and a second question asked, each
+    /// with the tip up). A view that leaves takes its popover with it, as New
+    /// Chat with the tip up showed, so the anchor leaves instead.
+    ///
+    /// **Nothing while no tip is up**, so the view this is on has no
+    /// container of TipKit's around it then: one took a row's accessibility
+    /// identifier when it did (`AskChatsPane`).
+    ///
+    /// **Touches go through the tip** (`tipBackgroundInteraction(_:)`), so the
+    /// reader can scroll on, or do what it describes, with it up. Without it a
+    /// popover tip lays a dismiss region over the window, and the first touch
+    /// anywhere only closes the tip.
+    func askPopoverTip(_ tip: some Tip, isShown: Bool, arrowEdge: Edge? = nil) -> some View {
+        background {
+            if isShown {
+                Color.clear
+                    .popoverTip(tip, arrowEdge: arrowEdge)
+                    .tipBackgroundInteraction(.enabled)
+            }
+        }
+    }
+}
+
 /// Where a tip's arrow points (`tipAnchor(_:)`).
 nonisolated enum AskTipAnchor: Hashable, Sendable {
     /// A starter on the first screen, by its id (`AskStarterTipAnchor`).

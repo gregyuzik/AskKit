@@ -2,7 +2,6 @@
 
 public import AskCore
 public import SwiftUI
-import TipKit
 
 /// The reader's chats as the list in the sheet the toolbar's button opens
 /// (`AskThreadHistorySheet`): the one on screen, and the ones New Chat put
@@ -59,18 +58,15 @@ struct AskThreadHistoryList: View {
                         .accessibilityAction(named: AskChatDeleteButton.title) { onDelete(summary) }
                         .accessibilityIdentifier(AskAccessibility.historyRow)
                         // How to delete one, on the first while that tip is
-                        // up, the same modifier on every row
-                        // (`AskChatDeleteTip`). Outside the identifier, which
-                        // the popover's anchor, a container of its own, would
-                        // otherwise share (`AskChatsPane`). Touches go
-                        // through, so the swipe it describes works with it up.
-                        // Under the row, clear of the sheet's bar
-                        // (`AskChatsPane`).
-                        .popoverTip(
-                            summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()) ? AskChatDeleteTip() : nil,
+                        // up (`AskChatDeleteTip`). Outside the identifier,
+                        // which the popover's anchor, a container of its own,
+                        // would otherwise share, and under the row, clear of
+                        // the sheet's bar (`AskChatsPane`).
+                        .askPopoverTip(
+                            AskChatDeleteTip(),
+                            isShown: summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()),
                             arrowEdge: .top
                         )
-                        .tipBackgroundInteraction(.enabled)
                     }
                 } header: {
                     Text("Earlier chats", bundle: #bundle, comment: "The reader's earlier Ask chats: the toolbar button that lists them, and the heading above them in that list.")
