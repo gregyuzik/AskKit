@@ -2154,16 +2154,16 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         return follow.questionInView == newest
     }
 
-    /// Whether a first screen shows starters: the ready one with any, and the
-    /// one that can't serve while the domain answers them without a model
-    /// (`AskFirstScreen`).
+    /// Whether the ready first screen shows starters, the one screen the
+    /// starter tip comes to.
+    ///
+    /// **Not the screen that can't serve**, though it shows starters where the
+    /// domain answers them without a model (`AskFirstScreen`). Its one line
+    /// says why Ask can't serve, and the tip over the copy covered it: in
+    /// Hebrew, "This language isn't supported by Apple Intelligence yet" (iPad
+    /// mini simulator, 2026-10-31).
     private var firstScreenOffersStarters: Bool {
-        guard stage.firstScreenIsKnown, !store.availableStarters.isEmpty else { return false }
-        switch stage.phase {
-        case .ready: return true
-        case .cannotServe: return store.domain.answersWithoutModel
-        case .thread, .nothingToAskAbout: return false
-        }
+        stage.firstScreenIsKnown && stage.phase == .ready && !store.availableStarters.isEmpty
     }
 
     /// Whether the chats are on screen beside iPhone Duo's fold with one that
