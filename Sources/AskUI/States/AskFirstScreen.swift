@@ -659,14 +659,16 @@ public struct AskFirstScreen<Mark: View>: View {
                 starters: Array(starters.prefix(starterBank)), kind: .starter,
                 alignment: .center, onTap: onStarter, onDecline: onDecline
             )
-            // "Don't suggest this" is behind a long press, so a tip says so,
-            // over the bank with its arrow on the first starter
-            // (`AskStarterTip`). Only where the chips have the item.
             .environment(\.askChipsAnchorStarterTip, onDecline != nil)
-            .overlay(alignment: .top) {
-                if onDecline != nil {
-                    AskStarterTip(first: starters.first)
-                }
+        }
+        // "Don't suggest this" is behind a long press, so a tip says so, over
+        // the heading with its arrow lined up on the first starter
+        // (`AskStarterTip`). Over the heading and not between it and the
+        // chips, where it half covered "Try asking" (iPhone 18 Pro simulator,
+        // 2026-10-31). Only where the chips have the item.
+        .overlay(alignment: .top) {
+            if onDecline != nil {
+                AskStarterTip(first: starters.first)
             }
         }
         .padding(.top, 4)

@@ -64,7 +64,12 @@ struct AskThreadHistoryList: View {
                         // the popover's anchor, a container of its own, would
                         // otherwise share (`AskChatsPane`). Touches go
                         // through, so the swipe it describes works with it up.
-                        .popoverTip(summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()) ? AskChatDeleteTip() : nil)
+                        // Under the row, clear of the sheet's bar
+                        // (`AskChatsPane`).
+                        .popoverTip(
+                            summary.id == earlier.first?.id && AskTips.isCurrent(AskChatDeleteTip()) ? AskChatDeleteTip() : nil,
+                            arrowEdge: .top
+                        )
                         .tipBackgroundInteraction(.enabled)
                     }
                 } header: {

@@ -190,20 +190,21 @@ nonisolated enum AskTipAnchor: Hashable, Sendable {
     case starter(String)
 }
 
-/// The starter tip, over the first screen's bank with its arrow on the first
-/// starter (`AskStarterDeclineTip`).
+/// The starter tip, over "Try asking" and the bank under it, its arrow lined
+/// up on the first starter (`AskStarterDeclineTip`).
 ///
 /// **Inline, aimed with an anchor, not a popover.** The starters are
 /// interactive glass, and a popover tip on a button in glass never presented
 /// (Compact, iPhone Duo and iPhone 18 Pro simulators, 2026-10-31): an inline
 /// tip with `anchorID` beside the glass did.
 ///
-/// **In an overlay, grown up from the bank's top edge**, so it moves no frame
-/// (house rule 4): a frame of no height on the edge, the tip standing on it.
-/// It covers "Try asking" and the copy above, not the chips, whose menu it
-/// asks the reader to open. Outside the bank's own accessibility container,
-/// whose first button the smoke suite and VoiceOver take for the first
-/// starter, and outside its glass group, since the tip is no capsule.
+/// **In an overlay, grown up from the heading's top edge**, so it moves no
+/// frame (house rule 4): a frame of no height on the edge, the tip standing on
+/// it. It covers the copy above, which the reader has read by then, and
+/// neither the heading nor the chips, whose menu it asks the reader to open.
+/// Outside the bank's own accessibility container, whose first button the
+/// smoke suite and VoiceOver take for the first starter, and outside its glass
+/// group, since the tip is no capsule.
 ///
 /// At most 340 pt wide, and less where the column is narrower, wrapping
 /// rather than cutting its words.
