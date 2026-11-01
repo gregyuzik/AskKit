@@ -971,6 +971,87 @@ away. Tapping the thread does the same, except on the Mac.
   why. It is derived from the mirror, never probed itself, and says nothing about the tier until the
   mirror has heard from its seam: an unpublished mirror reads as a tier serving. It has no toggle.
 
+### Tips
+
+Three tips point at what the screen keeps behind a long press, a shortcut menu or a swipe
+(`AskTips.swift`): the menu on a question (Copy, Copy answer, Edit & Resend, Ask again), which on iOS
+is the only way a touch reaches Copy answer; "Don't suggest this" on a starter; and deleting one chat.
+Each message names the gesture of its platform: touch and hold on iOS, pinch and hold on visionOS, and
+on the Mac the shortcut menu, since a Mac may be reached by a finger as well as a pointer.
+
+- **The host's TipKit.** AskKit never calls `Tips.configure`. A host that configures TipKit gets the
+  three beside its own, at its own `displayFrequency` and under its own `hideAllTipsForTesting()`; one
+  that doesn't sees none. Nothing is public.
+- **One at a time, the first that applies:** `AskTips.group` is a `TipGroup(.firstAvailable)`, question,
+  starter, chat. `.ordered` would let a tip the reader never meets, such as the chats' in a domain that
+  keeps none, hold the others back for good. The group is a `static let`, so iPhone Duo's fold, a size
+  class or a tab switch rebuilding the screen doesn't make a new one.
+- **Gates.** Each tip's one rule is a transient parameter in `AskTipGates`, which `AskScreen` writes
+  from the window the reader is in, and only when one changes: the question's while the newest question
+  is on screen between the bars, under a finished answer with words in it (so its menu holds Copy
+  answer), with no turn in flight; the starter's while the ready first screen offers starters, never
+  the one that can't serve, whose one line says why (in Hebrew the tip covered "This language isn't
+  supported by Apple Intelligence yet", iPad mini, 2026-10-31); the chat's while the chats sheet, or the
+  pane beside the fold, shows a chat that can be deleted. None is true while the scene is inactive, an
+  item is pushed or typing has raised the composer. On the Mac the chats sheet is a window of its own
+  that takes the key window from the screen's, so the screen counts as the reader's while its sheet is
+  up (`readerIsInWindow`): without that the chat tip never came to the sheet. The parameters are
+  spelled out (`Tips.Parameter`, `Tips.Rule`) rather than `@Parameter` and `#Rule`: under strict memory
+  safety the macro's expansion warns where no `unsafe` can reach it.
+- **Settled before they open.** A gate closes at once and opens only once it has held for half a
+  second (`AskTipGates.settling`), and each view draws its tip only while its settled gate is open as
+  well as while TipKit has the tip current (`askTipGates`). iPhone Duo opened with the keyboard up
+  builds a new screen whose keyboard flag reaches it 12 ms late: written at once, the starter's gate
+  opened and closed again, and TipKit kept the tip current after its rule had failed, up over the
+  keyboard (2026-10-31, two of two). TipKit's status can lag a gate that has closed, so the view's own
+  check is what keeps a covered tip down. A window at the back draws no tip. On visionOS a resize of the
+  window settles the gates again: a resize took the starter's popover away for good, at the new size
+  and back at the old one, while TipKit held the tip current (Apple Vision Pro simulator). Each return
+  counts as a display, which costs nothing while no tip has a `MaxDisplayCount`.
+- **Retired where the action lands.** The question's goes in the closures behind Copy, Copy answer,
+  Edit & Resend and Ask again, which the menu, VoiceOver's actions and `AskCommands` share; the
+  starter's in the decline, on the first screen and on the follow-ups; the chat's in the one-chat
+  delete, from either list. The × retires each for good too.
+- **Placement** (house rule 4: no tip moves a frame). All three are popovers, each on a side named the
+  same way on every platform (`AskTipSide`). The Mac reads `arrowEdge` the other way round: on iOS and
+  visionOS it is the popover's own edge that carries the arrow, so `.top` stood the chat tip under its
+  row; on macOS it is the anchor's side the popover opens on, so the same `.top` stood it above. Walked
+  on 2026-10-31 on the iPhone 18 Pro, iPad mini (A17 Pro), iPhone Duo and Apple Vision Pro simulators
+  (27.2) and on macOS 27.2:
+  - The starter's stands above "Try asking", over the copy the reader has read, its arrow on the
+    heading, on every device and in every Duo pose: on the outer display on its side, in a tabletop
+    below the fold, in a book on the thread's side of it. Not on a chip: the chips are interactive
+    glass, and a popover on a button in glass never presented. Drawn as a view in an overlay instead,
+    it never showed on visionOS, laid its words over the copy on the Mac and on iPad's wide column,
+    and ran off the Duo's outer display on its side and across the fold in a tabletop.
+  - The question's is on the newest question. On iOS and visionOS it stands above or below it,
+    whichever has room: under a first question near the top of an iPhone, above a low one (either fixed
+    edge covered the bar or the composer). Never beside: left free to, the system stood it on the
+    bubble's leading side wherever the column had room, over the answer's first line on an iPad at
+    regular width, and across the Duo's fold over the chats and their Delete All Chats. On
+    the Mac it stands under the bubble: left to choose, the system stood it above, over the toolbar and
+    past the window's top edge, and beside the bubble it hung 250 pt off a window 380 pt wide.
+  - The chat's stands under the first row that can be deleted, in the sheet and in the pane. Left to
+    choose, the system covered the sheet's Close and Delete All Chats on the iPhone.
+  - **A popover tip's anchor comes and goes with the tip** (`askPopoverTip`): a clear background that
+    exists only while its tip shows. A `.popoverTip` handed nil while its popover is up leaves it on
+    screen for good, over the old question after Ask again or a second question.
+- **Left as they are:**
+  - In a tabletop, the chats sheet's tip rides up over its own row: the system moves a popover clear of
+    the fold whatever its source, and under the row there is no room above the fold.
+  - Open flat on its side, the question tip under its question crosses the divider into the chats pane
+    by 9 pt, clear of the chats themselves. On the outer display on its side, the system's leading
+    placement lays the arrow's tip on the bubble's first letter.
+  - Closing iPhone Duo with the keyboard up hides the keyboard for up to a second as the scene moves
+    displays, under load, and the starter's gate can open in the gap; it closed again 377 ms later,
+    before TipKit had shown anything.
+  - At compact width in Hebrew the question popover is a few points short of its text, which is TipKit's
+    sizing; no text is lost.
+  - On visionOS in a narrow window the question popover overhangs the window, which visionOS allows; its
+    × stays in reach.
+  - The Mac's popover keeps the width its text asks for, so in a window 380 pt wide the question tip
+    hangs 125 pt past the window's trailing edge.
+
 ### Accessibility
 
 - **Every terminal state is announced** at high priority (`AskAnnouncement`), once however many windows

@@ -101,6 +101,9 @@ public struct AskFirstScreen<Mark: View>: View {
     /// nothing to ask about animate on it and lay nothing out by it
     /// (`onKeyboard`); the ready screen has `isMakingRoom`.
     @Environment(\.askFirstScreenKeyboardIsUp) private var keyboardIsUp
+    /// The tips' gates as `AskScreen` has settled them: the starter tip shows
+    /// only while its own is open (`tryAsking`).
+    @Environment(\.askTipGates) private var tipGates
     /// Whether the composer rests in a host's slot over a tab bar along the
     /// bottom, from `AskScreen` (`trimsOverSlot` says what it decides).
     @Environment(\.askFirstScreenIsOverSlot) private var isOverSlot
@@ -655,6 +658,30 @@ public struct AskFirstScreen<Mark: View>: View {
                 // starters from the top of the screen.
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier(AskAccessibility.tryAsking)
+                // "Don't suggest this" is behind a long press, so a tip says
+                // so (`AskStarterDeclineTip`), only where the chips have the
+                // item and only while the screen has the bank uncovered.
+                //
+                // **A popover on the heading, not on a chip and not drawn
+                // in the column.** The chips are interactive glass, and a
+                // popover tip on a button in glass never presented (Compact,
+                // iPhone Duo and iPhone 18 Pro simulators, 2026-10-31). Drawn
+                // as a view in an overlay instead, the tip was a layer
+                // visionOS never showed, laid its words over the copy on the
+                // Mac and on iPad's wide column, and ran off the top of
+                // iPhone Duo's outer display on its side and across the fold
+                // in a tabletop (2026-10-31). A popover is the system's to
+                // keep on screen, clear of the fold.
+                //
+                // **Above the heading**, over the copy the reader has read,
+                // and clear of the chips whose menu it asks them to open.
+                // Outside the heading's identifier, which the popover's
+                // anchor would otherwise take (`askPopoverTip`).
+                .askPopoverTip(
+                    AskStarterDeclineTip(),
+                    isShown: onDecline != nil && tipGates.starterDecline && AskTips.isCurrent(AskStarterDeclineTip()),
+                    side: .above
+                )
             AskChipRow(
                 starters: Array(starters.prefix(starterBank)), kind: .starter,
                 alignment: .center, onTap: onStarter, onDecline: onDecline

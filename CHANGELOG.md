@@ -12,6 +12,27 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Added
+
+- Three tips on the Ask screen, shown through the host's TipKit: the menu on a question (Copy, Copy
+  answer, Edit & Resend and Ask again), "Don't suggest this" on a starter, and deleting one chat, each
+  worded for touch, Apple Vision Pro or the Mac's shortcut menu, in all 25 languages. AskKit never calls
+  `Tips.configure`, so a host that doesn't configure TipKit sees none, and one that hides its tips for
+  captures with `Tips.hideAllTipsForTesting()` hides these with them. One shows at a time, only while
+  its surface is on screen with nothing over it, and goes once the reader has done what it says or
+  closed it. No API changes.
+
+### Fixed
+
+- A question's menu (Copy, Copy answer, Edit & Resend and Ask again) opens from anywhere on the
+  question. Its words were selectable, and the selection competed for the same press: on the Mac the
+  text took a right-click or a Control-click for its own menu of Cut, Copy, Paste and Font, so only
+  the few points of padding round the words reached the question's, and on an iPad a long press on
+  the words could select one and show the system's Copy, Look Up and Translate instead. A question's
+  words are no longer selectable; the menu's Copy copies the whole question.
+- On the Mac, the chats sheet opens tall enough to show its chats. It took the size its list asked
+  for, which is no height at all, and opened 470 by 158 points with nothing between its bars.
+
 ## [0.3.1] - 2026-10-29
 
 The composer's hint no longer makes an empty field two lines tall.

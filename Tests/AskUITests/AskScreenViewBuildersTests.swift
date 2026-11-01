@@ -422,7 +422,8 @@ struct AskThreadRowBuildersTokenTests {
         _ token: AskBuildersToken?,
         morph: Namespace.ID,
         focusesWaitRow: Bool = false,
-        spectrum: AskSpectrum? = nil
+        spectrum: AskSpectrum? = nil,
+        showsMenuTip: Bool = false
     ) -> AskThreadRow<UIDomain, EmptyView, EmptyView, EmptyView, EmptyView> {
         AskThreadRow(
             turn: turn, previous: nil, isLast: false, showsChips: false, followUps: [],
@@ -435,7 +436,7 @@ struct AskThreadRowBuildersTokenTests {
             onFollowUp: { _ in }, onCoaching: { _ in }, onDecline: { _ in }, onRerollPick: {},
             onRetry: {}, onStop: {}, onWaitRowFocused: {}, onFailureTakesFocus: {}, onRate: { _ in },
             onCopy: { _ in }, onCopyAnswer: {}, onEdit: {},
-            onAskAgain: {}, evidenceExpansion: .constant(false), onConfirmProposal: {},
+            onAskAgain: {}, showsMenuTip: showsMenuTip, evidenceExpansion: .constant(false), onConfirmProposal: {},
             onHandOffProposal: {}, onDeclineProposal: {}, onProposalOutcomeFocused: {}
         )
     }
@@ -468,6 +469,15 @@ struct AskThreadRowBuildersTokenTests {
         let morph = try namespace()
         #expect(row(nil, morph: morph, focusesWaitRow: true) != row(nil, morph: morph))
         #expect(row(nil, morph: morph, focusesWaitRow: true) == row(nil, morph: morph, focusesWaitRow: true))
+    }
+
+    /// The question's menu tip coming to the newest turn, or going from it,
+    /// draws the row again, or a skipped row would keep the popover it had
+    /// (`AskQuestionMenuTip`).
+    @Test func theMenuTipRedrawsTheRow() throws {
+        let morph = try namespace()
+        #expect(row(nil, morph: morph, showsMenuTip: true) != row(nil, morph: morph))
+        #expect(row(nil, morph: morph, showsMenuTip: true) == row(nil, morph: morph, showsMenuTip: true))
     }
 
     @Test func valuesOfTwoTypesAreNeverEqual() throws {

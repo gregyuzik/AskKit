@@ -3166,6 +3166,155 @@
         }
       }
     },
+    "Copy, Edit or Ask Again" : {
+      "comment" : "Title of a tip that points at the reader's own question in the Ask thread, whose menu copies the question or its answer, puts it back in the composer to edit, or asks it again.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نسخ أو تعديل أو طرح السؤال مرة أخرى"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zkopírovat, upravit nebo se zeptat znovu"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopier, rediger eller spørg igen"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieren, bearbeiten oder erneut fragen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar, editar o preguntar otra vez"
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar, editar o preguntar otra vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier, modifier ou redemander"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "העתקה, עריכה או שאלה חוזרת"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salin, Edit atau Tanya Lagi"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia, modifica o chiedi di nuovo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー、編集、もう一度質問"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복사, 편집, 다시 질문"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopier, rediger eller spør igjen"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopieer, wijzig of vraag opnieuw"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiuj, edytuj lub zapytaj ponownie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar, editar ou perguntar de novo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопировать, изменить или спросить снова"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopiera, redigera eller fråga igen"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "คัดลอก แก้ไข หรือถามอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kopyala, Düzenle veya Yeniden Sor"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скопіювати, редагувати або запитати знову"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sao chép, sửa hoặc hỏi lại"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝、编辑或再问一次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷貝、編輯或再問一次"
+          }
+        }
+      }
+    },
     "Current chat" : {
       "comment" : "Heading above the chat on screen, at the top of the list of Ask chats.",
       "localizations" : {
@@ -3609,6 +3758,155 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除所有聊天"
+          }
+        }
+      }
+    },
+    "Delete a Chat" : {
+      "comment" : "Title of a tip that points at one of the reader's earlier Ask chats in the list of chats, any of which can be deleted on its own.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف دردشة"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smazat chat"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slet en chat"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chat löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar un chat"
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar un chat"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer une discussion"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "מחיקת צ׳אט"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hapus Obrolan"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina una chat"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅 삭제"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slett en chat"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijder een chat"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuń czat"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar uma conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить чат"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Radera en chatt"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ลบแชท"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir Sohbeti Sil"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити чат"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xóa một cuộc trò chuyện"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除聊天"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除聊天"
           }
         }
       }
@@ -6061,6 +6359,155 @@
         }
       }
     },
+    "Hide a Suggestion" : {
+      "comment" : "Title of a tip that points at the suggested questions on the Ask first screen, any of which the reader can turn down.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إخفاء اقتراح"
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skrýt návrh"
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skjul et forslag"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorschlag ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar una sugerencia"
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar una sugerencia"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer une suggestion"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "הסתרת הצעה"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sembunyikan Saran"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nascondi un suggerimento"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提案を非表示にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제안 숨기기"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skjul et forslag"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verberg een suggestie"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ukryj propozycję"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocultar uma sugestão"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрыть предложение"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dölj ett förslag"
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ซ่อนคำแนะนำ"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir Öneriyi Gizle"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приховати пропозицію"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ẩn một gợi ý"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏建议"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱藏建議"
+          }
+        }
+      }
+    },
     "History" : {
       "comment" : "Voice Control name for the toolbar button that lists the reader's earlier Ask chats, beside its label 'Earlier chats'.",
       "localizations" : {
@@ -7706,6 +8153,471 @@
         }
       }
     },
+    "Open a chat's shortcut menu to delete it." : {
+      "comment" : "Tip on the Mac under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a chat’s shortcut menu to delete it."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك فتح قائمة اختصارات الدردشة لحذفها."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otevřete nabídku zkratek chatu, abyste ho mohli smazat."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åbn genvejsmenuen på en chat for at slette den."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne das Kontextmenü eines Chats, um ihn zu löschen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de un chat para eliminarlo."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de un chat para eliminarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez le menu contextuel d’une discussion pour la supprimer."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לפתוח את תפריט הקיצור של הצ׳אט כדי למחוק אותו."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka menu pintasan obrolan untuk menghapusnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il menu contestuale di una chat per eliminarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットのショートカットメニューを開くと、削除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅의 단축 메뉴를 열면 삭제할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne snarveismenyen på en chat for å slette den."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open het contextueel menu van een chat om hem te verwijderen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz menu skrótów czatu, aby go usunąć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o menu de atalho de uma conversa para apagá-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте контекстное меню чата, чтобы удалить его."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppna en chatts kontextmeny för att radera den."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เปิดเมนูลัดของแชทเพื่อลบแชทนั้น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir sohbeti silmek için kestirme menüsünü açın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрийте контекстне меню чату, щоб видалити його."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở menu phím tắt của một cuộc trò chuyện để xóa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开聊天的快捷键菜单，即可将其删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開聊天的快速鍵選單，即可將其刪除。"
+          }
+        }
+      }
+    },
+    "Open a question's shortcut menu to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on the Mac under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a question’s shortcut menu to copy it or its answer, edit it, or ask it again."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك فتح قائمة اختصارات السؤال لنسخه أو نسخ إجابته، أو تعديله، أو طرحه مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otevřete nabídku zkratek otázky, abyste ji nebo její odpověď mohli zkopírovat, upravit ji nebo se na ni zeptat znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åbn genvejsmenuen på et spørgsmål for at kopiere det eller svaret, redigere det eller spørge igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne das Kontextmenü einer Frage, um sie oder ihre Antwort zu kopieren, sie zu bearbeiten oder erneut zu fragen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez le menu contextuel d’une question pour la copier ou copier sa réponse, la modifier ou la redemander."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לפתוח את תפריט הקיצור של השאלה כדי להעתיק אותה או את התשובה שלה, לערוך אותה או לשאול אותה שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka menu pintasan pertanyaan untuk menyalin pertanyaan atau jawabannya, mengedit, atau tanya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il menu contestuale di una domanda per copiarla o copiarne la risposta, modificarla o chiederla di nuovo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問のショートカットメニューを開くと、質問や回答をコピーしたり、編集して再送信したり、もう一度質問したりできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "질문의 단축 메뉴를 열면 질문이나 답변을 복사하고, 편집 후 다시 보내고, 다시 질문할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne snarveismenyen på et spørsmål for å kopiere det eller svaret, redigere det eller spørre igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open het contextueel menu van een vraag om hem of het antwoord te kopiëren, hem te wijzigen of hem opnieuw te vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz menu skrótów pytania, aby skopiować je albo odpowiedź, edytować je lub zapytać ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o menu de atalho de uma pergunta para copiá-la ou copiar a resposta, editá-la ou perguntar de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте контекстное меню вопроса, чтобы скопировать его или ответ на него, изменить его или спросить снова."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppna en frågas kontextmeny för att kopiera den eller svaret, redigera den eller fråga igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เปิดเมนูลัดของคำถามเพื่อคัดลอกคำถามหรือคำตอบ แก้ไข หรือถามอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soruyu veya yanıtını kopyalamak, düzenlemek veya yeniden sormak için sorunuzun kestirme menüsünü açın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрийте контекстне меню запитання, щоб скопіювати його чи відповідь на нього, редагувати його або запитати знову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở menu phím tắt của câu hỏi để sao chép câu hỏi hoặc câu trả lời, sửa hoặc hỏi lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开问题的快捷键菜单，即可拷贝它或它的回答、编辑并重新发送，或再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開問題的快速鍵選單，即可拷貝它或它的回答、編輯並重新傳送，或再問一次。"
+          }
+        }
+      }
+    },
+    "Open a suggestion's shortcut menu to stop seeing it." : {
+      "comment" : "Tip on the Mac under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a suggestion’s shortcut menu to stop seeing it."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك فتح قائمة اختصارات الاقتراح لإيقاف ظهوره."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otevřete nabídku zkratek návrhu, abyste ho přestali vidět."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åbn genvejsmenuen på et forslag for ikke længere at se det."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne das Kontextmenü eines Vorschlags, um ihn nicht mehr zu sehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de una sugerencia para dejar de verla."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre el menú de atajos de una sugerencia para dejar de verla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez le menu contextuel d’une suggestion pour ne plus la voir."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לפתוח את תפריט הקיצור של ההצעה כדי להפסיק לראות אותה."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buka menu pintasan saran untuk tidak melihatnya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri il menu contestuale di un suggerimento per non vederlo più."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提案のショートカットメニューを開くと、表示されなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제안의 단축 메뉴를 열면 더 이상 표시되지 않습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne snarveismenyen på et forslag for ikke lenger å se det."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open het contextueel menu van een suggestie om hem niet meer te zien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz menu skrótów propozycji, aby przestać ją widzieć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o menu de atalho de uma sugestão para deixar de vê-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте контекстное меню предложения, чтобы больше его не видеть."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öppna ett förslags kontextmeny för att sluta visa det."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "เปิดเมนูลัดของคำแนะนำเพื่อไม่ให้เห็นอีก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir öneriyi bir daha görmemek için kestirme menüsünü açın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрийте контекстне меню пропозиції, щоб більше її не бачити."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở menu phím tắt của một gợi ý để không còn thấy nó nữa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开建议的快捷键菜单，即可不再看到它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開建議的快速鍵選單，即可不再看到它。"
+          }
+        }
+      }
+    },
     "Opened in the app" : {
       "comment" : "Line on the card under an Ask answer once the reader confirmed and the app opened its own form for them to finish, when the app gave no line of its own. Never says the thing was done: nothing is saved until they finish. Also spoken by VoiceOver.",
       "localizations" : {
@@ -8298,6 +9210,453 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "照片需要Private Cloud Compute"
+          }
+        }
+      }
+    },
+    "Pinch and hold a chat to delete it." : {
+      "comment" : "Tip on Apple Vision Pro under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك ضم إصبعيك مع الاستمرار على دردشة لحذفها."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sevřete a podržte chat, abyste ho mohli smazat."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knib og hold på en chat for at slette den."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte einen Chat mit zwei Fingern gedrückt, um ihn zu löschen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcado un chat para eliminarlo."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcado un chat para eliminarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pincez une discussion sans la relâcher pour la supprimer."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לבצע צביטה ממושכת על צ׳אט כדי למחוק אותו."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jepit dan tahan obrolan untuk menghapusnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pizzica e tieni premuta una chat per eliminarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットをピンチしたままにすると、削除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅을 길게 핀치하면 삭제할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knip og hold på en chat for å slette den."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knijp en houd een chat vast om hem te verwijderen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Złącz palce i przytrzymaj czat, aby go usunąć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pince e segure uma conversa para apagá-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сведите пальцы и удерживайте чат, чтобы удалить его."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nyp och håll ned en chatt för att radera den."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "จีบนิ้วค้างไว้ที่แชทเพื่อลบแชทนั้น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir sohbeti silmek için kıstırıp basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зведіть пальці й утримуйте чат, щоб видалити його."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chụm và giữ một cuộc trò chuyện để xóa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住聊天，即可将其删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住聊天，即可將其刪除。"
+          }
+        }
+      }
+    },
+    "Pinch and hold a question to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on Apple Vision Pro under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread: what pinching and holding it offers.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك ضم إصبعيك مع الاستمرار على سؤال لنسخه أو نسخ إجابته، أو تعديله، أو طرحه مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sevřete a podržte otázku, abyste ji nebo její odpověď mohli zkopírovat, upravit ji nebo se na ni zeptat znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knib og hold på et spørgsmål for at kopiere det eller svaret, redigere det eller spørge igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte eine Frage mit zwei Fingern gedrückt, um sie oder ihre Antwort zu kopieren, sie zu bearbeiten oder erneut zu fragen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcada una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcada una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pincez une question sans la relâcher pour la copier ou copier sa réponse, la modifier ou la redemander."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לבצע צביטה ממושכת על שאלה כדי להעתיק אותה או את התשובה שלה, לערוך אותה או לשאול אותה שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jepit dan tahan pertanyaan untuk menyalin pertanyaan atau jawabannya, mengedit, atau tanya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pizzica e tieni premuta una domanda per copiarla o copiarne la risposta, modificarla o chiederla di nuovo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問をピンチしたままにすると、質問や回答をコピーしたり、編集して再送信したり、もう一度質問したりできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "질문을 길게 핀치하면 질문이나 답변을 복사하고, 편집 후 다시 보내고, 다시 질문할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knip og hold på et spørsmål for å kopiere det eller svaret, redigere det eller spørre igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knijp en houd een vraag vast om hem of het antwoord te kopiëren, hem te wijzigen of hem opnieuw te vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Złącz palce i przytrzymaj pytanie, aby skopiować je albo odpowiedź, edytować je lub zapytać ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pince e segure uma pergunta para copiá-la ou copiar a resposta, editá-la ou perguntar de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сведите пальцы и удерживайте вопрос, чтобы скопировать его или ответ на него, изменить его или спросить снова."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nyp och håll ned en fråga för att kopiera den eller svaret, redigera den eller fråga igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "จีบนิ้วค้างไว้ที่คำถามเพื่อคัดลอกคำถามหรือคำตอบ แก้ไข หรือถามอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soruyu veya yanıtını kopyalamak, düzenlemek veya yeniden sormak için bir soruyu kıstırıp basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зведіть пальці й утримуйте запитання, щоб скопіювати його чи відповідь на нього, редагувати його або запитати знову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chụm và giữ một câu hỏi để sao chép câu hỏi hoặc câu trả lời, sửa hoặc hỏi lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住问题，即可拷贝它或它的回答、编辑并重新发送，或再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住問題，即可拷貝它或它的回答、編輯並重新傳送，或再問一次。"
+          }
+        }
+      }
+    },
+    "Pinch and hold a suggestion to stop seeing it." : {
+      "comment" : "Tip on Apple Vision Pro under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك ضم إصبعيك مع الاستمرار على اقتراح لإيقاف ظهوره."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sevřete a podržte návrh, abyste ho přestali vidět."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knib og hold på et forslag for ikke længere at se det."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte einen Vorschlag mit zwei Fingern gedrückt, um ihn nicht mehr zu sehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcada una sugerencia para dejar de verla."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pellizcada una sugerencia para dejar de verla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pincez une suggestion sans la relâcher pour ne plus la voir."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לבצע צביטה ממושכת על הצעה כדי להפסיק לראות אותה."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jepit dan tahan saran untuk tidak melihatnya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pizzica e tieni premuto un suggerimento per non vederlo più."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提案をピンチしたままにすると、表示されなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제안을 길게 핀치하면 더 이상 표시되지 않습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knip og hold på et forslag for ikke lenger å se det."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Knijp en houd een suggestie vast om hem niet meer te zien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Złącz palce i przytrzymaj propozycję, aby przestać ją widzieć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pince e segure uma sugestão para deixar de vê-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сведите пальцы и удерживайте предложение, чтобы больше его не видеть."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nyp och håll ned ett förslag för att sluta visa det."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "จีบนิ้วค้างไว้ที่คำแนะนำเพื่อไม่ให้เห็นอีก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir öneriyi bir daha görmemek için kıstırıp basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зведіть пальці й утримуйте пропозицію, щоб більше її не бачити."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chụm và giữ một gợi ý để không còn thấy nó nữa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住建议，即可不再看到它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捏住建議，即可不再看到它。"
           }
         }
       }
@@ -10565,6 +11924,155 @@
         }
       }
     },
+    "Swipe across a chat, or touch and hold it, to delete it." : {
+      "comment" : "Tip on iPhone and iPad under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك السحب عبر دردشة، أو المس مطولًا عليها، لحذفها."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Přejeďte prstem přes chat nebo na něm podržte prst, abyste ho mohli smazat."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stryg hen over en chat, eller hold en finger på den, for at slette den."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Streiche über einen Chat oder halte ihn gedrückt, um ihn zu löschen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desliza el dedo sobre un chat o mantén pulsado para eliminarlo."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desliza el dedo sobre un chat o mantén presionado para eliminarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balayez une discussion ou maintenez le doigt appuyé dessus pour la supprimer."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן להחליק על צ׳אט, או לבצע בו נגיעה ארוכה, כדי למחוק אותו."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesek obrolan ke samping, atau sentuh dan tahan, untuk menghapusnya."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scorri su una chat o tienila premuta per eliminarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チャットを横にスワイプするか、タッチして押さえたままにすると、削除できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "채팅을 옆으로 쓸어넘기거나 길게 터치하면 삭제할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sveip over en chat, eller trykk og hold på den, for å slette den."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Veeg over een chat of raak hem aan en houd vast om hem te verwijderen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przesuń palcem po czacie albo dotknij go i przytrzymaj, aby go usunąć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deslize sobre uma conversa ou toque e segure-a para apagá-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Смахните по чату или коснитесь и удерживайте его, чтобы удалить."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Svep över en chatt eller tryck och håll ned den för att radera den."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ปัดผ่านแชท หรือแตะค้างไว้ เพื่อลบแชทนั้น"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir sohbeti silmek için üzerinde kaydırın veya dokunup basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проведіть по чату або торкніть і утримуйте його, щоб видалити."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuốt ngang trên một cuộc trò chuyện, hoặc chạm và giữ, để xóa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在聊天上轻扫，或按住聊天，即可将其删除。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在聊天上滑動，或觸碰並按住聊天，即可將其刪除。"
+          }
+        }
+      }
+    },
     "That didn't work" : {
       "comment" : "Line on the card under an Ask answer when the app could not do what the answer offered. Also spoken by VoiceOver.",
       "localizations" : {
@@ -11467,6 +12975,304 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按讚"
+          }
+        }
+      }
+    },
+    "Touch and hold a question to copy it or its answer, edit it, or ask it again." : {
+      "comment" : "Tip on iPhone and iPad under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread: what touching and holding it offers.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك المس مطولًا سؤالًا لنسخه أو نسخ إجابته، أو تعديله، أو طرحه مرة أخرى."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podržte prst na otázce, abyste ji nebo její odpověď mohli zkopírovat, upravit ji nebo se na ni zeptat znovu."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold en finger på et spørgsmål for at kopiere det eller svaret, redigere det eller spørge igen."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte eine Frage gedrückt, um sie oder ihre Antwort zu kopieren, sie zu bearbeiten oder erneut zu fragen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén presionada una pregunta para copiarla o copiar su respuesta, editarla o preguntarla otra vez."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez le doigt appuyé sur une question pour la copier ou copier sa réponse, la modifier ou la redemander."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לבצע נגיעה ארוכה בשאלה כדי להעתיק אותה או את התשובה שלה, לערוך אותה או לשאול אותה שוב."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentuh dan tahan pertanyaan untuk menyalin pertanyaan atau jawabannya, mengedit, atau tanya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocca e tieni premuta una domanda per copiarla o copiarne la risposta, modificarla o chiederla di nuovo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "質問をタッチして押さえたままにすると、質問や回答をコピーしたり、編集して再送信したり、もう一度質問したりできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "질문을 길게 터치하면 질문이나 답변을 복사하고, 편집 후 다시 보내고, 다시 질문할 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trykk og hold på et spørsmål for å kopiere det eller svaret, redigere det eller spørre igjen."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raak een vraag aan en houd vast om hem of het antwoord te kopiëren, hem te wijzigen of hem opnieuw te vragen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dotknij i przytrzymaj pytanie, aby skopiować je albo odpowiedź, edytować je lub zapytać ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque e segure uma pergunta para copiá-la ou copiar a resposta, editá-la ou perguntar de novo."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коснитесь и удерживайте вопрос, чтобы скопировать его или ответ на него, изменить его или спросить снова."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tryck och håll ned en fråga för att kopiera den eller svaret, redigera den eller fråga igen."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แตะค้างไว้ที่คำถามเพื่อคัดลอกคำถามหรือคำตอบ แก้ไข หรือถามอีกครั้ง"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soruyu veya yanıtını kopyalamak, düzenlemek veya yeniden sormak için bir soruya dokunup basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Торкніть і утримуйте запитання, щоб скопіювати його чи відповідь на нього, редагувати його або запитати знову."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chạm và giữ một câu hỏi để sao chép câu hỏi hoặc câu trả lời, sửa hoặc hỏi lại."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住问题，即可拷贝它或它的回答、编辑并重新发送，或再问一次。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "觸碰並按住問題，即可拷貝它或它的回答、編輯並重新傳送，或再問一次。"
+          }
+        }
+      }
+    },
+    "Touch and hold a suggestion to stop seeing it." : {
+      "comment" : "Tip on iPhone and iPad under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكنك المس مطولًا اقتراحًا لإيقاف ظهوره."
+          }
+        },
+        "cs" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podržte prst na návrhu, abyste ho přestali vidět."
+          }
+        },
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold en finger på et forslag for ikke længere at se det."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Halte einen Vorschlag gedrückt, um ihn nicht mehr zu sehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada una sugerencia para dejar de verla."
+          }
+        },
+        "es-MX" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén presionada una sugerencia para dejar de verla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez le doigt appuyé sur une suggestion pour ne plus la voir."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ניתן לבצע נגיעה ארוכה בהצעה כדי להפסיק לראות אותה."
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentuh dan tahan saran untuk tidak melihatnya lagi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tocca e tieni premuto un suggerimento per non vederlo più."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提案をタッチして押さえたままにすると、表示されなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제안을 길게 터치하면 더 이상 표시되지 않습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trykk og hold på et forslag for ikke lenger å se det."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raak een suggestie aan en houd vast om hem niet meer te zien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dotknij i przytrzymaj propozycję, aby przestać ją widzieć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toque e segure uma sugestão para deixar de vê-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коснитесь и удерживайте предложение, чтобы больше его не видеть."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tryck och håll ned ett förslag för att sluta visa det."
+          }
+        },
+        "th" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "แตะค้างไว้ที่คำแนะนำเพื่อไม่ให้เห็นอีก"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir öneriyi bir daha görmemek için dokunup basılı tutun."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Торкніть і утримуйте пропозицію, щоб більше її не бачити."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chạm và giữ một gợi ý để không còn thấy nó nữa."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按住建议，即可不再看到它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "觸碰並按住建議，即可不再看到它。"
           }
         }
       }

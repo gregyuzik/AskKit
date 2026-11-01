@@ -2,6 +2,7 @@
 
 public import AskCore
 public import SwiftUI
+import TipKit
 
 /// The thread's rows: the one view on the screen that reads `turns`.
 ///
@@ -60,6 +61,10 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
     /// focus to nothing.
     @State private var waitRowFocus: AskWaitRowFocus?
 
+    /// The tips' gates as the screen has settled them (`AskScreen`): the
+    /// question's tip shows only while its own is open.
+    @Environment(\.askTipGates) private var tipGates
+
     var body: some View {
         // Paired by the store, from one read, and never indexed back into
         // the live array from in here (`pairedTurns`).
@@ -108,7 +113,12 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                     waitRowFocus = AskWaitRowFocus(after: pair.turn.id)
                     store.ask($0)
                 },
-                onDecline: { store.decline($0) },
+                // A follow-up turned down is the starter tip's action too:
+                // the same item under the same gesture (`AskStarterDeclineTip`).
+                onDecline: {
+                    AskStarterDeclineTip().invalidate(reason: .actionPerformed)
+                    store.decline($0)
+                },
                 onRerollPick: {
                     waitRowFocus = AskWaitRowFocus(after: pair.turn.id)
                     store.rerollPick(pair.turn)
@@ -132,7 +142,29 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 onCopy: onCopy,
                 onCopyAnswer: { copyAnswer(of: pair.turn.id) },
                 onEdit: { onEdit(pair.turn) },
-                onAskAgain: { store.askAgain(pair.turn) },
+                // Ask again is the one item of the question's menu that never
+                // passes through the screen, so its tip goes here; the screen
+                // retires it for the other three (`AskScreen.copy(_:)`).
+                onAskAgain: {
+                    AskQuestionMenuTip().invalidate(reason: .actionPerformed)
+                    store.askAgain(pair.turn)
+                },
+                // The newest question's own: the bubble the tip is on. Not
+                // while a turn is being asked, when the newest is a question
+                // with no answer yet and the screen's rule is about to take
+                // the tip down: it would flash up there for the frames
+                // TipKit takes to hear it. And only while the screen has the
+                // question's gate open, whatever TipKit says.
+                showsMenuTip: isLast && !store.isThinking && tipGates.questionMenu
+                    && AskTips.isCurrent(AskQuestionMenuTip()),
+                // Every row reports, and only the newest is heard, as with the
+                // row's height below: a report only the newest made would be a
+                // conditional modifier, rebuilding the bubble as it becomes
+                // the newest.
+                onQuestionPlaced: { frame in
+                    guard pair.turn.id == store.lastTurnID else { return }
+                    follow.questionPlaced(frame, of: pair.turn.id)
+                },
                 evidenceExpansion: $expandedEvidence[contains: pair.turn.id],
                 // The card's own yes and not now wait on the outcome for
                 // VoiceOver's focus; a host's control confirming leaves it.

@@ -187,12 +187,14 @@ private final class ObservationTally {
     private func bubble(
         question: String = "What do I own?",
         hasAnswerText: Bool = false,
+        showsMenuTip: Bool = false,
         onCopyAnswer: @escaping () -> Void = {}
     ) -> AskEquatableQuestionBubble {
         AskEquatableQuestionBubble(
             question: question, accent: .blue, morph: nil, photo: nil, photoImage: nil,
             photoThumbnail: { _ in nil }, hasAnswerText: hasAnswerText,
-            onCopy: {}, onCopyAnswer: onCopyAnswer, onEdit: {}, onAskAgain: {}
+            onCopy: {}, onCopyAnswer: onCopyAnswer, onEdit: {}, onAskAgain: {},
+            showsMenuTip: showsMenuTip, onPlaced: { _ in }
         )
     }
 
@@ -205,6 +207,13 @@ private final class ObservationTally {
         #expect(bubble(question: "What do I own?") != bubble(question: "What else?"))
     }
 
+    /// The menu's tip coming to the newest question, or going from it, is a
+    /// change: a bubble SwiftUI skipped would keep the popover it had.
+    @Test func theMenuTipIsAChange() {
+        #expect(bubble(showsMenuTip: true) != bubble())
+        #expect(bubble(showsMenuTip: true) == bubble(showsMenuTip: true))
+    }
+
     /// Every stored property there is, so that adding one fails here rather than
     /// quietly joining the ones the comparison leaves out: the closures, which
     /// hold nothing that changes (the type's own note), and the thumbnail loader,
@@ -214,7 +223,8 @@ private final class ObservationTally {
 
         #expect(found == [
             "question", "accent", "morph", "photo", "photoImage", "photoThumbnail",
-            "hasAnswerText", "onCopy", "onCopyAnswer", "onEdit", "onAskAgain"
+            "hasAnswerText", "onCopy", "onCopyAnswer", "onEdit", "onAskAgain",
+            "showsMenuTip", "onPlaced"
         ])
     }
 }

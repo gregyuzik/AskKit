@@ -1016,4 +1016,79 @@ import Testing
     }
 }
 
+/// Whether the newest question is on screen, which its tip waits for
+/// (`AskScrollFollow.questionInView`): whole between the bars, and the newest
+/// turn's own.
+@Suite(.timeLimit(.minutes(1))) @MainActor struct AskQuestionInViewTests {
+
+    /// An iPhone's thread at rest at its top: 670 pt between a 116 pt bar and
+    /// the composer, so the content's top is at the bar's edge.
+    private static func atTop(contentHeight: CGFloat = 2000) -> AskThreadGeometry {
+        AskThreadGeometry(contentHeight: contentHeight, containerHeight: 670, insetTop: 116, offset: -116)
+    }
+
+    @Test func aQuestionShowsOnlyWholeBetweenTheBars() {
+        let resting = Self.atTop()
+        #expect(resting.shows(top: 8, bottom: 52))
+        // Its foot behind the composer, at the bottom of the 670 pt.
+        #expect(!resting.shows(top: 640, bottom: 684))
+        #expect(resting.shows(top: 620, bottom: 670))
+
+        // Scrolled 300 pt down the thread: the band is 300 to 970.
+        var scrolled = resting
+        scrolled.offset = 184
+        #expect(!scrolled.shows(top: 8, bottom: 52), "under the navigation bar's glass")
+        #expect(scrolled.shows(top: 300, bottom: 344))
+        // Half a point either way is a frame landing in fractions.
+        #expect(scrolled.shows(top: 299.5, bottom: 970.5))
+    }
+
+    @Test func theNewestQuestionIsInViewOnceItSaysWhereItIs() {
+        let follow = AskScrollFollow()
+        let turn = UUID()
+        follow.geometryChanged(Self.atTop(), at: 100)
+        #expect(follow.questionInView == nil, "nothing has said where it is")
+
+        follow.questionPlaced(CGRect(x: 200, y: 8, width: 150, height: 44), of: turn)
+        #expect(follow.questionInView == turn)
+
+        // The reader scrolls it up under the bar, and back.
+        var scrolled = Self.atTop()
+        scrolled.offset = 184
+        follow.geometryChanged(scrolled, at: 101)
+        #expect(follow.questionInView == nil)
+        follow.geometryChanged(Self.atTop(), at: 102)
+        #expect(follow.questionInView == turn)
+    }
+
+    /// A long answer leaves its question over the top, since the thread
+    /// follows its foot and never pins the question (ARCHITECTURE.md,
+    /// Rejected designs).
+    @Test func aQuestionALongAnswerPushedOffTheTopIsOutOfView() {
+        let follow = AskScrollFollow()
+        let turn = UUID()
+        // The question at 1200 pt, its answer running to the content's foot
+        // at 3000, and the thread at that foot.
+        follow.geometryChanged(
+            AskThreadGeometry(contentHeight: 3000, containerHeight: 670, insetTop: 116, offset: 3000 - 670 - 116),
+            at: 100
+        )
+        follow.questionPlaced(CGRect(x: 200, y: 1200, width: 150, height: 44), of: turn)
+        #expect(follow.questionInView == nil)
+    }
+
+    /// The next question's bubble reports a moment after the newest turn
+    /// moves on to it, and until it does, the one before isn't taken for it.
+    @Test func inViewNamesTheTurnSoTheNextQuestionIsNotTakenForTheLast() {
+        let follow = AskScrollFollow()
+        let earlier = UUID()
+        follow.geometryChanged(Self.atTop(), at: 100)
+        follow.questionPlaced(CGRect(x: 200, y: 8, width: 150, height: 44), of: earlier)
+        let newest = UUID()
+        #expect(follow.questionInView != newest)
+        follow.questionPlaced(CGRect(x: 200, y: 400, width: 150, height: 44), of: newest)
+        #expect(follow.questionInView == newest)
+    }
+}
+
 #endif

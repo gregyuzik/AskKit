@@ -44,11 +44,18 @@ struct AskChatsPane: View {
 
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiatesWithoutColor
     @Environment(\.legibilityWeight) private var legibilityWeight
+    /// The tips' gates as the screen has settled them (`AskScreen`): the
+    /// chat's tip shows only while its own is open.
+    @Environment(\.askTipGates) private var tipGates
 
     var body: some View {
+        let rows = AskChatsPaneRows.rows(current: current, history: history)
+        // The row the delete tip points at: the first that can be deleted.
+        let tipped = tipGates.chatDelete && AskTips.isCurrent(AskChatDeleteTip())
+            ? rows.first(where: \.offersDelete)?.id : nil
         List {
-            ForEach(AskChatsPaneRows.rows(current: current, history: history)) { row in
-                self.row(row)
+            ForEach(rows) { row in
+                self.row(row, showsDeleteTip: row.id == tipped)
                     .listRowBackground(mark(isOpen: row.isOpen))
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 10, leading: 28, bottom: 10, trailing: 28))
@@ -104,7 +111,12 @@ struct AskChatsPane: View {
     /// same button takes the open chat's state through its modifiers, and the
     /// delete is left out of their contents rather than off the row. The row
     /// keeps its identity through the open too (`AskChatsPaneRows.Identity`).
-    private func row(_ row: AskChatsPaneRows.Row) -> some View {
+    ///
+    /// **How to delete one is said on the first that can be**
+    /// (`showsDeleteTip`, `AskChatDeleteTip`): a popover whose anchor comes
+    /// and goes behind the row (`askPopoverTip`), so no row changes identity
+    /// as the tip comes, goes or moves to another row.
+    private func row(_ row: AskChatsPaneRows.Row, showsDeleteTip: Bool) -> some View {
         let summary = row.summary
         return Button {
             AskChatOpening.announce(summary)
@@ -148,6 +160,17 @@ struct AskChatsPane: View {
         }
         .accessibilityAddTraits(row.isOpen ? .isSelected : [])
         .accessibilityIdentifier(row.identifier)
+        // **Outside the identifier.** The popover's anchor is a container of
+        // its own in the accessibility tree, and inside the identifier it
+        // took the row's, so a query for the open chat's row found a group
+        // with no label before the button. Touches go through the tip, so
+        // the swipe it describes works with it up.
+        //
+        // **Under the row**: the first chat that can go sits near the top of
+        // its list, and left to choose, the system put the tip over the bar
+        // above it, Close and Delete All Chats included. There is always room
+        // below.
+        .askPopoverTip(AskChatDeleteTip(), isShown: showsDeleteTip, side: .below)
     }
 
     /// Whether the open chat's row carries a check beside its title: where

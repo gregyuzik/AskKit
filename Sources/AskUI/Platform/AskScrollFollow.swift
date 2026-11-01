@@ -227,6 +227,33 @@ final class AskScrollFollow {
     @ObservationIgnored private var insetTop: CGFloat = 0
     @ObservationIgnored private var tallestInsetTop: CGFloat = 0
 
+    /// The space the thread's content lays out in, which its question bubbles
+    /// report where they are in (`questionPlaced(_:of:)`). The content's own,
+    /// and not the scroll view's, so a scroll moves nothing in it: a bubble
+    /// reports when the rows above it change, never at every frame of a
+    /// scroll.
+    nonisolated static var threadContent: NamedCoordinateSpace { .named("ask.thread.content") }
+
+    /// Where the newest question is in the thread's content, as its bubble
+    /// last said (`questionPlaced(_:of:)`), with the turn it belongs to.
+    /// Ignored by observation for `lastGeometry`'s reason: `questionInView`
+    /// is what's drawn from.
+    @ObservationIgnored private var newestQuestion: (turn: UUID, top: CGFloat, bottom: CGFloat)?
+
+    /// The turn whose question is whole between the bars, if the newest
+    /// turn's is: what the question's tip waits for (`AskScreen.tipGates`).
+    ///
+    /// **A turn's id, not a flag**, because which bubble is the newest moves
+    /// on before the new one has said where it is, and a flag would carry the
+    /// last turn's answer over to it. The screen compares it with the newest
+    /// turn, so until the new bubble reports it is in view for nobody.
+    ///
+    /// **Not pinned to the top.** A question lands at the foot and leaves
+    /// over the top of a long answer (ARCHITECTURE.md, Rejected designs), so
+    /// after one it is off screen, and its tip waits for the reader to scroll
+    /// back to it.
+    private(set) var questionInView: UUID?
+
     init() {}
 
     /// Whether to offer the pill.
@@ -446,6 +473,25 @@ final class AskScrollFollow {
         if keepsFootThroughResize(at: now), atFoot, scrollable, distance > 0 {
             footRequests += 1
         }
+        newestQuestionMoved()
+    }
+
+    /// The newest turn's question bubble is at `frame` in the thread's
+    /// content (`threadContent`): as it is laid out, and as the rows above it
+    /// change. `AskThreadList` passes on only the newest turn's.
+    func questionPlaced(_ frame: CGRect, of turn: UUID) {
+        newestQuestion = (turn, frame.minY, frame.maxY)
+        newestQuestionMoved()
+    }
+
+    /// Reads `questionInView` again from the newest question and the last
+    /// sample, publishing only a change: a scroll that keeps the bubble in
+    /// view, or out of it, tells nothing.
+    private func newestQuestionMoved() {
+        let inView = newestQuestion.flatMap { question in
+            lastGeometry?.shows(top: question.top, bottom: question.bottom) == true ? question.turn : nil
+        }
+        if inView != questionInView { questionInView = inView }
     }
 
     /// Keeps the top inset, and the tallest it has been, from every geometry

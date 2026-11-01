@@ -25,6 +25,12 @@ public import SwiftUI
 /// read back from disk (`AskDomain.photoThumbnail(for:)`), a glyph where there
 /// is neither. The frame is the same in each case, so a thumbnail that arrives
 /// late moves nothing under it.
+///
+/// **The newest question says the menu is there** (`AskQuestionMenuTip`): a
+/// popover from the bubble, never a view in the stack, so it moves no frame
+/// (house rule 4). It shows only while `AskScreen` has the bubble whole
+/// between the bars, which it learns from where the bubble says it is
+/// (`onPlaced`).
 struct AskQuestionBubble: View {
     private let question: String
     private let accent: Color
@@ -39,6 +45,12 @@ struct AskQuestionBubble: View {
     private let onCopyAnswer: (() -> Void)?
     private let onEdit: () -> Void
     private let onAskAgain: () -> Void
+    /// Whether the bubble points out its menu (`AskQuestionMenuTip`): the
+    /// newest question's, while that tip is the one up.
+    private let showsMenuTip: Bool
+    /// Where the bubble is in the thread's content
+    /// (`AskScrollFollow.threadContent`), each time that changes.
+    private let onPlaced: ((CGRect) -> Void)?
 
     init(
         question: String,
@@ -47,6 +59,8 @@ struct AskQuestionBubble: View {
         photo: AskQuestionPhoto? = nil,
         photoImage: CGImage? = nil,
         photoThumbnail: (@Sendable (AskQuestionPhoto) async -> CGImage?)? = nil,
+        showsMenuTip: Bool = false,
+        onPlaced: ((CGRect) -> Void)? = nil,
         onCopy: @escaping () -> Void,
         onCopyAnswer: (() -> Void)? = nil,
         onEdit: @escaping () -> Void,
@@ -58,6 +72,8 @@ struct AskQuestionBubble: View {
         self.photo = photo
         self.photoImage = photoImage
         self.photoThumbnail = photoThumbnail
+        self.showsMenuTip = showsMenuTip
+        self.onPlaced = onPlaced
         self.onCopy = onCopy
         self.onCopyAnswer = onCopyAnswer
         self.onEdit = onEdit
@@ -81,16 +97,21 @@ struct AskQuestionBubble: View {
             Spacer(minLength: 48)
             Text(question)
                 .font(.body)
-                // Selectable and menu-bearing. On iOS 27 `textSelection` is
-                // system selection rather than a callout menu, so whether a
-                // long press reaches the menu is the system's decision.
-                // Measured on an iPhone 17 Pro simulator with SDK 27, it does.
-                // The demo's `testTheQuestionBubblesContextMenuIsReachable`
-                // keeps measuring it, because Copy, Copy answer, Edit & Resend
-                // and Ask again reach a reader's touch through this menu and
-                // nowhere else in AskUI; VoiceOver has them as actions too
-                // (below).
-                .textSelection(.enabled)
+                // **Menu-bearing, not selectable.** Copy, Copy answer, Edit &
+                // Resend and Ask again reach a reader's touch through this
+                // menu and nowhere else in AskUI (VoiceOver has them as
+                // actions too, below), and the question's tip tells the reader
+                // to open it. Selectable, the words competed for the same
+                // press: on the Mac a selectable text view took the
+                // right-click and the Control-click for its own Cut, Copy,
+                // Paste and Font, so the question's menu opened only from the
+                // bubble's padding, the 14 by 10 points round the words (macOS
+                // 27.2); on an iPad a long press on the words selected one and
+                // showed the system's Copy, Look Up and Translate in two of
+                // three first presses (iPad mini simulator, iOS 27.2; both
+                // 2026-10-31). The menu's Copy copies the whole question. The
+                // demo's `testTheQuestionBubblesContextMenuIsReachable` keeps
+                // measuring that a long press reaches the menu.
                 // Black or white on the fill as contrast decides, not always
                 // `.primary` (`AskOnFill`).
                 .foregroundStyle(AskOnFill(fill: fill))
@@ -172,6 +193,24 @@ struct AskQuestionBubble: View {
                 // on iPad and the Mac while the phone kept them. Opting back
                 // in makes the code and what renders agree.
                 .labelStyle(.titleAndIcon)
+                // **The tip on the bubble, not the `HStack`**, whose spacer
+                // would put the arrow in the middle of the row. Its anchor
+                // comes and goes behind the bubble (`askPopoverTip`), so the
+                // bubble keeps its identity as it becomes the newest or stops
+                // being it. Scrolled from between the bars, the bubble takes
+                // the tip with it (`AskScreen.tipGates`).
+                //
+                // **Above or below, whichever has room**, on iOS and
+                // visionOS (`menuTipSide`).
+                .askPopoverTip(AskQuestionMenuTip(), isShown: showsMenuTip, side: Self.menuTipSide)
+                // Where the bubble is in the thread, read in the content's own
+                // space, which a scroll doesn't change: it reports when the
+                // rows above it move, not at every frame of a scroll.
+                .onGeometryChange(for: CGRect.self) { proxy in
+                    proxy.frame(in: AskScrollFollow.threadContent)
+                } action: { frame in
+                    onPlaced?(frame)
+                }
                 // On the bubble itself and not on the `HStack`, so the geometry
                 // that travels is the capsule's. The stack is full width with a
                 // `Spacer` holding the bubble trailing, so matching it would
@@ -212,6 +251,33 @@ struct AskQuestionBubble: View {
     static let fillOpacity = 0.6
 
     private static let corner: CGFloat = 20
+
+    /// The side the menu's tip stands on (`askPopoverTip`).
+    ///
+    /// **Above or below on iOS and visionOS, never beside.** The system takes
+    /// the one with room: under the first question, which sits just below
+    /// the bar, and above a newest question low on a long thread, over the
+    /// answer before it, which the reader has read (iPhone 18 Pro simulator,
+    /// 2026-10-31). Either edge, fixed, put the tip over the bar or the
+    /// composer in the other case. Left free to go beside, it stood on the
+    /// bubble's leading side wherever the column had room: over the first
+    /// line of the answer on an iPad at regular width (iPad mini simulator),
+    /// and across iPhone Duo's fold over the chats and their Delete All
+    /// Chats, open flat on its side (iPhone Duo simulator; both 2026-10-31).
+    ///
+    /// **Under the bubble on the Mac.** Left to choose, the system stood it
+    /// above, over the toolbar and past the window's top edge, as it did
+    /// fixed above. Beside the bubble it stayed in a wide window, but in one
+    /// 380 points wide, where the popover keeps its width, it hung 250 points
+    /// off the window's leading edge; under it, 125 off the trailing one
+    /// (macOS 27.2, 2026-10-31).
+    private static var menuTipSide: AskTipSide {
+        #if os(macOS)
+        .below
+        #else
+        .aboveOrBelow
+        #endif
+    }
 
     /// The bubble's fill: the accent at `fillOpacity`.
     private var fill: Color {

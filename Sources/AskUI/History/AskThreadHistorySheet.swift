@@ -57,6 +57,13 @@ struct AskThreadHistorySheet: View {
                 }
             }
         }
+        #if os(macOS)
+        // **A size of its own on the Mac**, where a sheet is as big as its
+        // content asks: a list asks for no height, and the sheet opened 470 by
+        // 158 points, its bars alone with no row between them (macOS 27.2,
+        // 2026-10-31). Room for a few rows, which scroll in what they have.
+        .frame(minWidth: 400, idealWidth: 480, minHeight: 300, idealHeight: 420)
+        #endif
     }
 }
 

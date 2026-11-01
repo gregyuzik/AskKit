@@ -2816,6 +2816,12 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// `hasTurns`'s reason.
     public var lastTurnID: UUID? { shape.ids.last }
 
+    /// Whether the newest turn has ended with words in it, so its question's
+    /// menu holds Copy answer: what the question's tip waits for
+    /// (`AskTipGates.questionMenu`). Read this rather than `turns.last`, for
+    /// `hasTurns`'s reason.
+    var lastTurnEndedWithText: Bool { shape.lastIsComplete && shape.lastHasText }
+
     /// The thread's stage: the screen's one layout animation key a turn can
     /// reach (`AskStage`), and which first screen shows, if any. It changes
     /// with the thread's shape, with a turn starting or ending, and with

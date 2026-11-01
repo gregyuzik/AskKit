@@ -26,6 +26,10 @@ struct AskThreadHistoryList: View {
     let onOpen: (AskThreadSummary) -> Void
     let onDelete: (AskThreadSummary) -> Void
 
+    /// The tips' gates as the screen has settled them (`AskScreen`): the
+    /// chat's tip shows only while its own is open.
+    @Environment(\.askTipGates) private var tipGates
+
     /// What the list of chats is called: the sheet's title, and the title of
     /// the pane beside the fold. One key for both.
     static var title: Text {
@@ -57,6 +61,18 @@ struct AskThreadHistoryList: View {
                         // reader can make.
                         .accessibilityAction(named: AskChatDeleteButton.title) { onDelete(summary) }
                         .accessibilityIdentifier(AskAccessibility.historyRow)
+                        // How to delete one, on the first while that tip is
+                        // up (`AskChatDeleteTip`) and the screen has its gate
+                        // open. Outside the identifier, which the popover's
+                        // anchor, a container of its own, would otherwise
+                        // share, and under the row, clear of the sheet's bar
+                        // (`AskChatsPane`).
+                        .askPopoverTip(
+                            AskChatDeleteTip(),
+                            isShown: summary.id == earlier.first?.id && tipGates.chatDelete
+                                && AskTips.isCurrent(AskChatDeleteTip()),
+                            side: .below
+                        )
                     }
                 } header: {
                     Text("Earlier chats", bundle: #bundle, comment: "The reader's earlier Ask chats: the toolbar button that lists them, and the heading above them in that list.")

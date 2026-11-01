@@ -1,4 +1,6 @@
+import os
 import SwiftUI
+import TipKit
 
 import AskCore
 // SPI for `askSimulatedFold(_:)` alone: the stand-in fold `-askFold` and the
@@ -14,13 +16,39 @@ import AskCore
 struct AskKitDemoApp: App {
     @State private var host = DemoHost.atLaunch()
 
-    #if DEBUG && os(macOS)
-    /// `DemoLaunchArgument.captureWindow`: the window written to a PNG for
-    /// the README, then the app quits (`DemoWindowCapture`).
     init() {
+        Self.startTips()
+        #if DEBUG && os(macOS)
+        // `DemoLaunchArgument.captureWindow`: the window written to a PNG for
+        // the README, then the app quits (`DemoWindowCapture`).
         DemoWindowCapture.startIfAsked()
+        #endif
     }
-    #endif
+
+    /// Starts TipKit, once, as the app launches: all AskUI's tips ask of a
+    /// host, since AskKit never configures TipKit itself (`AskTips`), and the
+    /// shape a host copies.
+    ///
+    /// **Hidden first, then configured.** `DemoLaunchArgument.hidesTips`, and
+    /// every capture of the Mac's window, hide every tip before TipKit starts:
+    /// a popover tip lays a dismiss region over the whole window, which takes
+    /// the UI tests' taps, and a tip in a README image would be in every copy
+    /// of it.
+    ///
+    /// `.immediate`, because the screen's three tips are met in one sitting
+    /// and each waits for its own surface anyway (`AskTipGates`).
+    private static func startTips() {
+        let arguments = CommandLine.arguments
+        if arguments.contains(DemoLaunchArgument.hidesTips) || arguments.contains(DemoLaunchArgument.captureWindow) {
+            Tips.hideAllTipsForTesting()
+        }
+        do {
+            try Tips.configure([.displayFrequency(.immediate)])
+        } catch {
+            Logger(subsystem: Bundle.main.bundleIdentifier ?? "AskKitDemo", category: "tips")
+                .error("TipKit didn't start: \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
