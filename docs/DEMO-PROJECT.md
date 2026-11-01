@@ -126,7 +126,7 @@ caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
 ## Imaging the iPhone screen
 
 The README's `docs/images/iphone.png` is an iPhone 18 Pro simulator (iOS 27.2) in light mode, a live
-answer from the on-device model on the library's first starter, framed with
+answer from the on-device model to its starter "What tools do I own?", framed with
 [`frames`](https://github.com/viticci/frames-cli) and scaled to 763x1560. Hold the simulator for the
 whole run, so no test or other app comes to the front on it.
 

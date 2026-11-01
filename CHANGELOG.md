@@ -12,6 +12,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-01
+
+Three TipKit tips on the Ask screen, the empty composer one line tall again on iOS and visionOS, and a
+demo that hosts both of its domains.
+
 ### Added
 
 - Three tips on the Ask screen, shown through the host's TipKit: the menu on a question (Copy, Copy
@@ -512,7 +517,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/gregyuzik/AskKit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/gregyuzik/AskKit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/gregyuzik/AskKit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/gregyuzik/AskKit/compare/v0.1.0...v0.2.0
