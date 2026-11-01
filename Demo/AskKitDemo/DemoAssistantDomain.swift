@@ -16,8 +16,8 @@ nonisolated struct DemoReminder: Codable, Sendable, Equatable, Identifiable {
     let when: String?
 }
 
-/// The reminders confirmed this launch, which the assistant's Reminders
-/// sheet lists.
+/// The reminders confirmed this launch, which the settings card's Reminders
+/// section lists (`DemoReminderSection`).
 ///
 /// **In memory, on purpose.** No EventKit and no permission prompt: the
 /// demo shows the shape of an action the model proposes and the reader
@@ -213,15 +213,15 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     /// No nothing-to-ask copy: there is nothing to own, so the first screen is
     /// the ready one whatever the overview counts.
     ///
-    /// **"Assistant", where README's sample says "Ask the Assistant".** The
-    /// title names the domain on screen by the name the switch gives it
-    /// (`DemoDomainSwitch`). And on an iPhone 18 Pro the switch is a third
-    /// item on the bar's leading side, beside Reminders and the settings:
-    /// between those and New Chat with the chats, "Ask the Assistant" doesn't
-    /// fit.
+    /// **"Ask the Assistant", the title README's sample gives.** The bar's
+    /// leading side holds the settings and the switch, as the library's does,
+    /// and the title stays centred and whole on an iPhone 18 Pro: measured
+    /// 0.3 pt left of centre at rest with the chats' item in the bar, and 1
+    /// pt right of it with the keyboard up and Done in the switch's place.
+    /// The switch names the domain shorter, "Assistant" (`DemoDomainChoice`).
     var brand: AskBrand {
         AskBrand(
-            title: "Assistant",
+            title: "Ask the Assistant",
             appDirectory: Self.appDirectory,
             logSubsystem: "com.example.askkitdemo",
             help: "Ask anything",

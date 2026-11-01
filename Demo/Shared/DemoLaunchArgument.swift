@@ -213,8 +213,8 @@ nonisolated enum DemoDomainChoice: String, CaseIterable, Sendable {
     /// The name in the menu. "Your Things" for the library, after the first
     /// screen's "Ask about your things", and not "Library", which is the
     /// second tab's name under `DemoLaunchArgument.tabs`: two places with
-    /// one name would read as one. "Assistant" for the assistant, which is
-    /// its title too (`DemoAssistantDomain.brand`).
+    /// one name would read as one. "Assistant" for the assistant, the short
+    /// of its title, "Ask the Assistant" (`DemoAssistantDomain.brand`).
     var name: String {
         switch self {
         case .library: "Your Things"
@@ -247,8 +247,10 @@ nonisolated enum DemoAccessibility {
     /// The bar's menu that switches domains on iOS and iPadOS, and the
     /// toolbar's pop-up that does on the Mac (`DemoDomainSwitch`).
     static let domainMenu = "demo.domainMenu"
-    /// The assistant's toolbar button that lists the reminders added.
-    static let reminders = "demo.reminders"
-    /// One reminder in that list.
+    /// The settings button in the bar, on both domains (`ContentView`,
+    /// `DemoAssistantView`), which opens the settings card.
+    static let settings = "demo.settings"
+    /// One reminder in the settings card's Reminders section
+    /// (`DemoReminderSection`).
     static let reminder = "demo.reminder"
 }

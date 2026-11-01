@@ -3,9 +3,10 @@ import AskUI
 import SwiftUI
 
 /// The assistant's screen, a switch away from the library's
-/// (`DemoDomainSwitch`): `AskScreen` in a stack, as every host has it,
-/// with the demo's mark, no tiles to draw, and two host items: the reminders
-/// the reader has added, and the settings card.
+/// (`DemoDomainSwitch`): `AskScreen` in a stack, as every host has it, with
+/// the demo's mark and no tiles to draw. Its one host item of its own is the
+/// settings card, beside the switch, and the card's Reminders section lists
+/// the reminders the reader has added (`DemoReminderSection`).
 ///
 /// Smaller than `ContentView` on purpose. The tabs, the slot, the photo
 /// button, the tile routes and the nothing-to-ask screen are about the
@@ -16,12 +17,11 @@ struct DemoAssistantView: View {
     /// over at launch.
     let host: DemoHost
 
-    @State private var showsReminders = false
     @State private var showsSettings = false
 
     /// Leading on the phone, as `ContentView.settingsPlacement` says, and
     /// secondary on the Mac, which has no top bar to lead.
-    private var hostItemsPlacement: ToolbarItemPlacement {
+    private var hostItemPlacement: ToolbarItemPlacement {
         #if os(macOS)
         .secondaryAction
         #else
@@ -37,23 +37,12 @@ struct DemoAssistantView: View {
                 #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
-                // Before the host's items, so the switch stands after them,
-                // where Done takes its place while the keyboard is up
+                // Before the host's item, so the switch stands after it, where
+                // Done takes its place while the keyboard is up
                 // (`DemoDomainSwitch`).
                 .modifier(DemoDomainSwitch(host: host))
                 .toolbar {
-                    ToolbarItemGroup(placement: hostItemsPlacement) {
-                        Button {
-                            showsReminders = true
-                        } label: {
-                            Label {
-                                Text(verbatim: "Reminders")
-                            } icon: {
-                                Image(systemName: "bell")
-                            }
-                        }
-                        .symbolRenderingMode(.monochrome)
-                        .accessibilityIdentifier(DemoAccessibility.reminders)
+                    ToolbarItem(placement: hostItemPlacement) {
                         Button {
                             showsSettings = true
                         } label: {
@@ -64,13 +53,13 @@ struct DemoAssistantView: View {
                             }
                         }
                         .symbolRenderingMode(.monochrome)
+                        .accessibilityIdentifier(DemoAccessibility.settings)
                     }
                 }
-                .sheet(isPresented: $showsReminders) {
-                    DemoReminderSheet(list: ask.domain.reminders)
-                }
                 .sheet(isPresented: $showsSettings) {
-                    DemoSettings(ask: ask)
+                    DemoSettings(ask: ask) {
+                        DemoReminderSection(list: ask.domain.reminders)
+                    }
                 }
         }
         .onOpenURL { ask.open($0) }
@@ -83,41 +72,33 @@ struct DemoAssistantView: View {
     }
 }
 
-/// The reminders added this launch: what a confirmed card did, where a
-/// host's own screen would show it.
-struct DemoReminderSheet: View {
+/// The reminders added this launch, as the settings card's Reminders section
+/// lists them: what a confirmed card did, where a host's own screen would
+/// show it.
+struct DemoReminderSection: View {
     let list: DemoReminderList
 
-    @Environment(\.dismiss) private var dismiss
-
     var body: some View {
-        NavigationStack {
-            List {
-                if list.reminders.isEmpty {
-                    Text(verbatim: "None yet. Ask to be reminded of something, and add it with the card under the answer.")
-                        .askDeemphasizedText()
-                } else {
-                    ForEach(list.reminders) { reminder in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(verbatim: reminder.text)
-                            if let when = reminder.when {
-                                Text(verbatim: when)
-                                    .font(.footnote)
-                                    .askDeemphasizedText()
-                            }
+        Section {
+            if list.reminders.isEmpty {
+                Text(verbatim: "None yet. Ask to be reminded of something, and add it with the card under the answer.")
+                    .askDeemphasizedText()
+            } else {
+                ForEach(list.reminders) { reminder in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: reminder.text)
+                        if let when = reminder.when {
+                            Text(verbatim: when)
+                                .font(.footnote)
+                                .askDeemphasizedText()
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier(DemoAccessibility.reminder)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(DemoAccessibility.reminder)
                 }
             }
-            .navigationTitle(Text(verbatim: "Reminders"))
-            .toolbar {
-                // The system's close button, as `DemoRowDetail` says.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .close) { dismiss() }
-                }
-            }
+        } header: {
+            Text(verbatim: "Reminders")
         }
     }
 }

@@ -1273,9 +1273,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(outcome.waitForExistence(timeout: uiTimeout), "The card says what came of it.")
         XCTAssertEqual(outcome.label, "Reminder added: water the plants, at 6 PM.", "In the app's words.")
 
-        app.buttons[DemoAccessibility.reminders].tap()
+        app.buttons[DemoAccessibility.settings].tap()
         let reminder = element(DemoAccessibility.reminder, in: app)
-        XCTAssertTrue(reminder.waitForExistence(timeout: uiTimeout), "The app has the reminder.")
+        XCTAssertTrue(reminder.waitForExistence(timeout: uiTimeout), "The settings card lists the reminder.")
         XCTAssertTrue(reminder.label.contains("water the plants"), "The one the card offered.")
     }
 
@@ -1321,13 +1321,10 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         starters.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(question(libraryQuestion, in: app).waitForExistence(timeout: uiTimeout))
         XCTAssertTrue(element(Ids.answer, in: app).waitForExistence(timeout: turnTimeout))
-        XCTAssertFalse(app.buttons[DemoAccessibility.reminders].exists, "The library has no Reminders item.")
+        XCTAssertEqual(app.buttons[DemoAccessibility.domainMenu].label, DemoDomainChoice.library.name, "The library is on screen.")
 
         switchDomain(to: .assistant, in: app)
-        XCTAssertTrue(
-            app.buttons[DemoAccessibility.reminders].waitForExistence(timeout: uiTimeout),
-            "The assistant is on screen, with its own bar item."
-        )
+        wait(app.buttons[DemoAccessibility.domainMenu], label: DemoDomainChoice.assistant.name)
         XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout), "On a thread of its own, at its first screen.")
         let assistantQuestion = starters.buttons.element(boundBy: 0).label
         XCTAssertNotEqual(assistantQuestion, libraryQuestion, "Its own starters.")
@@ -1341,7 +1338,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             "The library's thread is as it was left."
         )
         XCTAssertFalse(question(assistantQuestion, in: app).exists, "And holds nothing the assistant was asked.")
-        XCTAssertFalse(app.buttons[DemoAccessibility.reminders].exists)
+        XCTAssertEqual(app.buttons[DemoAccessibility.domainMenu].label, DemoDomainChoice.library.name, "The switch names the library.")
 
         switchDomain(to: .assistant, in: app)
         XCTAssertTrue(

@@ -29,7 +29,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   on the Mac a pop-up in the toolbar and the View menu (⌘1 and ⌘2). The demo opens on the domain it was
   left on, the library the first time. Each domain keeps its own thread and chats, both engines share
   one model seam, and a switch keeps the other domain's turn going. `-askAssistant` still opens on the
-  assistant. The assistant's title is "Assistant". No API changes.
+  assistant. No API changes.
+- **The assistant's bar holds the settings and the domain switch, as the library's does**, with its
+  title centred. The bell that listed the reminders the reader added is gone: they are a Reminders
+  section of the settings card. "Ask the Assistant" is the assistant's title again, measured centred
+  and whole on an iPhone 18 Pro both at rest and while typing. docs/DEMO-PROJECT.md gives the recipes
+  for imaging the iPhone screen and the Apple Vision Pro window, beside the Mac window's. No API changes.
 
 ### Fixed
 
