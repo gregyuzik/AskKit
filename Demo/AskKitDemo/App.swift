@@ -398,8 +398,9 @@ struct ContentView: View {
     /// iPhone with the caption at its longest, one item and Done centre the
     /// subtitle to within a point, three leave it 12pt right of centre, and
     /// with the chats beside New Chat the title and its caption leave the bar
-    /// altogether. The assistant's screen, whose Reminders makes three at
-    /// rest, has its title right of centre at rest.
+    /// altogether. The assistant's screen holds the same two at rest, and its
+    /// longer title, "Ask the Assistant", centres on them too (measured on an
+    /// iPhone 18 Pro, `DemoAssistantDomain.brand`).
     private var settingsPlacement: ToolbarItemPlacement {
         #if os(macOS)
         .secondaryAction
@@ -513,6 +514,7 @@ struct ContentView: View {
                         }
                     }
                     .symbolRenderingMode(.monochrome)
+                    .accessibilityIdentifier(DemoAccessibility.settings)
                 }
             }
             .sheet(isPresented: $showsSettings) {
@@ -695,10 +697,18 @@ struct DemoRowPage: View {
 /// "isn't enabled in this build" here, and its other states only in a host that
 /// holds one. That is the honest answer, and the reason the card takes its
 /// state from the seam's mirror rather than probing for itself.
-struct DemoSettings<Domain: AskDomain>: View {
+struct DemoSettings<Domain: AskDomain, Extra: View>: View {
     let ask: DemoAsk<Domain>
+    /// The host's own sections, below the Ask's card: the assistant's
+    /// Reminders (`DemoReminderSection`). Nothing on the library.
+    let extra: Extra
 
     @Environment(\.dismiss) private var dismiss
+
+    init(ask: DemoAsk<Domain>, @ViewBuilder extra: () -> Extra) {
+        self.ask = ask
+        self.extra = extra()
+    }
 
     var body: some View {
         NavigationStack {
@@ -708,6 +718,7 @@ struct DemoSettings<Domain: AskDomain>: View {
                 } header: {
                     Text(verbatim: "Ask")
                 }
+                extra
             }
             .navigationTitle(Text(verbatim: "Settings"))
             .toolbar {
@@ -718,6 +729,13 @@ struct DemoSettings<Domain: AskDomain>: View {
             }
             .task { await ask.seam.refreshStatus() }
         }
+    }
+}
+
+extension DemoSettings where Extra == EmptyView {
+    /// The settings card with nothing of the host's own below it.
+    init(ask: DemoAsk<Domain>) {
+        self.init(ask: ask) { EmptyView() }
     }
 }
 

@@ -22,8 +22,9 @@ import SwiftUI
 /// `AskScreen` adds Done to the bar's leading side while the reader types,
 /// and with the switch there too the side holds three items: on an iPhone
 /// 18 Pro with New Chat and the chats opposite, the library's title and the
-/// tier caption under it left the bar altogether, and the assistant's,
-/// beside Reminders as well, came down to "…" and "O…". So the switch is the
+/// tier caption under it left the bar altogether. Four (the assistant's, when
+/// it had a Reminders item beside the switch as well) left it "…" and "O…".
+/// So the switch is the
 /// last of the demo's host items, and goes while the software keyboard is
 /// up: Done lands where it stood, nothing else moves, and the bar while
 /// typing is the one it was before the switch. The signal is the keyboard's
