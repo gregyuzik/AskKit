@@ -12,7 +12,8 @@ AskKit is at 0.x, and fixes land in the newest minor version only.
 
 | Version | Supported |
 | --- | --- |
-| 0.3 | Yes |
+| 0.4 | Yes |
+| 0.3 | No |
 | 0.2 | No |
 | 0.1 | No |
 
