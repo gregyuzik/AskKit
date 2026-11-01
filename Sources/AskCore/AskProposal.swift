@@ -114,13 +114,14 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// marked as opened."), whatever a receipt says in general terms, and it
     /// repeats a receipt that opens with that sentence negated. Measured on
     /// macOS 27.2 (2026-11-01): Kabynyt's `edit_item`, "Mark Jaws as opened."
-    /// and "Lend Jaws to Sam.", said the change was made in 0 of 16 answers
-    /// with a card, 14 of them pointing at it, where `modelReceipt` let 13 of
-    /// 17 say it; the demo's reminder, given "No reminder to water the plants
-    /// is set yet.", in at most 1 of 16, all 16 pointing at the card, where
-    /// `modelReceipt` let 15 of 16 say it. Eleven receipts built without the
-    /// host's sentence, the proposal's title and button among them, left
-    /// Kabynyt's at 8 of 8 and the demo's at 9 of 16 or more.
+    /// and "Lend Jaws to Sam.", said the change was made in none of 20
+    /// answers with a card, 17 of them pointing at it, where `modelReceipt`
+    /// let 12 of 17 say it; the demo's reminder, given "No reminder to water
+    /// the plants at 6 PM is set yet.", in none of 20, every one pointing at
+    /// the card, where `modelReceipt` let 15 of 16 say it. Eleven receipts
+    /// without the host's sentence, seven general wordings and four built
+    /// from the proposal's title and button, left Kabynyt's at 8 of 8 each
+    /// and the demo's at 9 of 16 or more.
     ///
     /// **The answer repeats it, so write it to the person asking.** Name the
     /// thing as the app does and say what isn't so yet, never "the user" or

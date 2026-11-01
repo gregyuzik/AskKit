@@ -137,8 +137,9 @@ nonisolated struct DemoReminderArguments: Sendable {
 /// **Its receipt says no reminder is set, in so many words.** With the
 /// generic `AskProposal.modelReceipt`, the answer said the reminder was made
 /// ("You'll be reminded to water the plants at 6 PM.") 15 times in 16;
-/// opening with "No reminder to water the plants is set yet.", at most once
-/// in 16, every answer pointing at the card (macOS 27.2, 2026-11-01).
+/// opening with "No reminder to water the plants at 6 PM is set yet.", none
+/// of 20 times through the engine, every answer pointing at the card (macOS
+/// 27.2, 2026-11-01).
 nonisolated struct DemoReminderTool: Tool {
     let name = "propose_reminder"
     let description = "Set a reminder for the user, which they confirm on a card under your answer. Call it whenever they ask to be reminded of something."

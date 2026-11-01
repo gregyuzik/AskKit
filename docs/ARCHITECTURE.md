@@ -637,15 +637,18 @@ row. A widget that reads the chats from an App Group folder decodes `threads/<id
 ### Proposals
 
 A tool may offer to do something rather than just read (`AskProposal`): the model proposes, the reader
-confirms, the app performs. The tool records the proposal with the collector and returns
-`AskProposal.modelReceipt`, which tells the model nothing has happened yet. The answer carries it to a
-card under it, in the host's words, never the model's words about it: written from the row it acts on,
-or, with no row behind it, such as a reminder, showing what it will keep as it will keep it, the model's
-reading of the request clamped inside the host's own words. The button's label is the host's alone. Only
-the reader's tap reaches `AskDomain.perform(_:)`. A `.handOff` proposal opens the host's own editor
-instead, through the `askDraftOpener` environment value, an `AskDraftOpenAction` over the host's
-`AskDraftRouter`: its tool returns `AskProposal.handOffReceipt`, `perform` is never called, and with no
-opener the card's action is disabled. (A hand-off has nothing to do with the hand-down between tiers.) A
+confirms, the app performs. The tool records the proposal with the collector and returns its receipt,
+`modelReceipt(notYet:)`, which tells the model nothing has happened yet: it opens with the host's own
+sentence saying so ("Jaws is not marked as opened yet."), since the on-device model repeats that and
+otherwise echoes the request as done, and then names the card's button. `AskProposal.modelReceipt` is
+the receipt for a tool with no sentence of its own. The answer carries the proposal to a card under it,
+in the host's words, never the model's words about it: written from the row it acts on, or, with no row
+behind it, such as a reminder, showing what it will keep as it will keep it, the model's reading of the
+request clamped inside the host's own words. The button's label is the host's alone. Only the reader's
+tap reaches `AskDomain.perform(_:)`. A `.handOff` proposal opens the host's own editor instead, through
+the `askDraftOpener` environment value, an `AskDraftOpenAction` over the host's `AskDraftRouter`: its
+receipt says confirming opens a form (`AskProposal.handOffReceipt` for a tool with no sentence), `perform`
+is never called, and with no opener the card's action is disabled. (A hand-off has nothing to do with the hand-down between tiers.) A
 standalone turn has no card to confirm on, so a domain leaves proposing tools out of it.
 
 A proposal is carried out at most once for each yes. The reader's yes is saved with the turn
