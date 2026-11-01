@@ -533,10 +533,10 @@ public struct AskComposer: View {
 /// whole (`accessibilityHint`). Only a draft grows the capsule.
 ///
 /// **Where the draft's first line will be** (`AskComposerHintLayout`): on the
-/// field's first baseline where the field reports one, and at its top where
-/// it reports none, as UIKit's empty field doesn't. Set on what that field
-/// reports instead, the hint drew a line above the field's on iOS and
-/// visionOS, and held the empty capsule two lines tall.
+/// field's first baseline where the field reports one, and where its first
+/// line will be where it reports none, as UIKit's empty field doesn't. Set on
+/// what that field reports instead, the hint drew a line above the field's on
+/// iOS and visionOS, and held the empty capsule two lines tall.
 struct AskComposerFieldStack<Field: View>: View {
     /// The host's hint, or nil once the draft has anything in it.
     let placeholder: String?
@@ -589,17 +589,21 @@ struct AskComposerFieldStack<Field: View>: View {
 /// would leave it above the text (`AskComposerPlaceholderTests`, with a
 /// stand-in padded 10 pt).
 ///
-/// **At the field's top where it reports none.** UIKit's text field, empty,
-/// reports its first baseline at its top, 2.2 × 10⁻³⁰⁸ pt down
-/// (`CGFloat.leastNormalMagnitude`), and its last at its bottom; with a
-/// word in it, 16.33 pt down a 22 pt line, where one line of the hint has
-/// its baseline 16.33 pt down too (measured on the iOS 27.2 simulator,
-/// `AskComposerUIKitFieldTests`). Set on the empty field's report, as a
-/// `ZStack` aligned on `.firstTextBaseline` set it from 0.3.0, the hint
-/// drew a line above the field's and the stack was 38.33 pt tall, not 22.
-/// Its top, not its centre: centred, the hint sat 0.83 pt under the
-/// draft's line. The Mac's field reports its baseline empty or not, 13 pt
-/// down a 16 pt line, as the hint's is, so there the two agree.
+/// **At the field's first line where it reports none**, which is UIKit's
+/// empty field, on iOS and visionOS: it reports its first baseline at its
+/// top, 2.2 × 10⁻³⁰⁸ pt down (`CGFloat.leastNormalMagnitude`), and its last
+/// at its bottom. Set on that, as a `ZStack` aligned on `.firstTextBaseline`
+/// set it from 0.3.0, the hint drew a line above the field's, and the stack
+/// was 38.33 pt tall on an iPhone, not 22 (`AskComposerUIKitFieldTests`).
+/// The hint goes down the field by `unreportedLineInset`, where a word typed
+/// into the field puts its baseline. On the iOS 27.2 simulator that is the
+/// top: the baseline is 16.33 pt down a 22 pt line, and one line of the hint
+/// has its own 16.33 pt down. On visionOS 27.2 it is 2 pt down: the field's
+/// baseline is 18 pt down a 26 pt line, the hint's 16 pt, and 15.5 and 13.5
+/// at the smallest text size, 34.5 and 32.5 at the largest. Centred instead,
+/// the hint sat 0.83 pt under the draft's line on an iPhone. The Mac's field
+/// reports its baseline, empty or not, 13 pt down a 16 pt line, as the
+/// hint's is.
 ///
 /// **As wide as it is offered**, as the hint's `maxWidth: .infinity` made
 /// the `ZStack` before it, so the hint has the field's whole width to end in
@@ -633,8 +637,17 @@ nonisolated struct AskComposerHintLayout: Layout {
         }
     }
 
+    /// How far down its frame UIKit's text field sets its first line, for a
+    /// field that reports no baseline: none on iOS, and 2 pt on visionOS, at
+    /// every text size measured (the type's doc).
+    #if os(visionOS)
+    static let unreportedLineInset: CGFloat = 2
+    #else
+    static let unreportedLineInset: CGFloat = 0
+    #endif
+
     /// How far below the field's top the hint goes: down to the field's first
-    /// baseline, less the hint's own, or none where the field reports no
+    /// baseline, less the hint's own, or `inset` where the field reports no
     /// baseline.
     ///
     /// **A baseline less than a point below the top, or at or past the
@@ -642,8 +655,11 @@ nonisolated struct AskComposerHintLayout: Layout {
     /// `CGFloat`, and a view with no text in it reports its bottom: no line of
     /// text has its baseline within a point of its top, or on its bottom edge,
     /// with nothing of its descenders below.
-    static func hintTop(hintBaseline: CGFloat, fieldBaseline: CGFloat, fieldHeight: CGFloat) -> CGFloat {
-        guard fieldBaseline >= 1, fieldBaseline < fieldHeight else { return 0 }
+    static func hintTop(
+        hintBaseline: CGFloat, fieldBaseline: CGFloat, fieldHeight: CGFloat,
+        inset: CGFloat = unreportedLineInset
+    ) -> CGFloat {
+        guard fieldBaseline >= 1, fieldBaseline < fieldHeight else { return inset }
         return fieldBaseline - hintBaseline
     }
 }

@@ -272,14 +272,24 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
 /// Where the hint goes over the field (`AskComposerHintLayout.hintTop`), on
 /// the numbers each platform's field reports.
 @Suite(.timeLimit(.minutes(1))) struct AskComposerHintLayoutTests {
-    /// UIKit's field reports its first baseline at its top while empty, and
-    /// with a word in it 16.33 pt down a 22 pt line, as one line of the hint
-    /// has its own: the hint goes at the field's top either way, where the
-    /// draft's first baseline will be.
+    /// UIKit's field on iOS reports its first baseline at its top while
+    /// empty, and with a word in it 16.33 pt down a 22 pt line, as one line
+    /// of the hint has its own: the hint goes at the field's top either way,
+    /// where the draft's first baseline will be.
     @Test func onIOSTheHintGoesAtTheFieldsTop() {
         let hint: CGFloat = 49.0 / 3
-        #expect(AskComposerHintLayout.hintTop(hintBaseline: hint, fieldBaseline: .leastNormalMagnitude, fieldHeight: 22) == 0)
+        #expect(AskComposerHintLayout.hintTop(hintBaseline: hint, fieldBaseline: .leastNormalMagnitude, fieldHeight: 22, inset: 0) == 0)
         #expect(AskComposerHintLayout.hintTop(hintBaseline: hint, fieldBaseline: hint, fieldHeight: 22) == 0)
+    }
+
+    /// UIKit's field on visionOS reports its first baseline at its top while
+    /// empty, and with a word in it 18 pt down a 26 pt line, where the hint's
+    /// is 16: the hint goes 2 pt down, where the draft's will be.
+    @Test func onVisionOSTheHintGoesWhereTheDraftsLineWillBe() {
+        let empty = AskComposerHintLayout.hintTop(hintBaseline: 16, fieldBaseline: .leastNormalMagnitude, fieldHeight: 26, inset: 2)
+        let typed = AskComposerHintLayout.hintTop(hintBaseline: 16, fieldBaseline: 18, fieldHeight: 26)
+        #expect(empty == 2)
+        #expect(empty == typed)
     }
 
     /// The Mac's field reports its baseline 13 pt down a 16 pt line, empty
@@ -295,10 +305,11 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
     }
 
     /// A baseline within a point of the field's top, or on its bottom edge,
-    /// is none, and the hint goes at the top.
+    /// is none, and the hint goes down by the inset.
     @Test func aBaselineAtAnEdgeIsNone() {
         for reported: CGFloat in [-4, 0, .leastNormalMagnitude, 0.5, 16, 20] {
-            #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: reported, fieldHeight: 16) == 0)
+            #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: reported, fieldHeight: 16, inset: 0) == 0)
+            #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: reported, fieldHeight: 16, inset: 2) == 2)
         }
     }
 }

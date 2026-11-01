@@ -44,8 +44,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   UIKit's text field, empty, reports that baseline at its top, so the hint sat a whole line above the
   field's, and the capsule was 64 points tall on an iPhone where one line is 48. 0.3.1's one-line hint
   didn't cure it. The hint now goes on the field's first baseline where the field reports one, as the
-  Mac's does, and at its top where it reports none (`AskComposerHintLayout`). The Mac was never
-  affected. No API changes.
+  Mac's does, and where a typed line's baseline would be where it reports none
+  (`AskComposerHintLayout`). The Mac was never affected. No API changes.
 - A question's menu (Copy, Copy answer, Edit & Resend and Ask again) opens from anywhere on the
   question. Its words were selectable, and the selection competed for the same press: on the Mac the
   text took a right-click or a Control-click for its own menu of Cut, Copy, Paste and Font, so only

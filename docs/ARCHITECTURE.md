@@ -864,9 +864,10 @@ the host's accent, growing from one to four lines as the draft does. The host's 
 ending in an ellipsis when it is longer than the field is wide, so an empty field is always one line
 tall; VoiceOver reads the hint whole. The hint sits where the draft's first line will be
 (`AskComposerHintLayout`): on the field's first baseline where the field reports one, as the Mac's
-does, and at the field's top where it reports none, as UIKit's empty field on iOS and visionOS
-doesn't. Set on what that field reports, its top, the hint drew a line above the field's and held the
-empty capsule two lines tall, from 0.3.0 to 0.3.1. As it
+does, and where a typed line's baseline would be where it reports none, as UIKit's empty field on iOS
+and visionOS doesn't: at the field's top on iOS, and 2 pt down it on visionOS. Set on what that field
+reports, its top, the hint drew a line above the field's and held the empty capsule two lines tall,
+from 0.3.0 to 0.3.1. As it
 grows its corners keep the radius they have at one line, centred on the circles at the bottom of the row,
 so the circles stay as far inside the edge at four lines as at one: a capsule four lines tall, with ends
 57 pt round, ran them out over its rim.
