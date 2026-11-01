@@ -419,10 +419,15 @@ nonisolated struct DemoDomain: AskDomain {
         return "Marked \(row.displayTitle) as lent."
     }
 
+    /// The folder under Application Support that AskKit keeps the library's
+    /// chats in (`AskBrand.appDirectory`), named once so `DemoHost` can empty
+    /// it under `DemoLaunchArgument.freshHistory`.
+    static let appDirectory = "AskKitDemo"
+
     var brand: AskBrand {
         AskBrand(
             title: "Ask the Demo",
-            appDirectory: "AskKitDemo",
+            appDirectory: Self.appDirectory,
             logSubsystem: "com.example.askkitdemo",
             help: "Ask about your things",
             firstScreenHeadline: "Ask about your things",

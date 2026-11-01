@@ -16,16 +16,23 @@ import Foundation
 /// into all three, added there in Xcode.
 nonisolated enum DemoLaunchArgument {
     /// Start with an empty thread: `AskPersistence.perLaunch` instead of
-    /// `.thread`, so nothing is restored and nothing is saved.
+    /// `.thread`, so nothing is restored and nothing is saved. In either
+    /// domain, and the domain switched to isn't remembered either: the launch
+    /// opens on the library, or on the assistant under `assistant`, whatever
+    /// an earlier launch was left on (`DemoHost.atLaunch()`).
     ///
     /// A persisted thread and a UI-test suite do not mix — "the first screen
     /// shows three chips" passes alone and fails after any test that left a
-    /// turn on disk.
+    /// turn on disk — and nor does a remembered domain: a test that switched
+    /// would open every test after it on the assistant.
     static let resetThread = "-askResetThread"
 
     /// Keep chats (`.thread`), but start with none: the chat on disk, every
     /// earlier one, any thread set aside because it couldn't be read and the
-    /// feedback attachments are deleted before the store reads them.
+    /// feedback attachments are deleted before the store reads them, in both
+    /// domains' folders, once, at launch. The domain the demo was left on is
+    /// forgotten too, so the launch opens on the library (or the assistant
+    /// under `assistant`), and a switch from there is remembered as usual.
     ///
     /// For the history test, which needs a domain that keeps its chats and a
     /// list holding only what the test filed itself. Read in Debug builds
@@ -119,18 +126,21 @@ nonisolated enum DemoLaunchArgument {
     /// reason outranks an empty library (`AskStage`).
     static let emptyLibrary = "-askEmptyLibrary"
 
-    /// Host the assistant (`DemoAssistantDomain`) in place of the library: a
-    /// domain without rows, which converts units with one tool, proposes
-    /// reminders with another, and answers from the model alone when neither
-    /// applies. Its answers carry no tiles, and the line under each says what
-    /// it stood on: the assistant's own words where a tool grounded it, and
-    /// AskKit's "Not from this app's data" where nothing did.
+    /// Open on the assistant (`DemoAssistantDomain`) rather than on the
+    /// domain the demo was left on: a domain without rows, which converts
+    /// units with one tool, proposes reminders with another, and answers from
+    /// the model alone when neither applies. Its answers carry no tiles, and
+    /// the line under each says what it stood on: the assistant's own words
+    /// where a tool grounded it, and AskKit's "Not from this app's data"
+    /// where nothing did.
     ///
-    /// Only one Ask is built, the one this picks, since a process has one
-    /// model seam. `resetThread`, `freshHistory`, `scriptedAnswer`, `prefill`
-    /// and `fold` work with it as they do with the library; `photos`, `tabs`,
+    /// The reader reaches it without the flag too, from the demo's switch
+    /// (`DemoDomainSwitch`); the flag is for tests and scripts, which need
+    /// to know where a launch opens. The library is still a switch away.
+    /// `resetThread`, `freshHistory`, `scriptedAnswer`, `prefill` and `fold`
+    /// work with the assistant as they do with the library; `photos`, `tabs`,
     /// `slot`, `push` and `emptyLibrary`, which are about the library's
-    /// screen, do nothing.
+    /// screen, do nothing there.
     static let assistant = "-askAssistant"
 
     /// Show no tips: `Tips.hideAllTipsForTesting()` before TipKit starts
@@ -190,6 +200,40 @@ nonisolated enum DemoAssistantWords {
     static let fromItsTools = "From this app's tools"
 }
 
+/// The demo's two domains, as the reader switches between them
+/// (`DemoDomainSwitch`), named there for what each is asked about. Declared
+/// once for the reason `DemoLaunchArgument` is: the UI test picks them by
+/// name.
+nonisolated enum DemoDomainChoice: String, CaseIterable, Sendable {
+    /// The library: thirty made-up things behind one search (`DemoDomain`).
+    case library
+    /// The assistant, with no rows of its own (`DemoAssistantDomain`).
+    case assistant
+
+    /// The name in the menu. "Your Things" for the library, after the first
+    /// screen's "Ask about your things", and not "Library", which is the
+    /// second tab's name under `DemoLaunchArgument.tabs`: two places with
+    /// one name would read as one. "Assistant" for the assistant, which is
+    /// its title too (`DemoAssistantDomain.brand`).
+    var name: String {
+        switch self {
+        case .library: "Your Things"
+        case .assistant: "Assistant"
+        }
+    }
+
+    /// The symbol beside the name.
+    var systemImage: String {
+        switch self {
+        case .library: "books.vertical"
+        case .assistant: "sparkles"
+        }
+    }
+
+    /// Where the choice is kept between launches (`DemoHost.atLaunch()`).
+    static let defaultsKey = "demo.domain"
+}
+
 /// Identifiers the demo's own views carry — the ones outside `AskAccessibility`,
 /// which is AskUI's namespace and not the host's to add to.
 nonisolated enum DemoAccessibility {
@@ -200,6 +244,9 @@ nonisolated enum DemoAccessibility {
     static let spanCard = "demo.spanCard"
     /// The host's own accessory the demo puts in the slot on its Library tab.
     static let glance = "demo.glance"
+    /// The bar's menu that switches domains on iOS and iPadOS, and the
+    /// toolbar's pop-up that does on the Mac (`DemoDomainSwitch`).
+    static let domainMenu = "demo.domainMenu"
     /// The assistant's toolbar button that lists the reminders added.
     static let reminders = "demo.reminders"
     /// One reminder in that list.

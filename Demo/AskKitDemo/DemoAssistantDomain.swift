@@ -171,8 +171,9 @@ nonisolated extension DemoReminder {
 /// search arguments `AskNoSearchArguments`, and it leaves `overview()` and
 /// `search(_:context:)` to their defaults. It answers from the model alone,
 /// converts with one tool and proposes reminders with another: what a host
-/// with tools and actions, and no library, writes. `-askAssistant` shows it
-/// in place of the library (`DemoDomain`).
+/// with tools and actions, and no library, writes. The demo hosts it beside
+/// the library (`DemoDomain`), a switch away (`DemoDomainSwitch`), and
+/// `-askAssistant` opens on it.
 ///
 /// Its copy is English literals, as `DemoDomain`'s is: the demo carries no
 /// catalog.
@@ -200,15 +201,28 @@ nonisolated struct DemoAssistantDomain: AskDomain {
         CommandLine.arguments.contains(DemoLaunchArgument.resetThread) ? .perLaunch : .thread
     }
 
-    /// The thread is kept in a folder of its own: a thread the library wrote
-    /// holds `DemoRow`s, which an `AskNoRow` thread can't read, and would be
-    /// set aside as unreadable. No nothing-to-ask copy: there is nothing to
-    /// own, so the first screen is the ready one whatever the overview
-    /// counts.
+    /// The folder the assistant's chats are kept in, named once for the
+    /// reason `DemoDomain.appDirectory` is.
+    ///
+    /// **A folder of its own:** a thread the library wrote holds `DemoRow`s,
+    /// which an `AskNoRow` thread can't read, and would be set aside as
+    /// unreadable. And each domain's store is alive over its own thread, which
+    /// one folder for both would make two stores over one (`DemoHost`).
+    static let appDirectory = "AskKitDemoAssistant"
+
+    /// No nothing-to-ask copy: there is nothing to own, so the first screen is
+    /// the ready one whatever the overview counts.
+    ///
+    /// **"Assistant", where README's sample says "Ask the Assistant".** The
+    /// title names the domain on screen by the name the switch gives it
+    /// (`DemoDomainSwitch`). And on an iPhone 18 Pro the switch is a third
+    /// item on the bar's leading side, beside Reminders and the settings:
+    /// between those and New Chat with the chats, "Ask the Assistant" doesn't
+    /// fit.
     var brand: AskBrand {
         AskBrand(
-            title: "Ask the Assistant",
-            appDirectory: "AskKitDemoAssistant",
+            title: "Assistant",
+            appDirectory: Self.appDirectory,
             logSubsystem: "com.example.askkitdemo",
             help: "Ask anything",
             firstScreenHeadline: "Ask anything",

@@ -53,9 +53,13 @@ struct AskKitDemoApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                switch host {
-                case .library(let ask): ContentView(ask: ask)
-                case .assistant(let ask): DemoAssistantView(ask: ask)
+                // The domain the reader picked (`DemoDomainSwitch`). Every
+                // window shows the one host, so on the Mac a switch in one
+                // window switches them all, as every window already shows
+                // the one store's draft.
+                switch host.screen {
+                case .library(let ask): ContentView(ask: ask, host: host)
+                case .assistant(let ask): DemoAssistantView(ask: ask, host: host)
                 }
             }
             // A fold the simulator doesn't have, when the launch asks for
@@ -75,8 +79,10 @@ struct AskKitDemoApp: App {
         #if os(macOS)
         // `hasTurns`, never `!turns.isEmpty`: this is the scene's body, and a
         // read of `turns` here runs it again for every word an answer streams.
+        // Both read the domain on screen, so New Chat follows a switch.
         .commands {
             AskCommands(isEnabled: host.hasTurns) { host.startOver() }
+            DemoDomainCommands(host: host)
         }
         #endif
     }
@@ -94,87 +100,181 @@ struct AskKitDemoApp: App {
     }
 }
 
-/// Which Ask the demo hosts, picked once at launch: the library
-/// (`DemoDomain`), or the assistant under `DemoLaunchArgument.assistant`
-/// (`DemoAssistantDomain`).
-///
-/// **Only the one picked is built.** A process has one model seam, and a
-/// second `AppleModelSeam` alive is logged as a fault; building an Ask also
-/// reads its folder, and under `-askFreshHistory` empties it. The store,
-/// the engine and the screen are each generic over their domain, so the
-/// pick is made here, at the root, and each case carries its own.
+/// The Ask on screen, of the demo's two: the library (`DemoDomain`) or the
+/// assistant (`DemoAssistantDomain`). The store, the engine and the screen
+/// are each generic over their domain, so the root switches on this, and
+/// each case carries its own.
 @MainActor
-enum DemoHost {
+enum DemoScreen {
     case library(DemoAsk<DemoDomain>)
     case assistant(DemoAsk<DemoAssistantDomain>)
 
-    static func atLaunch() -> DemoHost {
-        CommandLine.arguments.contains(DemoLaunchArgument.assistant)
-            ? .assistant(DemoAsk())
-            : .library(DemoAsk())
+    var choice: DemoDomainChoice {
+        switch self {
+        case .library: .library
+        case .assistant: .assistant
+        }
+    }
+}
+
+/// The demo's two Asks, one on screen at a time, and the one model seam they
+/// share. The reader switches between them (`DemoDomainSwitch`), and the
+/// demo opens where they left it.
+///
+/// **One seam, shared.** A process has one model seam, and a second
+/// `AppleModelSeam` alive is logged as a fault (`AskModelSeam`, "One per
+/// process, not one per Ask"): two would run two cooldowns and two quota
+/// holds against one Private Cloud Compute. An engine takes any seam, and
+/// none of a seam's facts are a domain's, so both engines are built on this
+/// one, as the settings card's evaluation builds its own engine on the
+/// thread's seam (`DemoAsk.runEval()`).
+///
+/// **Each Ask built once, the first time it is shown, and kept.** A store
+/// is one per thread, not one per app (`AskConversationStore`), and the two
+/// domains keep their threads in folders of their own, so both stores alive
+/// is no misuse. Kept, a switch back finds its thread as it was left, a turn
+/// still in flight included, and the assistant's reminders last the launch.
+/// Torn down, the turn would go with its engine, and the thread would be
+/// read from disk again on every switch. Built in `show(_:)`, never in a
+/// view's body, which may not change the state it reads.
+@MainActor
+@Observable
+final class DemoHost {
+    /// The Ask on screen.
+    private(set) var screen: DemoScreen
+
+    /// The seam both engines are built on.
+    @ObservationIgnored let seam: AppleModelSeam
+
+    @ObservationIgnored private var library: DemoAsk<DemoDomain>?
+    @ObservationIgnored private var assistant: DemoAsk<DemoAssistantDomain>?
+
+    /// Whether a switch is kept for the next launch: false under
+    /// `DemoLaunchArgument.resetThread`, which saves nothing.
+    @ObservationIgnored private let remembersChoice: Bool
+
+    /// `DemoLaunchArgument.prefill`'s link, until a screen takes it
+    /// (`takeLaunchLink()`).
+    @ObservationIgnored private var launchLink: URL?
+
+    /// - Parameters:
+    ///   - choice: the domain to open on.
+    ///   - remembersChoice: whether a switch is kept for the next launch.
+    ///   - launchLink: an Ask link for the first screen to open.
+    init(opening choice: DemoDomainChoice, remembersChoice: Bool, launchLink: URL? = nil) {
+        // Undeclared: the demo's entitlements carry no Private Cloud Compute,
+        // and a request from a process without it is a fatal trap.
+        let seam = AppleModelSeam.make(privateCloudCompute: .undeclared)
+        self.seam = seam
+        self.remembersChoice = remembersChoice
+        self.launchLink = launchLink
+        switch choice {
+        case .library:
+            let ask = DemoAsk<DemoDomain>(seam: seam)
+            library = ask
+            screen = .library(ask)
+        case .assistant:
+            let ask = DemoAsk<DemoAssistantDomain>(seam: seam)
+            assistant = ask
+            screen = .assistant(ask)
+        }
     }
 
-    /// For the Mac's New Chat command (`AskCommands`), whichever Ask it is.
+    /// The host as this launch asks for it.
+    ///
+    /// **Where it opens:** on the assistant under
+    /// `DemoLaunchArgument.assistant`, and otherwise on the domain the reader
+    /// last switched to, or the library on a first launch. Under
+    /// `DemoLaunchArgument.resetThread` nothing earlier is read and no switch
+    /// is kept, and under `DemoLaunchArgument.freshHistory` the domain kept
+    /// is forgotten with the chats: a UI test knows where every launch opens,
+    /// whichever test switched before it.
+    static func atLaunch() -> DemoHost {
+        let arguments = CommandLine.arguments
+        let defaults = UserDefaults.standard
+        #if DEBUG
+        if arguments.contains(DemoLaunchArgument.freshHistory) {
+            // Both folders, once, at launch, before either store exists to
+            // read one: not when a domain is first shown, so a switch never
+            // empties anything.
+            forgetEveryChat(appDirectory: DemoDomain.appDirectory)
+            forgetEveryChat(appDirectory: DemoAssistantDomain.appDirectory)
+            defaults.removeObject(forKey: DemoDomainChoice.defaultsKey)
+        }
+        #endif
+        let remembersChoice = !arguments.contains(DemoLaunchArgument.resetThread)
+        let remembered = remembersChoice
+            ? defaults.string(forKey: DemoDomainChoice.defaultsKey).flatMap(DemoDomainChoice.init(rawValue:))
+            : nil
+        let choice = arguments.contains(DemoLaunchArgument.assistant) ? .assistant : remembered ?? .library
+        let launchLink = DemoLaunchArgument.value(after: DemoLaunchArgument.prefill).flatMap { URL(string: $0) }
+        return DemoHost(opening: choice, remembersChoice: remembersChoice, launchLink: launchLink)
+    }
+
+    /// The domain on screen, as the switch binds it.
+    var choice: DemoDomainChoice {
+        get { screen.choice }
+        set { show(newValue) }
+    }
+
+    /// Put `choice`'s Ask on screen, building it the first time, and keep the
+    /// choice for the next launch.
+    func show(_ choice: DemoDomainChoice) {
+        guard choice != screen.choice else { return }
+        switch choice {
+        case .library: screen = .library(libraryAsk())
+        case .assistant: screen = .assistant(assistantAsk())
+        }
+        if remembersChoice {
+            UserDefaults.standard.set(choice.rawValue, forKey: DemoDomainChoice.defaultsKey)
+        }
+    }
+
+    /// The library's Ask, built the first time it is asked for.
+    func libraryAsk() -> DemoAsk<DemoDomain> {
+        if let library { return library }
+        let ask = DemoAsk<DemoDomain>(seam: seam)
+        library = ask
+        return ask
+    }
+
+    /// The assistant's Ask, built the first time it is asked for.
+    func assistantAsk() -> DemoAsk<DemoAssistantDomain> {
+        if let assistant { return assistant }
+        let ask = DemoAsk<DemoAssistantDomain>(seam: seam)
+        assistant = ask
+        return ask
+    }
+
+    /// For the Mac's New Chat command (`AskCommands`), whichever Ask is on
+    /// screen.
     var hasTurns: Bool {
-        switch self {
+        switch screen {
         case .library(let ask): ask.store.hasTurns
         case .assistant(let ask): ask.store.hasTurns
         }
     }
 
     func startOver() {
-        switch self {
+        switch screen {
         case .library(let ask): ask.store.startOver()
         case .assistant(let ask): ask.store.startOver()
         }
     }
-}
 
-/// The one Ask, owned by the app.
-///
-/// **Not by the view.** A generic store cannot have a `static let shared` and
-/// should not: an iOS `TabView` keeps a tab alive across switches, but a Mac
-/// `NavigationSplitView` rebuilds its detail on every sidebar change — so a
-/// thread owned by the view would vanish because the reader glanced at another
-/// screen, taking a turn in flight with it. This is the shape a host copies.
-///
-/// Generic over the domain, since the demo has two (`DemoHost`).
-@MainActor
-@Observable
-final class DemoAsk<Domain: AskDomain> {
-    let domain: Domain
-    let seam: AppleModelSeam
-    let engine: AskEngine<Domain>
-    let store: AskConversationStore<Domain>
-
-    /// What the settings card's diagnostics row runs (`runEval()`).
-    @ObservationIgnored private let scenarios: [AskScenario]
-
-    /// `DemoLaunchArgument.prefill`'s link, until a screen takes it
-    /// (`takeLaunchLink()`).
-    @ObservationIgnored private var launchLink = DemoLaunchArgument.value(after: DemoLaunchArgument.prefill)
-        .flatMap { URL(string: $0) }
-
-    init(domain: Domain, scenarios: [AskScenario]) {
-        #if DEBUG
-        if CommandLine.arguments.contains(DemoLaunchArgument.freshHistory) {
-            Self.forgetEveryChat(appDirectory: domain.brand.appDirectory)
-        }
-        #endif
-        // Undeclared: the demo's entitlements carry no Private Cloud Compute,
-        // and a request from a process without it is a fatal trap.
-        let seam = AppleModelSeam.make(privateCloudCompute: .undeclared)
-        let engine = AskEngine(domain: domain, seam: seam)
-        self.domain = domain
-        self.seam = seam
-        self.engine = engine
-        self.store = AskConversationStore(engine: engine)
-        self.scenarios = scenarios
+    /// The link the launch handed over, once: the first screen to appear
+    /// opens it, and no screen after it does, a Mac window reopened, a tab
+    /// switched back to or the other domain switched to. Kept here, on the
+    /// one host, because a screen's own state is made again with the screen,
+    /// and each domain's Ask is built when it is first shown.
+    func takeLaunchLink() -> URL? {
+        defer { launchLink = nil }
+        return launchLink
     }
 
     #if DEBUG
-    /// `DemoLaunchArgument.freshHistory`: everything AskKit keeps for the
-    /// demo, gone before the store exists to read any of it.
+    /// `DemoLaunchArgument.freshHistory`: everything AskKit keeps for one of
+    /// the demo's domains, gone before its store exists to read any of it.
     ///
     /// **The folder, whole.** AskKit keeps all of it in the brand's folder
     /// under Application Support (`AskBrand.appDirectory`): the chat on disk,
@@ -201,14 +301,36 @@ final class DemoAsk<Domain: AskDomain> {
         try? FileManager.default.removeItem(at: support.appending(path: appDirectory, directoryHint: .isDirectory))
     }
     #endif
+}
 
-    /// The link the launch handed over, once: the first screen to appear
-    /// opens it, and no screen after it does, a Mac window reopened or a tab
-    /// switched back to. Kept here, on the one Ask, because a screen's own
-    /// state is made again with the screen.
-    func takeLaunchLink() -> URL? {
-        defer { launchLink = nil }
-        return launchLink
+/// One of the demo's Asks, owned by the app (`DemoHost`).
+///
+/// **Not by the view.** A generic store cannot have a `static let shared` and
+/// should not: an iOS `TabView` keeps a tab alive across switches, but a Mac
+/// `NavigationSplitView` rebuilds its detail on every sidebar change — so a
+/// thread owned by the view would vanish because the reader glanced at another
+/// screen, taking a turn in flight with it. This is the shape a host copies.
+///
+/// Generic over the domain, since the demo has two (`DemoHost`), and built on
+/// the seam the host shares between them.
+@MainActor
+@Observable
+final class DemoAsk<Domain: AskDomain> {
+    let domain: Domain
+    let seam: AppleModelSeam
+    let engine: AskEngine<Domain>
+    let store: AskConversationStore<Domain>
+
+    /// What the settings card's diagnostics row runs (`runEval()`).
+    @ObservationIgnored private let scenarios: [AskScenario]
+
+    init(domain: Domain, scenarios: [AskScenario], seam: AppleModelSeam) {
+        let engine = AskEngine(domain: domain, seam: seam)
+        self.domain = domain
+        self.seam = seam
+        self.engine = engine
+        self.store = AskConversationStore(engine: engine)
+        self.scenarios = scenarios
     }
 
     /// An Ask link prefills and never sends — `AskLink`'s rule, and the router
@@ -234,20 +356,25 @@ final class DemoAsk<Domain: AskDomain> {
 
 extension DemoAsk where Domain == DemoDomain {
     /// The library: thirty things behind one search.
-    convenience init() {
-        self.init(domain: DemoDomain(), scenarios: DemoDomain.scenarios)
+    convenience init(seam: AppleModelSeam) {
+        self.init(domain: DemoDomain(), scenarios: DemoDomain.scenarios, seam: seam)
     }
 }
 
 extension DemoAsk where Domain == DemoAssistantDomain {
     /// The assistant, with the list its reminders go to.
-    convenience init() {
-        self.init(domain: DemoAssistantDomain(reminders: DemoReminderList()), scenarios: DemoAssistantDomain.scenarios)
+    convenience init(seam: AppleModelSeam) {
+        self.init(
+            domain: DemoAssistantDomain(reminders: DemoReminderList()), scenarios: DemoAssistantDomain.scenarios, seam: seam
+        )
     }
 }
 
 struct ContentView: View {
     let ask: DemoAsk<DemoDomain>
+    /// The host, for the switch to the assistant, and for the link handed
+    /// over at launch.
+    let host: DemoHost
 
     @State private var showsSettings = false
     /// Where a tile's row opens: a sheet, or a push. The router the tiles
@@ -257,21 +384,22 @@ struct ContentView: View {
     @State private var selectedTab = DemoTab.ask
 
     /// Leading on the phone, not `.secondaryAction`. SDK 27 moves a secondary
-    /// action into the overflow menu, a "More" button beside New Chat, a second
+    /// action into the overflow menu, a "More" button beside New Chat, another
     /// trailing item — and a title stack centres only while its subtitle
     /// clears the items on both sides, so the demo's title would sit left of
-    /// centre where a host whose one bar item is New Chat has it centred. One
-    /// item a side keeps the demo honest about the screen it exists to show.
-    /// The Mac has no top bar to lead.
+    /// centre. Leading, with the domain switch after it (`DemoDomainSwitch`),
+    /// the demo's two host items stand opposite New Chat and the chats, and
+    /// the title is centred at rest, as a host's is. The Mac has no top bar to
+    /// lead.
     ///
-    /// **A cost that host does not pay.** `AskScreen` puts its own Done here
-    /// while the keyboard is up, so the demo's bar carries three items where
-    /// that host's carries two, and a title stack left-aligns once the sides
-    /// stop clearing the subtitle. Measured on an iPhone with the caption at
-    /// its longest: two items centre it to within a point, three leave the
-    /// subtitle 12pt right of centre. So the demo's title is centred at rest
-    /// and drifts while a question is being typed — the harness paying for a
-    /// host item, not a bug in the screen.
+    /// **While the keyboard is up, two items still.** `AskScreen` puts its
+    /// own Done here then, and the switch steps aside for it, so the side
+    /// holds the gear and Done. A third would cost the title: measured on an
+    /// iPhone with the caption at its longest, one item and Done centre the
+    /// subtitle to within a point, three leave it 12pt right of centre, and
+    /// with the chats beside New Chat the title and its caption leave the bar
+    /// altogether. The assistant's screen, whose Reminders makes three at
+    /// rest, has its title right of centre at rest.
     private var settingsPlacement: ToolbarItemPlacement {
         #if os(macOS)
         .secondaryAction
@@ -367,6 +495,10 @@ struct ContentView: View {
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            // Before the host's item, so the switch stands after it, where
+            // Done takes its place while the keyboard is up
+            // (`DemoDomainSwitch`).
+            .modifier(DemoDomainSwitch(host: host))
             .toolbar {
                 // The host's own item, beside AskScreen's: the screen adds New
                 // Chat itself, and a host is free to add more.
@@ -404,9 +536,9 @@ struct ContentView: View {
         .onOpenURL { ask.open($0) }
         // The same link handed over at launch — how the UI tests reach this
         // router, since a test cannot open a URL before the app is up. Once a
-        // launch, not once a screen (`DemoAsk.takeLaunchLink()`).
+        // launch, not once a screen (`DemoHost.takeLaunchLink()`).
         .task {
-            guard let url = ask.takeLaunchLink() else { return }
+            guard let url = host.takeLaunchLink() else { return }
             ask.open(url)
         }
     }
@@ -589,26 +721,28 @@ struct DemoSettings<Domain: AskDomain>: View {
     }
 }
 
-/// The one Ask this file's previews share. The canvas runs them in one
-/// process, which holds one model seam as the app does (`DemoHost`): an Ask
-/// apiece would make a second seam, which is logged as a fault, and each
-/// would read the same folder. Every preview shows the one store, as every
-/// Mac window does.
-private let previewAsk = DemoAsk<DemoDomain>()
+/// The one host the demo's previews share, in this file and
+/// `DemoAssistantView.swift`. The canvas runs them in one process, which
+/// holds one model seam as the app does (`DemoHost`): a host apiece would
+/// make a second seam, which is logged as a fault, and each would read the
+/// same folders. Every preview shows its domain's one store, as every Mac
+/// window does. It remembers no switch, so the canvas leaves the app's
+/// choice alone.
+let previewHost = DemoHost(opening: .library, remembersChoice: false)
 
 #Preview {
-    ContentView(ask: previewAsk)
+    ContentView(ask: previewHost.libraryAsk(), host: previewHost)
 }
 
 // iPhone Duo's two arrangements, on whatever the canvas is set to. On the
 // iPhone Duo destination with the canvas's Display set to the inner one, the
 // stand-in fold supplies the region a preview doesn't have.
 #Preview("Held like a book") {
-    ContentView(ask: previewAsk)
+    ContentView(ask: previewHost.libraryAsk(), host: previewHost)
         .askSimulatedFold(.book())
 }
 
 #Preview("Upright") {
-    ContentView(ask: previewAsk)
+    ContentView(ask: previewHost.libraryAsk(), host: previewHost)
         .askSimulatedFold(.upright())
 }
