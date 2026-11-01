@@ -196,8 +196,9 @@ asked through lldb.
    the window's `bounds`. Set it back to 1280x720 afterwards, since visionOS can restore a window's
    size on the next launch.
 4. Capture with `xcrun simctl io <udid> screenshot vision-raw.png`. The window is drawn at about
-   1.371 px a point, centred across the capture. Since visionOS 27, the title, with the chevron of
-   the menu that switches domains, floats in a pill above the window, not in the window's bar. Find
+   1.371 px a point, centred across the capture. The title floats in a pill above the window, not in
+   the window's bar: on visionOS the switch is the title's menu (`DemoDomainSwitch`), and visionOS
+   draws a title with a menu as a pill with the app's icon and a chevron. Find
    both edges in the capture, where the window's glass meets the room. At 1280x860 the window ran
    from x 1042 to 2797 and y 592 to 1770, and the pill from x 1795 to 2046 and y 496 to 557.
 5. Cut it out. Crop from the pill's top to the window's bottom. Make the alpha mask the window as a
