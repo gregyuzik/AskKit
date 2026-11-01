@@ -12,6 +12,18 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Fixed
+
+- **The demo's assistant calls its tools on the on-device model.** Asked "Remind me to water the
+  plants at 6 PM", it answered in prose with no card to confirm, and "Not from this app's data" under
+  it; asked "How many kilometers is 10 miles?" as a chat's first question, it worked the answer out
+  from memory. Its prompt opened "Answer a question asked of an assistant.", which kept the model
+  from calling the converter, and its reminder tool's description offered the reminder, which the
+  model did in prose instead. It now has no prompt prefix, and the reminder tool's description says
+  what it does: "Set a reminder for the user, …". Measured on the Mac, the reminder starter now
+  proposes the reminder 10 times in 10, where it did 0 times in 10, and the conversion is called 10
+  times in 10, where it was 0 times in 10. No API changes.
+
 ## [0.4.0] - 2026-11-01
 
 Three TipKit tips on the Ask screen, the empty composer one line tall again on iOS and visionOS, and a
