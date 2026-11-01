@@ -199,7 +199,8 @@ public actor AskCollector<Row: AskRow> {
 
     /// Record what this turn offers to do. **Nothing is done here**: the
     /// answer carries the proposal to a card, and only the reader's tap reaches
-    /// `AskDomain.perform(_:)`. The tool then returns `AskProposal.modelReceipt`.
+    /// `AskDomain.perform(_:)`. The tool then returns the proposal's receipt,
+    /// `AskProposal.modelReceipt(notYet:)`.
     ///
     /// One card to an answer, so the first proposal in a turn is kept and a
     /// second is refused, as is one whose payload is over

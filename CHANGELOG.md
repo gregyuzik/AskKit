@@ -26,11 +26,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   answers with a card, 17 of them pointing at the card, where under `modelReceipt` 12 of 17 said it
   and 3 pointed at the card. The demo's reminder said it was set in none of 20 answers through the
   engine, every one pointing at the card, where under `modelReceipt` 15 of 16 said so and none
-  pointed at it. Eleven receipts without the host's sentence, seven general wordings and four built
-  from the proposal's title and button, left Kabynyt's claim at 8 of 8 each, and the demo's at 9 of 16
-  or more. An app adopts it one tool at a time, with a sentence for each change the tool offers; the
-  static receipts stay for a tool with none. Private Cloud Compute reads the same receipt and wasn't
-  measured: a command-line tool or a test process can't reach it.
+  pointed at it. Without the host's sentence, eleven receipts on the demo (seven general wordings,
+  three built from the proposal's title and button, and one of those saying too that no one was
+  reminded yet) let 9 of 16 or more say it, and the four tried on Kabynyt (one general, three from the
+  title and button) 8 of 8 each. An app adopts it one tool at a time, with a sentence for each change
+  the tool offers; the static receipts stay for a tool with none. Private Cloud Compute reads the same
+  receipt and wasn't measured: a command-line tool or a test process can't reach it, and neither was an
+  answer in another language, since with "Write the answer in French." the demo's model never called
+  its reminder tool (0 of 16).
 
 ### Changed
 
@@ -39,7 +42,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   on their own." Each now says the change "waits for a yes on a card under your answer", and keeps the
   words it denies with ("never say it is done", "never say anything is open"). On the demo's reminder
   the reworded `modelReceipt` let 13 of 16 answers say the reminder was set, 15 of 16 before: no
-  better, which is why `modelReceipt(notYet:)` exists.
+  better, which is why `modelReceipt(notYet:)` exists. The reworded `handOffReceipt` was read only
+  there, standing in for a hand-off: 16 of 16 said the reminder was made, and none that anything was
+  open.
 
 ### Fixed
 

@@ -27,9 +27,9 @@ nonisolated public enum AskProposalKind: String, Codable, Sendable {
 ///
 /// **The model proposes, the reader confirms, the app performs.** A proposing
 /// tool records one of these with `AskCollector.record(proposal:)` and returns
-/// `modelReceipt`; it never acts itself. The answer carries the proposal out of
-/// the turn, AskUI draws it as a card under the answer, and only the reader's
-/// tap reaches `AskDomain.perform(_:)`.
+/// its receipt, `modelReceipt(notYet:)`; it never acts itself. The answer
+/// carries the proposal out of the turn, AskUI draws it as a card under the
+/// answer, and only the reader's tap reaches `AskDomain.perform(_:)`.
 ///
 /// **In the app's words.** The card is what the reader agrees to, so it says
 /// what the app will do in the app's words, never in the model's words about
@@ -118,10 +118,12 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// answers with a card, 17 of them pointing at it, where `modelReceipt`
     /// let 12 of 17 say it; the demo's reminder, given "No reminder to water
     /// the plants at 6 PM is set yet.", in none of 20, every one pointing at
-    /// the card, where `modelReceipt` let 15 of 16 say it. Eleven receipts
-    /// without the host's sentence, seven general wordings and four built
-    /// from the proposal's title and button, left Kabynyt's at 8 of 8 each
-    /// and the demo's at 9 of 16 or more.
+    /// the card, where `modelReceipt` let 15 of 16 say it. Without the host's
+    /// sentence, eleven receipts on the demo (seven general wordings, three
+    /// built from the proposal's title and button, and one of those saying
+    /// too that no one was reminded yet) let 9 of 16 or more say it, and the
+    /// four tried on Kabynyt (one general, three from the title and button)
+    /// 8 of 8 each.
     ///
     /// **The answer repeats it, so write it to the person asking.** Name the
     /// thing as the app does and say what isn't so yet, never "the user" or
@@ -135,6 +137,12 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// line. A sentence with no closing punctuation takes a full stop, and
     /// one that clamps to nothing reads `modelReceipt` or `handOffReceipt`
     /// instead.
+    ///
+    /// **Its words are English, as the rest of what a tool returns is, and the
+    /// answer repeats them.** Whether an answer in another language translates
+    /// them is unmeasured: with "Write the answer in French." in its
+    /// instructions, the demo's model called its reminder tool 0 times in 16,
+    /// so no receipt was read.
     public func modelReceipt(notYet: String) -> String {
         var sentence = AskPrompt.clamp(notYet, AskPrompt.longClamp)
         guard let last = sentence.last else {
