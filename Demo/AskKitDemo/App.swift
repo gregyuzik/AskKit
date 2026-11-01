@@ -387,21 +387,19 @@ struct ContentView: View {
     /// action into the overflow menu, a "More" button beside New Chat, another
     /// trailing item — and a title stack centres only while its subtitle
     /// clears the items on both sides, so the demo's title would sit left of
-    /// centre. Leading, after the domain switch (`DemoDomainSwitch`), the
-    /// demo's two host items stand opposite New Chat and the chats, and the
-    /// title is centred at rest, as a host's is. The Mac has no top bar to
+    /// centre. Leading, with the domain switch after it (`DemoDomainSwitch`),
+    /// the demo's two host items stand opposite New Chat and the chats, and
+    /// the title is centred at rest, as a host's is. The Mac has no top bar to
     /// lead.
     ///
-    /// **A cost a host with one item there does not pay.** `AskScreen` puts
-    /// its own Done here while the keyboard is up, so the demo's leading side
-    /// carries three items, and a title stack left-aligns once the sides stop
-    /// clearing the subtitle. Measured on an iPhone with the caption at its
-    /// longest, before the switch, when the gear led alone: with Done beside
-    /// it the subtitle centred to within a point, and a third item left it
-    /// 12pt right of centre. So the demo's title drifts while a question is
-    /// being typed — the harness paying for host items, not a bug in the
-    /// screen. The assistant's screen, whose Reminders makes three at rest,
-    /// has its title right of centre at rest too.
+    /// **While the keyboard is up, two items still.** `AskScreen` puts its
+    /// own Done here then, and the switch steps aside for it, so the side
+    /// holds the gear and Done. A third would cost the title: measured on an
+    /// iPhone with the caption at its longest, one item and Done centre the
+    /// subtitle to within a point, three leave it 12pt right of centre, and
+    /// with the chats beside New Chat the title and its caption leave the bar
+    /// altogether. The assistant's screen, whose Reminders makes three at
+    /// rest, has its title right of centre at rest.
     private var settingsPlacement: ToolbarItemPlacement {
         #if os(macOS)
         .secondaryAction
@@ -497,6 +495,10 @@ struct ContentView: View {
             #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            // Before the host's item, so the switch stands after it, where
+            // Done takes its place while the keyboard is up
+            // (`DemoDomainSwitch`).
+            .modifier(DemoDomainSwitch(host: host))
             .toolbar {
                 // The host's own item, beside AskScreen's: the screen adds New
                 // Chat itself, and a host is free to add more.
@@ -513,9 +515,6 @@ struct ContentView: View {
                     .symbolRenderingMode(.monochrome)
                 }
             }
-            // After the host's item, so the switch leads the bar and stands
-            // where it does on the assistant's screen.
-            .modifier(DemoDomainSwitch(host: host))
             .sheet(isPresented: $showsSettings) {
                 DemoSettings(ask: ask)
             }

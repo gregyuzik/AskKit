@@ -37,6 +37,10 @@ struct DemoAssistantView: View {
                 #if !os(macOS)
                 .navigationBarTitleDisplayMode(.inline)
                 #endif
+                // Before the host's items, so the switch stands after them,
+                // where Done takes its place while the keyboard is up
+                // (`DemoDomainSwitch`).
+                .modifier(DemoDomainSwitch(host: host))
                 .toolbar {
                     ToolbarItemGroup(placement: hostItemsPlacement) {
                         Button {
@@ -62,9 +66,6 @@ struct DemoAssistantView: View {
                         .symbolRenderingMode(.monochrome)
                     }
                 }
-                // After the host's items, so the switch leads the bar and
-                // stands where it does on the library's screen.
-                .modifier(DemoDomainSwitch(host: host))
                 .sheet(isPresented: $showsReminders) {
                     DemoReminderSheet(list: ask.domain.reminders)
                 }

@@ -1350,6 +1350,26 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         )
     }
 
+    /// The switch steps aside while the keyboard is up, and Done takes its
+    /// place: with both in the bar, and the chats beside New Chat, the title
+    /// and the tier caption had no room left (`DemoDomainSwitch`). Asserted
+    /// on the items rather than the title, since this launch keeps no chats
+    /// to put the chats' item in the bar, and the title fits either way here.
+    @MainActor
+    func testTheSwitchStepsAsideWhileTheReaderTypes() {
+        let app = launchScripted()
+        let menu = app.buttons[DemoAccessibility.domainMenu]
+        XCTAssertTrue(menu.waitForExistence(timeout: uiTimeout), "The bar has the switch at rest.")
+        let field = app.textFields[Ids.field]
+        XCTAssertTrue(field.waitForExistence(timeout: uiTimeout))
+        field.tap()
+        let done = app.buttons[Ids.done]
+        XCTAssertTrue(done.waitForExistence(timeout: uiTimeout), "Done comes with the keyboard.")
+        XCTAssertTrue(menu.waitForNonExistence(timeout: uiTimeout), "And the switch goes for it.")
+        done.tap()
+        XCTAssertTrue(menu.waitForExistence(timeout: uiTimeout), "With the keyboard away, the switch is back.")
+    }
+
     /// Pick `choice` in the bar's menu of domains.
     ///
     /// The menu's item by its name. The bar's button is labelled with the

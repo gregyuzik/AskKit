@@ -12,12 +12,25 @@ import SwiftUI
 /// title's menu took a tap only on the title's own line, 18 pt tall (y 68 to
 /// 85 of a bar from 62 to 116), and Apple's audit fails it ("Hit area is too
 /// small"), where every target on the screen is 44 pt. The bar item is the
-/// bar's own size, first of the demo's host items, so it stands in one place
-/// on both domains' screens. It draws the symbol of the domain on screen, and
+/// bar's own size. It draws the symbol of the domain on screen, and
 /// VoiceOver reads its name. It is there under a tab bar at the top too, on
 /// an iPad at regular width, where no title is drawn to hang a menu on
 /// (`AskTierCaption`); a bar draws it as its symbol alone there as well,
 /// whatever label style it is given.
+///
+/// **It steps aside while the keyboard is up, and Done takes its place.**
+/// `AskScreen` adds Done to the bar's leading side while the reader types,
+/// and with the switch there too the side holds three items: on an iPhone
+/// 18 Pro with New Chat and the chats opposite, the library's title and the
+/// tier caption under it left the bar altogether, and the assistant's,
+/// beside Reminders as well, came down to "…" and "O…". So the switch is the
+/// last of the demo's host items, and goes while the software keyboard is
+/// up: Done lands where it stood, nothing else moves, and the bar while
+/// typing is the one it was before the switch. The signal is the keyboard's
+/// own notifications, since Done keys on the composer's focus, which
+/// `AskScreen` keeps to itself, so where no keyboard comes up for the focus,
+/// the switch stays beside Done. Done or a send puts the keyboard away, and
+/// the switch comes back.
 ///
 /// **visionOS: the title's menu.** visionOS draws a title with a menu as a
 /// pill of its own above the window, the app's icon, the title and a
@@ -41,6 +54,12 @@ import SwiftUI
 /// tab switched away from.
 struct DemoDomainSwitch: ViewModifier {
     let host: DemoHost
+
+    #if os(iOS)
+    /// Whether the software keyboard is up, from its own notifications.
+    @State private var keyboardIsUp = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #endif
 
     func body(content: Content) -> some View {
         #if os(macOS)
@@ -67,25 +86,44 @@ struct DemoDomainSwitch: ViewModifier {
         #else
         content
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        DemoDomainPicker(host: host)
-                            .pickerStyle(.inline)
-                    } label: {
-                        Label {
-                            Text(verbatim: host.choice.name)
-                        } icon: {
-                            Image(systemName: host.choice.systemImage)
+                if !keyboardIsUp {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Menu {
+                            DemoDomainPicker(host: host)
+                                .pickerStyle(.inline)
+                        } label: {
+                            Label {
+                                Text(verbatim: host.choice.name)
+                            } icon: {
+                                Image(systemName: host.choice.systemImage)
+                            }
                         }
+                        // Monochrome, as the demo's other bar items are.
+                        .symbolRenderingMode(.monochrome)
+                        .accessibilityIdentifier(DemoAccessibility.domainMenu)
                     }
-                    // Monochrome, as the demo's other bar items are.
-                    .symbolRenderingMode(.monochrome)
-                    .accessibilityIdentifier(DemoAccessibility.domainMenu)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                setKeyboardIsUp(true)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                setKeyboardIsUp(false)
             }
         #endif
     }
 }
+
+#if os(iOS)
+extension DemoDomainSwitch {
+    /// On the curve Done comes and goes on in `AskScreen`, so the two trade
+    /// places in one movement.
+    private func setKeyboardIsUp(_ isUp: Bool) {
+        guard isUp != keyboardIsUp else { return }
+        withAnimation(reduceMotion ? .none : .snappy) { keyboardIsUp = isUp }
+    }
+}
+#endif
 
 /// The two domains as a picker: a menu's items, with the one on screen
 /// checked, or on the Mac a pop-up naming it.
