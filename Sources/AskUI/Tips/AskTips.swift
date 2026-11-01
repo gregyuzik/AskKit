@@ -91,6 +91,15 @@ nonisolated enum AskTipGates {
     /// trails the composer's focus (`AskScreen.composerHeldUp`).
     static let settling = Duration.milliseconds(500)
 
+    /// What a screen settles its gates on (`AskScreen.settleTipGates()`): its
+    /// reading, nil while the reader is in another window, and on visionOS how
+    /// many times its window has been resized, after each of which the tips
+    /// settle again.
+    struct Settling: Equatable {
+        var gates: Reading?
+        var resizes = 0
+    }
+
     /// The three gates as one screen reads them, written together when any
     /// of them changes (`write()`).
     struct Reading: Equatable {

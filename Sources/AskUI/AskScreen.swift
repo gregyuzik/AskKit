@@ -225,6 +225,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// the window is at the back, so only the window the reader is in draws
     /// a tip.
     @State private var settledTipGates = AskTipGates.Reading()
+    #if os(visionOS)
+    /// How many times the window has changed size, which the tips' gates
+    /// settle again on (`settleTipGates()`): a visionOS popover doesn't
+    /// outlive a resize.
+    @State private var windowResizes = 0
+    #endif
     /// Where VoiceOver's focus goes next, until the element it names takes it
     /// (`AskVoiceOverTarget`): the first screen's headline after New Chat,
     /// and the composer's field after Edit & Resend or a tap on the face in a
@@ -491,6 +497,21 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         // What the views drawing the tips read: each tip shows only while its
         // gate is settled open here, whatever TipKit says (`settleTipGates()`).
         .environment(\.askTipGates, settledTipGates)
+        #if os(visionOS)
+        // **A resize takes a popover tip away on visionOS** and nothing
+        // brings it back: resized with the starter tip up, the window drew
+        // none, at the new size or back at the old one, while TipKit held the
+        // tip current and its gate stayed open (Apple Vision Pro simulator,
+        // 2026-10-31). So the tips leave as the size changes and come back
+        // once it has held, as a gate that closes and opens again does, and
+        // not at every step of a resize.
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { _ in
+            settledTipGates = AskTipGates.Reading()
+            windowResizes += 1
+        }
+        #endif
         // Where the question tip stands beside iPhone Duo's fold
         // (`AskQuestionBubble`).
         .environment(\.askChatsAreBesideThread, foldArrangement.listsChats && leadingPaneContent == .chats)
@@ -647,7 +668,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         // the front writes its own. A task, so it runs again as the screen
         // comes back from a tab or a pushed item, with the gates its going
         // closed.
-        .task(id: readerIsInWindow ? tipGates : nil) { await settleTipGates() }
+        .task(id: tipSettling) { await settleTipGates() }
         // A host's accent can change on screen, such as one that dims with
         // its window, and so can its spectrum and its accessory button.
         .onChange(of: AskComposerFaceLook(accent: accent, spectrum: spectrum, accessory: slotFaceAccessory)) { _, _ in
@@ -2164,6 +2185,16 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// and visionOS changes nothing here.
     private var readerIsInWindow: Bool {
         windowAppearsActive || showsHistory
+    }
+
+    /// What the tips' gates settle on (`settleTipGates()`): the reading from
+    /// the window the reader is in, and on visionOS each resize of it.
+    private var tipSettling: AskTipGates.Settling {
+        #if os(visionOS)
+        AskTipGates.Settling(gates: readerIsInWindow ? tipGates : nil, resizes: windowResizes)
+        #else
+        AskTipGates.Settling(gates: readerIsInWindow ? tipGates : nil)
+        #endif
     }
 
     /// Writes `tipGates` to TipKit and to `settledTipGates`: a gate that
