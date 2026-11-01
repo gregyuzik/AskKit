@@ -25,7 +25,7 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 ### Changed
 
 - **The demo hosts both of its domains**, the library and the assistant, and the reader switches
-  between them in the app: a menu leading the bar on iOS and iPadOS, the title's menu on visionOS, and
+  between them in the app: a menu in the bar on iOS and iPadOS, the title's menu on visionOS, and
   on the Mac a pop-up in the toolbar and the View menu (⌘1 and ⌘2). The demo opens on the domain it was
   left on, the library the first time. Each domain keeps its own thread and chats, both engines share
   one model seam, and a switch keeps the other domain's turn going. `-askAssistant` still opens on the

@@ -216,8 +216,9 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     /// **"Assistant", where README's sample says "Ask the Assistant".** The
     /// title names the domain on screen by the name the switch gives it
     /// (`DemoDomainSwitch`). And on an iPhone 18 Pro the switch is a third
-    /// item leading the bar, beside Reminders and the settings: between those
-    /// and New Chat with the chats, "Ask the Assistant" doesn't fit.
+    /// item on the bar's leading side, beside Reminders and the settings:
+    /// between those and New Chat with the chats, "Ask the Assistant" doesn't
+    /// fit.
     var brand: AskBrand {
         AskBrand(
             title: "Assistant",

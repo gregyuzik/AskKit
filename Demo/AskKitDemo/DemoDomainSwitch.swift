@@ -5,7 +5,7 @@ import SwiftUI
 /// platform, each the closest native place to the title the domain is named
 /// by.
 ///
-/// **iOS and iPadOS: a menu leading the bar.** Not the title's menu
+/// **iOS and iPadOS: a menu on the bar's leading side.** Not the title's menu
 /// (`toolbarTitleMenu`), which is where Apple puts a choice of what a screen
 /// shows, because under a subtitle it is too small a target: measured on an
 /// iPhone 18 Pro (iOS 27.2) with the tier caption under the title, the
