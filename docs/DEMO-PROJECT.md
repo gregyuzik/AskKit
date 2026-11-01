@@ -122,3 +122,87 @@ caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
   -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
   -askCaptureWindow /dev/fd/4 -askCaptureAfter 8.5 -askCaptureSize 960x560 4>mac.png
 ```
+
+## Imaging the iPhone screen
+
+The README's `docs/images/iphone.png` is an iPhone 18 Pro simulator (iOS 27.2) in light mode, a live
+answer from the on-device model on the library's first starter, framed with
+[`frames`](https://github.com/viticci/frames-cli) and scaled to 763x1560. Hold the simulator for the
+whole run, so no test or other app comes to the front on it.
+
+1. Build and install `AskKitDemo_iOS` (Debug) on the simulator, then set Apple's status bar and the
+   appearance:
+
+   ```sh
+   xcrun simctl ui <udid> appearance light
+   xcrun simctl status_bar <udid> override --time 9:41 --dataNetwork wifi --wifiMode active \
+     --wifiBars 3 --cellularMode active --cellularBars 4 --batteryState discharging --batteryLevel 100
+   ```
+
+2. Launch on the library's first screen with the tips hidden, nothing saved and no domain
+   remembered:
+
+   ```sh
+   xcrun simctl launch --terminate-running-process <udid> com.example.askkitdemo \
+     -askHidesTips -askFreshHistory -askResetThread
+   ```
+
+3. Ask "What tools do I own?" by activating its starter, and wait for the answer, its tiles and the
+   follow-ups (about 20 seconds). A tap through Xcode's device interaction works. The repeatable way,
+   and the only one on visionOS, is lldb (`xcrun lldb -p <pid> --batch -o '…' -o detach`). First turn
+   on the app's accessibility, without which SwiftUI builds no accessibility elements:
+   `expr -l objc -- ((void (*)(int))dlsym((void*)-2, "_AXSApplicationAccessibilitySetEnabled"))(1)`.
+   Then walk the window's elements from `[[UIApplication sharedApplication] windows]`
+   (`accessibilityElementCount`, `accessibilityElementAtIndex:`, and `subviews` where a view has no
+   elements), find the one labelled with the starter, and send it `accessibilityActivate`.
+4. Put the question just under the bar. The answer, seven tiles and two follow-ups run a little taller
+   than the screen, and the screen settles at the thread's foot with the question under the bar. Set
+   the offset of the thread's scroll view (the `UIScrollView` with the identifier `ask.root`)
+   directly: `expr -l objc -- (void)[(id)<scroll view> setContentOffset:(CGPoint){0, <y>} animated:NO]`,
+   with `<y>` the current offset less the distance from the question's top to 4 pt under the bar's
+   bottom (116 pt). That puts the turn's time under the bar, and the last follow-up runs under the
+   composer's glass, as a chat's does. A drag on the thread is less precise, and one on the answer's
+   words selects them.
+5. Capture and frame. `frames` matches the 1206x2622 capture to the iPhone 18 Pro frame in Burgundy,
+   its default, at 1350x2760; scale that to 763x1560:
+
+   ```sh
+   xcrun simctl io <udid> screenshot iphone-raw.png
+   frames frame iphone-raw.png --output framed/
+   ```
+
+6. Put the simulator back: `xcrun simctl status_bar <udid> clear`, its own appearance, the app's
+   accessibility off (the same call with `0`), and the app quit.
+
+## Imaging the Apple Vision Pro window
+
+The README's `docs/images/vision.png` is the demo's window on an Apple Vision Pro simulator (visionOS
+27.2), cut out of the simulator's 3840x2160 capture with transparency around it, on a live answer to
+the library's "What clothes do I own?". No input tool reaches a visionOS simulator, so the turn is
+asked through lldb.
+
+1. Build and install `AskKitDemo_visionOS`, and launch it as in step 2 above.
+2. Turn on the app's accessibility and activate the "What clothes do I own?" starter as in step 3
+   above. If the answer comes back "Answer cut short", launch again and ask again.
+3. Make the window tall enough for the whole turn. In the default 1280x720 window the turn doesn't
+   fit between the bar and the composer at any scroll offset: the turn's time sits under the bar or
+   a follow-up lies over the composer. At 1280x860 it fits without scrolling:
+
+   ```
+   expr -l objc -- (void)[(id)[(id)<window> windowScene] requestGeometryUpdateWithPreferences:(id)[(id)[(Class)NSClassFromString(@"UIWindowSceneGeometryPreferencesVision") alloc] initWithSize:(CGSize){1280, 860}] errorHandler:nil]
+   ```
+
+   lldb reports the expression interrupted (`EXC_BREAKPOINT`), but the window takes the size: check
+   the window's `bounds`. Set it back to 1280x720 afterwards, since visionOS can restore a window's
+   size on the next launch.
+4. Capture with `xcrun simctl io <udid> screenshot vision-raw.png`. The window is drawn at about
+   1.371 px a point, centred across the capture. Since visionOS 27, the title, with the chevron of
+   the menu that switches domains, floats in a pill above the window, not in the window's bar. Find
+   both edges in the capture, where the window's glass meets the room. At 1280x860 the window ran
+   from x 1042 to 2797 and y 592 to 1770, and the pill from x 1795 to 2046 and y 496 to 557.
+5. Cut it out. Crop from the pill's top to the window's bottom. Make the alpha mask the window as a
+   rounded rectangle, with a 60 px corner radius and inset 5 px to drop the glass's rim, where the room
+   shows through, plus the pill as a capsule, and make everything else transparent.
+6. In the README, the three images' `width=` percentages keep them the same height, about 0.24 of the
+   row each: a width of 0.24 × the image's width over its height.
+7. Put the simulator back: the window at 1280x720, the app's accessibility off, and the app quit.

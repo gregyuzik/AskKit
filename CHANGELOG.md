@@ -33,8 +33,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 - **The assistant's bar holds the settings and the domain switch, as the library's does**, with its
   title centred. The bell that listed the reminders the reader added is gone: they are a Reminders
   section of the settings card. "Ask the Assistant" is the assistant's title again, measured centred
-  and whole on an iPhone 18 Pro both at rest and while typing. The README's iPhone and Apple Vision
-  Pro screenshots are retaken with the domain switch in them. No API changes.
+  and whole on an iPhone 18 Pro both at rest and while typing. docs/DEMO-PROJECT.md gives the recipes
+  for imaging the iPhone screen and the Apple Vision Pro window, beside the Mac window's. No API changes.
 
 ### Fixed
 

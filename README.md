@@ -13,9 +13,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="center">
-  <img src="docs/images/iphone.png" width="12%" alt="The Ask screen on iPhone, titled &quot;Ask the Demo&quot;, with the settings and the switch between the demo's domains beside the title: the question &quot;What tools do I own?&quot; answered in two sentences, with seven tiles of the tools it read, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the composer at the bottom">
+  <img src="docs/images/iphone.png" width="12%" alt="The Ask screen on iPhone: the question &quot;What tools do I own?&quot; answered in two sentences, with seven tiles of the tools it read, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the composer at the bottom">
   <img src="docs/images/mac.png" width="38%" alt="The Ask screen in a Mac window: the question &quot;What tools do I own?&quot; answered with seven tiles of tools, an evidence line, two follow-up suggestions and the composer">
-  <img src="docs/images/vision.png" width="33%" alt="The Ask screen in an Apple Vision Pro window, under its title &quot;Ask the Demo&quot;, which opens the switch between the demo's domains: the question &quot;What clothes do I own?&quot; answered with seven tiles of clothes, an evidence line, two follow-up suggestions and the composer">
+  <img src="docs/images/vision.png" width="43%" alt="The Ask screen in an Apple Vision Pro window: the question &quot;What clothes do I own?&quot; answered with seven tiles of clothes, an evidence line, two follow-up suggestions and the composer">
 </p>
 
 AskKit is a complete Ask screen over Apple's Foundation Models, for any kind of app. A reader asks in their own words and gets a short answer: from your app's data, through the tools your app gives the model, or from the model alone where your app allows it. When a tool proposes an action, such as adding a reminder or changing a setting, the reader confirms it on a card before your app carries it out. Private Cloud Compute writes the answer when it can serve, and the on-device model when it can't. Your app implements one protocol, `AskDomain`, which gives the model its tools and instructions and says which answers are kept, and AskKit supplies the engine (`AskCore`) and the SwiftUI screen (`AskUI`).
