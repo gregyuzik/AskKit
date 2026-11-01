@@ -12,8 +12,49 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Added
+
+- **`AskProposal.modelReceipt(notYet:)`, a receipt that opens with the host's own sentence.** A
+  proposing tool returns it in place of `modelReceipt` or `handOffReceipt`. `notYet` is the claim an
+  answer would make, negated, in the words it would make it in ("Jaws is not marked as opened yet."),
+  and AskKit follows it with where the change waits, by the card's button ("Nothing changes until
+  "Mark Opened" on the card below is confirmed."), or, for a hand-off, that confirming opens a form.
+  Both are clamped as tool output is. Asked for a change, the on-device model answers by echoing the
+  request as done, whatever a general receipt says, and it repeats a receipt that opens with that
+  sentence negated. Measured on the Mac (macOS 27.2) and graded by reading the answers, Kabynyt's
+  `edit_item` ("Mark Jaws as opened.", "Lend Jaws to Sam.") said the change was made in none of 20
+  answers with a card, 17 of them pointing at the card, where under `modelReceipt` 12 of 17 said it
+  and 3 pointed at the card. The demo's reminder said it was set in none of 20 answers through the
+  engine, every one pointing at the card, where under `modelReceipt` 15 of 16 said so and none
+  pointed at it. Without the host's sentence, eleven receipts on the demo (seven general wordings,
+  three built from the proposal's title and button, and one of those saying too that no one was
+  reminded yet) let 9 of 16 or more say it, and the four tried on Kabynyt (one general, three from the
+  title and button) 8 of 8 each. An app adopts it one tool at a time, with a sentence for each change
+  the tool offers; the static receipts stay for a tool with none. Private Cloud Compute reads the same
+  receipt and wasn't measured: a command-line tool or a test process can't reach it, and neither was an
+  answer in another language, since with "Write the answer in French." the demo's model never called
+  its reminder tool (0 of 16).
+
+### Changed
+
+- **`AskProposal.modelReceipt` and `handOffReceipt` no longer say "the reader".** An answer repeats
+  what its receipt says, and one on Klosyt told its reader "The reader is prompted to finish the item
+  on their own." Each now says the change "waits for a yes on a card under your answer", and keeps the
+  words it denies with ("never say it is done", "never say anything is open"). On the demo's reminder
+  the reworded `modelReceipt` let 13 of 16 answers say the reminder was set, 15 of 16 before: no
+  better, which is why `modelReceipt(notYet:)` exists. The reworded `handOffReceipt` was read only
+  there, standing in for a hand-off: 16 of 16 said the reminder was made, and none that anything was
+  open.
+
 ### Fixed
 
+- **The demo's assistant no longer says a reminder is set before it is.** Asked "Remind me to water
+  the plants at 6 PM", it answered "You'll be reminded to water the plants at 6 PM." above the card that
+  would set it, in 9 or 10 of 10 turns. Its reminder tool now returns `modelReceipt(notYet:)` opening
+  "No reminder to water the plants at 6 PM is set yet.", and through the engine the starter and "Remind
+  me to call Mom tomorrow morning" said no reminder was set yet in 20 of 20 turns, each pointing at the
+  card. "What's a good name for a houseplant?" and "thanks" still call nothing, and "thanks" after a
+  reminder is still "You're welcome."
 - **The demo's assistant calls its tools on the on-device model.** Asked "Remind me to water the
   plants at 6 PM", it answered in prose with no card to confirm, and "Not from this app's data" under
   it; asked "How many kilometers is 10 miles?" as a chat's first question, it worked the answer out
