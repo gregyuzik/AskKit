@@ -251,6 +251,6 @@ nonisolated enum DemoAccessibility {
     /// `DemoAssistantView`), which opens the settings card.
     static let settings = "demo.settings"
     /// One reminder in the settings card's Reminders section
-    /// (`DemoReminderRows`).
+    /// (`DemoReminderSection`).
     static let reminder = "demo.reminder"
 }
