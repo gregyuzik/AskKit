@@ -125,9 +125,16 @@ nonisolated struct DemoReminderArguments: Sendable {
 ///
 /// Offered only in a conversation (`DemoAssistantDomain.makeTools(_:)`): a
 /// standalone turn has no card to confirm on.
+///
+/// **Its description says what it does, not what the reader is offered.**
+/// Measured on the on-device model (macOS 27.2, 2026-11-01), "Remind me to
+/// water the plants at 6 PM" with the domain's instructions and no prompt
+/// prefix: worded "Offer the reader a reminder, …", the model called it 0
+/// times in 6 and answered in prose alone; worded "Set a reminder for the
+/// user, …", 8 times in 8, and 10 in 10 through the engine.
 nonisolated struct DemoReminderTool: Tool {
     let name = "propose_reminder"
-    let description = "Offer the reader a reminder, which they confirm on a card under your answer. Call it whenever they ask to be reminded of something."
+    let description = "Set a reminder for the user, which they confirm on a card under your answer. Call it whenever they ask to be reminded of something."
 
     typealias Arguments = DemoReminderArguments
 
@@ -252,8 +259,16 @@ nonisolated struct DemoAssistantDomain: AskDomain {
         return text
     }
 
-    /// Byte-stable, for the reason `DemoDomain.promptPrefix` gives.
-    var promptPrefix: String { "Answer a question asked of an assistant.\n" }
+    /// None, AskKit's default, said here so it isn't added back: words that
+    /// frame the request as a question to answer keep the on-device model
+    /// from calling the tools. Measured on a chat's first question (macOS
+    /// 27.2, 2026-11-01), "Answer a question asked of an assistant." ahead of
+    /// it had the model work out "How many kilometers is 10 miles?" from
+    /// memory 10 times in 10, where without it the model called
+    /// `convert_units` 10 times in 10, and it cost `propose_reminder` 2 calls
+    /// in 8. A follow-up's prompt carries no prefix, which is why the
+    /// conversion was called there.
+    var promptPrefix: String { "" }
 
     /// One of each thing it does: a conversion, a reminder and a question
     /// for the model alone.
