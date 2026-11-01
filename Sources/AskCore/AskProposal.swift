@@ -74,19 +74,80 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// refuses a heavier one. An id and a verb fit many times over.
     public static var maxPayloadBytes: Int { 4_096 }
 
-    /// What a proposing tool returns to the model: nothing has happened yet,
-    /// and the answer must not say otherwise. One sentence for every host, so
-    /// no answer tells a reader something is done before they have said yes.
+    /// What a proposing tool returns to the model when it has no sentence of
+    /// its own to give: nothing has happened yet, and the answer must not say
+    /// otherwise. One sentence for every host.
+    ///
+    /// **Prefer `modelReceipt(notYet:)`.** On the on-device model this
+    /// sentence doesn't stop an answer saying the change is made: it echoes
+    /// the request instead ("Jaws is now marked as opened"), as it did under
+    /// every generic wording measured (`modelReceipt(notYet:)` has the
+    /// numbers). It says nothing the answer could repeat to the person asking
+    /// and have it read wrong, so it names no one.
     public static var modelReceipt: String {
-        "Proposed, not done: the reader confirms it on a card under your answer. Say what it would do; never say it is done."
+        "Proposed, not done: it waits for a yes on a card under your answer. Say what it would do; never say it is done."
     }
 
-    /// What a **hand-off** tool returns instead. Sharper than `modelReceipt`
-    /// because it has one more thing to deny: the reader has not tapped, so
-    /// nothing is open either. An answer saying "I've opened the form" is as
-    /// wrong as one saying "added".
+    /// What a **hand-off** tool returns instead, with no sentence of its own.
+    /// Sharper than `modelReceipt` because it has one more thing to deny: no
+    /// one has tapped, so nothing is open either. An answer saying "I've
+    /// opened the form" is as wrong as one saying "added".
+    ///
+    /// **Prefer `modelReceipt(notYet:)`**, which ends a hand-off's receipt in
+    /// these terms, for the reason `modelReceipt` gives.
     public static var handOffReceipt: String {
-        "Proposed, not done: the reader confirms on a card under your answer, and confirming opens a form they fill in themselves. Say what it would start; never say it is done, and never say anything is open."
+        "Proposed, not done: it waits for a yes on a card under your answer, and a yes opens a form to fill in. Say what it would start; never say it is done, and never say anything is open."
+    }
+
+    /// What a proposing tool returns to the model once it has recorded this
+    /// proposal: `notYet`, the host's sentence saying the change hasn't
+    /// happened, then where it waits, by the button's own label. The kind
+    /// picks the ending, so a hand-off's says confirming opens a form.
+    ///
+    ///     return proposal.modelReceipt(notYet: "Jaws is not marked as opened yet.")
+    ///     // Jaws is not marked as opened yet. Nothing changes until
+    ///     // "Mark Opened" on the card below is confirmed.
+    ///
+    /// **`notYet` is the claim an answer would make, negated, in the words it
+    /// would make it in.** Asked for a change, the on-device model answers by
+    /// echoing the request as done ("Mark Jaws as opened." becomes "Jaws is now
+    /// marked as opened."), whatever a receipt says in general terms, and it
+    /// repeats a receipt that opens with that sentence negated. Measured on
+    /// macOS 27.2 (2026-11-01): Kabynyt's `edit_item`, "Mark Jaws as opened."
+    /// and "Lend Jaws to Sam.", said the change was made in 0 of 16 answers
+    /// with a card, 14 of them pointing at it, where `modelReceipt` let 13 of
+    /// 17 say it; the demo's reminder, given "No reminder to water the plants
+    /// is set yet.", in at most 1 of 16, all 16 pointing at the card, where
+    /// `modelReceipt` let 15 of 16 say it. Eleven receipts built without the
+    /// host's sentence, the proposal's title and button among them, left
+    /// Kabynyt's at 8 of 8 and the demo's at 9 of 16 or more.
+    ///
+    /// **The answer repeats it, so write it to the person asking.** Name the
+    /// thing as the app does and say what isn't so yet, never "the user" or
+    /// "the reader", which an answer would repeat to them: one answer on
+    /// Klosyt told its reader "The reader is prompted to finish the item on
+    /// their own." One sentence per change the tool offers, each written for
+    /// it ("Jaws is not lent to Sam yet.", "Nothing is added yet.").
+    ///
+    /// Clamped as tool output is (`AskPrompt.clamp`): `notYet` to
+    /// `AskPrompt.longClamp`, the label to `AskPrompt.shortClamp`, each on one
+    /// line. A sentence with no closing punctuation takes a full stop, and
+    /// one that clamps to nothing reads `modelReceipt` or `handOffReceipt`
+    /// instead.
+    public func modelReceipt(notYet: String) -> String {
+        var sentence = AskPrompt.clamp(notYet, AskPrompt.longClamp)
+        guard let last = sentence.last else {
+            return kind == .handOff ? Self.handOffReceipt : Self.modelReceipt
+        }
+        if !".!?…。！？".contains(last) { sentence += "." }
+        let label = AskPrompt.clamp(actionLabel, AskPrompt.shortClamp)
+        let button = label.isEmpty ? "the card below" : "\"\(label)\" on the card below"
+        switch kind {
+        case .perform:
+            return "\(sentence) Nothing changes until \(button) is confirmed."
+        case .handOff:
+            return "\(sentence) Nothing opens until \(button) is confirmed, and confirming it opens a form to finish it."
+        }
     }
 
     /// A proposal with each field as given and no payload, for one that

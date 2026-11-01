@@ -551,6 +551,7 @@ extension CrossPostureTests {
         #expect(AskProposal.maxPayloadBytes == 4_096)
         #expect(AskProposal.modelReceipt.hasPrefix("Proposed, not done"))
         #expect(AskProposal.handOffReceipt.hasPrefix("Proposed, not done"))
+        #expect(proposal.modelReceipt(notYet: "The Peregrine is not lent yet.").hasPrefix("The Peregrine is not lent yet. "))
         for outcome in [AskProposalOutcome.handedOff("Opened the form."), .declined] {
             let kept = try JSONEncoder().encode(outcome)
             #expect(try JSONDecoder().decode(AskProposalOutcome.self, from: kept) == outcome)

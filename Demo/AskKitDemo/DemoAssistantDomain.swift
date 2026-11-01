@@ -120,8 +120,9 @@ nonisolated struct DemoReminderArguments: Sendable {
 }
 
 /// `propose_reminder`: a proposing tool. It records an `AskProposal` and
-/// returns `AskProposal.modelReceipt`; nothing is added until the reader
-/// confirms the card, which reaches `DemoAssistantDomain.perform(_:)`.
+/// returns its receipt (`AskProposal.modelReceipt(notYet:)`); nothing is
+/// added until the reader confirms the card, which reaches
+/// `DemoAssistantDomain.perform(_:)`.
 ///
 /// Offered only in a conversation (`DemoAssistantDomain.makeTools(_:)`): a
 /// standalone turn has no card to confirm on.
@@ -132,6 +133,12 @@ nonisolated struct DemoReminderArguments: Sendable {
 /// prefix: worded "Offer the reader a reminder, …", the model called it 0
 /// times in 6 and answered in prose alone; worded "Set a reminder for the
 /// user, …", 8 times in 8, and 10 in 10 through the engine.
+///
+/// **Its receipt says no reminder is set, in so many words.** With the
+/// generic `AskProposal.modelReceipt`, the answer said the reminder was made
+/// ("You'll be reminded to water the plants at 6 PM.") 15 times in 16;
+/// opening with "No reminder to water the plants is set yet.", at most once
+/// in 16, every answer pointing at the card (macOS 27.2, 2026-11-01).
 nonisolated struct DemoReminderTool: Tool {
     let name = "propose_reminder"
     let description = "Set a reminder for the user, which they confirm on a card under your answer. Call it whenever they ask to be reminded of something."
@@ -143,12 +150,14 @@ nonisolated struct DemoReminderTool: Tool {
     @concurrent func call(arguments: DemoReminderArguments) async throws -> String {
         try await context.withToolCall { collector in
             guard let reminder = DemoReminder(arguments) else {
-                return ("Nothing to remind about: ask the reader what the reminder should say.", report: nil)
+                return ("Nothing to remind about: ask what the reminder should say.", report: nil)
             }
-            guard try await collector.record(proposal: DemoAssistantDomain.proposal(for: reminder)) else {
+            let proposal = try DemoAssistantDomain.proposal(for: reminder)
+            guard await collector.record(proposal: proposal) else {
                 return ("The reminder couldn't be offered.", report: nil)
             }
-            return (AskProposal.modelReceipt, report: nil)
+            let when = reminder.when.map { " \($0)" } ?? ""
+            return (proposal.modelReceipt(notYet: "No reminder to \(reminder.text)\(when) is set yet."), report: nil)
         }
     }
 }
