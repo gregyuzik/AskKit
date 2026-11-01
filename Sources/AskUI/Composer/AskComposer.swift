@@ -524,7 +524,8 @@ public struct AskComposer: View {
 
 /// The composer's field and the placeholder, the host's hint, in one stack:
 /// apart from the composer so the layout can be drawn in a test with a
-/// stand-in for the text field (`AskComposerPlaceholderTests`).
+/// stand-in for the text field (`AskComposerPlaceholderTests`), or with
+/// UIKit's own (`AskComposerUIKitFieldTests`).
 ///
 /// **One line, whatever its length**, so an empty field is the height of one
 /// line of draft: a hint that wrapped held the capsule two lines tall before
