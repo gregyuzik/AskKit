@@ -112,16 +112,46 @@ window in front the window draws as inactive, and the capture logs which app kep
 | `-askCaptureAfter <seconds>` | How long the window settles before it is written: 8 seconds by default. |
 | `-askCaptureSize <W>x<H>` | The window's content size: 1280x800 by default. The PNG is at the display's scale. |
 
-The README's `docs/images/mac.png` is a 960x560 window, which the thread fills, written after 8.5
-seconds, which lands between blinks of the composer's caret. The first two arguments draw it light and
-with the blue accent whatever the Mac's own settings are. Each `-key value` pair goes before any bare
-flag, since AppKit pairs a `-`-prefixed argument with the next one:
+The README's `docs/images/mac.png` is the assistant in a 960x560 window: its starter "Remind me to
+water the plants at 6 PM" answered under `-askScriptedAnswer`, with the reminder's card not yet
+confirmed. The on-device model, asked it on the Mac, answered without proposing the reminder. The turn
+is asked in one launch and imaged in a second, which reads the thread back: a card whose yes was never
+given comes back with its buttons. The first two arguments draw the window light and with the blue
+accent whatever the Mac's own settings are. Each `-key value` pair goes before any bare flag, since
+AppKit pairs a `-`-prefixed argument with the next one.
 
-```sh
-caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
-  -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
-  -askCaptureWindow /dev/fd/4 -askCaptureAfter 8.5 -askCaptureSize 960x560 4>mac.png
-```
+1. Launch with every chat forgotten and the thread kept, written late enough for the answer:
+
+   ```sh
+   caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
+     -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
+     -askCaptureWindow /dev/fd/4 -askCaptureAfter 20 -askCaptureSize 960x560 \
+     -askHidesTips -askAssistant -askFreshHistory -askScriptedAnswer 4>first.png &
+   ```
+
+2. Two or three seconds in, bring the window to the front with `open AskKitDemo.app`. The app asks for
+   the front itself, but activation is cooperative and the terminal keeps it, so the window would draw
+   as inactive. Run `open` only while the app is up: once it has quit, `open` starts another copy, with
+   no arguments.
+3. Activate the starter. A Return posted to the window doesn't reach the composer's `onKeyPress`, and
+   the Send menu item reports itself disabled, so post a click instead, from lldb
+   (`xcrun lldb -p <pid> --batch -o '…' -o detach`): a left mouse down and up
+   (`NSEvent mouseEventWithType:` 1, then 2) at the starter, (586, 234) in the window's coordinates,
+   sent to the key window with `-[NSApplication postEvent:atStart:]`.
+4. Launch again without `-askFreshHistory`, and bring the window to the front as before. The turn read
+   back is written after 8.5 seconds, which lands between blinks of the composer's caret:
+
+   ```sh
+   caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
+     -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
+     -askCaptureWindow /dev/fd/4 -askCaptureAfter 8.5 -askCaptureSize 960x560 \
+     -askHidesTips -askAssistant -askScriptedAnswer 4>mac.png
+   ```
+
+   On a 2x display an active window comes out 2144x1344; an inactive one is smaller, its shadow
+   shorter.
+5. Forget the chat with one more launch under `-askFreshHistory -askResetThread`, given
+   `-askCaptureWindow /dev/fd/4 -askCaptureAfter 2` and `4>/dev/null` so it quits.
 
 ## Imaging the iPhone screen
 
