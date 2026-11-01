@@ -640,13 +640,14 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             writeSlotFaceStyle()
             updateSlotCover { $0.screenAppeared() }
         }
-        // **The tips' gates, from the window the reader is in** (`tipGates`),
-        // each opening only once it has held (`settleTipGates()`). They're the
-        // app's, not the window's, so a screen in a window at the back writes
-        // nothing, and the one coming to the front writes its own. A task, so
-        // it runs again as the screen comes back from a tab or a pushed item,
-        // with the gates its going closed.
-        .task(id: windowAppearsActive ? tipGates : nil) { await settleTipGates() }
+        // **The tips' gates, from the window the reader is in** (`tipGates`,
+        // `readerIsInWindow`), each opening only once it has held
+        // (`settleTipGates()`). They're the app's, not the window's, so a
+        // screen in a window at the back writes nothing, and the one coming to
+        // the front writes its own. A task, so it runs again as the screen
+        // comes back from a tab or a pushed item, with the gates its going
+        // closed.
+        .task(id: readerIsInWindow ? tipGates : nil) { await settleTipGates() }
         // A host's accent can change on screen, such as one that dims with
         // its window, and so can its spectrum and its accessory button.
         .onChange(of: AskComposerFaceLook(accent: accent, spectrum: spectrum, accessory: slotFaceAccessory)) { _, _ in
@@ -2152,6 +2153,19 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         )
     }
 
+    /// Whether the reader is in this screen's window, whose screen writes the
+    /// tips' gates: the window in front, or its chats sheet.
+    ///
+    /// **The sheet counts on the Mac**, where it is a window of its own and
+    /// takes the key window, and the active appearance with it, from the
+    /// screen's (`windowAppearsActive`). Read alone, the sheet coming up
+    /// called off the chat tip's gate before its half second was up, and the
+    /// tip never came to the sheet (macOS 27.2, 2026-10-31). A sheet on iOS
+    /// and visionOS changes nothing here.
+    private var readerIsInWindow: Bool {
+        windowAppearsActive || showsHistory
+    }
+
     /// Writes `tipGates` to TipKit and to `settledTipGates`: a gate that
     /// closes at once, so a tip goes as its surface is covered, and one that
     /// opens only once it has held for `AskTipGates.settling`.
@@ -2166,7 +2180,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// too (`askTipGates`), so a status TipKit hasn't caught up on draws
     /// nothing either.
     private func settleTipGates() async {
-        guard windowAppearsActive else {
+        guard readerIsInWindow else {
             settledTipGates = AskTipGates.Reading()
             return
         }
