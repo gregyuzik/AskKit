@@ -1303,6 +1303,78 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertFalse(app.buttons[Ids.proposalConfirm].waitForExistence(timeout: 2), "And offers nothing.")
     }
 
+    // MARK: Two domains, one switch
+
+    /// The bar's menu switches between the demo's two domains
+    /// (`DemoDomainSwitch`), and each keeps its own thread: the library's
+    /// question is still there after a turn on the assistant and a switch
+    /// back, and the assistant's when it comes back too. Scripted, so no model
+    /// is needed, and under `resetThread`, as every launch here is, so the
+    /// switch doesn't outlast the launch: the next test opens on the library
+    /// whichever domain this one left on screen.
+    @MainActor
+    func testTheSwitchChangesDomainsAndEachKeepsItsThread() {
+        let app = launchScripted()
+        let starters = element(Ids.starters, in: app)
+        XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
+        let libraryQuestion = starters.buttons.element(boundBy: 0).label
+        starters.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(question(libraryQuestion, in: app).waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element(Ids.answer, in: app).waitForExistence(timeout: turnTimeout))
+        XCTAssertFalse(app.buttons[DemoAccessibility.reminders].exists, "The library has no Reminders item.")
+
+        switchDomain(to: .assistant, in: app)
+        XCTAssertTrue(
+            app.buttons[DemoAccessibility.reminders].waitForExistence(timeout: uiTimeout),
+            "The assistant is on screen, with its own bar item."
+        )
+        XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout), "On a thread of its own, at its first screen.")
+        let assistantQuestion = starters.buttons.element(boundBy: 0).label
+        XCTAssertNotEqual(assistantQuestion, libraryQuestion, "Its own starters.")
+        starters.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(question(assistantQuestion, in: app).waitForExistence(timeout: uiTimeout))
+        XCTAssertTrue(element(Ids.answer, in: app).waitForExistence(timeout: turnTimeout))
+
+        switchDomain(to: .library, in: app)
+        XCTAssertTrue(
+            question(libraryQuestion, in: app).waitForExistence(timeout: uiTimeout),
+            "The library's thread is as it was left."
+        )
+        XCTAssertFalse(question(assistantQuestion, in: app).exists, "And holds nothing the assistant was asked.")
+        XCTAssertFalse(app.buttons[DemoAccessibility.reminders].exists)
+
+        switchDomain(to: .assistant, in: app)
+        XCTAssertTrue(
+            question(assistantQuestion, in: app).waitForExistence(timeout: uiTimeout),
+            "So is the assistant's."
+        )
+    }
+
+    /// Pick `choice` in the bar's menu of domains.
+    ///
+    /// The menu's item by its name. The bar's button is labelled with the
+    /// domain on screen, and `choice` is never that one, so the name matches
+    /// the item alone.
+    @MainActor
+    private func switchDomain(to choice: DemoDomainChoice, in app: XCUIApplication) {
+        let menu = app.buttons[DemoAccessibility.domainMenu]
+        XCTAssertTrue(menu.waitForExistence(timeout: uiTimeout), "The bar has the switch.")
+        XCTAssertNotEqual(menu.label, choice.name, "A switch to the domain on screen tests nothing.")
+        menu.tap()
+        let item = app.buttons.matching(NSPredicate(format: "label == %@", choice.name)).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: uiTimeout), "The menu offers \(choice.name).")
+        item.tap()
+    }
+
+    /// The question bubble asking `text`: the bubble's label is "Your
+    /// question" on every one, and its value the question.
+    @MainActor
+    private func question(_ text: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@ AND value == %@", Ids.question, text))
+            .firstMatch
+    }
+
     /// The reader's chats, wherever the screen keeps them: the pane beside
     /// iPhone Duo's fold, where the bar has no History, or the sheet History
     /// opens everywhere else. Which one is there is the screen's to decide,

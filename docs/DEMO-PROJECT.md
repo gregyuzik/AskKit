@@ -80,10 +80,11 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
 - **The launch arguments.** Every `DemoLaunchArgument` but `-askAssistant`, `-askHoldTurn` and
   `-askHidesTips` is in each app scheme's Run arguments, off, so the scheme launches the demo plainly;
   tick one to use it. A flag for one platform alone, such as `-askTabs` or `-askCaptureWindow`, is
-  listed in every scheme all the same. `-askAssistant`, which hosts the assistant in place of the
-  library, `-askHoldTurn`, which holds every turn in flight, and `-askHidesTips`, which hides AskUI's
-  tips for the UI tests, aren't in the schemes: add one to a scheme's Run arguments in Xcode, or pass it
-  at launch.
+  listed in every scheme all the same. `-askAssistant`, which opens on the assistant rather than the
+  domain the demo was left on (the app switches between its two domains itself, and remembers which
+  was on screen), `-askHoldTurn`, which holds every turn in flight, and `-askHidesTips`, which hides
+  AskUI's tips for the UI tests, aren't in the schemes: add one to a scheme's Run arguments in Xcode, or
+  pass it at launch.
 - **`AskKitDemoUITests`** is iOS only. The smoke suite drives the screen on an iPhone 18 Pro simulator,
   and the Mac and visionOS apps are checked by hand, since a UI-test bundle per platform would be three
   flaky suites asserting one set of identifiers. It compiles `Shared/` too, so a launch argument isn't

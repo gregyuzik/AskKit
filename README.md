@@ -22,7 +22,7 @@ AskKit is a complete Ask screen over Apple's Foundation Models, for any kind of 
 
 A development build stays off Private Cloud Compute until you opt in, so it answers on the device. [Development builds and Private Cloud Compute](#development-builds-and-private-cloud-compute) says how to opt in.
 
-To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xcodeproj`: a library of thirty things to ask about, or, with the launch argument `-askAssistant`, which you add to the scheme yourself, an assistant with no data of its own that converts units and proposes reminders. With `-askScriptedAnswer`, either answers without a model ([The demo](#the-demo)).
+To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xcodeproj`. It hosts two domains, and a switch in the app moves between them: a library of thirty things to ask about, and an assistant with no data of its own that converts units and proposes reminders. With `-askScriptedAnswer`, either answers without a model ([The demo](#the-demo)).
 
 ## What you get
 
@@ -408,7 +408,7 @@ nonisolated struct AssistantDomain: AskDomain {
 }
 ```
 
-A tool that proposes an action works here as it does over rows: it records an `AskProposal`, and the reader confirms it on the card (step 5). `evidence(for:)` words the line under an answer a tool grounded, which AskKit's count of rows leaves out when the tool read none. The demo's assistant (`-askAssistant`, [The demo](#the-demo)) does both.
+A tool that proposes an action works here as it does over rows: it records an `AskProposal`, and the reader confirms it on the card (step 5). `evidence(for:)` words the line under an answer a tool grounded, which AskKit's count of rows leaves out when the tool read none. The demo's assistant ([The demo](#the-demo)) does both.
 
 ## Development builds and Private Cloud Compute
 
@@ -440,7 +440,7 @@ A turn is written when it ends, never while it streams. Writes are atomic, off t
 
 ## The demo
 
-`Demo/` is an app for iOS, macOS and visionOS over a small library of thirty things, books, records, tools and clothes, behind one search tool (`DemoDomain`). With `-askAssistant` it hosts a second domain in its place, `DemoAssistantDomain`: an assistant with no rows, which converts units with one tool, proposes reminders with another, and answers anything else from the model alone. It declares no Private Cloud Compute entitlement, so it always answers on the device. Its icon is three plates of Liquid Glass in the shape of the bubble in SF Symbols' `text.bubble.badge.sparkles`, the glyph its Ask tab and its mark wear, receding straight back and shading together through `AskSpectrum.aurora`'s colors; `scripts/make-demo-icon.py` makes it, tracing the bubble from the symbol. The symbol is Apple's, under Apple's SF Symbols terms.
+`Demo/` is an app for iOS, macOS and visionOS that hosts two domains, each with a thread and chats of its own. "Your Things" is a small library of thirty things, books, records, tools and clothes, behind one search tool (`DemoDomain`). "Assistant" is a domain with no rows (`DemoAssistantDomain`), which converts units with one tool, proposes reminders with another, and answers anything else from the model alone. The switch between them is a menu leading the bar on iOS and iPadOS, the title's menu on visionOS, and on the Mac a pop-up in the toolbar and the View menu (⌘1 and ⌘2). The demo opens where it was left, on the library the first time. Both share one model seam, as a host's Asks would, and each keeps its turn going while the other is on screen. It declares no Private Cloud Compute entitlement, so it always answers on the device. Its icon is three plates of Liquid Glass in the shape of the bubble in SF Symbols' `text.bubble.badge.sparkles`, the glyph its Ask tab and its mark wear, receding straight back and shading together through `AskSpectrum.aurora`'s colors; `scripts/make-demo-icon.py` makes it, tracing the bubble from the symbol. The symbol is Apple's, under Apple's SF Symbols terms.
 
 Open `Demo/AskKitDemo.xcodeproj` and run the `AskKitDemo_iOS` scheme on an iPhone 18 Pro simulator, or `AskKitDemo_macOS` or `AskKitDemo_visionOS`. The simulator and the Mac need no signing. A real turn needs Apple Intelligence; `-askScriptedAnswer` needs no model. To run on a device, put `DEVELOPMENT_TEAM = <your team ID>` in an untracked `Demo/Local.xcconfig`. [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md) says how the project is laid out and why its settings are what they are.
 
@@ -448,11 +448,11 @@ Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`, and
 
 | Argument | What it shows |
 |---|---|
-| none | A real turn on the on-device model, with starters drawn from the thirty items, "Surprise me" before the composer, and a gear button for the settings card. |
-| `-askResetThread` | An empty thread on every launch (`.perLaunch`): nothing is restored or saved. |
-| `-askFreshHistory` | The thread kept, but everything AskKit keeps for the demo deleted before the store reads it: the saved thread, every earlier chat, any thread set aside because it couldn't be read, and the feedback attachments. A clean History sheet. |
+| none | The domain the demo was left on, the library the first time. On the library, a real turn on the on-device model, with starters drawn from the thirty items, "Surprise me" before the composer, and a gear button for the settings card. |
+| `-askResetThread` | An empty thread on every launch (`.perLaunch`): nothing is restored or saved, in either domain. The launch opens on the library (or the assistant under `-askAssistant`) whichever was on screen last, and a switch isn't remembered. |
+| `-askFreshHistory` | The thread kept, but everything AskKit keeps for the demo deleted before the store reads it, in both domains: the saved thread, every earlier chat, any thread set aside because it couldn't be read, and the feedback attachments. A clean History sheet. The domain the demo was left on is forgotten too, so the launch opens on the library (or the assistant under `-askAssistant`). |
 | `-askScriptedAnswer` | Every question answered by the app, with no model. "What should I read tonight?" gets a pick with a basis line and Another pick, a question with "lend" in it gets a confirmation card, and anything else gets a two-tile lookup. The first screen keeps its starters even where Apple Intelligence is off. |
-| `-askPrefill <link>` | An Ask link opened once at launch, such as `askkitdemo://ask?q=…`: the question lands in the composer with the keyboard up and isn't sent. A window reopened or a tab switched back to doesn't open it again. |
+| `-askPrefill <link>` | An Ask link opened once at launch, such as `askkitdemo://ask?q=…`: the question lands in the composer with the keyboard up and isn't sent. A window reopened, a tab switched back to or the other domain switched to doesn't open it again. |
 | `-askPhotos` | The photo button in place of "Surprise me". It attaches a record sleeve the demo draws, and the answer notes that it read only the words. |
 | `-askTabs` (iOS) | The screen in a `TabView` of two tabs, Ask and Library. |
 | `-askSlot` (iOS, with `-askTabs`) | The composer's face in the tab bar's bottom accessory. The Library tab puts a host's own accessory there. |
@@ -461,7 +461,7 @@ Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`, and
 | `-askEmptyLibrary` | An empty library, so the first screen is the nothing-to-ask one; `-askEmptyLibrary button` adds its button. |
 | `-askHoldTurn` | Every turn held in flight until Stop, the app answering as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. Not in the schemes: pass it at launch, as `xcrun simctl launch <device> com.example.askkitdemo -askHoldTurn`. |
 | `-askHidesTips` | AskUI's tips hidden, as every UI test launches the demo. Without it the demo configures TipKit at launch and shows them; TipKit remembers a tip that has gone, so delete the app to see them again. Not in the schemes: pass it at launch. |
-| `-askAssistant` | The assistant in place of the library: no tiles, and under each answer the line saying what it stood on, the assistant's own words where a tool grounded it and "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed under Reminders. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing. |
+| `-askAssistant` | Opens on the assistant, whichever domain was on screen last; the switch still goes back to the library. The assistant shows no tiles, and under each answer the line saying what it stood on, the assistant's own words where a tool grounded it and "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed under Reminders. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing there. |
 
 `-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on the device writes Hebrew.
 

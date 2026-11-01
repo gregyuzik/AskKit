@@ -71,10 +71,11 @@ and AskKit has no third-party dependencies. `scripts/ci.sh api` compares `packag
 as public ones, so a public declaration made `package` prints no break, nor does an isolation change:
 each goes in the CHANGELOG by hand.
 
-**The demo.** `Demo/` is a small library, thirty books, records, tools and clothes behind one search tool
-(`DemoDomain`), and, under `-askAssistant`, an assistant with no rows in its place
+**The demo.** `Demo/` hosts two domains, switched between in the app: a small library, thirty books,
+records, tools and clothes behind one search tool (`DemoDomain`), and an assistant with no rows
 (`DemoAssistantDomain`), which converts units with one tool, proposes reminders with another and answers
-anything else from the model alone. It is built as an iOS, macOS and visionOS app from
+anything else from the model alone. Their engines share one seam, as a process's Asks do, and each
+domain's store is alive for the app's life over a thread of its own (`DemoHost`). It is built as an iOS, macOS and visionOS app from
 `Demo/AskKitDemo.xcodeproj`, with a UI-test bundle. It holds no Private Cloud Compute entitlement and
 declares none to its seam, and it is parked besides, so it always answers on device
 ([Entitlements](#entitlements), [the development park](#the-development-park)).

@@ -2,15 +2,19 @@ import AskCore
 import AskUI
 import SwiftUI
 
-/// The assistant's screen (`DemoLaunchArgument.assistant`): `AskScreen` in a
-/// stack, as every host has it, with the demo's mark, no tiles to draw, and
-/// two host items: the reminders the reader has added, and the settings card.
+/// The assistant's screen, a switch away from the library's
+/// (`DemoDomainSwitch`): `AskScreen` in a stack, as every host has it,
+/// with the demo's mark, no tiles to draw, and two host items: the reminders
+/// the reader has added, and the settings card.
 ///
 /// Smaller than `ContentView` on purpose. The tabs, the slot, the photo
 /// button, the tile routes and the nothing-to-ask screen are about the
 /// library's screen, and the assistant has no rows to open or own.
 struct DemoAssistantView: View {
     let ask: DemoAsk<DemoAssistantDomain>
+    /// The host, for the switch back to the library, and for the link handed
+    /// over at launch.
+    let host: DemoHost
 
     @State private var showsReminders = false
     @State private var showsSettings = false
@@ -58,6 +62,9 @@ struct DemoAssistantView: View {
                         .symbolRenderingMode(.monochrome)
                     }
                 }
+                // After the host's items, so the switch leads the bar and
+                // stands where it does on the library's screen.
+                .modifier(DemoDomainSwitch(host: host))
                 .sheet(isPresented: $showsReminders) {
                     DemoReminderSheet(list: ask.domain.reminders)
                 }
@@ -69,7 +76,7 @@ struct DemoAssistantView: View {
         // The link handed over at launch, once a launch, as `ContentView`
         // takes it.
         .task {
-            guard let url = ask.takeLaunchLink() else { return }
+            guard let url = host.takeLaunchLink() else { return }
             ask.open(url)
         }
     }
@@ -114,6 +121,7 @@ struct DemoReminderSheet: View {
     }
 }
 
+// On the one host the previews share (`previewHost`), for its one seam.
 #Preview {
-    DemoAssistantView(ask: DemoAsk())
+    DemoAssistantView(ask: previewHost.assistantAsk(), host: previewHost)
 }
