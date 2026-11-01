@@ -1024,11 +1024,11 @@ on the Mac the shortcut menu, since a Mac may be reached by a finger as well as 
     glass, and a popover on a button in glass never presented. Drawn as a view in an overlay instead,
     it never showed on visionOS, laid its words over the copy on the Mac and on iPad's wide column,
     and ran off the Duo's outer display on its side and across the fold in a tabletop.
-  - The question's is on the newest question. On iOS and visionOS the system picks its side: under a
-    first question near the top of an iPhone, above a low one (either fixed edge covered the bar or the
-    composer), and on a wider screen, such as the Duo's inner display, beside it on its leading side
-    over the answer's first line. Beside the Duo's chats it stays above or below: left to choose, the
-    system stood it on the leading side across the fold, over the chats and their Delete All Chats. On
+  - The question's is on the newest question. On iOS and visionOS it stands above or below it,
+    whichever has room: under a first question near the top of an iPhone, above a low one (either fixed
+    edge covered the bar or the composer). Never beside: left free to, the system stood it on the
+    bubble's leading side wherever the column had room, over the answer's first line on an iPad at
+    regular width, and across the Duo's fold over the chats and their Delete All Chats. On
     the Mac it stands under the bubble: left to choose, the system stood it above, over the toolbar and
     past the window's top edge, and beside the bubble it hung 250 pt off a window 380 pt wide.
   - The chat's stands under the first row that can be deleted, in the sheet and in the pane. Left to

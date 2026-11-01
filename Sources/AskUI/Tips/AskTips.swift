@@ -304,12 +304,6 @@ extension EnvironmentValues {
     /// a starter tip up over the keyboard (iPhone Duo simulator, 2026-10-31).
     /// All closed everywhere else.
     @Entry var askTipGates = AskTipGates.Reading()
-
-    /// Whether the reader's chats are on screen beside the thread, in the pane
-    /// by iPhone Duo's fold, which `AskScreen` sets in the environment. The
-    /// question tip stays above or below its question there, in the thread's
-    /// own pane (`AskQuestionBubble`). False everywhere else.
-    @Entry var askChatsAreBesideThread = false
 }
 
 #endif

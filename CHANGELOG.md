@@ -24,11 +24,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
-- On the Mac, a right-click or a Control-click anywhere on a question opens the question's shortcut
-  menu: Copy, Copy answer, Edit & Resend and Ask again. Its words were selectable, and the text took
-  the click for its own menu of Cut, Copy, Paste and Font, so only the few points of padding round
-  them reached the question's. Copy copies the whole question. On iOS and visionOS the question stays
-  selectable.
+- A question's menu (Copy, Copy answer, Edit & Resend and Ask again) opens from anywhere on the
+  question. Its words were selectable, and the selection competed for the same press: on the Mac the
+  text took a right-click or a Control-click for its own menu of Cut, Copy, Paste and Font, so only
+  the few points of padding round the words reached the question's, and on an iPad a long press on
+  the words could select one and show the system's Copy, Look Up and Translate instead. A question's
+  words are no longer selectable; the menu's Copy copies the whole question.
 - On the Mac, the chats sheet opens tall enough to show its chats. It took the size its list asked
   for, which is no height at all, and opened 470 by 158 points with nothing between its bars.
 

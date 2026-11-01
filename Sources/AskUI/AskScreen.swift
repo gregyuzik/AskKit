@@ -512,9 +512,6 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             windowResizes += 1
         }
         #endif
-        // Where the question tip stands beside iPhone Duo's fold
-        // (`AskQuestionBubble`).
-        .environment(\.askChatsAreBesideThread, foldArrangement.listsChats && leadingPaneContent == .chats)
         #if os(iOS)
         // Read in the panes' own space, so the fold's x counts from the
         // screen's leading edge, mirrored right to left, and from the screen's

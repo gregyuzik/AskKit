@@ -51,9 +51,6 @@ struct AskQuestionBubble: View {
     /// Where the bubble is in the thread's content
     /// (`AskScrollFollow.threadContent`), each time that changes.
     private let onPlaced: ((CGRect) -> Void)?
-    /// Whether the chats are beside the thread, by iPhone Duo's fold, where
-    /// the menu's tip stays above or below the bubble.
-    @Environment(\.askChatsAreBesideThread) private var chatsAreBesideThread
 
     init(
         question: String,
@@ -100,26 +97,21 @@ struct AskQuestionBubble: View {
             Spacer(minLength: 48)
             Text(question)
                 .font(.body)
-                // Selectable and menu-bearing on iOS and visionOS. On iOS 27
-                // `textSelection` is system selection rather than a callout
-                // menu, so whether a long press reaches the menu is the
-                // system's decision. Measured on an iPhone 17 Pro simulator
-                // with SDK 27, it does. The demo's
-                // `testTheQuestionBubblesContextMenuIsReachable` keeps
-                // measuring it, because Copy, Copy answer, Edit & Resend and
-                // Ask again reach a reader's touch through this menu and
-                // nowhere else in AskUI; VoiceOver has them as actions too
-                // (below).
-                //
-                // **Not selectable on the Mac**, where a selectable text view
-                // takes the right-click and the Control-click for its own
-                // menu, Cut, Copy, Paste and Font: the question's opened only
-                // from the bubble's padding, the 14 by 10 points round the
-                // words (macOS 27.2, 2026-10-31). Its Copy copies the whole
-                // question, and the menu bar has all four (`AskCommands`).
-                #if !os(macOS)
-                .textSelection(.enabled)
-                #endif
+                // **Menu-bearing, not selectable.** Copy, Copy answer, Edit &
+                // Resend and Ask again reach a reader's touch through this
+                // menu and nowhere else in AskUI (VoiceOver has them as
+                // actions too, below), and the question's tip tells the reader
+                // to open it. Selectable, the words competed for the same
+                // press: on the Mac a selectable text view took the
+                // right-click and the Control-click for its own Cut, Copy,
+                // Paste and Font, so the question's menu opened only from the
+                // bubble's padding, the 14 by 10 points round the words (macOS
+                // 27.2); on an iPad a long press on the words selected one and
+                // showed the system's Copy, Look Up and Translate in two of
+                // three first presses (iPad mini simulator, iOS 27.2; both
+                // 2026-10-31). The menu's Copy copies the whole question. The
+                // demo's `testTheQuestionBubblesContextMenuIsReachable` keeps
+                // measuring that a long press reaches the menu.
                 // Black or white on the fill as contrast decides, not always
                 // `.primary` (`AskOnFill`).
                 .foregroundStyle(AskOnFill(fill: fill))
@@ -208,23 +200,9 @@ struct AskQuestionBubble: View {
                 // being it. Scrolled from between the bars, the bubble takes
                 // the tip with it (`AskScreen.tipGates`).
                 //
-                // **The system picks the side** on iOS and visionOS, the one
-                // with room: under the first question, which sits just below
-                // the bar, and above a newest question low on a long thread,
-                // over the answer before it, which the reader has read
-                // (iPhone 18 Pro simulator, 2026-10-31). Either edge, fixed,
-                // would put the tip over the bar or the composer in the other
-                // case. The Mac's is fixed (`menuTipSide`).
-                //
-                // **Above or below alone beside the chats**, in the pane by
-                // iPhone Duo's fold: left to choose, the system stood the tip
-                // on the bubble's leading side, across the fold over the
-                // chats and their Delete All Chats (iPhone Duo simulator,
-                // open flat on its side, 2026-10-31).
-                .askPopoverTip(
-                    AskQuestionMenuTip(), isShown: showsMenuTip,
-                    side: chatsAreBesideThread ? .aboveOrBelow : Self.menuTipSide
-                )
+                // **Above or below, whichever has room**, on iOS and
+                // visionOS (`menuTipSide`).
+                .askPopoverTip(AskQuestionMenuTip(), isShown: showsMenuTip, side: Self.menuTipSide)
                 // Where the bubble is in the thread, read in the content's own
                 // space, which a scroll doesn't change: it reports when the
                 // rows above it move, not at every frame of a scroll.
@@ -274,8 +252,18 @@ struct AskQuestionBubble: View {
 
     private static let corner: CGFloat = 20
 
-    /// The side the menu's tip stands on, where nothing beside the thread
-    /// asks for one (`askPopoverTip`).
+    /// The side the menu's tip stands on (`askPopoverTip`).
+    ///
+    /// **Above or below on iOS and visionOS, never beside.** The system takes
+    /// the one with room: under the first question, which sits just below
+    /// the bar, and above a newest question low on a long thread, over the
+    /// answer before it, which the reader has read (iPhone 18 Pro simulator,
+    /// 2026-10-31). Either edge, fixed, put the tip over the bar or the
+    /// composer in the other case. Left free to go beside, it stood on the
+    /// bubble's leading side wherever the column had room: over the first
+    /// line of the answer on an iPad at regular width (iPad mini simulator),
+    /// and across iPhone Duo's fold over the chats and their Delete All
+    /// Chats, open flat on its side (iPhone Duo simulator; both 2026-10-31).
     ///
     /// **Under the bubble on the Mac.** Left to choose, the system stood it
     /// above, over the toolbar and past the window's top edge, as it did
@@ -287,7 +275,7 @@ struct AskQuestionBubble: View {
         #if os(macOS)
         .below
         #else
-        .any
+        .aboveOrBelow
         #endif
     }
 

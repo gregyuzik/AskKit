@@ -1075,13 +1075,13 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
 
     /// Copy, Copy answer, Edit & Resend and Ask again reach a reader's touch
     /// through the question bubble's menu and nowhere else in AskUI (VoiceOver
-    /// has them as the bubble's actions too). The bubble is
-    /// selectable as well as menu-bearing, and on iOS 27 `textSelection` is
-    /// system selection rather than a callout menu, so a long press on it may
-    /// resolve to selection and never reach the menu (`AskQuestionBubble`).
+    /// has them as the bubble's actions too), and the question's tip tells the
+    /// reader to open it. The bubble's words were selectable once, and a long
+    /// press on them could resolve to selection and never reach the menu
+    /// (`AskQuestionBubble`).
     ///
-    /// Driven rather than reasoned about, because which one wins is the
-    /// system's decision, and a new release can change it.
+    /// Driven rather than reasoned about, because what a long press reaches
+    /// is the system's decision, and a new release can change it.
     @MainActor
     func testTheQuestionBubblesContextMenuIsReachable() throws {
         let app = try launch()
