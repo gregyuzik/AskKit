@@ -249,10 +249,28 @@ nonisolated struct DemoAssistantDomain: AskDomain {
     /// Three sentences, a fourth in a conversation and one more with an answer
     /// language: short, as house rule 3 asks, and naming only the tools the
     /// session holds. The units live in the converter's `@Guide`s.
+    ///
+    /// **The converter's line names the question as well as the task, and
+    /// every word of it is measured.** On the on-device model (macOS 27.2,
+    /// 2026-11-01), worded "To convert an amount between units, call
+    /// convert_units and give its result.", the model called it for "Convert
+    /// 100 degrees Fahrenheit to Celsius" 6 times in 6, and for "What is 100
+    /// degrees Fahrenheit in Celsius?", "What is 10 miles in kilometers?" and
+    /// "What is 5 pounds in kilograms?" 0 times in 6 each, working them out
+    /// from memory instead, a value it couldn't know (137 °F) included.
+    /// Worded as it is, 8 in 8 for each and for the starter, and "What's a
+    /// good name for a houseplant?" still calls nothing. Rewordings that
+    /// read the same lost it: naming only the question ("When a question
+    /// gives an amount in one unit and asks for it in another, …") took the
+    /// starter to 6 in 8, "Whenever a question has an amount in one unit and
+    /// wants it in another, …" to 0 in 8, and saying it in the tool's
+    /// description instead left the "What is" questions between 0 and 5 in 6.
+    /// Still mostly from memory: "Convert 2 cups to milliliters", 1 in 8
+    /// (0 in 8 before).
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
         var text = """
             You are a helpful assistant in a demo app. Answer in two or three sentences of plain prose, with no headings and no lists.
-            To convert an amount between units, call convert_units and give its result.
+            To convert an amount between units, or to say what an amount is in another unit, call convert_units and give its result; never work it out yourself.
             """
         if isConversation { text += "\nWhen the reader asks to be reminded of something, call propose_reminder." }
         if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
