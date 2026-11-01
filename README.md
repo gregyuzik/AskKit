@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="center">
-  <img src="docs/images/iphone.png" width="12%" alt="The Ask screen on iPhone: the question &quot;What tools do I own?&quot; answered in two sentences, with seven tiles of the tools it read, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the composer at the bottom">
+  <img src="docs/images/iphone.png" width="12%" alt="The Ask screen on iPhone, the settings button and the switch between the demo's two domains at the bar's leading end: the question &quot;What tools do I own?&quot; answered in three sentences, with seven tiles of the tools it read, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the one-line composer at the bottom">
   <img src="docs/images/mac.png" width="38%" alt="The Ask screen in a Mac window: the question &quot;What tools do I own?&quot; answered with seven tiles of tools, an evidence line, two follow-up suggestions and the composer">
   <img src="docs/images/vision.png" width="33%" alt="The Ask screen in an Apple Vision Pro window, under the title's pill, whose menu switches between the demo's two domains: the question &quot;What clothes do I own?&quot; answered in a sentence naming seven clothes, with their seven tiles, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the one-line composer">
 </p>
