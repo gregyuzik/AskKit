@@ -23,6 +23,15 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   what it does: "Set a reminder for the user, …". Measured on the Mac, the reminder starter now
   proposes the reminder 10 times in 10, where it did 0 times in 10, and the conversion is called 10
   times in 10, where it was 0 times in 10. No API changes.
+- **The demo's assistant converts "What is 100 degrees Fahrenheit in Celsius?" with its converter.**
+  Its instructions said to call `convert_units` "to convert an amount between units", and the
+  on-device model took a question asking what an amount is in another unit as one to answer from
+  memory: "What is 100 degrees Fahrenheit in Celsius?", "What is 10 miles in kilometers?" and "What
+  is 5 pounds in kilograms?" called it 0 times in 6 each. The line now names that question too and
+  says never to work a conversion out by hand, and the three call it 10 times in 10 through the
+  engine, the starter and the reminder as before, with "What's a good name for a houseplant?" and
+  "thanks" still calling nothing. "Convert 2 cups to milliliters" is still mostly answered from
+  memory (1 in 8, 0 in 8 before). No API changes.
 
 ## [0.4.0] - 2026-11-01
 
