@@ -862,7 +862,11 @@ is drawn, such as a photo still decoding, crosses its placeholder the same way (
 `AskComposer` sits in the screen's bottom bar (`safeAreaBar(edge: .bottom)`): a glass capsule tinted with
 the host's accent, growing from one to four lines as the draft does. The host's hint takes one line,
 ending in an ellipsis when it is longer than the field is wide, so an empty field is always one line
-tall; VoiceOver reads the hint whole. As it
+tall; VoiceOver reads the hint whole. The hint sits where the draft's first line will be
+(`AskComposerHintLayout`): on the field's first baseline where the field reports one, as the Mac's
+does, and at the field's top where it reports none, as UIKit's empty field on iOS and visionOS
+doesn't. Set on what that field reports, its top, the hint drew a line above the field's and held the
+empty capsule two lines tall, from 0.3.0 to 0.3.1. As it
 grows its corners keep the radius they have at one line, centred on the circles at the bottom of the row,
 so the circles stay as far inside the edge at four lines as at one: a capsule four lines tall, with ends
 57 pt round, ran them out over its rim.
@@ -1327,8 +1331,7 @@ Each of these is the obvious thing to try, and each was ruled out for the reason
   never fires `onSubmit`, so a key labelled "send" inserts a newline.
 - **A text view of AskKit's own for the composer's field (`UIViewRepresentable`,
   `NSViewRepresentable`), to see an input method's marked text.** It would see it, and give up what
-  SwiftUI's `TextField` gives the composer: the hint on the field's first baseline
-  (`AskComposerFieldStack`); the focus binding, which SwiftUI clears as the field resigns
+  SwiftUI's `TextField` gives the composer: the focus binding, which SwiftUI clears as the field resigns
   (`AskKeyboard`), and VoiceOver's (`@AccessibilityFocusState`); the growth from one line to four; the
   words' hierarchical style on glass (`AskGlassForeground`); the field's VoiceOver and Voice Control
   labels and its `ask.field` identifier. And it would be two text views, UIKit's and AppKit's. The

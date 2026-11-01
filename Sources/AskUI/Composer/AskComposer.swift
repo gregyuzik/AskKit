@@ -532,10 +532,11 @@ public struct AskComposer: View {
 /// an ellipsis, as a system text field's prompt does, and VoiceOver reads it
 /// whole (`accessibilityHint`). Only a draft grows the capsule.
 ///
-/// **On the field's first baseline**, so the hint's first line sits where the
-/// draft's will: measured on the Mac, a text field padded 10 pt from the top
-/// took the hint's first line down with it, where top alignment left the hint
-/// 10 pt above the field's text.
+/// **Where the draft's first line will be** (`AskComposerHintLayout`): on the
+/// field's first baseline where the field reports one, and at its top where
+/// it reports none, as UIKit's empty field doesn't. Set on what that field
+/// reports instead, the hint drew a line above the field's on iOS and
+/// visionOS, and held the empty capsule two lines tall.
 struct AskComposerFieldStack<Field: View>: View {
     /// The host's hint, or nil once the draft has anything in it.
     let placeholder: String?
@@ -546,7 +547,9 @@ struct AskComposerFieldStack<Field: View>: View {
     @ViewBuilder let field: Field
 
     var body: some View {
-        ZStack(alignment: Alignment(horizontal: .leading, vertical: .firstTextBaseline)) {
+        // The field last, so it draws over the hint and takes a tap on its
+        // own frame.
+        AskComposerHintLayout {
             if let placeholder {
                 Text(placeholder)
                     .font(.body)
@@ -574,6 +577,74 @@ struct AskComposerFieldStack<Field: View>: View {
             }
             field
         }
+    }
+}
+
+/// Lays the hint over the composer's field (`AskComposerFieldStack`), the
+/// field last: the hint where the draft's first line will be, and the stack
+/// the field's height, so only a draft grows the capsule.
+///
+/// **On the field's first baseline where it reports one.** A field whose
+/// text sits lower in its frame takes the hint down with it, where the top
+/// would leave it above the text (`AskComposerPlaceholderTests`, with a
+/// stand-in padded 10 pt).
+///
+/// **At the field's top where it reports none.** UIKit's text field, empty,
+/// reports its first baseline at its top, 2.2 × 10⁻³⁰⁸ pt down
+/// (`CGFloat.leastNormalMagnitude`), and its last at its bottom; with a
+/// word in it, 16.33 pt down a 22 pt line, where one line of the hint has
+/// its baseline 16.33 pt down too (measured on the iOS 27.2 simulator,
+/// `AskComposerUIKitFieldTests`). Set on the empty field's report, as a
+/// `ZStack` aligned on `.firstTextBaseline` set it from 0.3.0, the hint
+/// drew a line above the field's and the stack was 38.33 pt tall, not 22.
+/// Its top, not its centre: centred, the hint sat 0.83 pt under the
+/// draft's line. The Mac's field reports its baseline empty or not, 13 pt
+/// down a 16 pt line, as the hint's is, so there the two agree.
+///
+/// **As wide as it is offered**, as the hint's `maxWidth: .infinity` made
+/// the `ZStack` before it, so the hint has the field's whole width to end in
+/// an ellipsis in.
+///
+/// **Not mirrored by hand**: SwiftUI mirrors a `Layout`'s space for right to
+/// left (`AskChipFlow.placeSubviews` says how that was measured).
+nonisolated struct AskComposerHintLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let field = subviews.last else { return .zero }
+        let size = field.sizeThatFits(proposal)
+        // A finite offer only: an infinite one is a probe asking how big
+        // this could be (`AskChipFlow.sizeThatFits`).
+        let offered = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        return CGSize(width: max(offered ?? 0, size.width), height: size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let field = subviews.last else { return }
+        let fieldProposal = ProposedViewSize(bounds.size)
+        field.place(at: bounds.origin, proposal: fieldProposal)
+        let fieldDimensions = field.dimensions(in: fieldProposal)
+        let hintProposal = ProposedViewSize(width: bounds.width, height: nil)
+        for hint in subviews.dropLast() {
+            let top = Self.hintTop(
+                hintBaseline: hint.dimensions(in: hintProposal)[.firstTextBaseline],
+                fieldBaseline: fieldDimensions[.firstTextBaseline],
+                fieldHeight: fieldDimensions.height
+            )
+            hint.place(at: CGPoint(x: bounds.minX, y: bounds.minY + top), proposal: hintProposal)
+        }
+    }
+
+    /// How far below the field's top the hint goes: down to the field's first
+    /// baseline, less the hint's own, or none where the field reports no
+    /// baseline.
+    ///
+    /// **A baseline less than a point below the top, or at or past the
+    /// bottom, is none.** UIKit's empty field reports the least positive
+    /// `CGFloat`, and a view with no text in it reports its bottom: no line of
+    /// text has its baseline within a point of its top, or on its bottom edge,
+    /// with nothing of its descenders below.
+    static func hintTop(hintBaseline: CGFloat, fieldBaseline: CGFloat, fieldHeight: CGFloat) -> CGFloat {
+        guard fieldBaseline >= 1, fieldBaseline < fieldHeight else { return 0 }
+        return fieldBaseline - hintBaseline
     }
 }
 

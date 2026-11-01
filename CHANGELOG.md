@@ -38,6 +38,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **The empty composer is one line tall again on iOS, iPadOS and visionOS**, with the host's hint on
+  that line between the accessory button and the send, where the draft's first line goes. Since 0.3.0
+  every host there drew it two lines tall: the hint was set on the field's first text baseline, and
+  UIKit's text field, empty, reports that baseline at its top, so the hint sat a whole line above the
+  field's, and the capsule was 64 points tall on an iPhone where one line is 48. 0.3.1's one-line hint
+  didn't cure it. The hint now goes on the field's first baseline where the field reports one, as the
+  Mac's does, and at its top where it reports none (`AskComposerHintLayout`). The Mac was never
+  affected. No API changes.
 - A question's menu (Copy, Copy answer, Edit & Resend and Ask again) opens from anywhere on the
   question. Its words were selectable, and the selection competed for the same press: on the Mac the
   text took a right-click or a Control-click for its own menu of Cut, Copy, Paste and Font, so only
