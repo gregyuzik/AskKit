@@ -22,6 +22,16 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   its surface is on screen with nothing over it, and goes once the reader has done what it says or
   closed it. No API changes.
 
+### Fixed
+
+- On the Mac, a right-click or a Control-click anywhere on a question opens the question's shortcut
+  menu: Copy, Copy answer, Edit & Resend and Ask again. Its words were selectable, and the text took
+  the click for its own menu of Cut, Copy, Paste and Font, so only the few points of padding round
+  them reached the question's. Copy copies the whole question. On iOS and visionOS the question stays
+  selectable.
+- On the Mac, the chats sheet opens tall enough to show its chats. It took the size its list asked
+  for, which is no height at all, and opened 470 by 158 points with nothing between its bars.
+
 ## [0.3.1] - 2026-10-29
 
 The composer's hint no longer makes an empty field two lines tall.
