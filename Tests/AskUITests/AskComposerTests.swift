@@ -2,6 +2,8 @@
 
 #if os(macOS)
 import AppKit
+#else
+import UIKit
 #endif
 import SwiftUI
 import Testing
@@ -144,22 +146,42 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
     /// More lines than the field grows to.
     private static let longest = String(repeating: "Ask about the things you keep here. ", count: 6)
 
+    /// Where a stand-in field says its first baseline is.
+    enum Baseline: Sendable {
+        /// Where its text's is, as the Mac's field reports, empty or not.
+        case text
+        /// At its top edge, as UIKit's empty field reports
+        /// (`AskComposerHintLayout`).
+        case top
+        /// At its bottom edge, as SwiftUI reports for a view with no text in
+        /// it.
+        case bottom
+    }
+
     /// What the field holds: `lines` lines of body text, drawn in no ink,
-    /// `inset` under the top of its frame.
-    private func field(lines: Int = 1, inset: CGFloat = 0) -> some View {
+    /// `inset` inside its frame above and below, and reporting its first
+    /// baseline at `baseline`.
+    private func field(lines: Int = 1, inset: CGFloat = 0, baseline: Baseline = .text) -> some View {
         Text(verbatim: (1...lines).map(String.init).joined(separator: "\n"))
             .font(.body)
             .lineLimit(AskComposerMetrics.lines)
             .hidden()
-            .padding(.top, inset)
+            .padding(.vertical, inset)
+            .alignmentGuide(.firstTextBaseline) { dimensions in
+                switch baseline {
+                case .text: dimensions[.firstTextBaseline]
+                case .top: 0
+                case .bottom: dimensions.height
+                }
+            }
     }
 
-    private func render(_ placeholder: String?, lines: Int = 1, inset: CGFloat = 0) throws -> NSBitmapImageRep {
+    private func render(_ placeholder: String?, lines: Int = 1, inset: CGFloat = 0, baseline: Baseline = .text) throws -> NSBitmapImageRep {
         let stack = AskComposerFieldStack(
             placeholder: placeholder,
             style: AskGlassForeground(minimum: AskGlassForeground.text),
             focusField: {},
-            field: { field(lines: lines, inset: inset) }
+            field: { field(lines: lines, inset: inset, baseline: baseline) }
         )
         let renderer = ImageRenderer(content: stack.foregroundStyle(.black).background(.white))
         renderer.scale = 1
@@ -192,13 +214,29 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
         #expect(try firstInk(in: render(Self.long)) != nil)
     }
 
-    /// **The hint's first line sits on the field's first baseline**, so it
-    /// is where the draft's first line will be: a field whose text sits
-    /// lower in its frame takes the hint down with it.
+    /// **The hint sits on the field's first baseline**, where the draft's
+    /// first line will be: a field whose text sits lower in its frame takes
+    /// the hint down with it, where the field's top would leave it 10 pt
+    /// above the text.
     @Test func theHintSitsOnTheFieldsFirstBaseline() throws {
         let level = try #require(firstInk(in: render(Self.short)))
         let lowered = try #require(firstInk(in: render(Self.short, inset: 10)))
         #expect(lowered == level + 10)
+    }
+
+    /// **A field that reports no first baseline** keeps the hint on its
+    /// line, at its top, and stays one line tall. UIKit's empty field reports
+    /// its first baseline at its top (`AskComposerHintLayout`): set on that,
+    /// the hint drew a line above the field's on iOS and visionOS, and held
+    /// the capsule two lines tall. Set on a view's bottom, the default where
+    /// it has no text, the hint sat under the field's line.
+    @Test(arguments: [Baseline.top, .bottom])
+    func aFieldWithNoBaselineKeepsTheHintOnItsLine(_ baseline: Baseline) throws {
+        let oneLine = try render(nil)
+        let level = try #require(firstInk(in: render(Self.short)))
+        let reported = try render(Self.short, baseline: baseline)
+        #expect(reported.pixelsHigh == oneLine.pixelsHigh)
+        #expect(firstInk(in: reported) == level)
     }
 }
 #endif
@@ -227,6 +265,87 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
         #expect(sending != AskComposerCommand(sends: false, stops: false, actions: actions))
         #expect(sending != AskComposerCommand(sends: true, stops: true, actions: actions))
         #expect(sending != AskComposerCommand(sends: true, stops: false, actions: AskComposerActions()))
+    }
+}
+#endif
+
+/// Where the hint goes over the field (`AskComposerHintLayout.hintTop`), on
+/// the numbers each platform's field reports.
+@Suite(.timeLimit(.minutes(1))) struct AskComposerHintLayoutTests {
+    /// UIKit's field on iOS reports its first baseline at its top while
+    /// empty, and with a word in it 16.33 pt down a 22 pt line, as one line
+    /// of the hint has its own: the hint goes at the field's top either way,
+    /// where the draft's first baseline will be.
+    @Test func onIOSTheHintGoesAtTheFieldsTop() {
+        let hint: CGFloat = 49.0 / 3
+        #expect(AskComposerHintLayout.hintTop(hintBaseline: hint, fieldBaseline: .leastNormalMagnitude, fieldHeight: 22, inset: 0) == 0)
+        #expect(AskComposerHintLayout.hintTop(hintBaseline: hint, fieldBaseline: hint, fieldHeight: 22) == 0)
+    }
+
+    /// UIKit's field on visionOS reports its first baseline at its top while
+    /// empty, and with a word in it 18 pt down a 26 pt line, where the hint's
+    /// is 16: the hint goes 2 pt down, where the draft's will be.
+    @Test func onVisionOSTheHintGoesWhereTheDraftsLineWillBe() {
+        let empty = AskComposerHintLayout.hintTop(hintBaseline: 16, fieldBaseline: .leastNormalMagnitude, fieldHeight: 26, inset: 2)
+        let typed = AskComposerHintLayout.hintTop(hintBaseline: 16, fieldBaseline: 18, fieldHeight: 26)
+        #expect(empty == 2)
+        #expect(empty == typed)
+    }
+
+    /// The Mac's field reports its baseline 13 pt down a 16 pt line, empty
+    /// or not, as the hint's is.
+    @Test func onTheMacTheHintGoesOnTheFieldsBaseline() {
+        #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: 13, fieldHeight: 16) == 0)
+    }
+
+    /// A field whose text sits lower in its frame takes the hint down by as
+    /// much.
+    @Test func aLowerBaselineTakesTheHintDown() {
+        #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: 23, fieldHeight: 36) == 10)
+    }
+
+    /// A baseline within a point of the field's top, or on its bottom edge,
+    /// is none, and the hint goes down by the inset.
+    @Test func aBaselineAtAnEdgeIsNone() {
+        for reported: CGFloat in [-4, 0, .leastNormalMagnitude, 0.5, 16, 20] {
+            #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: reported, fieldHeight: 16, inset: 0) == 0)
+            #expect(AskComposerHintLayout.hintTop(hintBaseline: 13, fieldBaseline: reported, fieldHeight: 16, inset: 2) == 2)
+        }
+    }
+}
+
+#if os(iOS) || os(visionOS)
+/// The composer's stack around UIKit's own text field, the field
+/// `AskComposerPlaceholderTests` stands in for on the Mac, measured in a
+/// hosting controller. Height alone: the hint's ink can't be read here,
+/// since `ImageRenderer` draws no UIKit view.
+@MainActor
+@Suite(.timeLimit(.minutes(1))) struct AskComposerUIKitFieldTests {
+    private func height(hint: String?, draft: String = "") -> CGFloat {
+        let stack = AskComposerFieldStack(
+            placeholder: hint,
+            style: AskGlassForeground(minimum: AskGlassForeground.text),
+            focusField: {},
+            field: {
+                TextField("", text: .constant(draft), axis: .vertical)
+                    .lineLimit(AskComposerMetrics.lines)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+            }
+        )
+        return UIHostingController(rootView: stack)
+            .sizeThatFits(in: CGSize(width: 300, height: CGFloat.greatestFiniteMagnitude)).height
+    }
+
+    /// **The hint leaves the empty field one line tall.** UIKit's empty
+    /// field reports its first baseline at its top (`AskComposerHintLayout`),
+    /// and set on that, the hint drew a line above the field's: the stack
+    /// was 38.33 pt tall, not 22, on the iOS 27.2 simulator.
+    @Test func theHintLeavesTheEmptyFieldOneLineTall() {
+        let oneLine = height(hint: nil)
+        #expect(height(hint: "Ask about your things") == oneLine)
+        #expect(height(hint: String(repeating: "Ask about your things. ", count: 6)) == oneLine)
+        #expect(height(hint: nil, draft: "One\nTwo") > oneLine)
     }
 }
 #endif
