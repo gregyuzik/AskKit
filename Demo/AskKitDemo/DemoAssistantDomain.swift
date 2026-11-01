@@ -261,13 +261,13 @@ nonisolated struct DemoAssistantDomain: AskDomain {
 
     /// None, AskKit's default, said here so it isn't added back: words that
     /// frame the request as a question to answer keep the on-device model
-    /// from calling the tools. Measured on a chat's first question (macOS
+    /// from calling the converter. Measured on a chat's first question (macOS
     /// 27.2, 2026-11-01), "Answer a question asked of an assistant." ahead of
     /// it had the model work out "How many kilometers is 10 miles?" from
     /// memory 10 times in 10, where without it the model called
-    /// `convert_units` 10 times in 10, and it cost `propose_reminder` 2 calls
-    /// in 8. A follow-up's prompt carries no prefix, which is why the
-    /// conversion was called there.
+    /// `convert_units` 10 times in 10. A follow-up's prompt carries no
+    /// prefix, and the same conversion asked as a follow-up was called 5
+    /// times in 6 with the prefix still in place.
     var promptPrefix: String { "" }
 
     /// One of each thing it does: a conversion, a reminder and a question
