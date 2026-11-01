@@ -384,21 +384,24 @@ struct ContentView: View {
     @State private var selectedTab = DemoTab.ask
 
     /// Leading on the phone, not `.secondaryAction`. SDK 27 moves a secondary
-    /// action into the overflow menu, a "More" button beside New Chat, a second
+    /// action into the overflow menu, a "More" button beside New Chat, another
     /// trailing item — and a title stack centres only while its subtitle
     /// clears the items on both sides, so the demo's title would sit left of
-    /// centre where a host whose one bar item is New Chat has it centred. One
-    /// item a side keeps the demo honest about the screen it exists to show.
-    /// The Mac has no top bar to lead.
+    /// centre. Leading, after the domain switch (`DemoDomainSwitch`), the
+    /// demo's two host items stand opposite New Chat and the chats, and the
+    /// title is centred at rest, as a host's is. The Mac has no top bar to
+    /// lead.
     ///
-    /// **A cost that host does not pay.** `AskScreen` puts its own Done here
-    /// while the keyboard is up, so the demo's bar carries three items where
-    /// that host's carries two, and a title stack left-aligns once the sides
-    /// stop clearing the subtitle. Measured on an iPhone with the caption at
-    /// its longest: two items centre it to within a point, three leave the
-    /// subtitle 12pt right of centre. So the demo's title is centred at rest
-    /// and drifts while a question is being typed — the harness paying for a
-    /// host item, not a bug in the screen.
+    /// **A cost a host with one item there does not pay.** `AskScreen` puts
+    /// its own Done here while the keyboard is up, so the demo's leading side
+    /// carries three items, and a title stack left-aligns once the sides stop
+    /// clearing the subtitle. Measured on an iPhone with the caption at its
+    /// longest, before the switch, when the gear led alone: with Done beside
+    /// it the subtitle centred to within a point, and a third item left it
+    /// 12pt right of centre. So the demo's title drifts while a question is
+    /// being typed — the harness paying for host items, not a bug in the
+    /// screen. The assistant's screen, whose Reminders makes three at rest,
+    /// has its title right of centre at rest too.
     private var settingsPlacement: ToolbarItemPlacement {
         #if os(macOS)
         .secondaryAction
