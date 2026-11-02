@@ -264,7 +264,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// there with Done in the bar while the composer has focus.
     ///
     /// `scripts/ui-smoke.sh` runs it on an iPhone. The iPad half needs an iPad
-    /// such as the iPad mini (A17 Pro), by UDID: full screen, it is regular
+    /// such as the iPad Air 11-inch (M4), by UDID: full screen, it is regular
     /// width either way up.
     @MainActor
     func testTheTierCaptionIsInViewWhenAskIsATab() throws {
