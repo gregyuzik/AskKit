@@ -37,6 +37,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Changed
 
+- **`Package.swift` declares `swift-tools-version: 6.4.2`**, the Swift that Xcode 27.2 ships, where
+  it declared 6.4. A toolchain older than Swift 6.4.2 no longer loads the manifest; Xcode 27.2, which
+  the 27.2 deployment targets already needed, is unaffected.
 - **`AskProposal.modelReceipt` and `handOffReceipt` no longer say "the reader".** An answer repeats
   what its receipt says, and one on Klosyt told its reader "The reader is prompted to finish the item
   on their own." Each now says the change "waits for a yes on a card under your answer", and keeps the
