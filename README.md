@@ -8,7 +8,7 @@
 # AskKit
 
 [![CI](https://github.com/gregyuzik/AskKit/actions/workflows/ci.yml/badge.svg)](https://github.com/gregyuzik/AskKit/actions/workflows/ci.yml)
-[![Swift 6.4](https://img.shields.io/badge/Swift-6.4-F05138?logo=swift&logoColor=white)](Package.swift)
+[![Swift 6.4.2](https://img.shields.io/badge/Swift-6.4.2-F05138?logo=swift&logoColor=white)](Package.swift)
 [![Platforms: iOS 27.2, macOS 27.2, visionOS 27.2, tvOS 27.2, watchOS 27.2](https://img.shields.io/badge/platforms-iOS%2027.2%20%7C%20macOS%2027.2%20%7C%20visionOS%2027.2%20%7C%20tvOS%2027.2%20%7C%20watchOS%2027.2-blue)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -40,7 +40,7 @@ To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xco
 
 ## Requirements
 
-- **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4.
+- **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4.2.
 - **A deployment target of 27.2** on every platform you build for.
 - **Platforms.** Both products build for iOS, macOS, visionOS, tvOS and watchOS, so a shared package can depend on them. The screen, and so Ask itself, exists on iOS, macOS and visionOS. On tvOS, AskCore's Foundation Models half (`AskDomain` and the engine with it) is compiled out, and on watchOS so is whatever names `SystemLanguageModel`, such as `AppleModelSeam`; `AppleAskSession` names nothing the watch lacks, and builds there.
 - **Apple Intelligence** on the reader's device, for the on-device model. When no model can serve, the first screen says why and the composer is off, unless your domain's `answersWithoutModel` says it can answer without one.

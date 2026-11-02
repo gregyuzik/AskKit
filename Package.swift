@@ -1,4 +1,4 @@
-// swift-tools-version: 6.4
+// swift-tools-version: 6.4.2
 import PackageDescription
 
 // The posture every target here builds under except `AskCrossPostureTests`:
