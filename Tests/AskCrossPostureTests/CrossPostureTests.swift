@@ -92,6 +92,12 @@ import FoundationModels
         AskDevelopmentPark.setAppOptIn { false }
         #expect(AskDevelopmentPark.optInKey == "ASK_LIVE_PCC")
         #expect(AskDevelopmentPark.isParked == (AskDevelopmentPark.reason != nil))
+
+        // The hold a host sets for a run that must not reach a model, and the
+        // error a held generation throws. `{ false }` is the default too.
+        AskInferenceHold.setHeld { false }
+        #expect(!AskInferenceHold.isHeld)
+        #expect(AskInferenceHold.HeldError() == AskInferenceHold.HeldError())
         #expect(AskProcessEntitlements.isDevelopmentSigned || !AskProcessEntitlements.isDevelopmentSigned)
         #expect(AskProcessEntitlements.privateCloudCompute == "com.apple.developer.private-cloud-compute")
 

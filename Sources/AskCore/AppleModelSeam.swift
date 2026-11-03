@@ -30,6 +30,10 @@ import Synchronization
 /// back in: `ASK_LIVE_PCC=1` in the environment, `-ASK_LIVE_PCC YES` as a
 /// launch argument, or the host's `AskDevelopmentPark.setAppOptIn(_:)`. The
 /// daily quota is the developer's own.
+///
+/// **Nor while the host holds inference** (`AskInferenceHold`): the tiers then
+/// read as a working on-device model and an unentitled Private Cloud Compute
+/// without a probe, and no session is built and no generation runs.
 public actor AppleModelSeam: AskModelSeam {
     private let logger: Logger
     /// The subsystem `logger` writes under, which the generation gate logs
@@ -64,6 +68,7 @@ public actor AppleModelSeam: AskModelSeam {
     private var quotaHeldUntil: ContinuousClock.Instant?
     private var hasLoggedRefusal = false
     private var hasLoggedPark = false
+    private var hasLoggedHold = false
     /// Private Cloud Compute's locale probe, by locale. See
     /// `speaksAppLanguage(_:locale:)`.
     private let localeProbes: AskSharedRead<String, Bool>
@@ -84,6 +89,9 @@ public actor AppleModelSeam: AskModelSeam {
     private let onDeviceSupportsLocale: @Sendable (Locale) async -> Bool
     /// The monotonic clock the seam's holds and probe are timed on.
     private let now: @Sendable () -> ContinuousClock.Instant
+    /// Whether the host holds inference (`AskInferenceHold.isHeld`), unless a
+    /// test says.
+    private let inferenceHeld: @Sendable () -> Bool
     /// The refreshes begun, and the newest whose reading the mirror took. A
     /// refresh reads the tiers over several awaits, so two that overlap can
     /// finish in either order, and the older one's reading must not land
@@ -158,9 +166,11 @@ public actor AppleModelSeam: AskModelSeam {
         onDeviceSupportsLocale: @escaping @Sendable (Locale) async -> Bool = {
             await AppleModelSeam.systemSupportsLocale($0)
         },
-        now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { .now },
+        inferenceHeld: @escaping @Sendable () -> Bool = { AskInferenceHold.isHeld }
     ) {
         self.status = status
+        self.inferenceHeld = inferenceHeld
         self.privateCloudCompute = privateCloudCompute
         self.gate = gate
         self.holderDeadline = holderDeadline
@@ -206,7 +216,29 @@ public actor AppleModelSeam: AskModelSeam {
 
     /// Private Cloud Compute's state, then the on-device model's.
     public func tierStates() async -> [AskTierState] {
-        [await privateCloudState(), await onDeviceState()]
+        if isHeld() { return Self.heldStates }
+        return [await privateCloudState(), await onDeviceState()]
+    }
+
+    /// The tiers while the host holds inference, read from nothing: Private
+    /// Cloud Compute as a build that may not reach it, the on-device model as
+    /// one that is ready and writes the app's language. So the screen shows
+    /// what a reader with a working model sees, in any language and on any
+    /// simulator, with no availability, language or quota read behind it.
+    nonisolated static let heldStates: [AskTierState] = [
+        AskTierState(tier: .privateCloud, speaksLanguage: true, unavailability: .notEntitled),
+        AskTierState(tier: .onDevice, speaksLanguage: true)
+    ]
+
+    /// `AskInferenceHold`, with the hold logged once per process, so a
+    /// developer wondering why Ask builds nothing finds the reason in the log.
+    private func isHeld() -> Bool {
+        guard inferenceHeld() else { return false }
+        if !hasLoggedHold {
+            hasLoggedHold = true
+            logger.notice("inference held by the host (AskInferenceHold): no probe, no session, no generation")
+        }
+        return true
     }
 
     private func privateCloudState() async -> AskTierState {
@@ -523,7 +555,10 @@ public actor AppleModelSeam: AskModelSeam {
     /// which needs no probe, and nil when the probe said no or couldn't say,
     /// so the answer is written in English.
     public func answerLanguage(for tier: AskTier) async -> String? {
-        await answerLanguage(for: tier, locale: Self.appLocale)
+        // Asked only to build a session, which a held process never does: no
+        // locale probe for it either.
+        if isHeld() { return nil }
+        return await answerLanguage(for: tier, locale: Self.appLocale)
     }
 
     /// `answerLanguage(for:)` for a given locale.
@@ -580,8 +615,8 @@ public actor AppleModelSeam: AskModelSeam {
 
     /// A session on `tier`, wrapped in `AppleAskSession`, with a planner on the
     /// same model for the grounded retry. Nil when Private Cloud Compute may
-    /// not be reached (undeclared, proved absent or parked) or the on-device
-    /// model isn't available. On device, an answer is capped at 1,024 tokens
+    /// not be reached (undeclared, proved absent or parked), the on-device
+    /// model isn't available, or the host holds inference. On device, an answer is capped at 1,024 tokens
     /// and a plan at 256 (`AppleAskSession.onDeviceAnswerCap` and
     /// `onDevicePlanCap`); Private Cloud Compute's sessions have no cap.
     public func makeSession(
@@ -595,6 +630,7 @@ public actor AppleModelSeam: AskModelSeam {
         // and stops a Private Cloud Compute turn's grounded retry from planning
         // on the on-device model, which is a different model answering half the
         // question and a generation the generation gate never saw.
+        if isHeld() { return nil }
         switch tier {
         case .privateCloud:
             guard let model = model() else { return nil }
@@ -801,13 +837,17 @@ public actor AppleModelSeam: AskModelSeam {
     /// gate, first in, first out; a Private Cloud Compute one runs at once.
     /// One presumed wedged is logged under the seam's subsystem, beside its
     /// other lines.
+    ///
+    /// While the host holds inference, neither tier's runs: this throws
+    /// `AskInferenceHold.HeldError`.
     public func withGeneration<T: Sendable>(
         onDevice: Bool,
         _ body: nonisolated(nonsending) @Sendable () async throws -> T
     ) async throws -> T {
-        guard onDevice else { return try await body() }
+        let held = isHeld()
+        guard onDevice || held else { return try await body() }
         return try await AskGenerationGate.run(
-            gate: gate, deadline: holderDeadline, logSubsystem: logSubsystem
+            gate: gate, deadline: holderDeadline, logSubsystem: logSubsystem, held: held
         ) { try await body() }
     }
 
@@ -828,8 +868,9 @@ public actor AppleModelSeam: AskModelSeam {
         let states = await tierStates()
         var snapshot = Self.snapshot(from: states)
         // `model()` is nil in a parked or unentitled process, so a development
-        // build, and a host that declared no entitlement, reads no quota either.
-        if let model = model() {
+        // build, and a host that declared no entitlement, reads no quota either;
+        // nor does a held one, which reads no model at all.
+        if !isHeld(), let model = model() {
             let quota = model.quotaUsage
             let held = isQuotaHeld
             snapshot.quotaReached = quota.isLimitReached || held

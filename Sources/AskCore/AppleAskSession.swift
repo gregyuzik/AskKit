@@ -349,8 +349,10 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
     }
 
     /// An empty prefix warms the model with nothing cached ahead of the
-    /// question, rather than caching an empty prompt.
+    /// question, rather than caching an empty prompt. Nothing is warmed while
+    /// the host holds inference (`AskInferenceHold`).
     public func prewarm(promptPrefix: String) async {
+        guard !AskInferenceHold.isHeld else { return }
         await Self.prewarm(session, promptPrefix: promptPrefix)
     }
 
