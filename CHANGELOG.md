@@ -12,6 +12,20 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Added
+
+- **`AskInferenceHold`, a host's switch that keeps the process from starting any model call.** A
+  host sets `AskInferenceHold.setHeld { … }` for a run that must not depend on a model, such as a
+  store-screenshot capture, where the on-device model on a simulator can take minutes, half-draw an
+  answer or refuse the language. While the closure says so, `AppleModelSeam` reads the on-device
+  tier as available and speaking the app's language, and Private Cloud Compute as `.notEntitled`,
+  without reading either model's availability, languages or quota, so the screen shows the intro a
+  reader with a working model sees; it builds no session, so the engine's `prewarm` warms nothing;
+  and `AppleModelSeam.withGeneration` and `AskGenerationGate.run` throw `AskInferenceHold.HeldError`
+  without running their body, on either tier, so a host's own generations stop at the same gate.
+  `AppleAskSession.prewarm(promptPrefix:)` warms nothing while it is on. Off by default and asked on
+  every read; behind no platform gate.
+
 ## [0.5.0] - 2026-11-02
 
 A receipt that opens with the host's own sentence, so an answer stops saying a proposed change is
