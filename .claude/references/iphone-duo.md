@@ -37,7 +37,7 @@ Why the fold is arranged as it is, with the measurements, is in ARCHITECTURE.md 
 - **Without a Duo**, `-askFold` ([README.md](../../README.md#the-demo)'s launch-argument table) shows the
   arrangement alone, and no scene moves between displays under it: say so wherever a capture of it is
   used, and leave it off on the Duo. Two panes need 240 pt for the chats and 320 for the conversation, so
-  an iPhone 18 Pro shows them only on its side, and an iPad mini either way.
+  an iPhone 18 Pro shows them only on its side, and an iPad Air 11-inch (M4) either way.
 - **The other first screens** want `-askFreshHistory`, which deletes what AskKit keeps for the demo:
   `duo.sh open <pose> both` copies it out and back, and for a launch of your own, copy
   `Library/Application Support/AskKitDemo` out of the demo's data container (`xcrun simctl
