@@ -363,6 +363,16 @@ and the seam logs why, once. TestFlight and App Store builds are never parked. A
 through `AskDevelopmentPark.setAppOptIn(_:)`. The launch argument is read from the argument domain
 alone ([Rejected designs](#6-rejected-designs) says why).
 
+### The inference hold
+
+A host can hold every model call in the process for a run that must not depend on a model, such as a
+store-screenshot capture, by passing `AskInferenceHold.setHeld(_:)` a closure, asked on every read.
+While it holds, `AppleModelSeam` reads the tiers from nothing (Private Cloud Compute `.notEntitled`, the
+on-device model available and speaking the app's language: no availability, locale or quota read),
+builds no session, and `withGeneration` and `AskGenerationGate.run` throw `AskInferenceHold.HeldError`
+before the queue, without running their body. The seam logs the hold once. AskKit never decides it:
+the host does, from a flag of its own.
+
 ### Private Cloud Compute's context gate
 
 A request from a process outside an app's context, such as a command-line tool or a test runner, fails
@@ -1445,7 +1455,8 @@ Each term below has one meaning in AskKit's docs and comments. A comment using o
   prefilled, or Another pick (`.reroll`). It is the turn's, for the screen to draw and Try Again to
   re-ask by; how the engine runs the turn is its **turn mode**.
 - **park**: `AskDevelopmentPark`, which keeps development builds off Private Cloud Compute and the
-  developer's quota.
+  developer's quota. Not the **hold**, `AskInferenceHold`, which a host sets to keep the process off
+  every model.
 - **pane**: one side of iPhone Duo's fold where the screen splits there (`AskFoldPanes`): the leading
   pane, which is the chats pane once the reader has a chat, or the conversation pane, trailing.
 - **pill**: the "Jump to latest" button (`AskJumpToLatestPill`).

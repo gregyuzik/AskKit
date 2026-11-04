@@ -365,6 +365,7 @@ import Synchronization
             var availability: SystemLanguageModel.Availability
             var writes: Bool
             var localeReads = 0
+            var availabilityReads = 0
             var heldRead: GateTestHold?
         }
         private let state: Mutex<State>
@@ -380,6 +381,9 @@ import Synchronization
         /// How many times the seam asked whether the model writes a locale.
         var localeReads: Int { state.withLock { $0.localeReads } }
 
+        /// How many times the seam asked whether the model is available.
+        var availabilityReads: Int { state.withLock { $0.availabilityReads } }
+
         /// Hold the next availability read at `hold`, answering what the
         /// model said when the read began.
         func holdNextRead(at hold: GateTestHold) {
@@ -389,6 +393,7 @@ import Synchronization
         func availability() async -> SystemLanguageModel.Availability {
             let (answer, hold) = state.withLock { state in
                 defer { state.heldRead = nil }
+                state.availabilityReads += 1
                 return (state.availability, state.heldRead)
             }
             await hold?.hold()
@@ -406,18 +411,67 @@ import Synchronization
     /// A seam on `device` and `clock`, with no Private Cloud Compute to
     /// reach.
     private func seam(
-        _ device: ScriptedOnDevice, clock: SeamClock = SeamClock(), status: AskModelStatus = AskModelStatus()
+        _ device: ScriptedOnDevice, clock: SeamClock = SeamClock(), status: AskModelStatus = AskModelStatus(),
+        held: Bool = false
     ) -> AppleModelSeam {
         AppleModelSeam(
             status: status, privateCloudCompute: .undeclared, gate: AskGenerationGate(), logSubsystem: nil,
             onDeviceAvailability: { await device.availability() },
             onDeviceSupportsLocale: { _ in device.supportsLocale() },
-            now: { clock.now }
+            now: { clock.now },
+            inferenceHeld: { held }
         )
     }
 
     private func onDevice(_ seam: AppleModelSeam) async throws -> AskTierState {
         try #require(await seam.tierStates().first { $0.tier == .onDevice })
+    }
+
+    // MARK: - The host's hold on inference
+
+    /// A model that is off and doesn't write the language, as a simulator's
+    /// can be: held, the seam reads neither, and says what a reader with a
+    /// working model would see.
+    @Test func aHeldSeamReadsAWorkingModelWithoutAskingIt() async throws {
+        let device = ScriptedOnDevice(.unavailable(.appleIntelligenceNotEnabled), writes: false)
+        let status = AskModelStatus()
+        let seam = seam(device, status: status, held: true)
+        let states = await seam.tierStates()
+        #expect(states == AppleModelSeam.heldStates)
+        #expect(try await onDevice(seam).isServable)
+        await seam.refreshStatus()
+        #expect(status.nextTier == .onDevice)
+        #expect(status.unavailability == nil)
+        #expect(await seam.answerLanguage(for: .onDevice) == nil)
+        #expect(device.availabilityReads == 0)
+        #expect(device.localeReads == 0)
+    }
+
+    /// Held, the seam builds no session and runs no generation on either
+    /// tier, and the body is never entered.
+    @Test func aHeldSeamBuildsNothingAndGeneratesNothing() async throws {
+        let device = ScriptedOnDevice(.available, writes: true)
+        let seam = seam(device, held: true)
+        for tier in AskTier.allCases {
+            #expect(try await seam.makeSession(tier: tier, tools: [], instructions: "") == nil)
+        }
+        let ran = Mutex(false)
+        for onDevice in [true, false] {
+            await #expect(throws: AskInferenceHold.HeldError.self) {
+                try await seam.withGeneration(onDevice: onDevice) { ran.withLock { $0 = true } }
+            }
+        }
+        #expect(!ran.withLock { $0 })
+        #expect(device.availabilityReads == 0)
+    }
+
+    /// The hold is the host's to lift: the same seam reads the model again
+    /// once it is off.
+    @Test func anUnheldSeamReadsTheModelAsItIs() async throws {
+        let device = ScriptedOnDevice(.unavailable(.appleIntelligenceNotEnabled), writes: true)
+        let seam = seam(device, held: false)
+        #expect(try await onDevice(seam).unavailability == .appleIntelligenceOff)
+        #expect(device.availabilityReads == 1)
     }
 
     // MARK: - The on-device model's languages

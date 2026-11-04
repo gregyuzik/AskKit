@@ -168,8 +168,9 @@ public actor AskGenerationGate {
     ///     the next caller is let in. Neither is stopped, but the call returns
     ///     by then once the body has.
     ///   - body: the generation.
-    /// - Throws: `CancellationError` when the caller's task is cancelled while
-    ///   it waits, or whatever `body` throws.
+    /// - Throws: `AskInferenceHold.HeldError`, without running `body`, while
+    ///   the host holds inference; `CancellationError` when the caller's task
+    ///   is cancelled while it waits; or whatever `body` throws.
     public static func run<T>(
         isolation: isolated (any Actor)? = #isolation,
         deadline: Duration = holderDeadline,
@@ -185,13 +186,24 @@ public actor AskGenerationGate {
     ///
     /// `gate` has no default, so a call that names none is the public `run`.
     /// A nil `logSubsystem` logs under the generation gate's own subsystem.
+    /// `held` is `AskInferenceHold.isHeld`, read as the call begins, unless a
+    /// test says.
     static func run<T>(
         isolation: isolated (any Actor)? = #isolation,
         gate: AskGenerationGate,
         deadline: Duration = holderDeadline,
         logSubsystem: String? = nil,
+        held: Bool = AskInferenceHold.isHeld,
         _ body: () async throws -> T
     ) async throws -> T {
+        // Before the queue, so a held generation neither runs nor waits for
+        // one that does.
+        if held {
+            Logger(subsystem: AskBrand.subsystem(logSubsystem), category: "gate").notice(
+                "generation refused: the host holds inference (AskInferenceHold)"
+            )
+            throw AskInferenceHold.HeldError()
+        }
         let id = try await gate.acquire()
         // The holder's time starts here, for the watchdog and for the wait on
         // its producers alike.

@@ -33,8 +33,8 @@ in its file. Inside `AskTriage`, the `SystemLanguageModel.Error` branch and both
 - `AskThreadStore`, `AskThreadArchive` and `AskFeedbackAttachments`;
 - `AskProposal`, `AskQuestionPhoto`, `AskLink` and `AskBrand`;
 - `AskDeadline`, `AskGenerationGate`, `AskLogSink`, `AskPrompt` and `AskActivity`;
-- `AskGroundingPolicy`, `AskEvidencePresentation`, `AskModelStatus`, `AskDiagnostics` and
-  `AskDevelopmentPark`.
+- `AskGroundingPolicy`, `AskEvidencePresentation`, `AskModelStatus`, `AskDiagnostics`,
+  `AskDevelopmentPark` and `AskInferenceHold`.
 
 **`AskProcessEntitlements` is a third shape.** It has no Foundation Models platform gate, but `#if`s of
 its own:

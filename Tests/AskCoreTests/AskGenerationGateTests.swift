@@ -12,6 +12,26 @@ import Testing
         #expect(value == 42)
     }
 
+    /// While the host holds inference the body never runs, and the call
+    /// doesn't wait behind a holder to find that out.
+    @Test func aHeldGenerationNeverRunsAndNeverWaits() async throws {
+        let gate = AskGenerationGate()
+        let hold = GateTestHold()
+        let holder = Task { try await AskGenerationGate.run(gate: gate) { await hold.hold() } }
+        for _ in 0..<4_000 where !hold.hasArrived {
+            try await Task.sleep(for: .microseconds(500))
+        }
+        try #require(hold.hasArrived)
+        let ran = Mutex(false)
+        await #expect(throws: AskInferenceHold.HeldError.self) {
+            try await AskGenerationGate.run(gate: gate, held: true) { ran.withLock { $0 = true } }
+        }
+        #expect(!ran.withLock { $0 })
+        #expect(await gate.queueDepth == 0)
+        hold.release()
+        try await holder.value
+    }
+
     @Test func atMostOneBodyRunsAtATime() async throws {
         let gate = AskGenerationGate()
         let concurrent = Mutex(0)
