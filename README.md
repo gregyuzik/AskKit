@@ -259,7 +259,7 @@ Everything else on `AskDomain` has a default, and each member's doc comment says
 | `promptPrefix` | empty | Fixed words that open every prompt. Keep them byte-stable: a warm session caches them. |
 | `phrase(for:)`, `basis(for:)`, `evidenceScope(from:)` | none | The wait row's words for a tool event, a factual line under an answer's tiles, and the part of your data the evidence line names. |
 | `perform(_:)` | throws | Carries out a proposal the reader confirmed. |
-| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, and whether it answers your starters, which a device where nothing can serve then keeps under its reason, with the composer. A payload goes in as your own type, and a throw fails the turn. |
+| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, and whether it answers your starters, which a device where nothing can serve then keeps under its reason, with the composer. No tier answers there, so that screen closes on your brand's `disclosureSentenceWithoutModel` in `disclosureSentence`'s place, where you give one. A payload goes in as your own type, and a throw fails the turn. |
 | `turnDeadline` | 45 seconds | How long one turn may run, counted from the question. |
 | `rowLimit(for:)`, `maxTurns(for:)` | 40 and 8 on Private Cloud Compute, 12 and 3 on the device | The rows a tool result may show, and the turns a session carries before it rolls over. |
 

@@ -1,7 +1,8 @@
 import AskCore
 import Testing
 
-/// The nothing-to-ask copy, which a host may leave out.
+/// The copy a host may leave out: the nothing-to-ask copy, and the line its
+/// can't-serve screen closes on where it answers without a model.
 ///
 /// Imported as a host imports AskCore, without `@testable`: each brand here
 /// is built the way a host's source already builds one, so a change to the
@@ -45,5 +46,32 @@ import Testing
             scopeCaveat: "It can be wrong."
         )
         #expect(brand.nothingToAskCopy == nil)
+    }
+
+    /// A host whose domain answers without a model names what answers where
+    /// no tier does, beside the tiers' own line, and keeps both as given. A
+    /// brand built without it has none.
+    @Test func aBrandKeepsTheLineWithoutAModelAsGiven() {
+        let brand = AskBrand(
+            title: "Ask the Shelf", appDirectory: "AskKitTests",
+            logSubsystem: "AskKit.tests", help: "Ask about your shelf",
+            firstScreenHeadline: "Ask about your shelf",
+            firstScreenSentence: "Some answers need no model.",
+            disclosureSentence: "Answered by Apple Intelligence.",
+            disclosureSentenceWithoutModel: "Answered from your shelf, on this device.",
+            scopeCaveat: "It can be wrong."
+        )
+        #expect(brand.disclosureSentence == "Answered by Apple Intelligence.")
+        #expect(brand.disclosureSentenceWithoutModel == "Answered from your shelf, on this device.")
+
+        let without = AskBrand(
+            title: "Ask the Clock", appDirectory: "AskKitTests",
+            logSubsystem: "AskKit.tests", help: "Ask the time anywhere",
+            firstScreenHeadline: "Ask the time anywhere",
+            firstScreenSentence: "Any city, any time zone.",
+            disclosureSentence: "Questions are answered on this device.",
+            scopeCaveat: "It can be wrong."
+        )
+        #expect(without.disclosureSentenceWithoutModel == nil)
     }
 }

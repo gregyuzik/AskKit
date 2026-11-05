@@ -560,7 +560,9 @@ public struct AskFirstScreen<Mark: View>: View {
     /// data answers its starters, keeps its starters and its composer under
     /// the same line, because those chips work. Without that, adopting
     /// Ask would turn a working screen into a dead end on every device without
-    /// Apple Intelligence.
+    /// Apple Intelligence. Its disclosure then says what answers instead, in
+    /// its brand's words where it gives them (`AskFirstScreenDisclosure`),
+    /// since no tier does.
     ///
     /// **Around iPhone Duo's fold the two are two arrangements.** With its
     /// starters the screen has two halves, the reason and what to ask, and
@@ -692,21 +694,29 @@ public struct AskFirstScreen<Mark: View>: View {
 
     /// One sentence, once, on the first screen. Not a toggle and not a
     /// per-answer disclaimer: the reader is told where their question goes
-    /// before they ask one.
-    private var disclosure: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "apple.intelligence")
-                .font(.caption)
-                // Decoration beside a sentence that already says Apple
-                // Intelligence: VoiceOver reading the glyph's name adds a
-                // word, not information. `AskPrivateCloudCard` hides both of
-                // its decorations for the same reason.
-                .accessibilityHidden(true)
-            Text(brand.disclosureSentence)
-                .font(.caption)
+    /// before they ask one, and on the screen that can't serve, what answers
+    /// it instead where the domain does (`AskFirstScreenDisclosure`).
+    @ViewBuilder private var disclosure: some View {
+        if let line = AskFirstScreenDisclosure(phase: phase, brand: brand, answersWithoutModel: answersWithoutModel) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // Only beside the sentence saying where a tier answers: under
+                // a domain's own answers it would say Apple Intelligence
+                // answers what it doesn't.
+                if line.showsAppleIntelligenceGlyph {
+                    Image(systemName: "apple.intelligence")
+                        .font(.caption)
+                        // Decoration beside a sentence that already says where
+                        // a question goes: VoiceOver reading the glyph's name
+                        // adds a word, not information. `AskPrivateCloudCard`
+                        // hides both of its decorations for the same reason.
+                        .accessibilityHidden(true)
+                }
+                Text(line.text)
+                    .font(.caption)
+            }
+            .askDeemphasizedText()
+            .padding(.top, 8)
         }
-        .askDeemphasizedText()
-        .padding(.top, 8)
     }
 }
 

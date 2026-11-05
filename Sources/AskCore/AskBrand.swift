@@ -72,8 +72,27 @@ nonisolated public struct AskBrand: Sendable {
     /// label and what it does in one value (`AskNothingToAskAction`).
     public let nothingToAskCopy: String?
     /// One sentence naming what leaves the device, shown last on the ready
-    /// and can't-serve first screens.
+    /// and can't-serve first screens, beside Apple Intelligence's glyph. On
+    /// the can't-serve screen of a domain that answers without a model,
+    /// `disclosureSentenceWithoutModel` takes its place where the brand gives
+    /// one.
     public let disclosureSentence: String
+    /// What answers on the can't-serve first screen of a domain that answers
+    /// without a model (`AskDomain.answersWithoutModel`), such as "Answers come
+    /// from your own records, on this device.", shown last there in
+    /// `disclosureSentence`'s place and with no Apple Intelligence glyph.
+    ///
+    /// **No tier answers there, and the domain answers all it can.** The
+    /// composer stays live under the reason, and every answer it gets is
+    /// `deterministicAnswer(for:)`'s, since no tier can give one. So a
+    /// `disclosureSentence` that says a tier answers, as one usually does, is
+    /// untrue there: a domain that answers without a model gives this line
+    /// unless its disclosure names no tier.
+    ///
+    /// Nil, the default, keeps `disclosureSentence` and its glyph there, as a
+    /// domain that needs a model always does: its composer is off under the
+    /// reason, so nothing answers there at all.
+    public let disclosureSentenceWithoutModel: String?
     /// One line saying what Ask reads and that it can be wrong, such as "Ask
     /// reads only what you own. It can't search the web, and it can be wrong."
     /// The ready first screen shows it under its sentence, and lets it go
@@ -91,6 +110,7 @@ nonisolated public struct AskBrand: Sendable {
         firstScreenSentence: String,
         nothingToAskCopy: String? = nil,
         disclosureSentence: String,
+        disclosureSentenceWithoutModel: String? = nil,
         scopeCaveat: String
     ) {
         self.title = title
@@ -101,6 +121,7 @@ nonisolated public struct AskBrand: Sendable {
         self.firstScreenSentence = firstScreenSentence
         self.nothingToAskCopy = nothingToAskCopy
         self.disclosureSentence = disclosureSentence
+        self.disclosureSentenceWithoutModel = disclosureSentenceWithoutModel
         self.scopeCaveat = scopeCaveat
         if !Self.isOneFolder(appDirectory), Self.reportedFolders.withLock({ $0.insert(appDirectory).inserted }) {
             Logger(subsystem: logSubsystem, category: "brand").fault("""

@@ -25,6 +25,16 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   without running their body, on either tier, so a host's own generations stop at the same gate.
   `AppleAskSession.prewarm(promptPrefix:)` warms nothing while it is on. Off by default and asked on
   every read; behind no platform gate.
+- **`AskBrand.disclosureSentenceWithoutModel`, the line the can't-serve first screen closes on for a
+  domain that answers without a model.** No tier answers there, and every answer under the reason is
+  the domain's own (`deterministicAnswer(for:)`), so the brand's `disclosureSentence`, which says a
+  tier answers, was untrue there, and so was Apple Intelligence's glyph beside it: vultyr's read
+  "Answered by Apple Intelligence, on device or Private Cloud Compute if available." under "Apple
+  Intelligence doesn't support this language yet.", over chips its own status data answered. Given,
+  the line takes `disclosureSentence`'s place on that screen when `answersWithoutModel` is true, with
+  no glyph. Nil, the default, keeps `disclosureSentence` and its glyph, so a host that gives none, or
+  whose domain needs a model, draws the screen as before. It is the initializer's argument after
+  `disclosureSentence`, defaulted, so a host's call compiles as it was.
 
 ## [0.5.0] - 2026-11-02
 
