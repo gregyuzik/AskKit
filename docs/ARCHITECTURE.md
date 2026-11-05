@@ -783,8 +783,11 @@ composer rising out of the slot**, over the keyboard.
   (`AskNothingToAskAction`: the label and what it does, in one value). Only for a host whose brand has
   the copy (`AskBrand.nothingToAskCopy`), once the overview has been read and is empty: with no copy,
   an empty library shows the ready screen.
-- **Can't serve.** The unlit mark, dimmed, and the reason. The starters stay, with a live composer,
-  only when the domain answers them without a model (`AskDomain.answersWithoutModel`).
+- **Can't serve.** The unlit mark, dimmed, the reason and the disclosure. The starters stay, with a
+  live composer, only when the domain answers them without a model (`AskDomain.answersWithoutModel`).
+  No tier answers under the reason then, so the disclosure is the brand's
+  `disclosureSentenceWithoutModel` where it gives one, without Apple Intelligence's glyph
+  (`AskFirstScreenDisclosure`).
 
 On iOS, a first screen with starters to put beside its copy lays out side by side in compact height, or
 in a regular-width window too short for the stack, but never at the accessibility sizes. On a phone on

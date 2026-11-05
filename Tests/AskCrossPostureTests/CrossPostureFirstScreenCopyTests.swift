@@ -17,14 +17,16 @@ import SwiftUI
 /// the target has none).
 @Suite(.timeLimit(.minutes(1))) struct CrossPostureFirstScreenCopyTests {
 
-    /// A domain that answers without a model says so in one word, and its
-    /// hook builds the answer with a payload of the host's own plain type,
-    /// which AskKit encodes and reads back as that type. A payload that
-    /// doesn't encode throws out of the hook, asked as the engine asks it.
+    /// A domain that answers without a model says so in one word, its brand
+    /// names what answers where no tier does, and its hook builds the answer
+    /// with a payload of the host's own plain type, which AskKit encodes and
+    /// reads back as that type. A payload that doesn't encode throws out of
+    /// the hook, asked as the engine asks it.
     @Test func aDomainAnswersWithoutAModelInOneWordAndItsPayloadIsTyped() async throws {
         let domain = ShelfScriptDomain()
         #expect(domain.answersWithoutModel)
         #expect(domain.brand.nothingToAskCopy == nil)
+        #expect(domain.brand.disclosureSentenceWithoutModel == "Some answers come from your records, on this device.")
 
         let answer = try #require(try await Self.answered(by: domain, "How old are my records?"))
         #expect(answer.payload(as: ShelfScriptSpan.self) == ShelfScriptSpan(oldest: 1959, newest: 1977))
@@ -106,7 +108,9 @@ private struct ShelfScriptDomain: AskDomain {
         title: "Ask About Records", appDirectory: "AskKitCrossPostureShelfScript",
         logSubsystem: "askkit.crossposture", help: "Ask about records.",
         firstScreenHeadline: "Ask about records", firstScreenSentence: "Some answers need no model.",
-        disclosureSentence: "Questions are answered on this device.", scopeCaveat: "It can be wrong."
+        disclosureSentence: "Questions are answered on this device.",
+        disclosureSentenceWithoutModel: "Some answers come from your records, on this device.",
+        scopeCaveat: "It can be wrong."
     )
 
     var grounding: AskGroundingPolicy { .notRequired }
