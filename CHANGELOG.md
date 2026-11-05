@@ -34,7 +34,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   the line takes `disclosureSentence`'s place on that screen when `answersWithoutModel` is true, with
   no glyph. Nil, the default, keeps `disclosureSentence` and its glyph, so a host that gives none, or
   whose domain needs a model, draws the screen as before. It is the initializer's argument after
-  `disclosureSentence`, defaulted, so a host's call compiles as it was.
+  `disclosureSentence`, defaulted, so a host's call compiles as it was; the API check lists the
+  initializer without it as removed, since its full name changes.
 
 ## [0.5.0] - 2026-11-02
 
