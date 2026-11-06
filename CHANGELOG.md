@@ -6,11 +6,19 @@ Every notable change to AskKit is recorded here. The format follows
 
 While AskKit is at 0.x, a minor version may break the API. A public enum that grows is
 `@nonexhaustive`, so a host's `switch` over it takes `@unknown default`, and a new case in it is an
-addition. A new case in one of the closed enums (README.md's "Switching over AskKit's enums" lists
+addition. A new case in one of the closed enums (docs/ADOPTING.md's "Switching over AskKit's enums" lists
 both kinds) is a breaking change, allowed in a 0.x minor version, because it stops a host's exhaustive
 `switch` compiling.
 
 ## [Unreleased]
+
+### Changed
+
+- **README.md is a short landing page.** Its adoption reference is now
+  [docs/ADOPTING.md](docs/ADOPTING.md): every `AskDomain` member, the optional pieces, Private Cloud
+  Compute in development, what is stored and sent, the enums and localization. The demo's launch
+  arguments are in [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md#running-it). The Adopt samples are
+  unchanged.
 
 ## [0.6.0] - 2026-11-06
 

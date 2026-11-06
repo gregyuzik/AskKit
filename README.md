@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://github.com/gregyuzik/AskKit/raw/main/docs/images/icon-dark.png">
-    <img src="docs/images/icon.png" width="128" height="128" alt="The demo app's icon: three plates of tinted glass in the shape of SF Symbols' speech bubble, receding straight back on a pastel field, each smaller and fainter than the one in front, shading together from cyan through blue, violet and magenta to coral">
+    <img src="docs/images/icon.png" width="128" height="128" alt="AskKit's icon: three glass speech bubbles receding on a pastel field, shading from cyan through violet to coral">
   </picture>
 </p>
 
@@ -12,41 +12,45 @@
 [![Platforms: iOS 27.2, macOS 27.2, visionOS 27.2, tvOS 27.2, watchOS 27.2](https://img.shields.io/badge/platforms-iOS%2027.2%20%7C%20macOS%2027.2%20%7C%20visionOS%2027.2%20%7C%20tvOS%2027.2%20%7C%20watchOS%2027.2-blue)](Package.swift)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+**An Ask screen for SwiftUI apps, on Apple's Foundation Models.** Readers ask about your app's data in
+their own words and get short answers, grounded in what your tools return. Private Cloud Compute
+answers when it can, and the on-device model when it can't.
+
 <p align="center">
   <img src="docs/images/iphone.png" width="12%" alt="The Ask screen on iPhone, the settings button and the switch between the demo's two domains at the bar's leading end: the question &quot;What tools do I own?&quot; answered in three sentences, with seven tiles of the tools it read, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the one-line composer at the bottom">
   <img src="docs/images/mac.png" width="38%" alt="The demo's assistant in a Mac window, the toolbar's Assistant pop-up, which switches between the demo's two domains, at its leading end: the question &quot;Remind me to water the plants at 6 PM&quot; answered in two sentences, an evidence line reading &quot;From this app's tools&quot;, a card proposing a reminder to water the plants at 6 PM with its Add Reminder and Not now buttons, and the one-line composer">
   <img src="docs/images/vision.png" width="33%" alt="The Ask screen in an Apple Vision Pro window, under the title's pill, whose menu switches between the demo's two domains: the question &quot;What clothes do I own?&quot; answered in a sentence naming seven clothes, with their seven tiles, an evidence line reading &quot;From 7 items&quot;, two follow-up suggestions and the one-line composer">
 </p>
 
-AskKit is a complete Ask screen over Apple's Foundation Models, for any kind of app. A reader asks in their own words and gets a short answer: from your app's data, through the tools your app gives the model, or from the model alone where your app allows it. When a tool proposes an action, such as adding a reminder or changing a setting, the reader confirms it on a card before your app carries it out. Private Cloud Compute writes the answer when it can serve, and the on-device model when it can't. Your app implements one protocol, `AskDomain`, which gives the model its tools and instructions and says which answers are kept, and AskKit supplies the engine (`AskCore`) and the SwiftUI screen (`AskUI`).
+## Features
 
-A development build stays off Private Cloud Compute until you opt in, so it answers on the device. [Development builds and Private Cloud Compute](#development-builds-and-private-cloud-compute) says how to opt in.
-
-To try the screen first, run the `AskKitDemo_iOS` scheme in `Demo/AskKitDemo.xcodeproj`. It hosts two domains, and a switch in the app moves between them: a library of thirty things to ask about, and an assistant with no data of its own that converts units and proposes reminders. With `-askScriptedAnswer`, either answers without a model ([The demo](#the-demo)).
-
-## What you get
-
-- **`AskCore`, the engine, with no UI.**
-  - `AskEngine` runs one question at a time on the tier that can serve, Private Cloud Compute first, behind one model seam (`AskModelSeam`, which `AppleModelSeam` implements on Foundation Models). When Private Cloud Compute goes out mid-turn, the turn is handed down once to the on-device model (the hand-down).
-  - Your domain's `grounding` policy decides which answers it keeps: by default only those grounded in your data, searching for the model and asking again when a first answer read nothing (the grounded retry); only those a tool call grounded; or every answer, each recording what grounded it. It carries the conversation from turn to turn and triages every failure into an `AskError` with a line for the reader in 25 languages. The engine writes nothing to disk: AskUI's store keeps the thread.
-  - `AskEval` runs scenarios through a real engine of its own. A host also uses `AskLink` (a deep link that prefills the composer and never sends), `AskProposal` (an action the model proposes and the reader confirms), `AskPrompt` (the clamps a tool puts fields through) and `AskEngine.answerOnce(_:)` (one answer outside the thread, for a Siri intent).
-- **`AskUI`, the screen:** `AskScreen` and the `AskConversationStore` that drives it, which keeps the thread and the earlier chats on disk, through AskCore's `AskThreadStore` and `AskThreadArchive`, which read and write for the store alone. A host that takes AskCore alone keeps its thread in storage of its own.
-  - The first screen: ready, with your starters (questions the reader can tap); nothing to ask about yet, for a domain over rows the reader has none of; or can't serve, which says why.
-  - The thread, where a turn shows its question; the wait row, saying what the tools are doing until the prose starts; the prose as it streams; your tiles, one view for each row the answer names, when it names rows; the evidence line, saying what the answer stood on ("From 7 items", your own words, or "Not from this app's data"); the card for an action the model proposed; and follow-up chips.
-  - A composer that takes one accessory button of yours; New Chat, History and the tier caption, which names the model answering; and a banner when the day's Private Cloud Compute quota is spent.
-  - Three tips, through your app's TipKit: the menu on a question (Copy, Copy answer, Edit & Resend and Ask again), "Don't suggest this" on a starter, and deleting one chat. Nothing on screen shows any of the three, and on iOS the question's menu is the only way a touch reaches Copy answer.
-  - `AskPrivateCloudCard` for your settings, and `AskCommands` for the Mac's menu bar: New Chat, Send and Stop, and Copy, Copy answer, Edit & Resend and Ask again for the newest turn.
-- **What stays yours:** your tools, and whatever data they read; your instructions and your copy; which answers are kept; the views for your tiles and what opening one does; and the actions the model may propose, and what carrying one out does.
+- **One protocol.** Your `AskDomain` gives the model its tools and instructions. AskKit supplies the
+  engine (`AskCore`) and the SwiftUI screen (`AskUI`).
+- **Grounded answers.** By default an answer has to stand on your data: when the model doesn't search,
+  the app searches for it and asks again.
+- **Both models, chosen for you.** Private Cloud Compute first, the on-device model otherwise, and a
+  turn handed down when Private Cloud Compute goes out mid-answer.
+- **Actions the reader confirms.** A tool can propose an action, such as adding a reminder, that runs
+  only once the reader taps yes.
+- **The whole screen.** Streaming answers, tiles for the rows an answer names, follow-ups, chat
+  history, a Mac menu and a settings card, on iOS, macOS and visionOS, iPhone Duo included.
+- **Every reader.** 25 languages, VoiceOver, Dynamic Type and Reduce Motion.
+- **Private.** No dependencies, no analytics and no network requests of its own.
 
 ## Requirements
 
-- **Xcode 27.2 or later**, on a Mac with Apple silicon, and Swift 6.4.2.
-- **A deployment target of 27.2** on every platform you build for.
-- **Platforms.** Both products build for iOS, macOS, visionOS, tvOS and watchOS, so a shared package can depend on them. The screen, and so Ask itself, exists on iOS, macOS and visionOS. On tvOS, AskCore's Foundation Models half (`AskDomain` and the engine with it) is compiled out, and on watchOS so is whatever names `SystemLanguageModel`, such as `AppleModelSeam`; `AppleAskSession` names nothing the watch lacks, and builds there.
-- **Apple Intelligence** on the reader's device, for the on-device model. When no model can serve, the first screen says why and the composer is off, unless your domain's `answersWithoutModel` says it can answer without one.
-- **For Private Cloud Compute, which is optional:** the managed entitlement `com.apple.developer.private-cloud-compute`, which Apple grants to eligible developers on request ([Accessing Private Cloud Compute](https://developer.apple.com/private-cloud-compute/), [the entitlement](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.developer.private-cloud-compute)); your declaration of it to AskKit, `AskPrivateCloudCompute.declared`; a network connection; and some of the reader's daily quota. Without the entitlement, every question goes to the on-device model.
+- Xcode 27.2 or later on an Apple silicon Mac, Swift 6.4.2, and a deployment target of 27.2.
+- Apple Intelligence on the reader's device. Where no model can serve, the first screen says why.
+- Optional: the [Private Cloud Compute entitlement](https://developer.apple.com/documentation/BundleResources/Entitlements/com.apple.developer.private-cloud-compute),
+  which Apple grants to eligible developers on request. Without it, every question is answered on the
+  device.
+
+Ask shows on iOS, macOS and visionOS. Both libraries also build for tvOS and watchOS, so a shared
+package can depend on them ([Platforms](docs/ADOPTING.md#platforms)).
 
 ## Install
+
+In Xcode, File > Add Package Dependencies with this repository's URL, or in a `Package.swift`:
 
 ```swift
 platforms: [.iOS("27.2"), .macOS("27.2"), .visionOS("27.2")],
@@ -55,68 +59,70 @@ dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.6.0
 dependencies: [.product(name: "AskCore", package: "AskKit"), .product(name: "AskUI", package: "AskKit")]
 ```
 
-Those are lines of a `Package.swift` of yours: a shared package that also builds for tvOS or watchOS adds `.tvOS("27.2")` and `.watchOS("27.2")`, and an app's project sets its deployment target itself. Or, in Xcode, File > Add Package Dependencies with the same URL. Add the `AskUI` and `AskCore` products to the targets that show the screen; a target that needs only the engine, or a type such as `AskLink`, takes `AskCore` alone. `AskUI` doesn't re-export `AskCore`, so a file that uses both imports both. The module names are generic, so check that nothing else in your build is called `AskCore` or `AskUI`. AskKit has no dependencies of its own.
-
-**Enhanced Security.** A target with Enhanced Security on (`ENABLE_ENHANCED_SECURITY`) builds an arm64e slice for a device and the Mac, and Xcode builds a package arm64e only when the workspace asks it to. Unasked, the arm64e slice can't find AskCore and AskUI, and the build fails. Set `iOSPackagesShouldBuildARM64e`, `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e` to `YES` in `WorkspaceSettings.xcsettings`, under your project's `project.xcworkspace/xcshareddata/` or your workspace's `xcshareddata/`, as the demo does ([docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md)).
-
-**Versions.** AskKit is at 0.x, and a minor version may break the API. `from: "0.6.0"` takes any release below 1.0.0, and `.upToNextMinor(from: "0.6.0")` holds you to 0.6.x. [CHANGELOG.md](CHANGELOG.md) says what changed.
-
-**Switching over AskKit's enums.** An enum that grows is open (`@nonexhaustive`): a `switch` of yours over one ends in `@unknown default`, or it doesn't compile, and a case a later version adds goes there instead of breaking your build. The open ones are `AskError`, `AskUnavailability`, `AskTier`, `AskActivity`, `AskTurnEvent`, `AskReasoningLevel`, `AskGrounding`, `AskDiscard.Reason`, `AskRetryAfter`, `AskProposalKind`, `AskProposalOutcome` and `AskOutcome.Miss`, and in AskUI `AskOrigin`, `AskStage.Phase`, `AskProposalPhase` and `AskPrivateCloudState`. The rest are closed, a set fixed by what it is, which a `switch` covers case by case with no default: `AskTurnMode`, `AskOutcome.Failure`, `AskGroundingPolicy`, `AskReplyShape`, `AskEvidencePresentation`, `AskPersistence`, `AskPrivateCloudCompute`, `AskFeedback.Sentiment`, `AskChipRow.Kind` and `AskArrival.Kind`. A new case in a closed one is a breaking change, allowed in a 0.x minor version.
-
-## Adopt with a coding assistant
-
-To adopt AskKit with a coding assistant, such as Claude Code, Xcode's coding intelligence or Cursor, give it this prompt in your app's project. The assistant adds the package and works through [Adopt](#adopt) over your app's own data; review what it writes against those steps.
-
-```text
-Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
-data in their own words.
-
-1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.6.0" to the app target, and
-   link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
-   imports both.
-2. Before writing code, read README.md and docs/ARCHITECTURE.md in that repository, and use only the
-   API they and AskKit's doc comments name. Then study this app's data model: its types, where they
-   are stored and how the app queries them.
-3. Follow the README's Adopt steps. Implement one AskDomain over the app's data: Row (an AskRow),
-   SearchArguments (@Generable), brand (an AskBrand), overview(), makeTools(_:),
-   instructions(tier:isConversation:answerLanguage:), search(_:context:) and
-   starters(overview:window:). Each tool runs its work in context.withToolCall, records every row it
-   shows with record(rows:), clamps every field with AskPrompt.clamp and returns its lines unfenced.
-   Choose grounding: .retrieval, .toolCall or .notRequired. If the tools read none of the app's
-   rows, follow the README's "A domain without rows" instead.
-4. Make one seam with AppleModelSeam.make(privateCloudCompute: .undeclared), passing .declared only
-   if the app's entitlements file grants com.apple.developer.private-cloud-compute, and one
-   AskEngine(domain:seam:).
-5. Own one AskConversationStore(engine:) at app scope, outside any view.
-6. Show AskScreen(store:) in a NavigationStack with .navigationTitle(store.brand.title), where the
-   app wants Ask, such as a tab of its own.
-7. Put the brand's copy, the starters and every other string the reader sees in the app's String
-   Catalog, resolved with String(localized:).
-8. Set the deployment target to 27.2 or later on every platform. In a target with main-actor default
-   isolation, mark the types AskKit uses off the main actor nonisolated and each tool's call
-   @concurrent. Ask shows on iOS, macOS and visionOS: in a target that also builds for tvOS or
-   watchOS, gate Ask's code as the README's Requirements and step 1 describe.
-9. Build and run. A development build answers on the device until you opt in to Private Cloud
-   Compute: https://github.com/gregyuzik/AskKit#development-builds-and-private-cloud-compute
-```
+`AskUI` doesn't re-export `AskCore`, so a file that uses both imports both. AskKit is at 0.x, where a
+minor version may break the API: [CHANGELOG.md](CHANGELOG.md) says what changed. Enhanced Security,
+versions and enums: [docs/ADOPTING.md](docs/ADOPTING.md#install).
 
 ## Adopt
 
-An app adopts AskKit in five steps. The code in steps 1 to 4 is [`Tests/AskCrossPostureTests/ReadmeDomain.swift`](Tests/AskCrossPostureTests/ReadmeDomain.swift), a domain over the app's own rows, which the package's tests compile and run; [a domain without rows](#a-domain-without-rows), after step 5, has a file of its own. [`Demo/AskKitDemo`](Demo/AskKitDemo) does both with more of the optional pieces.
+Two steps get an app answering. The code is
+[`ReadmeDomain.swift`](Tests/AskCrossPostureTests/ReadmeDomain.swift), which the package's tests
+compile and run.
 
 ### 1. Implement `AskDomain`
 
-Three members have no default. The two associated types, which name your row and your search's arguments, and `overview()` and `search(_:context:)` have defaults that suit only a domain whose tools read no rows ([A domain without rows](#a-domain-without-rows)), so a domain over your data, as this one is, gives all seven:
+The domain names its row, gives the model its tools and instructions, and runs the same search when
+the model won't:
 
-| Member | What you give it |
-|---|---|
-| `Row` | Your row, an `AskRow`: `Codable`, `Sendable`, `Identifiable` and `Equatable`, with a `displayTitle` that the model reads in tool output and writes back when it picks tiles. Rows are written into the thread file, so give a field you add later a default when it decodes. |
-| `SearchArguments` | A `@Generable` type, the arguments your tool takes, so that when the model won't call the tool, the app's own search chooses them the way the model would have. |
-| `brand` | An `AskBrand`: your copy, the Application Support folder the thread is kept in, and the log subsystem every AskKit logger writes under. Keep `help`, the field's placeholder, to a few words: it is drawn on one line and cut off with an ellipsis where it is wider than the field. |
-| `overview()` | What the reader has to ask about: scopes and counts. |
-| `makeTools(_:)` | The tools a session offers the model, built around the `AskToolContext` it is handed. |
-| `instructions(tier:isConversation:answerLanguage:)` | The session's instructions: yours, and short. |
-| `search(_:context:)` | The search the app runs when the model won't call a tool, through the tool's own code. |
+```swift
+/// Everything about Ask that is this app's rather than AskKit's.
+nonisolated struct LibraryDomain: AskDomain {
+    typealias Row = Book
+    typealias SearchArguments = BookQuery
+
+    let brand = AskBrand(
+        title: "Ask My Library",
+        appDirectory: "MyLibrary",
+        logSubsystem: "com.example.mylibrary",
+        help: "Ask about your books",
+        firstScreenHeadline: "Ask about your books",
+        firstScreenSentence: "Find, count and compare what is on your shelves.",
+        nothingToAskCopy: "Add a book to start asking.",
+        disclosureSentence: "Questions are answered on this device.",
+        scopeCaveat: "Ask reads only your library. It can't search the web, and it can be wrong."
+    )
+
+    func overview() async -> AskOverview {
+        let count = Book.shelf.count
+        return AskOverview(scopes: [AskOverview.Scope(id: "books", name: "books", count: count)], total: count)
+    }
+
+    func makeTools(_ context: AskToolContext<Book>) -> [any Tool] {
+        [SearchBooks(context: context)]
+    }
+
+    func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
+        var text = """
+            You answer questions about the books one person owns, and about nothing else.
+            Call search_books before you answer, and name only titles it returned.
+            """
+        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
+        return text
+    }
+
+    func search(_ arguments: BookQuery, context: AskToolContext<Book>) async throws -> String {
+        try await SearchBooks(context: context).call(arguments: arguments)
+    }
+
+    // Optional. Without it the first screen has its copy and the composer, and no chips.
+    func starters(overview: AskOverview, window: Int) -> [AskStarter] {
+        [AskStarter(text: "How many books do I own?"), AskStarter(text: "Which of my books is by Ursula K. Le Guin?")]
+    }
+}
+```
+
+<details>
+<summary>The row, the search's arguments and the tool</summary>
 
 ```swift
 import AskCore
@@ -188,84 +194,20 @@ nonisolated struct SearchBooks: Tool {
         return lines.joined(separator: "\n")
     }
 }
-
-/// Everything about Ask that is this app's rather than AskKit's.
-nonisolated struct LibraryDomain: AskDomain {
-    typealias Row = Book
-    typealias SearchArguments = BookQuery
-
-    let brand = AskBrand(
-        title: "Ask My Library",
-        appDirectory: "MyLibrary",
-        logSubsystem: "com.example.mylibrary",
-        help: "Ask about your books",
-        firstScreenHeadline: "Ask about your books",
-        firstScreenSentence: "Find, count and compare what is on your shelves.",
-        nothingToAskCopy: "Add a book to start asking.",
-        disclosureSentence: "Questions are answered on this device.",
-        scopeCaveat: "Ask reads only your library. It can't search the web, and it can be wrong."
-    )
-
-    func overview() async -> AskOverview {
-        let count = Book.shelf.count
-        return AskOverview(scopes: [AskOverview.Scope(id: "books", name: "books", count: count)], total: count)
-    }
-
-    func makeTools(_ context: AskToolContext<Book>) -> [any Tool] {
-        [SearchBooks(context: context)]
-    }
-
-    func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You answer questions about the books one person owns, and about nothing else.
-            Call search_books before you answer, and name only titles it returned.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
-    }
-
-    func search(_ arguments: BookQuery, context: AskToolContext<Book>) async throws -> String {
-        try await SearchBooks(context: context).call(arguments: arguments)
-    }
-
-    // Optional. Without it the first screen has its copy and the composer, and no chips.
-    func starters(overview: AskOverview, window: Int) -> [AskStarter] {
-        [AskStarter(text: "How many books do I own?"), AskStarter(text: "Which of my books is by Ursula K. Le Guin?")]
-    }
-}
 ```
 
-The file wraps this in `#if canImport(FoundationModels) && !os(tvOS)`, because `AskDomain` and the engine are compiled out on tvOS. A target that builds for tvOS needs the same gate.
+</details>
 
-Three things in that code are rules, not style:
+A tool keeps three rules:
 
-- **A tool is built once per session, and reports every call.** It keeps `context` and nothing per turn. It runs each call's work in `context.withToolCall(_:_:)`, which notes the call with the collector, finishes it however the work ends, and only then hands the phrase the work returns to the relay, because the finish clears a phrase reported before it. Inside, it records every row it shows the model with `record(rows:)`, since an answer's tiles resolve only against recorded rows.
-- **A tool's output is the reader's data, and AskKit fences it.** Put every field through `AskPrompt.clamp`, show at most `context.rowLimit` rows, and return the lines bare: no fence of your own, and none of AskKit's tag names (`user_request`, `rows`, `previous_question`, `previous_answer` and `tool_result`). AskKit fences what it composes, and a wrapper of your own would be redacted in the grounded retry. `clamp` swaps angle brackets for lookalikes, flattens newlines, redacts AskKit's fence tags and holds each character to 16 Unicode scalars, then cuts to the limit, redacting and cutting again while that lengthens it, so clamping twice changes nothing. So a field can't spell a fence tag in any spelling that compatibility decomposition (NFKD) maps to the tag once marks are dropped: in fullwidth, small or negated brackets (`＜`, `﹤`, `≮`), or in fullwidth, mathematical or accented letters. A letter of another script that only looks Latin spells another word. `AskPrompt.neuteringTags` does the bracket swap alone, for output whose line breaks carry its layout: pass such output through `AskPrompt.sanitizeForFence` first.
-- **The search is written once.** `search(_:context:)` runs the tool's own code, so the grounded retry reads the rows the tool would have returned, and records them as the tool does.
+- **It reports every call.** It runs its work in `context.withToolCall`, and records every row it shows
+  with `record(rows:)`: an answer's tiles resolve only against recorded rows.
+- **It returns bare text.** Every field goes through `AskPrompt.clamp`, and the lines carry no fence:
+  AskKit fences what it composes.
+- **Its search is written once.** `search(_:context:)` runs the tool's own code, so the grounded retry
+  reads what the tool would have.
 
-**Isolation.** AskKit builds with main-actor default isolation and `NonisolatedNonsendingByDefault`. In a target that does too, mark the types AskKit uses off the main actor `nonisolated`, as the sample does (a `Codable` payload you record needs it, or its conformance is main-actor isolated), and mark a tool's `call` `@concurrent`, since an `async` function that isn't runs on its caller's actor. A target with neither setting needs neither keyword: AskKit's public API is `nonisolated` throughout.
-
-**Keep `instructions` short**, a few sentences that name only tools the session holds, and put mappings (which word means which category) in `@Guide`s and tool descriptions, where the model reads them as it uses them.
-
-Everything else on `AskDomain` has a default, and each member's doc comment says what it does. The ones you will reach for first:
-
-| Member | Default | What it is for |
-|---|---|---|
-| `starters(overview:window:)` | none | The questions the first screen offers, and the coaching under a refused or ungrounded answer. `window` is the most that show at once: three on iOS, eight on macOS and visionOS, fewer where the screen is short. |
-| `grounding` | `.retrieval` | Which answers are kept: those grounded in your data, with the grounded retry (`.retrieval`); those a tool call grounded (`.toolCall`); or every answer, recording what grounded it (`.notRequired`). |
-| `evidence(for:)` | `.counted` | The line under an answer: AskKit's count of the rows it read, your own words (`.line`), or none. |
-| `replyShape` | `.full` | What the model writes: the answer, its question kind, the tiles it chose and the follow-ups (`.full`), or the answer and the follow-ups alone (`.prose`), for a domain whose answers never show tiles. On device the prose schema costs 192 tokens of the window where the full one costs 704. |
-| `promptLines(question:overview:)` | none | Lines such as today's date, sent when a question starts a fresh session. |
-| `promptPrefix` | empty | Fixed words that open every prompt. Keep them byte-stable: a warm session caches them. |
-| `phrase(for:)`, `basis(for:)`, `evidenceScope(from:)` | none | The wait row's words for a tool event, a factual line under an answer's tiles, and the part of your data the evidence line names. |
-| `perform(_:)` | throws | Carries out a proposal the reader confirmed. |
-| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, and whether it answers your starters, which a device where nothing can serve then keeps under its reason, with the composer. No tier answers there, so that screen closes on your brand's `disclosureSentenceWithoutModel` in `disclosureSentence`'s place, where you give one. A payload goes in as your own type, and a throw fails the turn. |
-| `turnDeadline` | 45 seconds | How long one turn may run, counted from the question. |
-| `rowLimit(for:)`, `maxTurns(for:)` | 40 and 8 on Private Cloud Compute, 12 and 3 on the device | The rows a tool result may show, and the turns a session carries before it rolls over. |
-
-### 2. Make the seam and the engine
-
-`AppleModelSeam` owns what the process knows about its models: which tier can serve, the cooldown after a failure, the quota and the generation gate. Build one for the process, and one `AskEngine(domain:seam:)` for the thread. `privateCloudCompute:` has no default: pass `.declared` only if your entitlements file holds the Private Cloud Compute entitlement, and `.undeclared` otherwise. A host that already routes its own model calls can bridge its router to `AskModelSeam` instead, wrapping each session in `AppleAskSession`, so Ask and its other features share one cooldown and one generation gate. That gate is the process's one, where the seam's on-device generations wait: run your own through `AskGenerationGate.run`, which waits there too. There is no other gate to build, and the seam logs one of its generations presumed wedged under its own `logSubsystem`.
+### 2. Make the engine, and show the screen
 
 ```swift
 import AskCore
@@ -285,17 +227,7 @@ final class LibraryAsk {
         store = AskConversationStore(engine: engine)
     }
 }
-```
 
-### 3. Own one store at app scope
-
-`AskConversationStore` is the screen's state: the turns, the turn in flight and the draft. Make one for the life of the app and hold it outside any view, as `LibraryAsk` does, for example in your `App` as `@State private var ask = LibraryAsk()`. A Mac `NavigationSplitView` rebuilds its detail on every sidebar change, so a store owned by a view would lose the thread, and a turn in flight with it. Making the store reads nothing: the screen reads the saved thread as it appears.
-
-### 4. Host `AskScreen` in a navigation stack
-
-Show `AskScreen` in a `NavigationStack` titled with `store.brand.title`. The screen sets no title of its own, and puts New Chat, History (for a domain that keeps its thread) and the tier caption in the toolbar, so outside a navigation container they have nowhere to render.
-
-```swift
 /// The screen in a navigation stack, titled with the brand's title.
 struct AskTab: View {
     let ask: LibraryAsk
@@ -309,28 +241,23 @@ struct AskTab: View {
 }
 ```
 
-`AskScreen(store:)` takes the store and the screen's options (`accent:`, `spectrum:`, `nothingToAskAction:`, `onAttach:` and `composerAccessory:`, which takes the photo button's place and leaves `onAttach:` unused), and draws AskKit's own mark and tiles. An empty overview shows the nothing-to-ask screen only when your brand gives `nothingToAskCopy`, and that screen has a button only when you pass `nothingToAskAction:`, an `AskNothingToAskAction` holding its label and what it does. Your views replace them with modifiers, in any order: `mark(_:)`, `tiles(_:)`, `evidenceDisclosure(_:)` and `answerFooter(_:)`. These are the only way to set your views: the initializer takes the store and the screen's options alone. A `tiles` builder is handed the rows; the turn and the rows; or the turn, the rows and an `open` closure, nil where nothing opens. Return an `AskTileGrid`, so the tiles arrive one at a time. A value a builder captures reaches answers already on screen only through `buildersDepend(on:)`. On iPhone Duo's inner display the screen arranges itself around the fold, with nothing for you to wire.
+Hold the store at app scope, for example as `@State private var ask = LibraryAsk()` in your `App`, so
+the thread outlives every view. The screen puts New Chat, History and the model's caption in the
+toolbar, so it needs a navigation stack.
 
-### 5. Wire the optional pieces
+### Then add what you need
 
-| Piece | How | Notes |
-|---|---|---|
-| Tiles that open a row | A class of yours conformed to `AskItemRouter` (`func open(_ id: Book.ID)`), and `.environment(\.askItemOpener, AskItemOpenAction(router))` above the screen | The id is typed by the router's `open(_:)`. A router for another id type opens nothing, and AskKit logs it once for each id type. With no opener, tiles are inert. Keep the router in `@State` or on an object the app holds: two actions on one router are equal, so building the action in a body redraws nothing, and a new router redraws every bank of tiles in the thread. |
-| A page pushed over the screen | `.environment(\.askItemIsPushed, pushedID != nil)` on the screen | The screen holds its navigation bar open while it's true: a page pushed while the bar is minimized hangs the app. |
-| Actions the model proposes | A tool records an `AskProposal`, and you implement `AskDomain.perform(_:)` | A proposal's payload is your own `Encodable` value, which AskKit stores as JSON and `payload(as:)` decodes, so `try AskProposal(…, payload: value)` throws only for a value JSON can't hold, such as a NaN, or a `Data`, which is already encoded. The answer shows a confirmation card, and only the reader's tap reaches `perform`, off the main actor, once AskKit has saved the yes, so it runs at most once for each yes. A perform that throws can be confirmed again, so make one that fails part-way safe to run again. A proposal that opens your own editor is a hand-off: conform a class to `AskDraftRouter` (`func open(_ proposal: AskProposal)`), set `askDraftOpener` to `AskDraftOpenAction(router)`, keeping the router as the tile opener's is, and `perform` is never called. Leave a proposing tool out where `context.isConversation` is false. |
-| A photo or a scan | `acceptsPhotoAttachments`, `AskScreen(store:onAttach:)` and `store.attachPhoto(_:label:reference:)`, or `AskScreen(store:composerAccessory:)` | A composer has one accessory button: yours (`AskComposerAccessory`), which wins when you pass both, or the photo button. Only Private Cloud Compute reads photos; on the device the question runs on its words, and the thread says so. |
-| A spectrum look | `AskScreen(store:spectrum:)` with `.aurora`, or `AskSpectrum([…])` of your own colors | The send circle and the reveal's caret take a gradient of the colors, on the slot's face too; everything else keeps `accent`. The send circle's glyph is white, or black where white falls under 3:1 on its lightest color. Increase Contrast puts the accent back. |
-| The Ask tab's glyph | `Image(systemName: "text.bubble.badge.sparkles")` as the tab's `Label` icon | The glyph the demo's tab wears, in one colour like the bar's other items; AskKit ships none of its own. A host that wants two colours can give it `.symbolRenderingMode(.palette)`, whose first colour paints the sparkles and second the bubble. The bar then draws the colours as given and won't mark the selection, so pass the selected bubble's colour yourself, fixed and resolved for the colour scheme: in a tab item's palette `.tint` and `Color.accentColor` both come out the system blue whatever the app's accent, `.primary` comes out black on a dark bar, and a gradient is flattened to its first colour. The tab bar swaps in the `.fill` variant itself. |
-| The tab bar slot (iOS) | `.askComposerSlot(store, isEnabled:)` on the `TabView` that holds Ask, with `.tabBarMinimizeBehavior(.onScrollDown)` | The composer's face rides in the tab view's bottom accessory, beside the tab bar when it minimizes. It does nothing on macOS and visionOS, so a shared host needs no `#if`. |
-| The Mac menu | `.commands { AskCommands(store: ask.store) }` on the scene, or `AskCommands(isEnabled: ask.store.hasTurns) { … }` when your New Chat does more than start over | New Chat (⇧⌘N), Send (⌘Return) and Stop (⌘.) in the File menu, acting on the focused window's composer, and after them Copy, Copy answer, Edit & Resend and Ask again, with no shortcuts, acting on the newest turn of the focused window's thread. `AskCommands` exists only on macOS, so a scene shared with iOS or visionOS wraps the modifier in `#if os(macOS)`, as the demo's `App.swift` does. |
-| Entry points | `store.prefill(_:scope:send:)` and `store.focusComposer()` | `prefill` puts a question in the composer and the reader in front of it. `AskLink` builds and reads `<scheme>://ask?q=…` links, and a link only ever prefills. `scope` is your id for where the question came from, and `scopeLine(for:)` tells the prompt what it means. |
-| The settings card | `AskPrivateCloudCard(store: ask.store)` in your settings | It says where answers come from, and why, with no toggle. `AskPrivateCloudCard(store:onRunEval:)` adds a row that runs your evaluation, shown where diagnostics are on: a Debug build, a TestFlight build, the Mac's included, once StoreKit has said so (`AskDiagnostics.isTestFlight`), or wherever you set `AskDiagnostics.enabledByApp`. A build under App Review most likely reads as TestFlight too: to keep the rows from a reviewer, pass `showsDiagnostics:` yourself. |
-| The tips | `try Tips.configure()` in your `App.init`, and `Tips.hideAllTipsForTesting()` before it for your screenshot and UI-test launches | AskKit never configures TipKit: an app that does gets AskUI's three tips beside its own, one at a time and at its own `displayFrequency`, and an app that doesn't sees none. Each tip shows only while its surface is on screen with nothing over it, and goes once the reader has done what it says, from the menu, the swipe or VoiceOver, or closed it. Nothing is public: there is nothing more to wire. |
-| Siri and UI tests | `.appEntityIdentifier(…)` on each tile your `AskTileGrid` draws; `AskAccessibility` | An annotation per tile lets Siri resolve "this" to the item the reader means (`AskDefaultTiles` carries none). Every control has an `ask.*` identifier, so one UI-test recipe drives every host. |
+Tiles that open your rows, actions the model proposes, photos, the composer in the tab bar, the Mac
+menu, the settings card and tips: [docs/ADOPTING.md](docs/ADOPTING.md) covers each, and every member of
+`AskDomain`.
 
-### A domain without rows
+<details>
+<summary>A domain without rows</summary>
 
-Not every domain reads your app's rows. One whose tools work something out or act names neither associated type, so its `Row` is `AskNoRow` and its `SearchArguments` is `AskNoSearchArguments`, and it leaves `overview()` and `search(_:context:)` to their defaults. What it writes is its brand, its tools and its instructions, and its `grounding`, which decides what becomes of an answer no tool grounded: under `.notRequired` the answer is kept, and the line under it says it isn't from the app's data. With no rows to show, it asks for `.prose` replies, so the model spends none of the window on tiles. This code is [`Tests/AskCrossPostureTests/ReadmeAssistantDomain.swift`](Tests/AskCrossPostureTests/ReadmeAssistantDomain.swift), which the package's tests compile and run too, and steps 2 to 5 are the same for it.
+A domain whose tools work something out or act, rather than read your data, leaves out the row, the
+search and the overview. It keeps answers no tool grounded with `.notRequired`, and asks for `.prose`
+replies, which have no tiles. This is
+[`ReadmeAssistantDomain.swift`](Tests/AskCrossPostureTests/ReadmeAssistantDomain.swift):
 
 ```swift
 import AskCore
@@ -408,77 +335,93 @@ nonisolated struct AssistantDomain: AskDomain {
 }
 ```
 
-A tool that proposes an action works here as it does over rows: it records an `AskProposal`, and the reader confirms it on the card (step 5). `evidence(for:)` words the line under an answer a tool grounded, which AskKit's count of rows leaves out when the tool read none. The demo's assistant ([The demo](#the-demo)) does both.
+</details>
+
+<details>
+<summary>Adopt with a coding assistant</summary>
+
+Give Claude Code, Xcode's coding intelligence or Cursor this prompt in your app's project, then review
+what it writes against the steps above.
+
+```text
+Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
+data in their own words.
+
+1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.6.0" to the app target, and
+   link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
+   imports both.
+2. Before writing code, read README.md, docs/ADOPTING.md and docs/ARCHITECTURE.md in that
+   repository, and use only the API they and AskKit's doc comments name. Then study this app's data
+   model: its types, where they are stored and how the app queries them.
+3. Follow the README's Adopt steps. Implement one AskDomain over the app's data: Row (an AskRow),
+   SearchArguments (@Generable), brand (an AskBrand), overview(), makeTools(_:),
+   instructions(tier:isConversation:answerLanguage:), search(_:context:) and
+   starters(overview:window:). Each tool runs its work in context.withToolCall, records every row it
+   shows with record(rows:), clamps every field with AskPrompt.clamp and returns its lines unfenced.
+   Choose grounding: .retrieval, .toolCall or .notRequired. If the tools read none of the app's
+   rows, follow the README's "A domain without rows" instead.
+4. Make one seam with AppleModelSeam.make(privateCloudCompute: .undeclared), passing .declared only
+   if the app's entitlements file grants com.apple.developer.private-cloud-compute, and one
+   AskEngine(domain:seam:).
+5. Own one AskConversationStore(engine:) at app scope, outside any view.
+6. Show AskScreen(store:) in a NavigationStack with .navigationTitle(store.brand.title), where the
+   app wants Ask, such as a tab of its own.
+7. Put the brand's copy, the starters and every other string the reader sees in the app's String
+   Catalog, resolved with String(localized:).
+8. Set the deployment target to 27.2 or later on every platform. In a target with main-actor default
+   isolation, mark the types AskKit uses off the main actor nonisolated and each tool's call
+   @concurrent. Ask shows on iOS, macOS and visionOS: in a target that also builds for tvOS or
+   watchOS, gate Ask's code as docs/ADOPTING.md's "Platforms" describes.
+9. Build and run. A development build answers on the device until you opt in to Private Cloud
+   Compute: https://github.com/gregyuzik/AskKit#development-builds-and-private-cloud-compute
+```
+
+</details>
 
 ## Development builds and Private Cloud Compute
 
-**A development build never reaches Private Cloud Compute by default.** Two checks stand between a question and the tier:
+A development build answers on the device. Private Cloud Compute's daily quota belongs to the iCloud
+account, so AskKit keeps Debug builds, simulators, test runs and development-signed binaries off it,
+and never holds back a TestFlight or App Store build. To measure the tier in development, launch a
+build signed with the entitlement with `ASK_LIVE_PCC=1` in its environment.
+[docs/ADOPTING.md](docs/ADOPTING.md#private-cloud-compute) has the rest: the entitlement check, the
+quota, and holding every model call for a screenshot run.
 
-- **The entitlement.** A Private Cloud Compute request from a process without it is a fatal trap, not an error. So the seam sends one only when you declared the entitlement and the running build doesn't prove it absent. The Mac and the simulator read their entitlements exactly; on a device, a provisioning profile without it proves it absent. TestFlight and App Store builds carry no profile, so your declaration is all there is: declare it only when your entitlements file grants it.
-- **The development park.** The daily quota belongs to the iCloud account, and every development run would spend the developer's own, so `AskDevelopmentPark` keeps off the tier a test host or `swift test` run, a Debug build, a simulator, and a binary signed for development (`get-task-allow`: a Profile run, or a Release build installed by hand). A parked process sends Private Cloud Compute nothing, not even a prewarm, and its tier caption says "On device". **TestFlight and App Store builds are never parked.**
+## Privacy
 
-To measure the tier in a development run, opt in with `ASK_LIVE_PCC=1` in the environment (`yes` and `true` work too), the launch argument `-ASK_LIVE_PCC YES`, or a closure of your own passed to `AskDevelopmentPark.setAppOptIn(_:)`, from a build signed with the entitlement. The opt-in lifts the park and nothing else. A process outside an app's context, such as a command-line tool, fails every request at once with `LanguageModelError` −1 (`ModelManagerError 1001`), which AskKit reads as the tier being unreachable.
-
-**Holding every model call.** For a run that must not depend on a model at all, such as a store-screenshot capture, pass a closure of your own to `AskInferenceHold.setHeld(_:)`. While it says so, the seam reads the on-device model as available and speaking the app's language without asking it, builds no session and runs no generation, and `AskGenerationGate.run` throws `AskInferenceHold.HeldError` for your own generations too: the screen shows the intro a reader with a working model sees, in any language and on any simulator, and nothing reaches a model.
-
-**The daily quota.** When the reader's quota is spent, the seam holds the tier until the reset, the turn that hit it is handed down to the on-device model, and a banner says when the quota comes back. Where the on-device model can't serve either, a question fails at once with the quota's line until the reset, asking Private Cloud Compute nothing and spending no request. Opening the screen warms no session, since a warm on Private Cloud Compute spends a request: AskKit warms one once the reader starts their own question, by typing it or editing one a link left in the composer. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the order of the checks, under "Entitlements" and "The development park".
-
-## What is stored, and where
-
-With `persistence` at its default, `.thread`, AskKit keeps these under `Application Support/<appDirectory>/`, where `appDirectory` is your `AskBrand.appDirectory`. It must be one folder name: not empty, not `.` or `..`, and with no `/`. With any other, the stores read and write nothing, and AskKit logs a fault. An unsandboxed Mac app's Application Support is shared by every app the user runs, so there take a name no other app would, such as your bundle identifier: Delete All Chats deletes every chat file it finds there, whichever app wrote it. The folder holds:
-
-| Path | Holds |
-|---|---|
-| `ask-thread.json` | The chat on screen, its newest 50 turns: each question, the prose, the answer with the rows behind it (your `Row` values, encoded), the failure if there was one, the model that answered, when it was asked, and the reader's thumbs. A photo is kept as its label and your reference, never its pixels. |
-| `threads/` | The earlier chats, at most 50, in the same format: `index.json` and one `<id>.json` for each. |
-| `feedback/` | Feedback attachments, only where diagnostics are on and the reader rated an answer, at most 10. They leave the device only when the reader shares them from the settings card. |
-| `ask-thread-unreadable-<id>.json`, `ask-thread-original-<id>.json` | A thread this build couldn't decode, or read only in part, set aside whole rather than overwritten, until a launch that reads it puts it back. |
-
-A turn is written when it ends, never while it streams. Writes are atomic, off the main actor, excluded from backup, and under complete file protection except on a Mac, whether the app runs there natively, as a Mac Catalyst build or as an iPhone or iPad app. On a Mac they keep the system's default class, readable from the first unlock until restart, because on macOS 27.2 complete protection fails every write while the Mac is locked. `persistence: .perLaunch` keeps the thread for the process only: nothing is restored or written.
-
-**What a turn sends to Private Cloud Compute.** On the device, none of this leaves it. On Private Cloud Compute a turn sends your instructions, your tools' definitions and AskKit's reply schema; the prompt (when a session starts fresh, your `promptPrefix`, a recap of the thread's last exchanges and your `promptLines`; on a follow-up, the titles the last answer named; a scope line for a question asked from one part of your app; and the reader's question, clamped to 500 characters and fenced); what your tools return; the grounded retry's request and the rows it found, when the model won't search; and a photo with your label for it, when the question has one. AskKit makes no network requests of its own, other than watching whether the device is online. [`AskBrand.disclosureSentence`](Sources/AskCore/AskBrand.swift) is where you tell the reader what leaves the device.
-
-**The privacy manifest.** `AskCore`'s resource bundle carries a [`PrivacyInfo.xcprivacy`](Sources/AskCore/Resources/PrivacyInfo.xcprivacy), so your app's privacy report includes AskKit's part with nothing more from you. It declares the two required-reason APIs AskCore calls: user defaults for `CA92.1`, read only for the launch's own arguments (`ASK_LIVE_PCC`), and the file timestamp for `C617.1`, the modification date of a chat file in the folder above, inside your app's container. It declares no tracking, no tracking domains and no collected data: AskKit sends nothing to its developer or any third party. Answers come from Apple's Foundation Models on the device or on Private Cloud Compute, under Apple's terms, and the host app owns its data. `AskUI` calls none of these APIs and carries no manifest.
+On the device, nothing leaves it. On Private Cloud Compute, a turn sends your instructions and tools,
+the prompt (the reader's question, a recap of the thread and your lines), what your tools return, and
+a photo when the question has one, under Apple's terms. AskKit sends nothing anywhere else, and its
+privacy manifest declares no tracking and no collected data. The thread is kept in your app's
+Application Support folder, excluded from backup:
+[what is stored, and where](docs/ADOPTING.md#what-is-stored-and-where).
 
 ## The demo
 
-`Demo/` is an app for iOS, macOS and visionOS that hosts two domains, each with a thread and chats of its own. "Your Things" is a small library of thirty things, books, records, tools and clothes, behind one search tool (`DemoDomain`). "Assistant" is a domain with no rows (`DemoAssistantDomain`), which converts units with one tool, proposes reminders with another, and answers anything else from the model alone. The switch between them is a menu on iOS and iPadOS, the last of the bar's leading items, the title's menu on visionOS, and on the Mac a pop-up in the toolbar and the View menu (⌘1 and ⌘2). The demo opens where it was left, on the library the first time. Both share one model seam, as a host's Asks would, and each keeps its turn going while the other is on screen. It declares no Private Cloud Compute entitlement, so it always answers on the device. Its icon is three plates of Liquid Glass in the shape of the bubble in SF Symbols' `text.bubble.badge.sparkles`, the glyph its Ask tab and its mark wear, receding straight back and shading together through `AskSpectrum.aurora`'s colors; `scripts/make-demo-icon.py` makes it, tracing the bubble from the symbol. The symbol is Apple's, under Apple's SF Symbols terms.
-
-Open `Demo/AskKitDemo.xcodeproj` and run the `AskKitDemo_iOS` scheme on an iPhone 18 Pro simulator, or `AskKitDemo_macOS` or `AskKitDemo_visionOS`. The simulator and the Mac need no signing. A real turn needs Apple Intelligence; `-askScriptedAnswer` needs no model. To run on a device, put `DEVELOPMENT_TEAM = <your team ID>` in an untracked `Demo/Local.xcconfig`. [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md) says how the project is laid out and why its settings are what they are.
-
-Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`, and all but `-askAssistant`, `-askHoldTurn` and `-askHidesTips` are listed, off, in each app scheme's Run > Arguments, so you tick one to use it. Those three aren't there: add one to the scheme's Run > Arguments in Xcode, or pass it at launch, as `xcrun simctl launch <device> com.example.askkitdemo -askAssistant`. The three that image the Mac window are in [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md#imaging-the-mac-window), and the rest are here:
-
-| Argument | What it shows |
-|---|---|
-| none | The domain the demo was left on, the library the first time. On the library, a real turn on the on-device model, with starters drawn from the thirty items, "Surprise me" before the composer, and a gear button for the settings card. |
-| `-askResetThread` | An empty thread on every launch (`.perLaunch`): nothing is restored or saved, in either domain. The launch opens on the library (or the assistant under `-askAssistant`) whichever was on screen last, and a switch isn't remembered. |
-| `-askFreshHistory` | The thread kept, but everything AskKit keeps for the demo deleted before the store reads it, in both domains: the saved thread, every earlier chat, any thread set aside because it couldn't be read, and the feedback attachments. A clean History sheet. The domain the demo was left on is forgotten too, so the launch opens on the library (or the assistant under `-askAssistant`). |
-| `-askScriptedAnswer` | Every question answered by the app, with no model. "What should I read tonight?" gets a pick with a basis line and Another pick, a question with "lend" in it gets a confirmation card, and anything else gets a two-tile lookup. The first screen keeps its starters even where Apple Intelligence is off. |
-| `-askPrefill <link>` | An Ask link opened once at launch, such as `askkitdemo://ask?q=…`: the question lands in the composer with the keyboard up and isn't sent. A window reopened, a tab switched back to or the other domain switched to doesn't open it again. |
-| `-askPhotos` | The photo button in place of "Surprise me". It attaches a record sleeve the demo draws, and the answer notes that it read only the words. |
-| `-askTabs` (iOS) | The screen in a `TabView` of two tabs, Ask and Library. |
-| `-askSlot` (iOS, with `-askTabs`) | The composer's face in the tab bar's bottom accessory. The Library tab puts a host's own accessory there. |
-| `-askPush` | A tile pushes its row onto the Ask tab's stack instead of showing it in a sheet. |
-| `-askFold <shape>` | The screen arranged around a fold the simulator doesn't have: `book`, `bookBent`, `upright` or `uprightBent`. |
-| `-askEmptyLibrary` | An empty library, so the first screen is the nothing-to-ask one; `-askEmptyLibrary button` adds its button. |
-| `-askHoldTurn` | Every turn held in flight until Stop, the app answering as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. Not in the schemes: pass it at launch, as `xcrun simctl launch <device> com.example.askkitdemo -askHoldTurn`. |
-| `-askHidesTips` | AskUI's tips hidden, as every UI test launches the demo. Without it the demo configures TipKit at launch and shows them; TipKit remembers a tip that has gone, so delete the app to see them again. Not in the schemes: pass it at launch. |
-| `-askAssistant` | Opens on the assistant, whichever domain was on screen last; the switch still goes back to the library. The assistant shows no tiles, and under each answer the line saying what it stood on, the assistant's own words where a tool grounded it and "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed in a Reminders section of the settings card. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing there. |
-
-`-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on the device writes Hebrew.
+Open `Demo/AskKitDemo.xcodeproj` and run `AskKitDemo_iOS` on an iPhone 18 Pro simulator, or
+`AskKitDemo_macOS` or `AskKitDemo_visionOS`. Neither the simulator nor the Mac needs signing. It hosts
+two domains: a library of thirty things to ask about, and an assistant that converts units and
+proposes reminders. A real answer needs Apple Intelligence, and `-askScriptedAnswer` answers without a
+model. The demo has no Private Cloud Compute entitlement, so it answers on the device. Its launch
+arguments and project: [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md).
 
 ## How it behaves
 
-The eight house rules, as the reader meets them. Section 5 of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) gives the reason for each.
+Eight house rules govern the engine and the screen.
+[ARCHITECTURE.md](docs/ARCHITECTURE.md#5-the-house-rules) gives the reason for each.
 
-1. **Private Cloud Compute answers every turn it can, and the on-device model answers the rest, with no switch for the reader.** When Private Cloud Compute goes out during a turn, the turn is handed down once to the on-device model. A refusal, an ungrounded answer or a request the model can't take is never handed down. The tier caption names the model that is answering.
-2. **By default, an answer with no retrieval behind it is never shown.** When a first question gets an ungrounded answer, the app searches for the model and asks again. An ungrounded follow-up fails, with coaching. A domain chooses this with `grounding`: `.toolCall` fails an ungrounded first answer without the search, and `.notRequired` keeps every answer, recording what grounded it: one that nothing grounded says so under it.
-3. **Instructions are yours and short, and everything the reader or a tool wrote is data.** AskKit fences what it composes: the reader's question, clamped to 500 characters, the recap of earlier turns, and the rows the grounded retry found. A tool clamps its own fields. A fence tag in any of them is redacted, in any spelling that compatibility decomposition (NFKD) maps to the tag once marks are dropped, and the answer loses every link and image before it is drawn.
-4. **Nothing animates on tokens or tool payloads.** The reveal paints ink over text already laid out, and the wait row shows the turn's real tool events, never an invented delay.
-5. **Nothing shown is taken back.** A failure renders beneath the prose already drawn, a stopped turn keeps its text, and the deadline truncates an answer rather than wiping it. The one exception is a turn asked again from the start, after a hand-down or a rollover.
-6. **A session's tool set is fixed for its life, and a warm session only starts a conversation.** Changing the tools or the prefix would throw away the session's cached prefix.
-7. **Every user-facing string ships in all 25 languages, and the model's question kind decides** whether an answer shows tiles, never an English word list.
-8. **Reduce Motion has an answer in every animation, VoiceOver hears every terminal state, and Dynamic Type scales the marks.**
+1. Private Cloud Compute answers every turn it can, and the on-device model the rest. The reader gets
+   no switch.
+2. By default, an answer with no retrieval behind it is never shown.
+3. Instructions are yours and short, and whatever the reader or a tool wrote is data, fenced and
+   clamped.
+4. Nothing animates on tokens or tool payloads.
+5. Nothing shown is taken back.
+6. A session's tool set is fixed for its life, and a warm session only starts a conversation.
+7. Every string ships in all 25 languages, and the model's question kind, never an English word list,
+   decides whether an answer shows tiles.
+8. Reduce Motion has an answer in every animation, VoiceOver hears every terminal state, and Dynamic
+   Type scales the marks.
 
 ## Architecture
 
@@ -500,21 +443,24 @@ flowchart TD
     reveal --> disk["Written to disk<br/>when the turn ends"]
 ```
 
-The store in `AskUI` starts the turn and draws it, and the engine in `AskCore` runs everything between. One turn runs at a time: a new question stops the turn in flight and waits for it. One deadline (`turnDeadline`) covers the whole turn: the domain's hooks (`deterministicAnswer(for:)`, `overview()`, `promptLines(question:overview:)` and `refine`), every generation, the grounded retry's search and the hand-down. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes each step, the screen, the house rules, the designs that were tried and rejected, and a glossary.
+AskUI's store starts a turn and draws it, and AskCore's engine runs everything between: one turn at a
+time, under one deadline. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes each step, the
+screen, the designs that were rejected and a glossary.
 
-## Localization
+## Contributing
 
-The screen ships in 25 languages: `en ar cs da de es es-MX fr he id it ja ko nb nl pl pt-BR ru sv th tr uk vi zh-Hans zh-Hant`, in two String Catalogs, AskUI's for the screen and AskCore's for the error lines. Your copy is yours to localize: AskKit shows the strings in your `AskBrand`, your starters and what your domain returns, such as `phrase(for:)` and `basis(for:)`, as you give them, and looks none of them up. The samples above use plain literals to stay short; in your app, resolve each from your own catalog with `String(localized:)`. AskKit's languages appear only where your app declares them: an app runs in the languages it supports, and one with no catalog of its own supports only its development language, so AskKit shows in that one language whatever the reader's. Declare yours with your own String Catalogs or `CFBundleLocalizations` in your Info.plist, as the demo's `Info.plist` does. In a Swift package, write `String(localized: "…", bundle: #bundle)`: a bare `String(localized:)` searches the app's main bundle and returns the key. `scripts/check-catalog-completeness.py` is the only check between AskKit's strings and English shipped to 24 languages, and [TRANSLATION.md](TRANSLATION.md) has each locale's rules. The documentation and the code comments are in English.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the toolchain, the checks and the pull-request rules. No test
+asks a real model: the engine and the store run against scripted sessions. Report a vulnerability
+privately, as [SECURITY.md](SECURITY.md) says. Everyone taking part follows the
+[code of conduct](CODE_OF_CONDUCT.md). The screen's design draws on
+[docs/DESIGN-RESEARCH.md](docs/DESIGN-RESEARCH.md).
 
-## Testing
+## Built with AskKit
 
-`swift test` runs the package's Swift Testing suites, `AskCoreTests`, `AskUITests`, `AskCrossPostureTests` and `AskReadmeApproachableTests`. No test asks a real model: the engine and the store run against scripted sessions. The cross-posture target compiles AskKit's public API with none of the package's concurrency settings, as a host that doesn't share them would, and the README's two samples run there and again in `AskReadmeApproachableTests`, under the package's own settings but strict memory safety, whose main-actor default isolation and `NonisolatedNonsendingByDefault` a host on Xcode's app template has too. `scripts/ci.sh test-ios` runs the package's tests on an iPhone 18 Pro simulator, and `scripts/ui-smoke.sh` runs the demo's UI tests there; both are local runs. CI runs `scripts/ci.sh`'s other steps on every pull request and push to `main`: the checks, the tests, the package for the eight destinations `scripts/ci.sh destinations` lists, and the demo. [CONTRIBUTING.md](CONTRIBUTING.md) has the whole gate.
+[Klosyt](https://apps.apple.com/app/id6758277603), a wardrobe;
+[Kabynyt](https://apps.apple.com/app/id6771412493), a collection; and
+[vultyr](https://apps.apple.com/app/id6761264004), a service-status monitor.
 
-## Contributing, security, license and credits
+## License
 
-- **Contributing.** [CONTRIBUTING.md](CONTRIBUTING.md) covers the toolchain, the checks, strings and pull requests.
-- **Security.** Report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes, rather than in an issue.
-- **Conduct.** Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md), the Contributor Covenant.
-- **License.** MIT: see [LICENSE](LICENSE).
-- **Research.** [docs/DESIGN-RESEARCH.md](docs/DESIGN-RESEARCH.md) is the research on Apple's guidance and on chat interfaces that the screen's design draws on.
-- **Credits.** [Klosyt](https://apps.apple.com/app/id6758277603), a wardrobe, [Kabynyt](https://apps.apple.com/app/id6771412493), a collection, and [vultyr](https://apps.apple.com/app/id6761264004), a service-status monitor, are built on AskKit.
+MIT: see [LICENSE](LICENSE).
