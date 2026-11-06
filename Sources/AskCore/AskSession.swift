@@ -270,6 +270,11 @@ nonisolated public struct AskSessionBox: Sendable {
     /// on-device session says so here, and that generation goes through the
     /// generation gate and the caption names the on-device model.
     public let tier: AskTier
+    /// The line the session's tool results end on, which the rows the grounded
+    /// retry finds for the model end on too: the domain's
+    /// `toolResultEnding(answerLanguage:)`, set as the engine builds the
+    /// session. Nil for none.
+    var toolResultEnding: String?
 
     /// A box for `session`, bound to `tier`.
     public init(session: any AskSession, tier: AskTier) {

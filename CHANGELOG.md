@@ -36,6 +36,20 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   whose domain needs a model, draws the screen as before. It is the initializer's argument after
   `disclosureSentence`, defaulted, so a host's call compiles as it was; the API check lists the
   initializer without it as removed, since its full name changes.
+- **`AskDomain.toolResultEnding(answerLanguage:)` and `AskAnswerLanguage`: a domain's line at the end
+  of every tool result, outside English.** Told the language only in its instructions, Apple's
+  on-device model answered questions about rows written in English in English. A domain that returns a
+  line, such as `"Write your answer in \(answerLanguage.promptName)."`, has the engine end every tool
+  result on it after a blank line, and the rows the grounded retry fences too. In Klosyt's eval that
+  line took answers in the asked language from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30 of 47 in
+  Korean, 8 of 24 to 30 of 34 in Chinese and 12 of 24 to 24 of 24 in Spanish. The engine asks once a
+  session, with the language the instructions were told, and never in English; only a tool whose output
+  is `String` takes the line, and any other passes through, its name logged. `AskAnswerLanguage` names
+  the language in English and in its own words, "Japanese (日本語)", from the app's localization. Nil,
+  the default, changes nothing: the line has a cost, since read last it ends the search, and a question
+  that takes a second search stopped searching again until the instructions named the tool, so a host
+  measures its own questions before turning it on. ARCHITECTURE.md's new "Writing a domain's tools"
+  collects what Klosyt's evals taught about tool output.
 
 ## [0.5.0] - 2026-11-02
 

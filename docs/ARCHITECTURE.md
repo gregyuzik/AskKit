@@ -558,6 +558,44 @@ not redacted, so a line that quotes it is the host's to clamp. The rendered answ
 image URL the markdown parse produced: the model writes a link's label and its destination, so a link
 would be a hidden tap target inside trusted app chrome.
 
+**The answer language at the end of a result.** Outside English, a domain can give a line of its own
+that ends every tool result and the rows the grounded retry fences (`toolResultEnding(answerLanguage:)`,
+nil by default). The engine asks once a session, as it builds the tools, with the language the
+instructions were just told (`AskAnswerLanguage`: the seam's English name and the app localization's
+own, "Japanese (日本語)"). It wraps each tool whose output is `String` to add the line after a blank
+line, and passes any other through, logging its name. In the retry the line goes inside `<tool_result>`,
+after the rows, as a tool's would.
+
+### Writing a domain's tools
+
+Measured on Apple's on-device model, in Klosyt's evals:
+
+- **The language last.** Told the language only in its instructions, the model answered questions about
+  rows written in English in English. Ending each result on "Write your answer in Japanese (日本語)."
+  took answers in the asked language from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30 of 47 in
+  Korean, 8 of 24 to 30 of 34 in Chinese and 12 of 24 to 24 of 24 in Spanish, with English unchanged.
+  The same change stopped Klosyt's instructions quoting an English sample answer outside English.
+- **A line at the end of a result changes how the tools are used.** Read last, the language line reads
+  as the end of the search: "what goes with my navy blazer?" named a second garment in 0 of 12 runs in
+  Korean, Chinese and Spanish, down from 4, 12 and 12. A sentence closing the instructions that names
+  the tool to search again with ("To find what goes with a garment, search the closet's other
+  categories with search_my_closet.") brought Chinese back to 14 of 16 and Spanish to 12 of 12, though
+  not Korean (2 of 12). A domain whose questions take several searches measures them before it turns
+  the line on.
+- **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
+  it ("8 shirts" for 3). Each group's count goes on its own line, and the total after them.
+- **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an
+  English-tagged closet for "Grün" and "緑" and found nothing. Klosyt's search reads the app's own words
+  for its colours and categories that match nothing as the tags the rows are filed under, and green
+  answers went from 1 of 3 and 0 of 3 to 3 of 3.
+- **No argument the model has to make up.** A search whose empty query means everything takes the query
+  as optional.
+- **Guide patterns.** Apple's model refuses a `@Guide` pattern with a bracketed class, `\S`, `\p{L}` or a
+  lookahead. `.` works but cost about 82 s an answer; an alternation of the characters allowed works.
+- **A dozen runs.** Three runs can't tell a prompt change from noise: one scenario's Korean pairing went
+  4 of 6 one night and 4 of 12 the next. Run each scenario 12 times, and count the proposing tools'
+  calls as well as the answers.
+
 ### Persistence and history
 
 A domain whose `persistence` is `.thread` (the default) keeps the thread in

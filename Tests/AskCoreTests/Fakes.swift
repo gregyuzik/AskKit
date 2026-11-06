@@ -628,6 +628,9 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
     /// The instructions each session was built with — where the answer language
     /// shows up, since only the domain can phrase it.
     let instructionsSeen = Mutex<[String]>([])
+    /// The tools each session was built with — where the domain's line at the
+    /// end of a tool result shows up, since the engine wraps them.
+    let toolsSeen = Mutex<[[any Tool]]>([])
     /// What `answerLanguage(for:)` reports.
     let language = Mutex<String?>(nil)
     /// A real generation gate for on-device generations, as `AppleModelSeam`
@@ -674,6 +677,7 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
         instructions: String
     ) async throws -> AskSessionBox? {
         instructionsSeen.withLock { $0.append(instructions) }
+        toolsSeen.withLock { $0.append(tools) }
         guard !refusesSession.withLock({ $0.contains(tier) }) else { return nil }
         let boxed = boxesAs.withLock { $0[tier] } ?? tier
         if buildsShapelessSessions.withLock({ $0 }) {
@@ -778,6 +782,12 @@ nonisolated struct FakeDomain: AskDomain {
     /// Rows the tool hands back. The tool records into the collector, so a test
     /// that wants a grounded turn scripts the session's `toolCallsAfter` too.
     var rows: [FakeRow] = FakeRow.six
+    /// What `makeTools` hands the session, once it has published the
+    /// collector and the relay.
+    var tools: [any Tool] = []
+    /// Whether `toolResultEnding(answerLanguage:)` asks for the line Klosyt's
+    /// eval measured, "Write your answer in Japanese (日本語).".
+    var endsToolResults = false
     var kinds: [AskQuestionKind] = AskQuestionKind.default
     var deadline: Duration = .seconds(45)
     /// Outranks `deadline` while set. A class, for `instructionsFor`'s reason.
@@ -866,7 +876,11 @@ nonisolated struct FakeDomain: AskDomain {
 
     func makeTools(_ context: AskToolContext<FakeRow>) -> [any Tool] {
         bridge.publish(context.collector, relay: context.relay)
-        return []
+        return tools
+    }
+
+    func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String? {
+        endsToolResults ? "Write your answer in \(answerLanguage.promptName)." : nil
     }
 
     /// Records what it was told, so a test can say the sentences and the tool

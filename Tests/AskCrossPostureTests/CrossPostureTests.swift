@@ -934,6 +934,15 @@ extension CrossPostureTests {
         #expect(domain.referent(from: AskAnswer(text: "Arrival.", matches: [dune, arrival], tiles: [dune])) == ["Dune"])
         #expect(domain.referent(from: AskAnswer(text: "Try Arrival.", matches: [dune, arrival])) == ["Arrival"])
 
+        let japanese = AskAnswerLanguage(englishName: "Japanese", localization: "ja")
+        #expect(japanese?.englishName == "Japanese")
+        #expect(japanese?.ownName == "日本語")
+        #expect(japanese?.promptName == "Japanese (日本語)")
+        #expect(AskAnswerLanguage(englishName: nil) == nil)
+        if let japanese {
+            #expect(domain.toolResultEnding(answerLanguage: japanese) == nil)
+        }
+
         let sink = CrossPostureQuietSink()
         sink.turn(AskTurnStats(tier: .onDevice))
         sink.routing("heard by nobody")

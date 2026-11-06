@@ -62,6 +62,9 @@ public actor AskEngine<Domain: AskDomain> {
     /// What a warm session's age is read against (`warmMaxAge`): the
     /// continuous clock, or a test's.
     private let clock: @Sendable () -> ContinuousClock.Instant
+    /// The app's localization, which names the answer language in its own
+    /// words (`AskAnswerLanguage`): the main bundle's first, or a test's.
+    private let answerLocalization: @Sendable () -> String?
 
     private var conversation: AskConversation<Row>?
     /// What the thread has said, while no kept conversation carries it: a
@@ -132,11 +135,13 @@ public actor AskEngine<Domain: AskDomain> {
     }
 
     /// The engine with the clock a warm session is aged by, so a test can
-    /// move it past `warmMaxAge` rather than wait five minutes.
+    /// move it past `warmMaxAge` rather than wait five minutes, and the
+    /// localization the answer language is named in, so a test can pin one.
     init(
         domain: Domain,
         seam: any AskModelSeam,
         log: (any AskLogSink)?,
+        answerLocalization: @escaping @Sendable () -> String? = { Bundle.main.preferredLocalizations.first },
         clock: @escaping @Sendable () -> ContinuousClock.Instant
     ) {
         self.domain = domain
@@ -146,6 +151,7 @@ public actor AskEngine<Domain: AskDomain> {
         let osLog = AskOSLogSink(subsystem: domain.brand.logSubsystem)
         self.log = log ?? osLog
         self.clock = clock
+        self.answerLocalization = answerLocalization
         // A mistake in the domain is a bug in the host's code, logged once,
         // here: a fault under the brand's subsystem, which the log store
         // keeps and Console and Xcode set apart, and a routing line to a
@@ -1282,6 +1288,10 @@ public actor AskEngine<Domain: AskDomain> {
             throw AskError.couldNotAnswer
         }
         var lines = domainLines
+        // The rows end on the line the session's tools end their results on,
+        // as one of those tools would have returned them
+        // (`AskDomain.toolResultEnding(answerLanguage:)`).
+        let found = box.toolResultEnding.map { rows + "\n\n" + $0 } ?? rows
         lines.append(
             "These are the things the app found for this question — answer only from them, "
             + "and do not search again: <tool_result>"
@@ -1292,7 +1302,7 @@ public actor AskEngine<Domain: AskDomain> {
             // domain's search to have done it. Not `clamp`: that collapses
             // newlines and truncates, flattening the layout the domain built
             // for the model to read.
-            + AskPrompt.neuteringTags(AskPrompt.sanitizeForFence(rows))
+            + AskPrompt.neuteringTags(AskPrompt.sanitizeForFence(found))
             + "</tool_result>"
         )
         return AskPrompt.promptText(prefix: domain.promptPrefix, lines: lines, question: question)
@@ -1875,6 +1885,8 @@ public actor AskEngine<Domain: AskDomain> {
         let tools = domain.makeTools(context)
         let seam = self.seam
         let domain = self.domain
+        let log = self.log
+        let localization = self.answerLocalization
         let build: @Sendable () async throws -> AskSessionBox? = {
             // Asked of the seam, not of the locale: a tier that cannot write
             // the app's language answers in English rather than spending a
@@ -1887,7 +1899,28 @@ public actor AskEngine<Domain: AskDomain> {
             let instructions = domain.instructions(
                 tier: tier, isConversation: isConversation, answerLanguage: language
             )
-            return try await seam.makeSession(tier: tier, tools: tools, instructions: instructions)
+            // The domain's line for the end of each tool result, in the
+            // language the instructions were just told, so the two can't
+            // disagree. Asked here, once: the session keeps its tools for its
+            // life (house rule 6), and its language with them.
+            let ending = AskAnswerLanguage(englishName: language, localization: localization())
+                .flatMap { domain.toolResultEnding(answerLanguage: $0) }
+                .flatMap { $0.isEmpty ? nil : $0 }
+            var sessionTools = tools
+            if let ending {
+                let ended = AskToolEnding.wrap(tools, ending: ending)
+                sessionTools = ended.tools
+                if !ended.passedThrough.isEmpty {
+                    log.routing(
+                        "tools returning no text keep their results as they are: "
+                            + ended.passedThrough.joined(separator: ", ")
+                    )
+                }
+            }
+            guard var box = try await seam.makeSession(tier: tier, tools: sessionTools, instructions: instructions)
+            else { return nil }
+            box.toolResultEnding = ending
+            return box
         }
         guard let made = try await AskDeadline.run(until: deadline, build) else {
             log.routing("ran out of time building a \(tier.rawValue) session")
