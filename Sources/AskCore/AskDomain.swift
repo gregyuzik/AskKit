@@ -278,6 +278,30 @@ nonisolated public protocol AskDomain: Sendable {
     /// nil for English (`AskModelSeam.answerLanguage(for:)`). Only the domain
     /// can phrase it.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String
+    /// A line of the domain's own for the end of every tool result in a
+    /// session asked to answer in `answerLanguage`: nil, the default, for none.
+    /// The engine asks once a session, as it builds the session's tools, and
+    /// never in English, where the seam names no language.
+    ///
+    /// The line follows a blank line at the end of what each tool returns, and
+    /// of the rows the grounded retry finds for the model, so the language is
+    /// the last thing the model reads before it writes. Told the language only
+    /// in its instructions, Apple's on-device model answered questions about
+    /// rows written in English in English: in Klosyt's eval, the line
+    /// `"Write your answer in \(answerLanguage.promptName)."` took answers in
+    /// the asked language from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30
+    /// of 47 in Korean, 8 of 24 to 30 of 34 in Chinese and 12 of 24 to 24 of 24
+    /// in Spanish.
+    ///
+    /// It has a cost. Read last, the line reads as the end of the search: a
+    /// question that takes a second search ("what goes with my navy blazer?")
+    /// stopped naming a second garment in Korean, Chinese and Spanish until the
+    /// instructions named the tool to search again with. Measure a domain's own
+    /// questions before turning it on, its proposing tools' too.
+    ///
+    /// Only a tool whose output is `String` takes the line. Any other passes
+    /// through as it is, and the engine logs its name.
+    func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String?
     /// The static opening of every prompt: what `prewarm(promptPrefix:)`
     /// caches ahead of the question. **Byte-stable**, or the warm session's KV
     /// cache is thrown away.
@@ -578,6 +602,9 @@ nonisolated extension AskDomain {
 
     /// No lines of the domain's own between the prefix and the question.
     public func promptLines(question: String, overview: AskOverview) async -> [String] { [] }
+
+    /// Nil: tool results reach the model as the tools return them.
+    public func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String? { nil }
 
     /// No words of the domain's own ahead of the lines.
     public var promptPrefix: String { "" }
