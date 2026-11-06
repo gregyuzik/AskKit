@@ -1,12 +1,12 @@
 # Translating AskKit
 
-AskKit owns the Ask screen's copy, so a string that is wrong here is wrong in every app that hosts the
-screen, and a host's catalog checks never scan a package: `scripts/check-catalog-completeness.py` is the
-only thing between these catalogs and shipping English to 24 locales. This file sits at the root because
-Xcode 27's agent-driven translation reads it there.
+AskKit owns the Ask screen's copy, so a string wrong here is wrong in every host, and no host's catalog
+check scans a package: `scripts/check-catalog-completeness.py` alone keeps these catalogs from shipping
+English to 24 locales. This file sits at the root because Xcode 27's agent-driven translation reads it
+there.
 
-**Apple's style guides win.** Xcode 27 has a translation style guide for each locale. Where a rule or a
-row here disagrees with the locale's guide, follow the guide and correct the row.
+**Apple's style guides win.** Where a rule or row here disagrees with the locale's translation style
+guide in Xcode 27, follow the guide and correct the row.
 
 ## The catalogs
 
@@ -15,11 +15,11 @@ row here disagrees with the locale's guide, follow the guide and correct the row
 | `Sources/AskCore/Resources/Localizable.xcstrings` | The error copy: what the reader is told when a turn can't finish. |
 | `Sources/AskUI/Resources/Localizable.xcstrings` | The screen: the wait row, the evidence line, the chips, the composer, the settings card. |
 
-Both carry `en` and these 24, every translatable key in all of them before it is pushed:
+Both carry `en` and these 24, each with every translatable key before a push:
 `ar cs da de es es-MX fr he id it ja ko nb nl pl pt-BR ru sv th tr uk vi zh-Hans zh-Hant`. The one
-exemption is `"shouldTranslate": false` on the key. Copy that names the app is the host's: the title,
-the help text, the first-screen sentences and any error line naming the app stay in the host's catalog
-and reach AskUI through `AskBrand`.
+exemption is `"shouldTranslate": false` on the key. Copy that names the app (the title, the help text,
+the first-screen sentences, any error line naming it) is the host's: it stays in the host's catalog and
+reaches AskUI through `AskBrand`.
 
 **`bundle: #bundle` on every lookup**, `String(localized: "…", bundle: #bundle)` and
 `Text("…", bundle: #bundle)`, format-only keys too (`Text("\(a)\(b)")` looks up `"%@%@"`). `#bundle` is
@@ -32,9 +32,9 @@ too, and the check never reads it.
 
 `check-catalog-completeness.py` runs its own self-test first, then fails on any of these.
 
-**A unit that isn't `"state": "translated"` with a value.** `needs_review` is the extractor's default,
-so it is evidence that nobody translated the string, and an empty value renders as nothing. A locale a
-catalog carries that the script's `LOCALES` doesn't name is reported too.
+**A unit that isn't `"state": "translated"` with a value.** `needs_review`, the extractor's default, is
+evidence that nobody translated the string, and an empty value renders as nothing. A locale a catalog
+carries that the script's `LOCALES` doesn't name is reported too.
 
 **A missing plural category**, wherever the plural sits: at the top of a localization, under a device
 variation or inside a substitution.
@@ -50,15 +50,15 @@ variation or inside a substitution.
 A superset passes: Spanish, French, Italian and Portuguese add `many` on some keys. A count key also
 fails in a locale that gives every count the same form, unless that locale needs only `other`. A key is
 a count key when its source passes an integer (`%lld`, `%d`, `%u` and the rest) or inflects
-(`^[…](inflect: true)`), or when any localization varies it by plural. A key whose integer isn't a
-count, such as a percentage, goes in the script's `NOT_COUNTS`, with the reason.
+(`^[…](inflect: true)`), or any localization varies it by plural. A key whose integer isn't a count,
+such as a percentage, goes in the script's `NOT_COUNTS` with the reason.
 
-**An argument whose specifier changed.** Foundation resolves a format against the call's arguments,
-not the words around them. A key passing `(Int, String)` whose translation reads `%@ … %lld` hands the
-integer to `%@` as an object pointer, and the process crashes, in that locale only; `%1$@ … %2$lld`
-does the same, and so does one `%@` where the source has `%lld`. Argument N must carry the specifier
-the source gives argument N, and a translation reads no argument the source doesn't pass: a `%@` added
-to a key that takes none, such as `Answer ready`, fails too.
+**An argument whose specifier changed.** Foundation resolves a format against the call's arguments, not
+the words around them, so argument N must carry the specifier the source gives argument N. Swap an
+integer's and an object's specifiers, numbered or not, and the integer reaches `%@` as an object
+pointer: the process crashes, in that locale only. One `%@` where the source has `%lld` does the same.
+Nor may a translation read an argument the source doesn't pass: a `%@` added to a key that takes none,
+such as `Answer ready`, fails too.
 
 ```
 source:   From ^[%lld item](inflect: true) in your %@      (Int, String)
@@ -70,40 +70,39 @@ wrong:    %1$@ içindeki %2$lld öğeden      numbered, still swapped
 It bites hardest where a plural category drops the numeral: Hebrew's dual, `מתוך שני פריטים ב%2$@`,
 has no `%lld`, so without the `2$` its `%@` would be argument 1.
 
-**A substitution reference read as a specifier.** Open a plural key in Xcode and it rewrites the value
+**A substitution reference read as a specifier.** Opening a plural key in Xcode rewrites the value
 around one, `%1$@%#@items@`, moving the count into a `substitutions` entry with its own `argNum` and
 `formatSpecifier` (`"items": { "argNum": 2, "formatSpecifier": "lld", … }`). The check reads
-`%#@items@` through that entry, so a swapped number or type is still caught, and a reference the
-localization doesn't declare is reported.
+`%#@items@` through that entry, so it still catches a swapped number or type, and reports a reference
+the localization doesn't declare.
 
-**Thai's `[tt]` flag on the wrong placeholder.** `%[tt]@` (numbered `%2$[tt]@`) goes on a `%@` that
-holds a name against Thai text, and Foundation spaces a Latin value. The check reads it as the `%@` it
-is, and refuses `[tt]` on a number or before the position.
+**Thai's `[tt]` flag on the wrong placeholder.** `%[tt]@` (numbered `%2$[tt]@`) goes on a `%@` holding
+a name against Thai text, and Foundation spaces a Latin value. The check reads it as a `%@` and refuses
+`[tt]` on a number or before the position.
 
 **The source, read from the other side.** A literal looked up with `bundle: #bundle` must be in its own
-target's catalog, AskCore's in AskCore's and AskUI's in AskUI's. A localized literal with no bundle
-fails, and so does a scan that finds no `#bundle` literal at all, since the check would then be blind.
-A literal counts as a lookup in `Text`, `String(localized:)` and the other calls the script's `LOOKUP`
-names (the SwiftUI views and modifiers that take a `LocalizedStringKey`, wrapped in
-`LocalizedStringKey("…")` or not), as `.searchable`'s `prompt:`, and as an element of
-`.accessibilityInputLabels`' array.
+target's catalog. A localized literal with no bundle fails, as does a scan that finds no `#bundle`
+literal at all, which would leave the check blind. A literal counts as a lookup in `Text`,
+`String(localized:)` and the other calls the script's `LOOKUP` names (the SwiftUI views and modifiers
+that take a `LocalizedStringKey`, wrapped in `LocalizedStringKey("…")` or not), as `.searchable`'s
+`prompt:` and as an element of `.accessibilityInputLabels`' array.
 
 ## What the check can't see
 
 **A key made away from its lookup.** A `LocalizedStringKey` held in a variable and passed in later, or
-a literal in a call `LOOKUP` doesn't name, isn't read, so its bundle and its catalog entry go unchecked.
+a literal in a call `LOOKUP` doesn't name, isn't read: its bundle and catalog entry go unchecked.
 
 **The right-to-left mark.** A Hebrew or Arabic value that opens with a Latin name, as many open with
 `Apple Intelligence` or `Private Cloud Compute`, starts with U+200F: a paragraph takes the direction of
 its first strong character, so without the mark the whole line may lay out left to right. An Arabic
-value that ends in a Latin name or a placeholder, a full stop or ellipsis aside, ends with it too.
+value ending in a Latin name or a placeholder, a full stop or ellipsis aside, ends with it too.
 
-**A host's `%@` noun follows a fixed noun, never a possessive.** The source says `in your %@`, and the
-host fills in its own scope noun, in its own words and language, number and gender, so a translation
-can't agree with it (`ton` or `ta`, `deinem` or `deiner`). Name the kind of thing and quote the host's
-word after it, in the quotes the locale's guide gives: `sección “%@”` (es, es-MX), `sektionen “%@”`
-(da), `Bereich „%@“` (de), `section « %@ »` (fr) and `sektionen ”%@”` (sv). nb, it and tr have no
-possessive to drop.
+**A host's `%@` noun follows a fixed noun, never a possessive.** In the source's `in your %@` the host
+fills in its own scope noun, in its own words, language, number and gender, so a translation can't
+agree with it (`ton` or `ta`, `deinem` or `deiner`). Name the kind of thing and quote the host's word
+after it, in the locale guide's quotes: `sección “%@”` (es, es-MX), `sektionen “%@”` (da),
+`Bereich „%@“` (de), `section « %@ »` (fr) and `sektionen ”%@”` (sv). nb, it and tr have no possessive
+to drop.
 
 **No-break spaces (U+00A0)** inside `Apple Intelligence` and `Private Cloud Compute` in cs, de, es,
 es-MX, fr, ko, nl, pl, ru, tr and uk, whose guides ask for them; fr joins two words at most
@@ -111,20 +110,20 @@ es-MX, fr, ko, nl, pl, ru, tr and uk, whose guides ask for them; fr joins two wo
 (`wird gelesen …`) and, in cs, after a one-letter word (`a i k o s u v z`).
 
 **A line that names the device or its Settings app carries a `mac` device variation** beside `other`:
-`System Settings`, and `this Mac` for `this device`, in Apple's own words for the locale, as the
-system's own strings give them. AskCore's `AskEnglishCatalogTests` checks the English pair.
+`System Settings`, and `this Mac` for `this device`, as the system's own strings give them in the
+locale. AskCore's `AskEnglishCatalogTests` checks the English pair.
 
 **Not for translation.** `Text(verbatim:)` for anything that isn't words: a value, a name the reader
 typed, glue. "Private Cloud Compute", a name, and `%@%@`, the reveal renderer's format-only key, are
 `"shouldTranslate": false`. If `-exportLocalizations` runs, it adds an empty key and a bare `%@`: mark
-them the same way, since deleting them only has it recreate them.
+them the same way, since it recreates them if deleted.
 
 **The typographic apostrophe**, `’` (U+2019), in English and the Latin-script locales (`Sur l’appareil`,
 `Ayarlar’dan`), and in Hebrew the *geresh* `׳` (U+05F3), not a quotation mark (`צ׳אט חדש`). The keys
 keep the ASCII `'` that code and translations hang on, so an `en` value differs from its key there.
 `AskEnglishCatalogTests`, in both test targets, fails an English line with a typewriter apostrophe.
 
-**One register per locale, the one Apple's own copy uses**, kept by every string in the locale:
+**One register per locale, the one Apple's own copy uses**, in every string:
 
 | Locale | Addressing the reader |
 |---|---|
@@ -146,13 +145,13 @@ keep the ASCII `'` that code and translations hang on, so an `en` value differs 
 | ko | 합쇼체 for statements and ~세요 for instructions, never 당신 |
 | he | gender-neutral: `ניתן ל־` or `יש ל־` for an instruction, a gerund for a button (`שליחה`, `ניסיון נוסף`), and no `שלך` where the definite article says it |
 
-No native reader has checked the ar, cs, id, pl, th, uk and es-MX rows or Arabic's name genders: a
-reader who does corrects the row and the strings under it. Outside Hebrew, a button's bare imperative
-(`Sil`, `Kopyala`) is a command rather than address, and so is a first-person status line (`Czytam…`).
+No native reader has checked the ar, cs, id, pl, th, uk and es-MX rows or Arabic's name genders; one
+who does corrects the row and its strings. Outside Hebrew, a button's bare imperative (`Sil`,
+`Kopyala`) is a command rather than address, as is a first-person status line (`Czytam…`).
 
-**Right to left.** Hebrew and Arabic are the right-to-left locales. Check every horizontal layout in the
-demo with `-AppleLanguages (he)` and `-AppleLanguages (ar)`; `rotationEffect` isn't mirrored, even where
-the layout is.
+**Right to left.** Check every horizontal layout in the demo in the right-to-left locales, Hebrew
+(`-AppleLanguages (he)`) and Arabic (`-AppleLanguages (ar)`); `rotationEffect` isn't mirrored, even
+where the layout is.
 
 **Length.** Vietnamese and German run about 1.5 times English. A string in a fixed frame needs
 `lineLimit` and `minimumScaleFactor`; one that is the only signal on screen, like the summarized marker,
@@ -164,8 +163,8 @@ Vietnamese need three lines. A bare `fixedSize()` suits only a one-line label, l
 Edit by hand or by script, never by regenerating the file wholesale, which buries the real change. The
 catalogs keep Xcode's exact serialization, `json.dumps(indent=2, separators=(',', ' : '))` with
 `strings` sorted by key, non-ASCII kept and a final newline, so a script's default `json.dump` fails the
-push gate's shape check. A script loads with `object_pairs_hook=collections.OrderedDict` and writes
-with `ensure_ascii=False`. After any edit, by script, by hand or through Xcode:
+push gate's shape check: load with `object_pairs_hook=collections.OrderedDict` and write with
+`ensure_ascii=False`. After any edit, Xcode's included:
 
 ```
 python3 scripts/normalize-catalogs.py          # restores the committed shape and nothing else
@@ -173,4 +172,4 @@ python3 scripts/normalize-catalogs.py --check
 python3 scripts/check-catalog-completeness.py
 ```
 
-`scripts/ci.sh checks` runs the last two, and so does the push gate, on every push, docs-only included.
+`scripts/ci.sh checks` runs the last two, as does the push gate on every push, docs-only included.

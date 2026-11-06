@@ -1,9 +1,8 @@
 # AskKit design research: OS 27 guidance and 2026 AI-chat practice
 
 What Apple's Human Interface Guidelines, as revised on June 8, 2026, and the 2025–2026 research on chat
-interfaces ask of a screen like Ask, and what AskKit does with each. §1 to §3 are the findings, §4 how
-AskKit applies them. The full passages are in the sources, listed at the end. How the design works is
-in [ARCHITECTURE.md](ARCHITECTURE.md).
+interfaces ask of a screen like Ask (§1 to §3), and how AskKit applies each (§4). The sources at the end have the full passages;
+[ARCHITECTURE.md](ARCHITECTURE.md) has how the design works.
 
 ## 1. Apple: what the HIG says
 
@@ -12,11 +11,10 @@ in [ARCHITECTURE.md](ARCHITECTURE.md).
   (`AskModelSeam`).
 - **Hallucinations.** "Clearly communicate that AI-generated content may contain errors … Avoid
   requesting factual information unless you're confident the model has access to verified and
-  up-to-date information." The grounding rule, that an answer with no retrieval behind it is never
-  shown, is the strongest reading of this guideline, which is why it is a house rule and the default
-  grounding policy, not a disclaimer. A domain whose answers needn't rest on the reader's data may keep
-  answers nothing grounded (`AskGroundingPolicy.notRequired`), and each such answer records that
-  nothing did (`AskAnswer.grounding`).
+  up-to-date information." The grounding rule, never showing an answer with no retrieval behind it, is
+  the guideline's strongest reading, so it is a house rule and the default grounding policy, not a
+  disclaimer. A domain whose answers needn't rest on the reader's data may keep answers nothing grounded
+  (`AskGroundingPolicy.notRequired`), each recording that nothing did (`AskAnswer.grounding`).
 - **Non-AI fallback.** "Ensure a great experience even when generative features aren't available or
   people opt not to use them." The can't-serve screen with its reason is the minimum; a host's
   deterministic answers (`AskDomain.deterministicAnswer(for:)`), which need no model, are a real
@@ -24,30 +22,28 @@ in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Specific, reassuring feedback during generation.** "Instead of 'Processing…', say 'Finding
   substitutions for ingredients'." The wait row names the turn's real tool events ("Searching your
   records…"). The same paragraph endorses a "Writing…" label, and **AskKit has none on purpose**: the
-  wait row is gone by the time the first words land, and the reveal's caret says the writing goes on
-  ([ARCHITECTURE.md](ARCHITECTURE.md#the-thread-the-reveal-and-the-waves)). The caret already does the
-  label's job.
+  wait row is gone by the time the first words land, and the reveal's caret already says the writing
+  goes on ([ARCHITECTURE.md](ARCHITECTURE.md#the-thread-the-reveal-and-the-waves)).
 - **Irreversible actions.** "Generally, ask for confirmation before performing a significant action on
   someone's behalf." An action tool proposes, and the reader's tap on a confirmation card commits
   (`AskProposal`).
 - **Searching.** "In apps that use tab bars … search is a dedicated tab." A host that puts search in its
-  library's own field and gives the tab to Ask has a defensible reading: one place to search, the field
-  on the content it filters. Asking is a different verb from searching, so Ask stays a tab of its own,
-  and the two meet where a search finds nothing, with an offer to ask instead
+  library's own field and gives the tab to Ask reads the guideline defensibly: one place to search,
+  the field on the content it filters. Asking is a different verb, so Ask keeps its own tab, and the
+  two meet where a search finds nothing, with an offer to ask instead
   (`AskConversationStore.prefill(_:scope:send:)`).
 - **Apple Intelligence's visual grammar.** The multicolor shimmer border is the system's signature, Siri's
-  and Writing Tools', and a third-party surface doesn't imitate it. AskKit draws no colored border at
-  all: the spectrum look is the host's own colors, opt-in, on the send circle and the streaming caret
-  alone, and the composer is plain glass. The `apple.intelligence` symbol belongs on the first screen's
-  disclosure and the settings card, **not on every message**. The host's own mark is the identity.
+  and Writing Tools', which a third-party surface doesn't imitate. AskKit draws no colored border: the
+  spectrum look is the host's own colors, opt-in, on the send circle and the streaming caret alone, and
+  the composer is plain glass. The `apple.intelligence` symbol belongs on the first screen's disclosure
+  and the settings card, **not on every message**; the host's own mark is the identity.
 
 ## 2. Research on chat UX (NN/g, 2025–2026)
 
 - Users want "quick answers, not a conversation": "direct, scannable, and easy to expand." Suggestions
   are **buttons, not text**, updated through the conversation, and a declined one is removed.
   **Images, not links.** **Don't autoscroll users to the end of a response**: "users expect to start at
-  the beginning of messages". AskKit follows a growing answer only for a reader already at its foot,
-  and never pulls one who has scrolled away (§4 #1).
+  the beginning of messages" (§4 #1).
 - "Half of all conversations contained a follow-up action": the datum the chips stand on. Use
   **standard icons with labels** (a magic wand confuses), name features plainly, and group controls by
   function.
@@ -58,7 +54,7 @@ in [ARCHITECTURE.md](ARCHITECTURE.md).
 ## 3. Practice in 2026 products
 
 Plain prose, no assistant bubble, an honest wait and no pacing is the tool-first shape the survey
-favors. Its **pitfall list** reads as a review checklist for any change here:
+favors. Its **pitfall list** is a review checklist for any change here:
 
 - fake typing that throttles a fast model; a missing stop; autoscroll that fights the reader; no
   persistent history; a disclaimer repeated on every message; bubbles that read as a casual messenger;
@@ -68,18 +64,17 @@ favors. Its **pitfall list** reads as a review checklist for any change here:
   the user's message, regenerate, a persistent searchable history, and attachments. Perplexity made
   **citations the receipt**; Gemini and Siri show **cards** inside the answer; follow-up suggestions are
   Gemini's and Siri's convention, not ChatGPT's.
-- **Shape of AI**'s pattern names are worth using in reviews: wayfinders (suggestions, nudges, follow
-  up), governors (citations, controls, stream of thought, verification, action plan), trust builders
-  (disclosure, footprints, caveat, consent) and identifiers (name, avatar, color, iconography,
-  personality).
+- **Shape of AI**'s pattern names suit reviews: wayfinders (suggestions, nudges, follow up), governors
+  (citations, controls, stream of thought, verification, action plan), trust builders (disclosure,
+  footprints, caveat, consent) and identifiers (name, avatar, color, iconography, personality).
 
 ## 4. How AskKit applies it
 
 | # | The finding | What AskKit does | Source |
 |---|---|---|---|
-| 1 | Never pull the reader down a streaming answer. | The follow keeps the foot in view only while the reader is at the foot, and "Jump to latest" shows otherwise. The new question lands at the foot rather than pinned to the top; why not the top is in ARCHITECTURE.md §6. | NN/g #7; Setproduct |
-| 2 | Per-answer actions, and a visible acknowledgment when a re-ask replaces an answer. | Copy, Copy answer, Edit & Resend and Ask again on the question's menu and as VoiceOver actions, and "Another pick" leading the follow-ups where the answer's kind can be rerolled. A re-ask is a new turn below, so nothing is replaced. | HIG "refine or revert … acknowledge"; every 2026 product |
-| 3 | Disclose what leaves the device, without a toggle. | The first screen carries the host's disclosure sentence (`AskBrand.disclosureSentence`) beside the `apple.intelligence` symbol, or, where nothing can serve and the domain answers without a model, its `disclosureSentenceWithoutModel` without the symbol, the settings card says where answers come from, and the tier caption names the tier answering. | HIG privacy and transparency |
+| 1 | Never pull the reader down a streaming answer. | The follow keeps the foot in view only while the reader is there, and "Jump to latest" shows otherwise. The new question lands at the foot, not pinned to the top (ARCHITECTURE.md §6 says why). | NN/g #7; Setproduct |
+| 2 | Per-answer actions, and a visible acknowledgment when a re-ask replaces an answer. | Copy, Copy answer, Edit & Resend and Ask again on the question's menu and as VoiceOver actions, and "Another pick" leading the follow-ups where the answer's kind can be rerolled. A re-ask is a new turn below, replacing nothing. | HIG "refine or revert … acknowledge"; every 2026 product |
+| 3 | Disclose what leaves the device, without a toggle. | The first screen carries the host's disclosure sentence (`AskBrand.disclosureSentence`) beside the `apple.intelligence` symbol, or, where nothing can serve and the domain answers without a model, its `disclosureSentenceWithoutModel` without it; the settings card says where answers come from; the tier caption names the tier answering. | HIG privacy and transparency |
 | 4 | Attribution, never a percentage. | The evidence line ("From N items") and the domain's basis line under tiles, written from what the tools read. | HIG attribution and confidence; Perplexity's receipts |
 | 5 | Follow-ups that cover the conversation's shapes. | `AskReply` asks for two of different shapes, one narrowing and one broadening, shown under the last answer only. A starter or coaching chip the reader asked or passed over doesn't come back in the thread. | NN/g's six types and guideline #4 |
 | 6 | A persistent, searchable history. | The History button's list of past chats, titled by their first question, with search, swipe to delete, and a recap when an earlier chat goes on. | Siri 27; Setproduct's "no persistent history" |
@@ -98,8 +93,7 @@ Not taken from the research: an assistant bubble or avatar beside every answer (
 finding); a visible "thinking" transcript for Private Cloud Compute's reasoning, which Apple keeps in
 intermediate segments the app never receives as prose, so a collapsible box would show nothing honest;
 a model picker (one policy, one tier caption); per-message disclaimers; and any imitation of the Apple
-Intelligence shimmer: no colored border, and the spectrum look's colors stay on the send circle and the
-caret (§1).
+Intelligence shimmer (§1).
 
 ## Sources
 
