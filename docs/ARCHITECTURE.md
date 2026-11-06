@@ -583,7 +583,7 @@ Measured on Apple's on-device model, in Klosyt's evals:
   not Korean (2 of 12). A domain whose questions take several searches measures them before it turns
   the line on.
 - **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
-  it ("8 shirts" for 3). Each group's count goes on its own line, and the total after them.
+  it. Each group's count goes on its own line, and the total after them.
 - **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an
   English-tagged closet for "Grün" and "緑" and found nothing. Klosyt's search reads the app's own words
   for its colours and categories that match nothing as the tags the rows are filed under, and green
