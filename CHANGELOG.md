@@ -12,6 +12,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-06
+
+A host's switch that keeps its process off every model, a first screen that stops crediting Apple
+Intelligence where the domain answers alone, and a domain's line at the end of every tool result
+outside English.
+
 ### Added
 
 - **`AskInferenceHold`, a host's switch that keeps the process from starting any model call.** A
@@ -626,7 +632,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/gregyuzik/AskKit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gregyuzik/AskKit/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/gregyuzik/AskKit/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/gregyuzik/AskKit/compare/v0.3.0...v0.3.1
