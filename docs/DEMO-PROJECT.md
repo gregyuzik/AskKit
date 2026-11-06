@@ -204,13 +204,20 @@ AppKit pairs a `-`-prefixed argument with the next one.
 
 ## Imaging the iPhone screen
 
-The README's `docs/images/iphone.png` is an iPhone 18 Pro simulator (iOS 27.2) in light mode, a live
-answer from the on-device model to its starter "What tools do I own?", framed with
-[`frames`](https://github.com/viticci/frames-cli) and scaled to 763x1560. Hold the simulator for the
-whole run, so no test or other app comes to the front on it.
+The README's six iPhone images are an iPhone 18 Pro simulator (iOS 27.2), each shot in light
+(`iphone-<shot>.png`) and dark (`iphone-<shot>-dark.png`), framed with
+[`frames`](https://github.com/viticci/frames-cli) and scaled to 600x1227:
+- `first`: the library's first screen, nothing asked;
+- `answer`: a live answer from the on-device model to a starter, "What records do I own?" in light and
+  "What books do I own?" in dark ("What tools do I own?" came back padded in every take);
+- `card`: the assistant's live answer to its starter "Remind me to water the plants at 6 PM", the
+  reminder's card not yet confirmed.
+
+Live answers vary, so take a few and keep one whose prose names the items with no padding. Hold the
+simulator for the whole run, so no test or other app comes to the front on it.
 
 1. Build and install `AskKitDemo_iOS` (Debug) on the simulator, then set Apple's status bar and the
-   appearance:
+   appearance, `light` or `dark`:
 
    ```sh
    xcrun simctl ui <udid> appearance light
@@ -219,23 +226,24 @@ whole run, so no test or other app comes to the front on it.
    ```
 
 2. Launch on the library's first screen with the tips hidden, nothing saved and no domain
-   remembered:
+   remembered, adding `-askAssistant` for `card`:
 
    ```sh
    xcrun simctl launch --terminate-running-process <udid> com.example.askkitdemo \
      -askHidesTips -askFreshHistory -askResetThread
    ```
 
-3. Ask "What tools do I own?" by activating its starter, and wait for the answer, its tiles and the
-   follow-ups (about 20 seconds). A tap through Xcode's device interaction works. The repeatable way,
+3. Ask by activating the starter, and wait for the answer, its tiles and the follow-ups (20 to 45
+   seconds). A tap through Xcode's device interaction works. The repeatable way,
    and the only one on visionOS, is lldb (`xcrun lldb -p <pid> --batch -o '…' -o detach`). First turn
    on the app's accessibility, without which SwiftUI builds no accessibility elements:
    `expr -l objc -- ((void (*)(int))dlsym((void*)-2, "_AXSApplicationAccessibilitySetEnabled"))(1)`.
    Then walk the window's elements from `[[UIApplication sharedApplication] windows]`
    (`accessibilityElementCount`, `accessibilityElementAtIndex:`, and `subviews` where a view has no
    elements), find the one labelled with the starter, and send it `accessibilityActivate`.
-4. Put the question just under the bar. The answer, seven tiles and two follow-ups run a little taller
-   than the screen, and the screen settles at the thread's foot with the question under the bar. Set
+4. Put the question just under the bar. An answer with eight tiles and two follow-ups runs a little
+   taller than the screen, and the screen settles at the thread's foot with the question under the bar
+   (the card's turn fits, and needs no scroll). Set
    the offset of the thread's scroll view (the `UIScrollView` with the identifier `ask.root`)
    directly: `expr -l objc -- (void)[(id)<scroll view> setContentOffset:(CGPoint){0, <y>} animated:NO]`,
    with `<y>` the current offset less the distance from the question's top to 4 pt under the bar's
@@ -243,11 +251,12 @@ whole run, so no test or other app comes to the front on it.
    composer's glass, as a chat's does. A drag on the thread is less precise, and one on the answer's
    words selects them.
 5. Capture and frame. `frames` matches the 1206x2622 capture to the iPhone 18 Pro frame in Burgundy,
-   its default, at 1350x2760; scale that to 763x1560:
+   its default, at 1350x2760; scale that to 600x1227:
 
    ```sh
    xcrun simctl io <udid> screenshot iphone-raw.png
    frames frame iphone-raw.png --output framed/
+   sips -z 1227 600 framed/iphone-raw_framed.png --out iphone-answer.png
    ```
 
 6. Put the simulator back: `xcrun simctl status_bar <udid> clear`, its own appearance, the app's
@@ -283,6 +292,7 @@ asked through lldb.
 5. Cut it out. Crop from the pill's top to the window's bottom. Make the alpha mask the window as a
    rounded rectangle, with a 60 px corner radius and inset 5 px to drop the glass's rim, where the room
    shows through, plus the pill as a capsule, and make everything else transparent.
-6. In the README, the three images' `width=` percentages keep them the same height, about 0.24 of the
-   row each: a width of 0.24 × the image's width over its height.
+6. In the README, the three iPhone images share a row at 30% each, and the Mac and Apple Vision Pro
+   images a second row at one height: their `width=` percentages are in proportion to each image's
+   width over its height, 51% and 44%.
 7. Put the simulator back: the window at 1280x720, the app's accessibility off, and the app quit.
