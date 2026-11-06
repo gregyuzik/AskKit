@@ -114,7 +114,7 @@ for first:
 | `toolResultEnding(answerLanguage:)` | none | A line added to the end of every tool result, and of the grounded retry's rows, when the answer language isn't English, such as "Write your answer in Japanese (日本語)." |
 | `phrase(for:)`, `basis(for:)`, `evidenceScope(from:)` | none | The wait row's words for a tool event, a factual line under an answer's tiles, and the part of your data the evidence line names. |
 | `perform(_:)` | throws | Carries out a proposal the reader confirmed. |
-| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, whose payload is your own type and whose throw fails the turn, and whether such answers cover your starters. If they do, a device where nothing can serve keeps the starters and the composer under its reason, and closes on your brand's `disclosureSentenceWithoutModel`, where you give one. |
+| `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, whose payload is your own type and whose throw fails the turn, and whether such answers cover your starters. If they do, a device where nothing can serve keeps the starters and the composer under its reason, and closes on your brand's `disclosureSentenceWithoutModel` in place of `disclosureSentence`, where you give one. |
 | `turnDeadline` | 45 seconds | How long one turn may run, counted from the question. |
 | `rowLimit(for:)`, `maxTurns(for:)` | 40 and 8 on Private Cloud Compute, 12 and 3 on the device | The rows a tool result may show, and the turns a session carries before it rolls over. |
 
@@ -138,8 +138,8 @@ entitlements file holds the Private Cloud Compute entitlement, `.undeclared` oth
 A host that already routes its own model calls can bridge its router to `AskModelSeam` instead, wrapping
 each session in `AppleAskSession`, so Ask and its other features share one cooldown and one generation
 gate. That gate is the process's one, where the seam's on-device generations wait: run your own through
-`AskGenerationGate.run`, which waits there too. The seam logs a generation it presumes wedged under your
-`logSubsystem`.
+`AskGenerationGate.run`, which waits there too. The seam logs a generation it presumes wedged under its
+`logSubsystem:`; pass your brand's, so its lines sit with the engine's.
 
 **The store.** `AskConversationStore` holds the turns, the turn in flight and the draft. Make one for the
 life of the app, outside any view: a Mac `NavigationSplitView` rebuilds its detail on every sidebar
