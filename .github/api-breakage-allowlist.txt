@@ -10,4 +10,3 @@
 // A comment starts with //. The digester reads this file through the C
 // preprocessor, and a line starting with # makes it read the whole list as
 // empty, so `ci.sh api` refuses one.
-API breakage: constructor AskBrand.init(title:appDirectory:logSubsystem:help:firstScreenHeadline:firstScreenSentence:nothingToAskCopy:disclosureSentence:scopeCaveat:) has been removed
