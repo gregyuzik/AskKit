@@ -1,4 +1,54 @@
-# The demo's project
+# The demo
+
+`Demo/` is an app for iOS, macOS and visionOS that hosts two domains, each with a thread and chats of
+its own. "Your Things" (`DemoDomain`) is a library of thirty things, books, records, tools and clothes,
+behind one search tool. "Assistant" (`DemoAssistantDomain`) has no rows: it converts units with one tool,
+proposes reminders with another, and answers anything else from the model alone. The switch between them
+is a menu on iOS and iPadOS, the last of the bar's leading items; the title's menu on visionOS; and on the
+Mac a pop-up in the toolbar and the View menu (⌘1 and ⌘2). The demo opens where it was left, on the
+library the first time. Both domains share one model seam, as a host's Asks would, and each keeps its
+turn going while the other is on screen. The demo declares no Private Cloud Compute entitlement, so it
+always answers on the device.
+
+Its icon is three plates of Liquid Glass in the shape of the bubble in SF Symbols'
+`text.bubble.badge.sparkles`, the glyph its Ask tab and its mark wear, receding straight back and shading
+through `AskSpectrum.aurora`'s colors. `scripts/make-demo-icon.py` makes it, tracing the bubble from the
+symbol, which is Apple's, under Apple's SF Symbols terms.
+
+## Running it
+
+Open `Demo/AskKitDemo.xcodeproj` and run `AskKitDemo_iOS` on an iPhone 18 Pro simulator, or
+`AskKitDemo_macOS` or `AskKitDemo_visionOS`. The simulator and the Mac need no signing. A real turn needs
+Apple Intelligence, and `-askScriptedAnswer` needs no model. To run on a device, put
+`DEVELOPMENT_TEAM = <your team ID>` in an untracked `Demo/Local.xcconfig`.
+
+Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`. All but `-askAssistant`,
+`-askHoldTurn` and `-askHidesTips` are listed, off, in each app scheme's Run > Arguments: tick one to use
+it. Add those three to the scheme in Xcode, or pass one at launch, as
+`xcrun simctl launch <device> com.example.askkitdemo -askAssistant`. The three that image the Mac window
+are under [Imaging the Mac window](#imaging-the-mac-window).
+
+| Argument | What it shows |
+|---|---|
+| none | The domain the demo was left on, the library the first time. On the library, a real turn on the on-device model, starters drawn from the thirty items, "Surprise me" before the composer, and a gear button for the settings card. |
+| `-askResetThread` | An empty thread on every launch (`.perLaunch`), in both domains: nothing is restored or saved. It opens on the library, or the assistant under `-askAssistant`, whatever was on screen last, and a switch isn't remembered. |
+| `-askFreshHistory` | The thread kept, but everything AskKit keeps for the demo deleted before the store reads it, in both domains: the saved thread, every earlier chat, any thread set aside as unreadable, and the feedback attachments, for a clean History sheet. The remembered domain goes too, so it opens on the library, or the assistant under `-askAssistant`. |
+| `-askScriptedAnswer` | The app answers every question, with no model. "What should I read tonight?" gets a pick with a basis line and Another pick, a question with "lend" in it a confirmation card, and anything else a two-tile lookup. The first screen keeps its starters even where Apple Intelligence is off. |
+| `-askPrefill <link>` | An Ask link opened once at launch, such as `askkitdemo://ask?q=…`: the question lands in the composer with the keyboard up, unsent. Reopening a window, returning to a tab or switching domains doesn't open it again. |
+| `-askPhotos` | The photo button in place of "Surprise me". It attaches a record sleeve the demo draws, and the answer notes that it read only the words. |
+| `-askTabs` (iOS) | The screen in a `TabView` of two tabs, Ask and Library. |
+| `-askSlot` (iOS, with `-askTabs`) | The composer's face in the tab bar's bottom accessory. The Library tab puts a host's own accessory there. |
+| `-askPush` | A tile pushes its row onto the Ask tab's stack instead of showing it in a sheet. |
+| `-askFold <shape>` | The screen arranged around a fold the simulator doesn't have: `book`, `bookBent`, `upright` or `uprightBent`. |
+| `-askEmptyLibrary` | An empty library, so the first screen is the nothing-to-ask one; `-askEmptyLibrary button` adds its button. |
+| `-askHoldTurn` | Every turn held in flight until Stop, answered as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. |
+| `-askHidesTips` | AskUI's tips hidden, as every UI test launches the demo. Without it the demo configures TipKit at launch and shows them; TipKit remembers a tip that has gone, so delete the app to see them again. |
+| `-askAssistant` | Opens on the assistant, whatever was on screen last; the switch still goes back to the library. The assistant shows no tiles, and under each answer the line saying what it stood on: its own words where a tool grounded it, "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed in a Reminders section of the settings card. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing there. |
+
+`-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on
+the device writes Hebrew.
+
+## The project
 
 `Demo/AskKitDemo.xcodeproj/project.xcproj` is the demo's project, in Xcode 27.2's JSON format (JSON5,
 which Xcode writes in one canonical form and which keeps no comments). It is committed with the four
@@ -61,7 +111,8 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   follow the app to arm64e on its own: without them a Mac build stops at "Unable to resolve module
   dependency: 'AskCore'", and a device build can't link AskCore and AskUI ("Undefined symbols for
   architecture arm64e"). A host that turns Enhanced Security on needs the same keys, in its project's
-  `project.xcworkspace/xcshareddata/` or its workspace's `xcshareddata/` (README's Install).
+  `project.xcworkspace/xcshareddata/` or its workspace's `xcshareddata/`
+  ([ADOPTING.md's Enhanced Security](ADOPTING.md#enhanced-security)).
 - **One target per platform**, `AskKitDemo_iOS`, `AskKitDemo_macOS` and `AskKitDemo_visionOS`, with a
   scheme apiece, each compiling `AskKitDemo/` and `Shared/` and linking AskCore and AskUI from the
   package at `..`. `AskKitDemo_macOS` is a plain window, not Catalyst, so it declares its own category
@@ -77,14 +128,12 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   unless the app requires full screen". The demo doesn't set `UIRequiresFullScreen` to quiet it:
   AskKit lays out by size class and measured size, so the app stays resizable, as a host's should.
   The iPhone's list is left unset: the check is the iPad's.
-- **The launch arguments.** Every `DemoLaunchArgument` but `-askAssistant`, `-askHoldTurn` and
-  `-askHidesTips` is in each app scheme's Run arguments, off, so the scheme launches the demo plainly;
-  tick one to use it. A flag for one platform alone, such as `-askTabs` or `-askCaptureWindow`, is
-  listed in every scheme all the same. `-askAssistant`, which opens on the assistant rather than the
-  domain the demo was left on (the app switches between its two domains itself, and remembers which
-  was on screen), `-askHoldTurn`, which holds every turn in flight, and `-askHidesTips`, which hides
-  AskUI's tips for the UI tests, aren't in the schemes: add one to a scheme's Run arguments in Xcode, or
-  pass it at launch.
+- **The launch arguments** are in each app scheme's Run arguments, off, so the scheme launches the demo
+  plainly ([Running it](#running-it)). A flag for one platform alone, such as `-askTabs` or
+  `-askCaptureWindow`, is listed in every scheme all the same. Three aren't: `-askAssistant`, which
+  opens on the assistant rather than where the demo was left (the app's own switch moves between the
+  domains and remembers which was on screen); `-askHoldTurn`, which holds every turn in flight; and
+  `-askHidesTips`, which hides AskUI's tips for the UI tests.
 - **`AskKitDemoUITests`** is iOS only. The smoke suite drives the screen on an iPhone 18 Pro simulator,
   and the Mac and visionOS apps are checked by hand, since a UI-test bundle per platform would be three
   flaky suites asserting one set of identifiers. It compiles `Shared/` too, so a launch argument isn't

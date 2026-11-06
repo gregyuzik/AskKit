@@ -2,7 +2,7 @@
 
 Three things keep a development run off Private Cloud Compute: the context gate, the entitlement and
 the development park. ARCHITECTURE.md §3 says how each works ("Entitlements", "The development park",
-"Private Cloud Compute's context gate"), and README.md's "Development builds and Private Cloud Compute"
+"Private Cloud Compute's context gate"), and docs/ADOPTING.md's "Private Cloud Compute"
 how a host opts a run in. This page is how to measure the tier anyway.
 
 ## Measuring it

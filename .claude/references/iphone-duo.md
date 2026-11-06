@@ -34,7 +34,7 @@ Why the fold is arranged as it is, with the measurements, is in ARCHITECTURE.md 
   the strip on the left). Open, the inner display is 669 × 951 upright, with the bars along the top. On
   its side the window is 951 × 669, the strip takes its last 84 pt, leaving 867, and the fold is at
   x 455.5 to 495.5; upright it is at y 455.5 to 495.5 of the display.
-- **Without a Duo**, `-askFold` ([README.md](../../README.md#the-demo)'s launch-argument table) shows the
+- **Without a Duo**, `-askFold` ([DEMO-PROJECT.md](../../docs/DEMO-PROJECT.md#running-it)'s launch-argument table) shows the
   arrangement alone, and no scene moves between displays under it: say so wherever a capture of it is
   used, and leave it off on the Duo. Two panes need 240 pt for the chats and 320 for the conversation, so
   an iPhone 18 Pro shows them only on its side, and an iPad Air 11-inch (M4) either way.

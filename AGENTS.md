@@ -16,7 +16,7 @@ Deeper notes: `.claude/references/`.
   nonisolated context" is an AskCore bug. Only `AskCrossPostureTests` catches it (no `swiftSettings`, on
   purpose), and only for API it calls, so add new public API there (`concurrency.md`).
 - **Public enums.** A new one is `@nonexhaustive`, with a doc paragraph saying it is open, unless its
-  cases are fixed by what it is (CONTRIBUTING.md's Pull requests; README.md lists both kinds).
+  cases are fixed by what it is (CONTRIBUTING.md's Pull requests; docs/ADOPTING.md lists both kinds).
 - **`@concurrent`.** The package defaults to the main actor, so tool bodies and file I/O need
   `@concurrent`, or they run on it.
 - **Private Cloud Compute's context gate.** A process outside an app's context, such as a command-line
