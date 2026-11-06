@@ -31,8 +31,11 @@ answers when it can, and the on-device model when it can't.
   </picture>
 </p>
 <p align="center">
-  <img src="docs/images/mac.png" width="51%" alt="The assistant in a Mac window, proposing a reminder to water the plants at 6 PM on a card with Add Reminder and Not now">
-  <img src="docs/images/vision.png" width="44%" alt="The Ask screen in an Apple Vision Pro window: &quot;What clothes do I own?&quot; answered with a tile for each of seven clothes, and two follow-up questions">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/gregyuzik/AskKit/raw/main/docs/images/mac-dark.png">
+    <img src="docs/images/mac.png" width="45%" alt="A conversation in a Mac window: &quot;What records do I own?&quot; answered with a tile for each of eight records, then &quot;Which one is the oldest?&quot; answered &quot;The oldest record is Kind of Blue, released in 1959&quot;, with its tile and two follow-up questions">
+  </picture>
+  <img src="docs/images/vision.png" width="52%" alt="The Ask screen in an Apple Vision Pro window: &quot;What clothes do I own?&quot; answered with a tile for each of seven clothes, and two follow-up questions">
 </p>
 
 ## Features

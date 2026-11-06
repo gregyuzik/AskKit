@@ -161,46 +161,67 @@ window in front the window draws as inactive, and the capture logs which app kep
 | `-askCaptureAfter <seconds>` | How long the window settles before it is written: 8 seconds by default. |
 | `-askCaptureSize <W>x<H>` | The window's content size: 1280x800 by default. The PNG is at the display's scale. |
 
-The README's `docs/images/mac.png` is the assistant in a 960x560 window: its starter "Remind me to
-water the plants at 6 PM" answered under `-askScriptedAnswer`, with the reminder's card not yet
-confirmed. The on-device model, asked it on the Mac, answered without proposing the reminder. The turn
-is asked in one launch and imaged in a second, which reads the thread back: a card whose yes was never
-given comes back with its buttons. The first two arguments draw the window light and with the blue
-accent whatever the Mac's own settings are. Each `-key value` pair goes before any bare flag, since
-AppKit pairs a `-`-prefixed argument with the next one.
+The README's `docs/images/mac.png` and `mac-dark.png` are the library in a 1100x900 window: two live
+turns from the on-device model, "What records do I own?" and then "Which one is the oldest?". Both are
+asked in one launch, since a second launch would start a fresh session with a recap, which the thread
+marks with an "Earlier in this chat is summarized" line. A later launch reads the thread back and
+images it. Each `-key value` pair goes before any bare flag, since AppKit pairs a `-`-prefixed argument
+with the next one.
 
-1. Launch with every chat forgotten and the thread kept, written late enough for the answer:
+1. Launch with every chat forgotten, the first question in the composer, and a capture delay long
+   enough to keep the app up. `caffeinate` execs the app in place, so `$!` is the app's pid:
 
    ```sh
    caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
      -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
-     -askCaptureWindow /dev/fd/4 -askCaptureAfter 20 -askCaptureSize 960x560 \
-     -askHidesTips -askAssistant -askFreshHistory -askScriptedAnswer 4>first.png &
+     -askCaptureWindow /dev/fd/4 -askCaptureAfter 150 -askCaptureSize 1100x900 \
+     -askPrefill 'askkitdemo://ask?q=What%20records%20do%20I%20own%3F' \
+     -askHidesTips -askFreshHistory 4>/dev/null &
    ```
 
 2. Two or three seconds in, bring the window to the front with `open AskKitDemo.app`. The app asks for
    the front itself, but activation is cooperative and the terminal keeps it, so the window would draw
    as inactive. Run `open` only while the app is up: once it has quit, `open` starts another copy, with
    no arguments.
-3. Activate the starter. A Return posted to the window doesn't reach the composer's `onKeyPress`, and
-   the Send menu item reports itself disabled, so post a click instead, from lldb
-   (`xcrun lldb -p <pid> --batch -o '…' -o detach`): a left mouse down and up
-   (`NSEvent mouseEventWithType:` 1, then 2) at the starter, (586, 234) in the window's coordinates,
-   sent to the key window with `-[NSApplication postEvent:atStart:]`.
-4. Launch again without `-askFreshHistory`, and bring the window to the front as before. The turn read
-   back is written after 8.5 seconds, which lands between blinks of the composer's caret:
+3. Send it. A Return posted to the window doesn't reach the composer's `onKeyPress`, and the Send menu
+   item reports itself disabled, so post a click on the send button, at (860, 24) in a 1100-point-wide
+   window (points, from the bottom left). Run these from a file, `xcrun lldb -p <pid> --batch -s <file>`,
+   ending in `detach`. lldb's parser refuses an `NSPoint` argument, so the event is made through
+   `objc_msgSend` with the point as two doubles, one expression a line (`$0` to `$2` are lldb's results):
 
-   ```sh
-   caffeinate -dimsu AskKitDemo.app/Contents/MacOS/AskKitDemo \
-     -NSRequiresAquaSystemAppearance YES -AppleAccentColor 4 \
-     -askCaptureWindow /dev/fd/4 -askCaptureAfter 8.5 -askCaptureSize 960x560 \
-     -askHidesTips -askAssistant -askScriptedAnswer 4>mac.png
+   ```
+   expr -l objc -- (long)[(NSWindow *)[(NSApplication *)[NSApplication sharedApplication] keyWindow] windowNumber]
+   expr -l objc -- (id)((id (*)(id, SEL, NSUInteger, double, double, NSUInteger, double, NSInteger, id, NSInteger, NSInteger, float))objc_msgSend)((id)[NSEvent class], @selector(mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:), (NSUInteger)1, (double)860, (double)24, (NSUInteger)0, (double)[(NSProcessInfo *)[NSProcessInfo processInfo] systemUptime], (NSInteger)$0, (id)nil, (NSInteger)0, (NSInteger)1, (float)1.0)
+   expr -l objc -- (id)((id (*)(id, SEL, NSUInteger, double, double, NSUInteger, double, NSInteger, id, NSInteger, NSInteger, float))objc_msgSend)((id)[NSEvent class], @selector(mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:), (NSUInteger)2, (double)860, (double)24, (NSUInteger)0, (double)[(NSProcessInfo *)[NSProcessInfo processInfo] systemUptime], (NSInteger)$0, (id)nil, (NSInteger)0, (NSInteger)1, (float)0.0)
+   expr -l objc -- (void)[(id)[NSApplication sharedApplication] postEvent:(id)$1 atStart:(BOOL)NO]
+   expr -l objc -- (void)[(id)[NSApplication sharedApplication] postEvent:(id)$2 atStart:(BOOL)NO]
    ```
 
-   On a 2x display an active window comes out 2144x1344; an inactive one is smaller, its shadow
-   shorter.
-5. Forget the chat with one more launch under `-askFreshHistory -askResetThread`, given
-   `-askCaptureWindow /dev/fd/4 -askCaptureAfter 2` and `4>/dev/null` so it quits.
+4. Wait for the answer. The unsigned build keeps its thread at
+   `~/Library/Application Support/AskKitDemo/ask-thread.json`, and a turn is there once it ends. Then
+   type the second question into the composer and send it with the click above, in a second attach:
+
+   ```
+   expr -l objc -- (void)[(id)[(NSWindow *)[(NSApplication *)[NSApplication sharedApplication] keyWindow] firstResponder] insertText:(id)@"Which one is the oldest?"]
+   ```
+
+   Once that answer is saved, quit: `expr -l objc -- (void)[(id)[NSApplication sharedApplication] terminate:nil]`.
+   Ask again from step 1 if either answer is padded.
+5. Image it: launch again without `-askFreshHistory` or `-askPrefill`, with
+   `-askCaptureAfter 8.5 4>mac-light.png`, and bring the window to the front. For dark, swap
+   `-NSRequiresAquaSystemAppearance YES` for `-AppleInterfaceStyle Dark` (tried on a Mac set to dark)
+   and write `mac-dark.png`. The composer's caret blinks, so retake with a slightly different delay
+   (8.3 worked) until it doesn't show. On a 2x display an active window comes out 2424x2024; an
+   inactive one is smaller, its shadow shorter. Convert each to sRGB and scale it to 1400 wide:
+
+   ```sh
+   sips --matchTo '/System/Library/ColorSync/Profiles/sRGB Profile.icc' --resampleWidth 1400 mac-light.png --out mac.png
+   ```
+
+6. Forget the chat with one more launch under `-askFreshHistory -askResetThread`, given
+   `-askCaptureWindow /dev/fd/4 -askCaptureAfter 2` and `4>/dev/null` so it quits. `-askCaptureSize`
+   also changes the window frame the demo saves, so read it before step 1
+   (`defaults read com.example.askkitdemo`) and give this launch the old size.
 
 ## Imaging the iPhone screen
 
@@ -294,5 +315,5 @@ asked through lldb.
    shows through, plus the pill as a capsule, and make everything else transparent.
 6. In the README, the three iPhone images share a row at 30% each, and the Mac and Apple Vision Pro
    images a second row at one height: their `width=` percentages are in proportion to each image's
-   width over its height, 51% and 44%.
+   width over its height, 45% and 52%.
 7. Put the simulator back: the window at 1280x720, the app's accessibility off, and the app quit.
