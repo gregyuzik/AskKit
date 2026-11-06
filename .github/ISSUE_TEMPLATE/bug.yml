@@ -11,7 +11,7 @@ body:
     attributes:
       label: AskKit version
       description: The tag or commit your package resolves to.
-      placeholder: 0.5.0
+      placeholder: 0.6.0
     validations:
       required: true
   - type: dropdown
