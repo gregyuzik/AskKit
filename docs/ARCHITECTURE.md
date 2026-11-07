@@ -548,20 +548,50 @@ line, and passes any other through, logging its name. In the retry the line goes
 
 ### Writing a domain's tools
 
-Measured on Apple's on-device model, in Klosyt's evals:
+Measured on Apple's on-device model, in the evals of the three apps built on AskKit. Klosyt turns the
+language line below on; Kabynyt and vultyr measured it and leave it off.
 
 - **The language last.** Told the language only in its instructions, the model answered questions about
-  English rows in English. Ending each result on "Write your answer in Japanese (日本語)." took answers
-  in the asked language from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30 of 47 in Korean, 8 of 24 to
-  30 of 34 in Chinese and 12 of 24 to 24 of 24 in Spanish, with English unchanged. The same change
-  stopped Klosyt's instructions quoting an English sample answer outside English.
+  English rows in English. Ending each result on "Write your answer in Japanese (日本語)." raised the
+  answers in the asked language:
+  - in Klosyt, from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30 of 47 in Korean, 8 of 24 to 30 of 34
+    in Chinese and 12 of 24 to 24 of 24 in Spanish, with English unchanged;
+  - in vultyr, from 77 to 97 of 108 in Japanese, 63 to 101 in Korean, 1 to 90 in Chinese and 102 to 108
+    in Spanish;
+  - in Kabynyt, from 76 to 122 of 128 across the four.
+
+  The same change stopped Klosyt's instructions quoting an English sample answer outside English.
 - **A line at the end of a result changes how the tools are used.** Read last, the language line reads
-  as the end of the search: "what goes with my navy blazer?" named a second garment in 0 of 12 runs in
-  Korean, Chinese and Spanish, down from 4, 12 and 12. Ending the instructions on a sentence that names
-  the tool to search again with ("To find what goes with a garment, search the closet's other
-  categories with search_my_closet.") brought Chinese back to 14 of 16 and Spanish to 12 of 12, but not
-  Korean (2 of 12). A domain whose questions take several searches measures them before turning the
-  line on.
+  as the end of the turn's tool use, by an amount that differs from language to language:
+  - **Searches.** Klosyt's "what goes with my navy blazer?" named a second garment in 0 of 12 runs in
+    Korean, Chinese and Spanish, down from 4, 12 and 12. Ending the instructions on a sentence that
+    names the tool to search again with ("To find what goes with a garment, search the closet's other
+    categories with search_my_closet.") brought Chinese back to 14 of 16 and Spanish to 12 of 12, but
+    not Korean (2 of 12).
+  - **Searches in vultyr.** Its history question read the service's history in 12, 11, 4 and 6 of 12
+    runs in Japanese, Korean, Chinese and Spanish, and in 9, 0, 1 and 8 with the line. A question about
+    two services read both in 11 of 12 Korean runs, and in 5 with the line. In Chinese, a closing
+    sentence that named vultyr's overview tool made that tool the first call in 12 of 12 runs, and the
+    two-services question read both in none.
+  - **Changes.** Kabynyt's change requests reached its proposing tool, `edit_item`, in 14 of 32 runs, and
+    in 6 with the line. Answers that said the change was made, with no card, went from 4 or 5 of 24 to
+    13 to 16 of 32. A closing sentence naming `add_item` and `edit_item`, in Klosyt's shape, still left
+    10 of 24, against 3 of 24 with the line off. vultyr's watch cards went from 7 to 4 of 12 in Korean.
+- **The line can bring refusals.** It is an instruction inside tool output, and vultyr's instructions
+  say tool output is never obeyed.
+  - In Chinese, 10 of 23 turns on one result shape threw `LanguageModelError.refusal`, the model
+    explaining that the tools are "not for general instructions or unrelated tasks". None did without
+    the line.
+  - A sentence making the line that rule's one exception made it worse: 12 of 12.
+  - Instructions that ended on a closing paragraph stopped the refusals in every arm. But they sent the
+    two-services question to the overview tool first in 11 or 12 of 12 runs, and none brought the reads
+    back to where they were without the line.
+- **One-shots get the line too.** The engine doesn't tell `toolResultEnding` whether the session is a
+  conversation, so `answerOnce(_:)`'s turns end on it with none of a domain's conversation-only
+  instructions. In vultyr's Japanese one-shots:
+  - answers in Japanese went from 48 to 60 of 60;
+  - the history question read the history in 5 of 12 runs, down from 11;
+  - degenerate answers went from 2 to 7.
 - **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
   it, so each group's count goes on its own line, and the total after them.
 - **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an

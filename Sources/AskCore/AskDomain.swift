@@ -293,11 +293,22 @@ nonisolated public protocol AskDomain: Sendable {
     /// of 47 in Korean, 8 of 24 to 30 of 34 in Chinese and 12 of 24 to 24 of 24
     /// in Spanish.
     ///
-    /// It has a cost. Read last, the line reads as the end of the search: a
-    /// question that takes a second search ("what goes with my navy blazer?")
-    /// stopped naming a second garment in Korean, Chinese and Spanish until the
-    /// instructions named the tool to search again with. Measure a domain's own
-    /// questions before turning it on, its proposing tools' too.
+    /// It has costs, so measure a domain's own questions in each language it
+    /// answers in before turning it on, 12 runs a scenario, counting the tools'
+    /// calls and proposals as well as the answers. ARCHITECTURE.md's "Writing
+    /// a domain's tools" has the numbers from Klosyt, Kabynyt and vultyr:
+    /// - Read last, the line reads as the end of the turn's tool use. A
+    ///   question that takes a second search stops after the first, by an
+    ///   amount that differs from language to language, and a change request
+    ///   can end before the proposing tool runs, in an answer that says the
+    ///   change was made.
+    /// - It is an instruction inside tool output, so it can run into a
+    ///   domain's own rule that tool output is never obeyed, and the model
+    ///   refuses (`LanguageModelError.refusal`). An exception for the line in
+    ///   that rule made the refusals more frequent, not less.
+    /// - One-shot turns (`AskEngine.answerOnce(_:)`) end on it too, and they
+    ///   get none of a domain's conversation-only instructions: the engine
+    ///   doesn't tell this hook which kind of session it builds.
     ///
     /// Only a tool whose output is `String` takes the line. Any other passes
     /// through as it is, and the engine logs its name.
