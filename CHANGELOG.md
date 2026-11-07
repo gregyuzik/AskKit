@@ -19,6 +19,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   Compute in development, what is stored and sent, the enums and localization. The demo's launch
   arguments are in [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md#running-it). The Adopt samples are
   unchanged.
+- **`toolResultEnding(answerLanguage:)` records what Kabynyt and vultyr measured.** Both turn the line
+  off. In Kabynyt it ended change requests before the proposing tool ran, in answers that said the
+  change was made. In vultyr it stopped searches early, more in some languages than others, and
+  brought `LanguageModelError.refusal` where the instructions say tool output is never obeyed. It also
+  ends one-shot turns, which the hook can't tell apart. The doc comment, ARCHITECTURE.md's "Writing a
+  domain's tools" and ADOPTING.md say so.
 
 ## [0.6.0] - 2026-11-06
 
