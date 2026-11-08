@@ -82,6 +82,11 @@ cuts to the limit, so clamping twice changes nothing; its doc comment has the sp
 line breaks carry its layout, use `AskPrompt.sanitizeForFence`, then `AskPrompt.neuteringTags`, which
 does the bracket swap alone.
 
+**`context.rowLimit` caps what a result shows, not what a tool reads.** Read all that the call asks
+about, show the first `rowLimit` rows in the order that matters, and say how many more there were, as
+the README's sample does with `found`. Capped before the read, the rest go unread and unsaid, and the
+model answers as if they held nothing.
+
 **The search is written once.** `search(_:context:)` runs the tool's own code, so the grounded retry reads
 and records the rows the tool would have.
 
