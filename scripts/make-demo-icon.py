@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Generate the demo's app icon, three plates of tinted glass in the silhouette of the speech bubble
-from SF Symbols' `text.bubble.badge.sparkles`.
+"""Generate the demo's app icon, three plates of tinted glass in the shape of `askkit.bubbles`, the
+symbol its Ask tab and its mark wear, so the icon and the tab can't drift apart.
 
-The symbol's bubble is rendered through AppKit as a 4096 px mask and traced back to curves, and only
-its outline is kept: the text lines go, and the notch the sparkles cut in its shoulder is filled with
-its other top corner, mirrored. Three outputs:
+`scripts/make-demo-symbol.swift --plates` gives the symbol's three bubbles at regular, each filled
+out to its stroke's outer edge: one size, each up and to the right of the one in front. They are
+scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`. Four outputs:
 
-- `Demo/AskKitDemo/AppIcon.icon/` — the Icon Composer document, `icon.json` included. The plates
-  recede straight back, each smaller and higher than the one in front, so nothing slides sideways,
-  each in Liquid Glass, from the most transparent at the back to the most saturated at the front, so
-  the color deepens where they overlap. Each plate is an image of its own with its place and size
-  drawn in, and a gradient through `AskSpectrum.aurora`'s five colors runs across the whole stack from
+- `Demo/AskKitDemo/AppIcon.icon/` — the Icon Composer document, `icon.json` included. The plates are
+  in Liquid Glass, from the most transparent at the back to the most saturated at the front, so the
+  color deepens where they overlap. Each plate is an image of its own with its place and size drawn
+  in, and a gradient through `AskSpectrum.aurora`'s five colors runs across the whole stack from
   bottom left to top right, not across each plate, so where plates overlap their colors agree. The
   images are Display P3 PNGs because Icon Composer clamps an SVG's gradients to sRGB and takes only
   two colors in a fill. Behind them lies a pastel field, peach-cream through pink to pale teal (deep
@@ -21,27 +20,30 @@ its other top corner, mirrored. Three outputs:
   parallax, scaled to sit inside the round mask.
 - `docs/images/icon.png` and `icon-dark.png` — the icon atop the README, rendered by Icon Composer's
   `ictool` in light and dark.
+- `docs/images/social-preview.png` — GitHub's card for the repository: the icon, rendered by
+  `ictool`, laid over the tile the card holds, its field and its words left as they are. GitHub
+  shows a new card only once it's uploaded in the repository's settings.
 
-Needs macOS with Xcode (the symbol is rendered through AppKit, the README's images by `ictool`) and
-numpy, shapely, Pillow and potracer:
+Needs macOS with Xcode (`swift` runs make-demo-symbol.swift, and `ictool` renders the images) and
+numpy, shapely and Pillow:
 
-    python3 -m venv tmp/venv && tmp/venv/bin/pip install numpy shapely pillow potracer
+    python3 -m venv tmp/venv && tmp/venv/bin/pip install numpy shapely pillow
     tmp/venv/bin/python scripts/make-demo-icon.py
 """
 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 import numpy as np
-import potrace
 from PIL import Image, ImageDraw
 from shapely import affinity
-from shapely.geometry import MultiPolygon, Polygon, box
+from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -49,11 +51,6 @@ DEMO = ROOT / "Demo/AskKitDemo"
 ICON = DEMO / "AppIcon.icon"
 STACK = DEMO / "Assets.xcassets/AppIcon.solidimagestack"
 IMAGES = ROOT / "docs/images"
-
-SYMBOL = "text.bubble.badge.sparkles.fill"
-# The symbol's ink spans this much of the 1024 grid while it's traced.
-INK_WIDTH = 700
-MASK_SIDE = 4096
 DISPLAY_P3 = Path("/System/Library/ColorSync/Profiles/Display P3.icc")
 
 # `AskSpectrum.aurora` (Sources/AskUI/AskSpectrum.swift) in Display P3: cyan, blue, violet, magenta,
@@ -61,12 +58,11 @@ DISPLAY_P3 = Path("/System/Library/ColorSync/Profiles/Display P3.icc")
 AURORA = ((0.30, 0.86, 1.00), (0.24, 0.48, 1.00), (0.56, 0.36, 1.00), (0.90, 0.32, 0.86), (1.00, 0.50, 0.44))
 AURORA_STOPS = (0.0, 0.3, 0.55, 0.8, 1.0)
 
-# The bubble's width on the 1024 grid at full size, the front plate's. Then the plates, back to
-# front: each one's scale about the centre, its offset from the centre after that (y down) and its
-# opacity. Each plate is a group of its own, and with the field that's Icon Composer's limit of four.
-PLATE_WIDTH = 638
-PLATE_SCALES = (0.72, 0.86, 1.0)
-PLATE_OFFSETS = ((0, -161), (0, -62), (0, 77))
+# The stack's width on the 1024 grid, and where the centre of its bounds sits, a little low, as the
+# tail hangs below. Then each plate's opacity, back to front. Each plate is a group of its own, and
+# with the field that's Icon Composer's limit of four.
+STACK_WIDTH = 760
+STACK_CENTRE = (512, 520)
 PLATE_OPACITY = (0.25, 0.55, 0.95)
 TRANSLUCENCY = 0.5
 
@@ -81,49 +77,11 @@ FIELD = {
 STACK_SCALE = 0.86
 STACK_BACK = 2
 
-RENDER_SWIFT = r"""
-import AppKit
-// The symbol's bubble layer as an alpha mask, the whole symbol scaled so its ink is `width` of a
-// 1024 grid wide and centred.
-let name = CommandLine.arguments[1], width = CGFloat(Double(CommandLine.arguments[2])!)
-let side = Int(CommandLine.arguments[3])!, out = CommandLine.arguments[4]
-let scale = CGFloat(side) / 1024
-
-func render(_ palette: [NSColor], in rect: NSRect?) -> (NSBitmapImageRep, NSRect) {
-    let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)!
-        .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 1000, weight: .regular).applying(.init(paletteColors: palette)))!
-    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side, bitsPerSample: 8, samplesPerPixel: 4,
-                               hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-    let target = rect ?? NSRect(origin: .zero, size: image.size)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    image.draw(in: target)
-    NSGraphicsContext.restoreGraphicsState()
-    return (rep, target)
-}
-
-/// The inked pixels' bounds, bottom up, as drawing coordinates run.
-func ink(_ rep: NSBitmapImageRep) -> NSRect {
-    let data = rep.bitmapData!, stride = rep.bytesPerRow
-    var minX = side, maxX = -1, minY = side, maxY = -1
-    for y in 0..<side { for x in 0..<side where data[y * stride + x * 4 + 3] > 127 {
-        minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
-    } }
-    return NSRect(x: minX, y: side - 1 - maxY, width: maxX - minX + 1, height: maxY - minY + 1)
-}
-
-let (probe, natural) = render([.white, .white], in: nil)
-let box = ink(probe)
-let k = width * scale / box.width
-let placed = NSRect(x: CGFloat(side) / 2 - (box.midX - natural.minX) * k, y: CGFloat(side) / 2 - (box.midY - natural.minY) * k,
-                    width: natural.width * k, height: natural.height * k)
-// The palette's first layer is the sparkles, its second the bubble.
-let (rep, _) = render([.clear, .white], in: placed)
-try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
-"""
+# Where the icon's tile sits on GitHub's 1280 x 640 card: its left edge, top edge and side.
+SOCIAL_TILE = (153, 150, 340)
 
 
-# MARK: - The bubble
+# MARK: - The plates
 
 
 def bezier(p0, p1, p2, p3, steps: int = 24) -> list[tuple[float, float]]:
@@ -132,60 +90,47 @@ def bezier(p0, p1, p2, p3, steps: int = 24) -> list[tuple[float, float]]:
     return [tuple(p) for p in (1 - t) ** 3 * p0 + 3 * (1 - t) ** 2 * t * p1 + 3 * (1 - t) * t ** 2 * p2 + t ** 3 * p3]
 
 
-def traced(png: Path):
-    """The mask's shape on the 1024 grid, y down: every traced ring, filled even-odd."""
-    # potracer traces the dark pixels, so the mask goes in inverted.
-    dark = ~(np.asarray(Image.open(png).getchannel("A")) > 127)
-    unit = 1024 / MASK_SIDE
-    shape = None
-    for curve in potrace.Bitmap(dark).trace(turdsize=4, alphamax=1.0, opticurve=True, opttolerance=0.2):
-        points, last = [], curve.start_point
-        for segment in curve.segments:
-            end = (segment.end_point.x, segment.end_point.y)
-            if segment.is_corner:
-                points += [(segment.c.x, segment.c.y), end]
-            else:
-                points += bezier((last.x, last.y), (segment.c1.x, segment.c1.y), (segment.c2.x, segment.c2.y), end)
-            last = segment.end_point
-        ring = Polygon([(x * unit, y * unit) for x, y in points]).buffer(0)
-        shape = ring if shape is None else shape.symmetric_difference(ring)
-    return shape
+def outline(data: str) -> Polygon:
+    """One closed outline from make-demo-symbol.swift's path data, which is absolute M, L, Q, C and
+    Z, its curves sampled."""
+    points: list[tuple[float, float]] = []
+    for command, args in re.findall(r"([MLQCZ])([^MLQCZ]*)", data):
+        values = [float(v) for v in args.split()]
+        pairs = list(zip(values[0::2], values[1::2]))
+        if command == "M":
+            assert not points, "expected one outline a plate"
+            points.append(pairs[0])
+        elif command == "L":
+            points.append(pairs[0])
+        elif command == "Q":
+            start, control, end = map(np.array, (points[-1], *pairs))
+            t = np.linspace(0, 1, 17)[1:, None]
+            points += [tuple(p) for p in (1 - t) ** 2 * start + 2 * (1 - t) * t * control + t ** 2 * end]
+        elif command == "C":
+            points += bezier(points[-1], *pairs)
+    return Polygon(points).buffer(0)
 
 
 def parts(geom) -> list[Polygon]:
     return list(geom.geoms) if isinstance(geom, MultiPolygon) else [geom]
 
 
-def bubble() -> Polygon:
-    """The bubble's outline, `PLATE_WIDTH` wide and centred on the grid, its notch filled."""
-    with tempfile.TemporaryDirectory() as scratch:
-        source, mask = Path(scratch) / "render.swift", Path(scratch) / "bubble.png"
-        source.write_text(RENDER_SWIFT)
-        subprocess.run(["xcrun", "swift", str(source), SYMBOL, str(INK_WIDTH), str(MASK_SIDE), str(mask)],
-                       check=True, capture_output=True)
-        layer = traced(mask)
-    shapes = parts(layer)
-    assert len(shapes) == 1 and len(shapes[0].interiors) == 2, \
-        f"expected one bubble with two text lines, traced {len(shapes)} shapes"
-    outline = Polygon(shapes[0].exterior)
-    # The sparkles cut a notch in the top right corner. The body is a rounded rectangle, so its top
-    # half mirrored left to right is the whole corner, and the tail sits low enough to stay out of it.
-    x0, y0, x1, y1 = outline.bounds
-    top = outline.intersection(box(x0, y0, x1, (y0 + y1) / 2))
-    filled = unary_union([outline, affinity.scale(top, -1, 1, origin=((x0 + x1) / 2, 0))]).buffer(0.5).buffer(-0.5)
-    assert isinstance(filled, Polygon) and filled.area > outline.area, "the notch didn't fill"
-    x0, y0, x1, y1 = filled.bounds
-    k = PLATE_WIDTH / (x1 - x0)
-    return affinity.translate(affinity.scale(filled, k, k, origin=((x0 + x1) / 2, (y0 + y1) / 2)),
-                              512 - (x0 + x1) / 2, 512 - (y0 + y1) / 2)
+def bubbles() -> list[Polygon]:
+    """askkit.bubbles' three bubbles, back to front, scaled together to `STACK_WIDTH` and centred on
+    `STACK_CENTRE`."""
+    result = subprocess.run(["xcrun", "swift", str(ROOT / "scripts/make-demo-symbol.swift"), "--plates"],
+                            check=True, capture_output=True, text=True)
+    shapes = [outline(data) for data in json.loads(result.stdout)["plates"]]
+    x0, y0, x1, y1 = unary_union(shapes).bounds
+    k = STACK_WIDTH / (x1 - x0)
+    return [affinity.translate(affinity.scale(shape, k, k, origin=((x0 + x1) / 2, (y0 + y1) / 2)),
+                               STACK_CENTRE[0] - (x0 + x1) / 2, STACK_CENTRE[1] - (y0 + y1) / 2)
+            for shape in shapes]
 
 
-def plates(shape: Polygon, scale: float = 1.0) -> list[Polygon]:
-    """The plates, back to front: the bubble scaled about the grid's centre and moved by its offset,
-    then the whole stack scaled by `scale` about the centre."""
-    return [affinity.scale(affinity.translate(affinity.scale(shape, k, k, origin=(512, 512)), dx, dy),
-                           scale, scale, origin=(512, 512))
-            for k, (dx, dy) in zip(PLATE_SCALES, PLATE_OFFSETS)]
+def plates(shapes: list[Polygon], scale: float = 1.0) -> list[Polygon]:
+    """The plates, back to front, the whole stack scaled by `scale` about the grid's centre."""
+    return [affinity.scale(shape, scale, scale, origin=(512, 512)) for shape in shapes]
 
 
 # MARK: - Drawing
@@ -264,12 +209,12 @@ def srgb(code: str) -> str:
     return "srgb:" + ",".join(f"{v:.5f}" for v in (*hex_rgb(code), 1.0))
 
 
-def write_icon(shape: Polygon) -> None:
+def write_icon(shapes: list[Polygon]) -> None:
     """The Icon Composer document, front to back: a group for each plate, then the field."""
     assets = ICON / "Assets"
     shutil.rmtree(assets, ignore_errors=True)
     assets.mkdir(parents=True)
-    geoms = plates(shape)
+    geoms = plates(shapes)
     rgb = spectrum(geoms)
     for i, geom in enumerate(geoms):
         save_p3(painted(geom, rgb), assets / f"plate-{i + 1}.png")
@@ -327,11 +272,11 @@ def render_readme_icons() -> None:
 # MARK: - visionOS
 
 
-def write_stack(shape: Polygon) -> None:
+def write_stack(shapes: list[Polygon]) -> None:
     """visionOS's layers: the field at the back, the back plates in the middle, the front plate in
     front."""
     layers = {"Middle": Image.new("RGBA", (1024, 1024), (0, 0, 0, 0)), "Front": Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))}
-    geoms = plates(shape, STACK_SCALE)
+    geoms = plates(shapes, STACK_SCALE)
     rgb = spectrum(geoms)
     for i, geom in enumerate(geoms):
         name = "Middle" if i < STACK_BACK else "Front"
@@ -341,14 +286,29 @@ def write_stack(shape: Polygon) -> None:
     field("light").save(STACK / "Back.solidimagestacklayer/Content.imageset/back.png", optimize=True)
 
 
+def render_social_preview() -> None:
+    """The icon laid over the tile on GitHub's card, at `SOCIAL_TILE`."""
+    with tempfile.TemporaryDirectory() as scratch:
+        tile = Path(scratch) / "tile.png"
+        subprocess.run([str(ictool()), str(ICON), "--export-image", "--output-file", str(tile),
+                        "--platform", "iOS", "--rendition", "Default", "--width", "1024", "--height", "1024",
+                        "--scale", "1", "--design-generation", "27"], check=True, capture_output=True)
+        left, top, side = SOCIAL_TILE
+        card = Image.open(IMAGES / "social-preview.png").convert("RGBA")
+        card.alpha_composite(Image.open(tile).convert("RGBA").resize((side, side), Image.LANCZOS), (left, top))
+        card.convert("RGB").save(IMAGES / "social-preview.png", optimize=True)
+
+
 def main() -> None:
-    shape = bubble()
-    write_icon(shape)
-    write_stack(shape)
+    shapes = bubbles()
+    write_icon(shapes)
+    write_stack(shapes)
     render_readme_icons()
+    render_social_preview()
     print(f"wrote {ICON.relative_to(ROOT)} (icon.json and {len(list((ICON / 'Assets').iterdir()))} assets)")
     print(f"wrote {STACK.relative_to(ROOT)} (back, middle, front)")
     print(f"wrote {(IMAGES / 'icon.png').relative_to(ROOT)} and {(IMAGES / 'icon-dark.png').relative_to(ROOT)}")
+    print(f"wrote {(IMAGES / 'social-preview.png').relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
