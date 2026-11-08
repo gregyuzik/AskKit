@@ -191,7 +191,7 @@ step_checks() {
   # checked here: each lookup in its own target's bundle and catalog, both
   # catalogs there, and a count key varying by plural.
   say "String lookups and count keys"
-  python3 -I scripts/check-strings.py || fail "the strings' lookups or count keys need fixing (above)"
+  python3 -I scripts/check-strings.py || fail "scripts/check-strings.py found problems in the strings (above)"
   # README.md's Adopt section shows ReadmeDomain.swift and
   # ReadmeAssistantDomain.swift, which the package's tests compile and run. An
   # adopter copies the README's code, so what it shows has to be the code that
