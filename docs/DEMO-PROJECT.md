@@ -122,7 +122,9 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   those settings' entitlements and its entitlements file's together, and runs in its container, where
   everything AskKit and the demo write already lives: Application Support.
 - **`INFOPLIST_FILE = AskKitDemo/Info.plist`** is a base plist that `GENERATE_INFOPLIST_FILE`'s keys
-  are combined with. It carries the locale list and the URL scheme, and its comments say why.
+  are combined with. It carries the locale list and the URL scheme, and its comments say why. The
+  project's localizations are `Base` and the same 24 locales, as the maintainers' catalog checker asks
+  of every project; with no catalog of its own, the demo runs in them by the plist's list.
 - **`INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad`** lists all four orientations, upside
   down included, on `AskKitDemo_iOS`. An iPad app that takes part in multitasking has to support
   every one, and without them a device build warns "All interface orientations must be supported
