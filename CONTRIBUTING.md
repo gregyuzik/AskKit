@@ -29,7 +29,7 @@ steps:
 
 | Command | What it runs |
 |---|---|
-| `scripts/ci.sh checks` | ShellCheck, actionlint, zizmor over `.github/` (offline), `swiftlint lint --strict`, both String Catalog checks, README.md's Adopt code against its sample files (below), and the demo's project file: no `project.pbxproj` beside it, as `xcrun xcprojformatter` writes it, and loadable by `xcrun xcodeproj`. |
+| `scripts/ci.sh checks` | ShellCheck, actionlint, zizmor over `.github/` (offline), `swiftlint lint --strict`, the strings' lookups and count keys (`scripts/check-strings.py`, below), README.md's Adopt code against its sample files (below), and the demo's project file: no `project.pbxproj` beside it, as `xcrun xcprojformatter` writes it, and loadable by `xcrun xcodeproj`. |
 | `scripts/ci.sh test` | `swift test`, cold. It fails when fewer than 1,640 tests run, skipped ones included, since `swift test` exits 0 when an over-tight `#if` compiles a suite out. A pull request that grows the suite well past that raises it. |
 | `scripts/ci.sh api` | `swift package diagnose-api-breaking-changes` against the newest `v*` tag in the branch's history, over the macOS build's public and `package` API, in about 30 seconds. It fails on anything removed, renamed or changed, a new enum case included, unless `.github/api-breakage-allowlist.txt` lists it (below). It can't see a public declaration made `package`, or a change of isolation alone. |
 | `scripts/ci.sh builds` | The `AskKit-Package` scheme for eight generic destinations: iOS, macOS, visionOS, tvOS and watchOS on the simulator or the Mac, then the iOS, visionOS and watchOS devices. `scripts/ci.sh build DESTINATION` builds one, and `scripts/ci.sh destinations` lists them for CI's matrix. |
@@ -76,12 +76,15 @@ Every user-facing string ships in 25 languages, from two String Catalogs:
   `"shouldTranslate": false` for a string that isn't for translation, such as "Private Cloud Compute".
 - A lookup in the package takes `bundle: #bundle`, or it falls through to the host's bundle and shows the
   key. `Text(verbatim:)` is for anything that isn't words.
-- `python3 scripts/check-catalog-completeness.py` checks the locales, plurals and placeholders, and
-  `python3 scripts/normalize-catalogs.py` puts a catalog back in Xcode's serialization before you commit.
-  [TRANSLATION.md](TRANSLATION.md) has the rules and each locale's register.
+- `python3 scripts/check-strings.py`, which `scripts/ci.sh checks` runs, checks that each lookup takes
+  `bundle: #bundle` and finds its key in its own target's catalog, and that a key with a count in it
+  varies by plural. The catalogs themselves, their locales, plurals, placeholders and file format, are
+  checked by the maintainers' pre-push gate, with the String Catalog checker all their apps share,
+  which CI doesn't run. [TRANSLATION.md](TRANSLATION.md) has the rules, each locale's register and how
+  to edit a catalog.
 
 If you can't write all 24 translations, add the English key and say so in the pull request: the
-maintainer fills in the rest before merging, and `scripts/ci.sh checks` fails until then.
+maintainer fills in the rest before merging, and their push gate fails until then.
 
 ## Code
 

@@ -36,9 +36,11 @@ Deeper notes: `.claude/references/`.
 - **Soft deprecations** (`deprecated: 100000`) never warn, so the push gate can't see them.
   `scripts/soft-deprecation-check.sh` lists every one AskKit calls (`soft-deprecations.md`).
 - **Strings.** Package strings need `bundle: #bundle`, or lookups fall through to the host's bundle.
-  Every user-facing string ships in 25 languages; `scripts/check-catalog-completeness.py` is the only
-  guard. Edit a catalog as TRANSLATION.md's "Editing a catalog" says, and run
-  `python3 scripts/normalize-catalogs.py` after.
+  Every user-facing string ships in 25 languages. The push gate's `gate_catalogs` grades the catalogs
+  with the checker the maintainers' apps share (`~/.config/git/hooks/xcstrings.py`, beside
+  `PREPUSH_LIB`; CI can't reach it), and `scripts/check-strings.py`, in `ci.sh checks`, checks the
+  source's lookups and the count keys. Edit a catalog as TRANSLATION.md's "Editing a catalog" says,
+  and run `python3 -I ~/.config/git/hooks/xcstrings.py normalize` after.
 - **Tool output.** A tool clamps each field with `AskPrompt.clamp` and returns its lines bare: no fence
   of its own and none of AskKit's fence tag names (`AskPrompt.fenceTags`). AskKit fences what it
   composes, and redacts a tag it finds there.
@@ -60,12 +62,13 @@ Deeper notes: `.claude/references/`.
   release or release candidate, 27.2 or later (a beta, with a warning, only when neither exists),
   and fails at setup with none, or on a runner that isn't GitHub-hosted. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
   tests without running them, with a warning. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
-  runs them in order; both scripts stay mode `100755`, since a hook dispatcher skips a non-executable
-  hook silently. The push gate refuses an untracked file under `Sources/`, `Tests/` or `Demo/` or at
-  `Package.swift`, which SwiftPM would compile into the tree it proves.
+  runs them in order, with `gate_catalogs` (Strings, above) after `checks`; both scripts stay mode
+  `100755`, since a hook dispatcher skips a non-executable hook silently. The push gate refuses an
+  untracked file under `Sources/`, `Tests/` or `Demo/` or at `Package.swift`, which SwiftPM would
+  compile into the tree it proves.
   - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, actionlint and zizmor (offline,
     over `.github/`; ignore a finding inline with its reason, as the setup action does), `swiftlint
-    lint` (`trailing_comma` is on, `Package.swift` included), both catalog checks, the README
+    lint` (`trailing_comma` is on, `Package.swift` included), `scripts/check-strings.py`, the README
     sample's check and the demo project file's checks. Repo settings allow GitHub-owned actions only,
     pinned to a commit.
   - `scripts/ci.sh api` runs `swift package diagnose-api-breaking-changes` against the newest `v*`
