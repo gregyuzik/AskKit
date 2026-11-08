@@ -37,8 +37,16 @@ nonisolated public struct AskToolContext<Row: AskRow>: Sendable {
     /// Where a tool says what it is doing, for the wait row, once its call has
     /// finished (see above). `withToolCall(_:_:)` reports here for it.
     public let relay: AskActivityRelay
-    /// How many rows one tool result may show the model on this tier. Never
-    /// negative, so `prefix(rowLimit)` in a tool can't trap.
+    /// How many rows one tool result may show the model on this tier: a cap
+    /// on what a result shows, not on what a tool reads. Read all that the
+    /// call asks about, show the first `rowLimit` rows in the order that
+    /// matters, and say how many more there were, as the README's sample
+    /// does. A cap taken before the read leaves the rest unread and unsaid,
+    /// and the model answers as if they held nothing: asked what happened
+    /// overnight across all 14 watched services, a draft of vultyr's history
+    /// tool read only the first 12 on device, and its result named only those
+    /// (2026-11-08). Never negative, so `prefix(rowLimit)` in a tool can't
+    /// trap.
     public let rowLimit: Int
     /// The tier the session runs on.
     public let tier: AskTier

@@ -43,6 +43,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   source can answer: each lookup in its own target's bundle and catalog, both catalogs there, and a
   count key varying by plural. CI runs that, and no longer grades the catalogs' translations. The
   demo's project lists the 24 locales.
+- **`rowLimit` caps what a tool result shows, not what a tool reads.** `AskToolContext.rowLimit`'s
+  doc comment and ADOPTING.md say so: read all that a call asks about, show the first `rowLimit` rows
+  and say how many more there were, as the README's sample does. A cap taken before the read drops
+  the rest without a word, as a draft of vultyr's overnight read did with the last 2 of 14 watched
+  services on device.
 
 ## [0.6.0] - 2026-11-06
 
