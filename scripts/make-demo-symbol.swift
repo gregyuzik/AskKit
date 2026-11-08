@@ -8,6 +8,9 @@
 //
 //     swift scripts/make-demo-symbol.swift
 //
+// With `--plates` it writes nothing, and prints the three bubbles at regular as JSON instead, each
+// filled out to its stroke's outer edge: the plates `scripts/make-demo-icon.py` makes the app icon of.
+//
 // Each is an SF Symbols template with all 27 variants, nine weights in three scales, in the layout
 // Xcode's asset compiler takes: a cap-height guide for each row, Medium and Large blown up from Small
 // about the cap box's centre (1.267 and 1.618 times, as Apple's own symbols measure), and the margins
@@ -127,14 +130,19 @@ func stroked(_ path: CGPath, _ width: CGFloat) -> CGPath {
     path.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10).normalized()
 }
 
-/// The stack at one weight, its outline or its fill. Each layer is cleared where a layer in front
-/// of it lies, and for a gap around that layer, so the ones behind show as slivers.
-func stack(weight: Weight, filled: Bool) -> CGPath {
+/// The three bubbles at one weight, back to front, each with its stroke.
+func bubbles(weight: Weight) -> [(bubble: Bubble, stroke: CGFloat)] {
     let frontWidth = (regularFrontWidth + regular.extra) * weight.widen - weight.extra
     let near = weight.stroke / 2 + weight.gap + weight.backStroke / 2
     let far = near + weight.backStroke + weight.gap
     let bubble = front(width: frontWidth)
-    let layers = [(bubble.behind(far), weight.backStroke), (bubble.behind(near), weight.backStroke), (bubble, weight.stroke)]
+    return [(bubble.behind(far), weight.backStroke), (bubble.behind(near), weight.backStroke), (bubble, weight.stroke)]
+}
+
+/// The stack at one weight, its outline or its fill. Each layer is cleared where a layer in front
+/// of it lies, and for a gap around that layer, so the ones behind show as slivers.
+func stack(weight: Weight, filled: Bool) -> CGPath {
+    let layers = bubbles(weight: weight)
     var result = CGMutablePath() as CGPath
     for (index, (layer, width)) in layers.enumerated() {
         let path = layer.path
@@ -271,14 +279,21 @@ func contents(_ name: String) -> String {
 
 // MARK: - Writing
 
-let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let catalog = CommandLine.arguments.count > 1
-    ? URL(fileURLWithPath: CommandLine.arguments[1])
-    : root.appendingPathComponent("Demo/AskKitDemo/Assets.xcassets")
-for (name, filled) in [("askkit.bubbles", false), ("askkit.bubbles.fill", true)] {
-    let set = catalog.appendingPathComponent("\(name).symbolset")
-    try FileManager.default.createDirectory(at: set, withIntermediateDirectories: true)
-    try template(filled: filled).write(to: set.appendingPathComponent("\(name).svg"), atomically: true, encoding: .utf8)
-    try contents(name).write(to: set.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8)
-    print("wrote \(set.path)")
+let arguments = CommandLine.arguments.dropFirst()
+if arguments.first == "--plates" {
+    // The three bubbles at regular, back to front, each filled out to its stroke's outer edge, in
+    // pixels at 100 pt with y down: the plates make-demo-icon.py builds the app icon from.
+    let plates = bubbles(weight: regular).map { layer in svgData(layer.bubble.path.union(stroked(layer.bubble.path, layer.stroke))) }
+    let json = try JSONSerialization.data(withJSONObject: ["plates": plates], options: [.prettyPrinted, .sortedKeys])
+    print(String(bytes: json, encoding: .utf8) ?? "")
+} else {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    let catalog = arguments.first.map { URL(fileURLWithPath: $0) } ?? root.appendingPathComponent("Demo/AskKitDemo/Assets.xcassets")
+    for (name, filled) in [("askkit.bubbles", false), ("askkit.bubbles.fill", true)] {
+        let set = catalog.appendingPathComponent("\(name).symbolset")
+        try FileManager.default.createDirectory(at: set, withIntermediateDirectories: true)
+        try template(filled: filled).write(to: set.appendingPathComponent("\(name).svg"), atomically: true, encoding: .utf8)
+        try contents(name).write(to: set.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8)
+        print("wrote \(set.path)")
+    }
 }

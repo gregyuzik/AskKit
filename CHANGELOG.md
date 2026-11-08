@@ -19,6 +19,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   `text.bubble.badge.sparkles`. `scripts/make-demo-symbol.swift` draws it, every weight in every
   scale, and the tab bar swaps in the fill itself. ADOPTING.md's Ask tab row says a custom symbol
   works there too, through `Image(_:)`.
+- **The demo's icon is the symbol's three bubbles in glass.** Its plates are one size, each up and to
+  the right of the one in front, and `scripts/make-demo-icon.py` takes them from
+  `scripts/make-demo-symbol.swift --plates`, so the icon and the tab can't drift apart. It no longer
+  traces SF Symbols' bubble, and no longer needs potracer. The README's icon and
+  `docs/images/social-preview.png` follow.
 - **README.md is a short landing page.** Its adoption reference is now
   [docs/ADOPTING.md](docs/ADOPTING.md): every `AskDomain` member, the optional pieces, Private Cloud
   Compute in development, what is stored and sent, the enums and localization. The demo's launch
