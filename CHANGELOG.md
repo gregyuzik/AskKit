@@ -14,6 +14,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Changed
 
+- **The demo's Ask tab and mark wear the icon's three bubbles.** `askkit.bubbles`, a custom symbol in
+  the demo's asset catalog with an `askkit.bubbles.fill` sibling, replaces SF Symbols'
+  `text.bubble.badge.sparkles`. `scripts/make-demo-symbol.swift` draws it, every weight in every
+  scale, and the tab bar swaps in the fill itself. ADOPTING.md's Ask tab row says a custom symbol
+  works there too, through `Image(_:)`.
 - **README.md is a short landing page.** Its adoption reference is now
   [docs/ADOPTING.md](docs/ADOPTING.md): every `AskDomain` member, the optional pieces, Private Cloud
   Compute in development, what is stored and sent, the enums and localization. The demo's launch

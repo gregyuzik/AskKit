@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Generate the demo's app icon, three plates of tinted glass in the silhouette of the speech bubble
-from SF Symbols' `text.bubble.badge.sparkles`, the glyph its Ask tab wears, so the icon and the tab
-can't drift apart.
+from SF Symbols' `text.bubble.badge.sparkles`.
 
 The symbol's bubble is rendered through AppKit as a 4096 px mask and traced back to curves, and only
 its outline is kept: the text lines go, and the notch the sparkles cut in its shoulder is filled with

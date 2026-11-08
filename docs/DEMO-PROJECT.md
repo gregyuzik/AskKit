@@ -11,9 +11,10 @@ turn going while the other is on screen. The demo declares no Private Cloud Comp
 always answers on the device.
 
 Its icon is three plates of Liquid Glass in the shape of the bubble in SF Symbols'
-`text.bubble.badge.sparkles`, the glyph its Ask tab and its mark wear, receding straight back and shading
-through `AskSpectrum.aurora`'s colors. `scripts/make-demo-icon.py` makes it, tracing the bubble from the
-symbol, which is Apple's, under Apple's SF Symbols terms.
+`text.bubble.badge.sparkles`, receding straight back and shading through `AskSpectrum.aurora`'s colors.
+`scripts/make-demo-icon.py` makes it, tracing the bubble from the symbol, which is Apple's, under Apple's
+SF Symbols terms. Its Ask tab and its mark wear the icon's three bubbles as a custom symbol of the
+demo's own drawing: `askkit.bubbles` in its asset catalog, with an `askkit.bubbles.fill` sibling.
 
 ## Running it
 
