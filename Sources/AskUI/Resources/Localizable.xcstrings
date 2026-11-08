@@ -160,24 +160,6 @@
         "ar" : {
           "variations" : {
             "plural" : {
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "لم يُقرأ أي عنصر"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "قُرئ عنصر واحد"
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "قُرئ عنصران"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -190,10 +172,28 @@
                   "value" : "قُرئ %lld عنصرًا"
                 }
               },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "قُرئ عنصر واحد"
+                }
+              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "قُرئ %lld عنصر"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "قُرئ عنصران"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "لم يُقرأ أي عنصر"
                 }
               }
             }
@@ -202,12 +202,6 @@
         "cs" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Přečtena %lld položka"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -218,6 +212,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Přečteno %lld položky"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Přečtena %lld položka"
                 }
               },
               "other" : {
@@ -328,16 +328,16 @@
                   "value" : "אחד נקרא"
                 }
               },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "שניים נקראו"
-                }
-              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld נקראו"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "שניים נקראו"
                 }
               }
             }
@@ -436,12 +436,6 @@
         "pl" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Przeczytano %lld element"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -452,6 +446,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Przeczytano %lld elementów"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Przeczytano %lld element"
                 }
               },
               "other" : {
@@ -484,12 +484,6 @@
         "ru" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "прочитан %lld"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -500,6 +494,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "прочитано %lld"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "прочитан %lld"
                 }
               },
               "other" : {
@@ -562,12 +562,6 @@
         "uk" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Прочитано %lld елемент"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -578,6 +572,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Прочитано %lld елементів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Прочитано %lld елемент"
                 }
               },
               "other" : {
@@ -5270,24 +5270,6 @@
         "ar" : {
           "variations" : {
             "plural" : {
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من دون عناصر"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من عنصر واحد"
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من عنصرين"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5300,10 +5282,28 @@
                   "value" : "من %lld عنصرًا"
                 }
               },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من عنصر واحد"
+                }
+              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "من %lld عنصر"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من عنصرين"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من دون عناصر"
                 }
               }
             }
@@ -5312,12 +5312,6 @@
         "cs" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Z jedné položky"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5328,6 +5322,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Z %lld položky"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Z jedné položky"
                 }
               },
               "other" : {
@@ -5438,16 +5438,16 @@
                   "value" : "מתוך פריט אחד"
                 }
               },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "מתוך שני פריטים"
-                }
-              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "מתוך %lld פריטים"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "מתוך שני פריטים"
                 }
               }
             }
@@ -5546,12 +5546,6 @@
         "pl" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Z jednego elementu"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5562,6 +5556,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Z %lld elementów"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Z jednego elementu"
                 }
               },
               "other" : {
@@ -5594,12 +5594,6 @@
         "ru" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Из %lld объекта"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5610,6 +5604,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Из %lld объектов"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из %lld объекта"
                 }
               },
               "other" : {
@@ -5672,12 +5672,6 @@
         "uk" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "З %lld елемента"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5688,6 +5682,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "З %lld елементів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "З %lld елемента"
                 }
               },
               "other" : {
@@ -5743,24 +5743,6 @@
         "ar" : {
           "variations" : {
             "plural" : {
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من دون أي عنصر في %2$@‏"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من عنصر واحد في %2$@‏"
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "من عنصرين في %2$@‏"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5773,10 +5755,28 @@
                   "value" : "من %lld عنصرًا في %@‏"
                 }
               },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من عنصر واحد في %2$@‏"
+                }
+              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "من %lld عنصر في %@‏"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من عنصرين في %2$@‏"
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "من دون أي عنصر في %2$@‏"
                 }
               }
             }
@@ -5785,12 +5785,6 @@
         "cs" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Z jedné položky ve vaší sekci %2$@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -5801,6 +5795,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Z %lld položky ve vaší sekci %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Z jedné položky ve vaší sekci %2$@"
                 }
               },
               "other" : {
@@ -5911,16 +5911,16 @@
                   "value" : "מתוך פריט אחד ב%2$@"
                 }
               },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "מתוך שני פריטים ב%2$@"
-                }
-              },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "מתוך %lld פריטים ב%@"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "מתוך שני פריטים ב%2$@"
                 }
               }
             }
@@ -6019,12 +6019,6 @@
         "pl" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Z jednego elementu w Twojej sekcji %2$@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -6035,6 +6029,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Z %lld elementów w Twojej sekcji %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Z jednego elementu w Twojej sekcji %2$@"
                 }
               },
               "other" : {
@@ -6067,12 +6067,6 @@
         "ru" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Из %lld объекта в разделе «%@»"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -6083,6 +6077,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Из %lld объектов в разделе «%@»"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Из %lld объекта в разделе «%@»"
                 }
               },
               "other" : {
@@ -6145,12 +6145,6 @@
         "uk" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "З %lld елемента у розділі %@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -6161,6 +6155,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "З %lld елементів у розділі %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "З %lld елемента у розділі %@"
                 }
               },
               "other" : {
@@ -7554,12 +7554,6 @@
     "Not from this app's data" : {
       "comment" : "Attribution under an Ask answer that nothing in the app grounded: the model answered from the conversation or what it knows, without reading the reader's items or using the app's tools. Shown where the line saying how many items an answer read would be. A neutral statement of fact, not a warning, in small secondary text.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not from this app’s data"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7582,6 +7576,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nicht aus den Daten dieser App"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not from this app’s data"
           }
         },
         "es" : {
@@ -8156,12 +8156,6 @@
     "Open a chat's shortcut menu to delete it." : {
       "comment" : "Tip on the Mac under 'Delete a Chat', pointing at one of the reader's earlier Ask chats in the list of chats. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open a chat’s shortcut menu to delete it."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8184,6 +8178,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Öffne das Kontextmenü eines Chats, um ihn zu löschen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a chat’s shortcut menu to delete it."
           }
         },
         "es" : {
@@ -8311,12 +8311,6 @@
     "Open a question's shortcut menu to copy it or its answer, edit it, or ask it again." : {
       "comment" : "Tip on the Mac under 'Copy, Edit or Ask Again', pointing at the reader's own question in the Ask thread. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open a question’s shortcut menu to copy it or its answer, edit it, or ask it again."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8339,6 +8333,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Öffne das Kontextmenü einer Frage, um sie oder ihre Antwort zu kopieren, sie zu bearbeiten oder erneut zu fragen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a question’s shortcut menu to copy it or its answer, edit it, or ask it again."
           }
         },
         "es" : {
@@ -8466,12 +8466,6 @@
     "Open a suggestion's shortcut menu to stop seeing it." : {
       "comment" : "Tip on the Mac under 'Hide a Suggestion', pointing at a suggested question on the Ask first screen. 'Shortcut menu' is the Mac's own term for a context menu; use the term the Mac uses in your language.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open a suggestion’s shortcut menu to stop seeing it."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8494,6 +8488,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Öffne das Kontextmenü eines Vorschlags, um ihn nicht mehr zu sehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a suggestion’s shortcut menu to stop seeing it."
           }
         },
         "es" : {
