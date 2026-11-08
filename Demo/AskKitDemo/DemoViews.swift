@@ -7,14 +7,14 @@ import SwiftUI
 /// other two first screens.
 ///
 /// A host's can be a glyph of its own, even one that moves. The demo's is its
-/// Ask tab's, whose bubble its icon traces: SF Symbols'
-/// `text.bubble.badge.sparkles`, lit in the tint as the tab draws it selected,
-/// and unlit in one tertiary ink.
+/// Ask tab's: `askkit.bubbles`, the custom symbol in its asset catalog drawn
+/// from its icon's three bubbles, lit in the tint as the tab draws it
+/// selected, and unlit in one tertiary ink.
 struct DemoMark: View {
     let isLit: Bool
 
     var body: some View {
-        Image(systemName: "text.bubble.badge.sparkles.fill")
+        Image("askkit.bubbles.fill")
             .resizable()
             .scaledToFit()
             .padding(6)

@@ -419,11 +419,13 @@ struct ContentView: View {
                     Label {
                         Text(verbatim: "Ask")
                     } icon: {
-                        // The speech bubble with sparkles whose bubble the
-                        // app icon traces, in one colour like the bar's other
-                        // items: the tint while Ask is selected and the bar's
-                        // plain ink otherwise.
-                        Image(systemName: "text.bubble.badge.sparkles")
+                        // The app icon's three bubbles as a custom symbol, in
+                        // one colour like the bar's other items: the tint
+                        // while Ask is selected and the bar's plain ink
+                        // otherwise. `Image(_:)`, since `Image(systemName:)`
+                        // finds only SF Symbols; the bar swaps in
+                        // `askkit.bubbles.fill` itself.
+                        Image("askkit.bubbles")
                     }
                 }
                 Tab(value: DemoTab.library) {
