@@ -1,7 +1,9 @@
 #!/bin/sh
 # The push gate: what has to hold before a push leaves the machine. Its checks,
 # tests and builds are scripts/ci.sh's, the steps CI runs, so the two gates
-# can't drift apart.
+# can't drift apart. One check is the gate's alone: the String Catalogs graded
+# against the standard the maintainers' apps share (`gate_catalogs`, below),
+# whose checker CI can't reach.
 #
 # In a clone: `git config core.hooksPath scripts/git-hooks`. It needs the tools
 # scripts/ci.sh lists, and it runs all of ci.sh on every push. Git ignores a
@@ -16,21 +18,29 @@
 # trees that have passed. It defines `gate_proven`, which succeeds when the
 # tests and builds can be skipped for this tree, and `gate_record`, which notes
 # that it passed them, and it reads `gate_irrelevant` below to leave docs out
-# of the tree's key. Nothing in this repository provides one; without it the
-# gate runs every step.
+# of the tree's key. It also defines `gate_catalogs`, which grades every
+# tracked String Catalog with the checker the maintainers' apps share: each key
+# in the 24 locales beside English, every unit translated and not blank, each
+# argument's specifier, the CLDR plural categories, no stray locale, the demo
+# project's and Info.plist's locale lists, and the bytes Xcode writes. Nothing
+# in this repository provides one; without it the gate runs every step of
+# ci.sh, scripts/check-strings.py among them, and nothing grades the catalogs'
+# translations.
 #
 # Order is cheapest-first, so a logic break surfaces in seconds rather than
 # after twelve xcodebuilds:
 #   1. the dirty-tree check  (what a step reads must be committed, and no
 #                             untracked file may sit where a build reads)
-#   2. ci.sh checks          (shellcheck, actionlint and zizmor, swiftlint, both
-#                             String Catalog checks, the README sample's, the
-#                             project file's)
-#   3. ci.sh test            (`swift test`, cold, with a minimum pass count)
-#   4. ci.sh api             (the public API against the newest release tag)
-#   5. ci.sh builds          (the package for eight destinations)
-#   6. ci.sh demo            (the demo's three apps and its UI tests)
-# A cache may skip 3 to 6, never the checks. A change to THIS file reaches no
+#   2. ci.sh checks          (shellcheck, actionlint and zizmor, swiftlint, the
+#                             strings' lookups and count keys, the README
+#                             sample's, the project file's)
+#   3. gate_catalogs         (the String Catalogs against the shared standard,
+#                             with PREPUSH_LIB only)
+#   4. ci.sh test            (`swift test`, cold, with a minimum pass count)
+#   5. ci.sh api             (the public API against the newest release tag)
+#   6. ci.sh builds          (the package for eight destinations)
+#   7. ci.sh demo            (the demo's three apps and its UI tests)
+# A cache may skip 4 to 7, never the checks. A change to THIS file reaches no
 # compiler, but it decides what passing means, so a cache has to count it as a
 # change to the tree. The release tag `api` compares with is no part of the
 # tree, so a tree that passed stays passed when a new tag is cut; CI, which has
@@ -184,7 +194,7 @@ if [ -n "$dirty_relevant$untracked_relevant$ignored_relevant" ]; then
 fi
 
 if [ -z "${PREPUSH_LIB:-}" ]; then
-  echo "pre-push: running scripts/ci.sh, the steps CI runs; with no cache (PREPUSH_LIB), every step runs" >&2
+  echo "pre-push: running scripts/ci.sh, the steps CI runs; with no PREPUSH_LIB there is no cache, so every step runs, and no shared String Catalog checker" >&2
   exec ./scripts/ci.sh all
 fi
 
@@ -199,6 +209,7 @@ ASKKIT_CI_WORK="${TMPDIR%/}/askkit-gate${PREPUSH_SLOT_SUFFIX:-}"
 export ASKKIT_CI_WORK
 
 ./scripts/ci.sh checks || exit 1
+gate_catalogs || exit 1
 
 # Only the steps whose inputs are in the key are skipped. The checks above have
 # already run, and they are the half `--no-verify` throws away.

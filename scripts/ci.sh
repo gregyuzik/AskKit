@@ -5,9 +5,10 @@
 # gates can't drift apart.
 #
 # usage: scripts/ci.sh [step]
-#   checks        shellcheck, actionlint and zizmor, swiftlint, both String
-#                 Catalog checks, README's samples against ReadmeDomain.swift and
-#                 ReadmeAssistantDomain.swift, and the project file's
+#   checks        shellcheck, actionlint and zizmor, swiftlint, the strings'
+#                 lookups and count keys, README's samples against
+#                 ReadmeDomain.swift and ReadmeAssistantDomain.swift, and the
+#                 project file's
 #   test          `swift test`, cold, with a minimum pass count and a warning check
 #   api           the public API against the newest release tag, less the
 #                 breaks .github/api-breakage-allowlist.txt lists
@@ -183,18 +184,14 @@ step_checks() {
   # violation.
   say "swiftlint --strict"
   swiftlint lint --strict --quiet || fail "swiftlint found violations"
-  # A host's own catalog checks never see a package's catalogs, so this is the
-  # only thing between AskKit's strings and shipping English to every other
-  # locale.
-  say "String Catalog completeness"
-  python3 -I scripts/check-catalog-completeness.py || fail "the String Catalogs are missing translations"
-  # Xcode rewrites a whole catalog in its own serialization when it exports or
-  # edits one, and says nothing. That turns a small change into a diff nobody
-  # reads, which is where a translation regression hides. Checked rather than
-  # fixed, so the step fails loudly instead of rewriting the tree.
-  say "String Catalog shape"
-  python3 -I scripts/normalize-catalogs.py --check ||
-    fail "the String Catalogs aren't in the committed shape: python3 scripts/normalize-catalogs.py restores it"
+  # The catalogs themselves, their translations, placeholders, plurals and
+  # format, are graded by the push gate's shared checker (`gate_catalogs`),
+  # which reads catalogs alone and which CI can't run. A host's checks never
+  # read a package's source, so what AskKit's code asks of its catalogs is
+  # checked here: each lookup in its own target's bundle and catalog, both
+  # catalogs there, and a count key varying by plural.
+  say "String lookups and count keys"
+  python3 -I scripts/check-strings.py || fail "scripts/check-strings.py found problems in the strings (above)"
   # README.md's Adopt section shows ReadmeDomain.swift and
   # ReadmeAssistantDomain.swift, which the package's tests compile and run. An
   # adopter copies the README's code, so what it shows has to be the code that

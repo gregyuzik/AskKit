@@ -1,9 +1,9 @@
 # Translating AskKit
 
 AskKit owns the Ask screen's copy, so a string wrong here is wrong in every host, and no host's catalog
-check scans a package: `scripts/check-catalog-completeness.py` alone keeps these catalogs from shipping
-English to 24 locales. This file sits at the root because Xcode 27's agent-driven translation reads it
-there.
+check scans a package: the maintainers' push gate grades these catalogs, with the String Catalog checker
+all their apps share, and `scripts/check-strings.py` checks AskKit's source against them. This file sits
+at the root because Xcode 27's agent-driven translation reads it there.
 
 **Apple's style guides win.** Where a rule or row here disagrees with the locale's translation style
 guide in Xcode 27, follow the guide and correct the row.
@@ -28,13 +28,15 @@ host's main bundle and returns the key: silently, and only outside English, wher
 A host's `AskDomain.phrase(for:)` resolves its own strings, so its adapter in a package needs `#bundle`
 too, and the check never reads it.
 
-## What the check enforces
+## What the checks enforce
 
-`check-catalog-completeness.py` runs its own self-test first, then fails on any of these.
+The shared checker grades the catalogs in the maintainers' push gate, which CI doesn't run.
+`scripts/check-strings.py`, in `scripts/ci.sh checks`, grades the count keys' forms and the source, in
+CI and the push gate alike. Each runs its own self-test first, then fails on any of these.
 
 **A unit that isn't `"state": "translated"` with a value.** `needs_review`, the extractor's default, is
 evidence that nobody translated the string, and an empty value renders as nothing. A locale a catalog
-carries that the script's `LOCALES` doesn't name is reported too.
+carries beyond English and the 24 above is reported too.
 
 **A missing plural category**, wherever the plural sits: at the top of a localization, under a device
 variation or inside a substitution.
@@ -47,11 +49,12 @@ variation or inside a substitution.
 | id ja ko th vi zh-Hans zh-Hant | `other` |
 | everything else | `one` `other` |
 
-A superset passes: Spanish, French, Italian and Portuguese add `many` on some keys. A count key also
-fails in a locale that gives every count the same form, unless that locale needs only `other`. A key is
-a count key when its source passes an integer (`%lld`, `%d`, `%u` and the rest) or inflects
-(`^[…](inflect: true)`), or any localization varies it by plural. A key whose integer isn't a count,
-such as a percentage, goes in the script's `NOT_COUNTS` with the reason.
+A superset passes: Spanish, French, Italian and Portuguese add `many` on some keys.
+`scripts/check-strings.py` also fails a count key in a locale that gives every count the same form,
+unless that locale needs only `other`. A key is a count key when its source passes an integer (`%lld`,
+`%d`, `%u` and the rest) or inflects (`^[…](inflect: true)`), or any localization varies it by plural.
+A key whose integer isn't a count, such as a percentage, goes in that script's `NOT_COUNTS` with the
+reason.
 
 **An argument whose specifier changed.** Foundation resolves a format against the call's arguments, not
 the words around them, so argument N must carry the specifier the source gives argument N. Swap an
@@ -83,11 +86,11 @@ a name against Thai text, and Foundation spaces a Latin value. The check reads i
 **The source, read from the other side.** A literal looked up with `bundle: #bundle` must be in its own
 target's catalog. A localized literal with no bundle fails, as does a scan that finds no `#bundle`
 literal at all, which would leave the check blind. A literal counts as a lookup in `Text`,
-`String(localized:)` and the other calls the script's `LOOKUP` names (the SwiftUI views and modifiers
-that take a `LocalizedStringKey`, wrapped in `LocalizedStringKey("…")` or not), as `.searchable`'s
-`prompt:` and as an element of `.accessibilityInputLabels`' array.
+`String(localized:)` and the other calls `scripts/check-strings.py`'s `LOOKUP` names (the SwiftUI views
+and modifiers that take a `LocalizedStringKey`, wrapped in `LocalizedStringKey("…")` or not), as
+`.searchable`'s `prompt:` and as an element of `.accessibilityInputLabels`' array.
 
-## What the check can't see
+## What the checks can't see
 
 **A key made away from its lookup.** A `LocalizedStringKey` held in a variable and passed in later, or
 a literal in a call `LOOKUP` doesn't name, isn't read: its bundle and catalog entry go unchecked.
@@ -160,16 +163,17 @@ Vietnamese need three lines. A bare `fixedSize()` suits only a one-line label, l
 
 ## Editing a catalog
 
-Edit by hand or by script, never by regenerating the file wholesale, which buries the real change. The
-catalogs keep Xcode's exact serialization, `json.dumps(indent=2, separators=(',', ' : '))` with
-`strings` sorted by key, non-ASCII kept and a final newline, so a script's default `json.dump` fails the
-push gate's shape check: load with `object_pairs_hook=collections.OrderedDict` and write with
-`ensure_ascii=False`. After any edit, Xcode's included:
+Edit in Xcode, by hand or by script, never by regenerating the file wholesale, which buries the real
+change. The catalogs are the bytes Xcode 27.2 writes: `" : "` after a key, two-space indents, every map
+sorted by key (by code point), non-ASCII kept and no final newline, so a script's default `json.dump`
+fails the maintainers' push gate, which checks them byte for byte.
+`json.dumps(catalog, ensure_ascii=False, indent=2, separators=(",", " : "), sort_keys=True)`, with
+nothing after it, writes them, but for an empty map or list, which Xcode writes with a blank line
+inside. After any edit:
 
 ```
-python3 scripts/normalize-catalogs.py          # restores the committed shape and nothing else
-python3 scripts/normalize-catalogs.py --check
-python3 scripts/check-catalog-completeness.py
+python3 scripts/check-strings.py
 ```
 
-`scripts/ci.sh checks` runs the last two, as does the push gate on every push, docs-only included.
+`scripts/ci.sh checks` runs it, in CI and in the push gate, which runs it on every push, docs-only
+included.

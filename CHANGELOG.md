@@ -35,6 +35,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   brought `LanguageModelError.refusal` where the instructions say tool output is never obeyed. It also
   ends one-shot turns, which the hook can't tell apart. The doc comment, ARCHITECTURE.md's "Writing a
   domain's tools" and ADOPTING.md say so.
+- **The catalogs are graded by the String Catalog checker the maintainers' apps share.** Their push
+  gate runs it: every key in the 24 locales, translated and not blank, its placeholders and plural
+  categories, no stray locale, the demo's locale lists, and the bytes Xcode 27.2 writes, which the
+  catalogs now are (every map sorted, no final newline). `scripts/normalize-catalogs.py` is gone, and
+  `scripts/check-catalog-completeness.py` is `scripts/check-strings.py`, which keeps what only AskKit's
+  source can answer: each lookup in its own target's bundle and catalog, both catalogs there, and a
+  count key varying by plural. CI runs that, and no longer grades the catalogs' translations. The
+  demo's project lists the 24 locales.
 
 ## [0.6.0] - 2026-11-06
 
