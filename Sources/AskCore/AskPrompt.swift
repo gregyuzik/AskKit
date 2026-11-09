@@ -579,8 +579,14 @@ nonisolated public enum AskPrompt {
             cut = true
             kept = settled(String(kept.prefix(limit)), trimmingItsEnd: false)
         }
-        return cut ? boundingScalars(kept, before: "…") + "…" : kept
+        return cut ? boundingScalars(kept, before: cutMark) + String(cutMark) : kept
     }
+
+    /// What `clamp(_:_:)` puts after a text it cut: an ellipsis, so a model
+    /// that names a row by a title it was shown cut writes it there, and tile
+    /// and mention matching read a name that ends in it as a cut title
+    /// (`AskAnswer.cutTitleFloor`).
+    static let cutMark: Unicode.Scalar = "…"
 
     /// `text` as `clamp(_:_:)` shows it to the model before any cut: its
     /// angle brackets swapped, its tabs and line breaks made spaces, then

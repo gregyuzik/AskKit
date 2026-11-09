@@ -415,6 +415,26 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// "Go" is in "play Go tonight".
     public static var wholeWordBelow: Int { 4 }
 
+    /// The fewest characters a title cut short keeps for a name or a mention
+    /// ending in the cut's ellipsis to count as that title.
+    ///
+    /// A tool clamps the titles it shows (`AskPrompt.clamp(_:_:)`), and the
+    /// model names a row whose title the clamp cut as it was shown: its first
+    /// characters, then an ellipsis (`AskPrompt.cutMark`), which the model may
+    /// retype as three periods. So a name or a mention that ends in one names
+    /// the row whose title, as shown or as stored (`needles(for:)`), opens
+    /// with what comes before it and goes on past it.
+    ///
+    /// Shorter than this, what comes before an ellipsis can be the model
+    /// trailing off after a word or three, and a word can open a title: "You
+    /// could play…" opens Playing the Angel, and a tile named "The B…" opens
+    /// every band whose name starts so. `wholeWordBelow`, the floor for a
+    /// title inside other text, lets both through. A clamp's cut is as long as
+    /// the tool's limit, 60 characters at `AskPrompt.shortClamp`, so only a
+    /// tool that clamps titles to fewer than this shows the model a cut that
+    /// names no row.
+    static var cutTitleFloor: Int { 16 }
+
     /// The rows in `matches` whose title the prose names, in the order it
     /// names them.
     public var mentioned: [Row] {
@@ -427,26 +447,60 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         // names a row, against up to `AskCollector.maxThreadRows` rows, so once
         // per row would rework the whole answer two hundred times a snapshot.
         let haystack = plainPunctuation(text)
-        let named = rows.compactMap { row -> (row: Row, places: [Range<String.Index>])? in
-            let places = needles(for: row.displayTitle).flatMap { mentions(of: $0, inPlain: haystack) }
-            return places.isEmpty ? nil : (row, places.sorted { $0.lowerBound < $1.lowerBound })
+        let cuts = cutMarks(inPlain: haystack)
+        let named: [(row: Row, places: [Place])] = rows.compactMap { row in
+            let places = places(of: row.displayTitle, inPlain: haystack, cuts: cuts)
+            return places.isEmpty ? nil : (row, places)
         }
         // A title inside a longer one the prose names is that one's mention:
-        // "Aliens" does not also name Alien, nor "Dune Messiah" Dune. The
-        // shorter title counts only where the prose names it outside every
-        // longer title it names: at a place no other row's place holds and
-        // outruns. Only the rows already named are compared, so the cost is
-        // the few titles an answer names, never every row read.
-        let kept = named.indices.compactMap { index -> (row: Row, at: String.Index)? in
-            let others = named.indices.lazy.filter { $0 != index }.map { named[$0].places }
-            let own = named[index].places.first { place in
-                !others.contains { theirs in
-                    theirs.contains { $0 != place && $0.lowerBound <= place.lowerBound && place.upperBound <= $0.upperBound }
+        // "Aliens" does not also name Alien, nor "Dune Messiah" Dune, nor a
+        // title cut short ("Dune: The Machine Crusade and the Butlerian…") the
+        // Dune it opens with. The shorter title counts only where the prose
+        // names it outside every longer title it names: at a place no other
+        // row's place holds (`Place.holds(_:)`). Only the rows already named
+        // are compared, so the cost is the few titles an answer names, never
+        // every row read.
+        var kept: [(row: Row, at: String.Index)] = []
+        for (index, entry) in named.enumerated() {
+            let own = entry.places.first { place in
+                !named.indices.contains { other in
+                    other != index && named[other].places.contains { $0.holds(place) }
                 }
             }
-            return own.map { (named[index].row, $0.lowerBound) }
+            if let own { kept.append((entry.row, own.range.lowerBound)) }
         }
-        return kept.sorted { $0.at < $1.at }.map(\.row)
+        return kept.sorted { $0.at < $1.at }.map { $0.row }
+    }
+
+    /// Where the prose, its punctuation made plain, names a title, and
+    /// whether it names it cut short.
+    private struct Place {
+        let range: Range<String.Index>
+        let isCut: Bool
+
+        /// Whether this place, another row's, is where `place` is named: it
+        /// takes in `place` and runs further, or is the same place with the
+        /// title whole where `place` is cut. A title that ends in an ellipsis
+        /// is that title, not the start of a longer one.
+        func holds(_ place: Place) -> Bool {
+            guard range.lowerBound <= place.range.lowerBound, place.range.upperBound <= range.upperBound else { return false }
+            return range != place.range || (place.isCut && !isCut)
+        }
+    }
+
+    /// Every place the prose, its punctuation made plain, names a title, in
+    /// order: whole in any of its forms (`needles(for:)`), or cut short
+    /// before one of the prose's ellipses (`cutMentions(of:at:inPlain:)`).
+    private static func places(of title: String, inPlain haystack: String, cuts: [CutMark]) -> [Place] {
+        let forms = needles(for: title)
+        var places: [Place] = []
+        for form in forms {
+            places += mentions(of: form, inPlain: haystack).map { Place(range: $0, isCut: false) }
+            if !cuts.isEmpty {
+                places += cutMentions(of: form, at: cuts, inPlain: haystack).map { Place(range: $0, isCut: true) }
+            }
+        }
+        return places.sorted { $0.range.lowerBound < $1.range.lowerBound }
     }
 
     /// The tiles a turn shows, from what the model returned.
@@ -505,12 +559,23 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     }
 
     /// Resolve the model's tile titles to rows: an exact title first, in
-    /// `turn` and then in `thread`, and only then a near one, in the same
-    /// order. A near match is for a model that paraphrased; when the title it
-    /// wrote is a row, that row is the one it meant, so "Aliens" is never
-    /// Alien for having been read first, nor "Dune" Dune Messiah. A title that
-    /// resolves to nothing is dropped: a tile must be a row the thread
-    /// actually read.
+    /// `turn` and then in `thread`, then a title cut short, and only then a
+    /// near one, each in the same order. A near match is for a model that
+    /// paraphrased; when the title it wrote is a row, that row is the one it
+    /// meant, so "Aliens" is never Alien for having been read first, nor
+    /// "Dune" Dune Messiah. A title that resolves to nothing is dropped: a
+    /// tile must be a row the thread actually read.
+    ///
+    /// **A title cut short, after an exact one and before a near one.** A
+    /// name that ends in an ellipsis, as the clamp ends a title it cut, names
+    /// the row whose title opens with what comes before it and goes on past
+    /// it (`cutTitleFloor`), in `turn` and then in `thread`. Before a near
+    /// match, since the row whose title is the cut's text alone, without its
+    /// ellipsis, was shown to the model whole and is a near match to every
+    /// cut of a longer one; after an exact one, so a title that itself ends
+    /// in an ellipsis is still that title. Titles that open with the same
+    /// characters were shown cut there alike, so a cut name is the first of
+    /// them read, this turn's before the thread's.
     ///
     /// **The nearest near match, not the first.** Of the rows a paraphrase
     /// matches, the one sharing the most of it wins: the length of whichever
@@ -526,6 +591,11 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             func firstExact(in rows: [Row]) -> Row? {
                 rows.first { !seen.contains($0.id) && titleEquals($0.displayTitle, name: name) }
             }
+            let cut = cutTitle(in: name)
+            func firstCut(in rows: [Row]) -> Row? {
+                guard let cut else { return nil }
+                return rows.first { !seen.contains($0.id) && needles(for: $0.displayTitle).contains { opens($0, with: cut) } }
+            }
             func nearest(in rows: [Row]) -> Row? {
                 var best: (row: Row, overlap: Int)?
                 for row in rows where !seen.contains(row.id) {
@@ -534,7 +604,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
                 }
                 return best?.row
             }
-            let hit = firstExact(in: turn) ?? firstExact(in: thread) ?? nearest(in: turn) ?? nearest(in: thread)
+            let hit = firstExact(in: turn) ?? firstExact(in: thread)
+                ?? firstCut(in: turn) ?? firstCut(in: thread)
+                ?? nearest(in: turn) ?? nearest(in: thread)
             guard let hit else { continue }
             seen.insert(hit.id)
             picked.append(hit)
@@ -575,13 +647,14 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// punctuation made plain, so a title stored with three periods or a
     /// straight apostrophe is found in prose the model wrote with an ellipsis
     /// or a curly one, and with the title read as stored or as a tool's
-    /// clamp showed it (`needles(for:)`), the first place either is named.
-    /// The range indexes the text with its punctuation made plain
-    /// (`plainPunctuation`), not the original; callers use it only to order
-    /// mentions, never to slice the original.
+    /// clamp showed it (`needles(for:)`), whole or cut short before an
+    /// ellipsis (`cutTitleFloor`): the first place it is named. The range
+    /// indexes the text with its punctuation made plain (`plainPunctuation`),
+    /// not the original; callers use it only to order mentions, never to
+    /// slice the original.
     static func mention(of title: String, in text: String) -> Range<String.Index>? {
         let haystack = plainPunctuation(text)
-        return needles(for: title).compactMap { firstMention(of: $0, inPlain: haystack) }.min { $0.lowerBound < $1.lowerBound }
+        return places(of: title, inPlain: haystack, cuts: cutMarks(inPlain: haystack)).first?.range
     }
 
     /// The first place a needle is named in prose whose punctuation is
@@ -609,6 +682,89 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             }
             return nil
         }
+    }
+
+    /// Where an ellipsis stands in prose whose punctuation is plain: the
+    /// ellipsis, and where the text before it ends, short of any spaces
+    /// between them, as the clamp leaves one when it cuts after a space.
+    private struct CutMark {
+        let end: String.Index
+        let mark: Range<String.Index>
+    }
+
+    /// The clamp's ellipsis (`AskPrompt.cutMark`) as matching reads it, its
+    /// punctuation made plain: three periods.
+    private static var plainCutMark: String { plainPunctuation(String(AskPrompt.cutMark)) }
+
+    /// Every ellipsis in the prose, in order. None in most answers, which
+    /// then cost the mention scan nothing more.
+    private static func cutMarks(inPlain haystack: String) -> [CutMark] {
+        var marks: [CutMark] = []
+        var start = haystack.startIndex
+        while let mark = haystack.range(of: plainCutMark, options: .literal, range: start..<haystack.endIndex) {
+            var end = mark.lowerBound
+            while end > haystack.startIndex, haystack[haystack.index(before: end)].isWhitespace,
+                  !haystack[haystack.index(before: end)].isNewline {
+                end = haystack.index(before: end)
+            }
+            marks.append(CutMark(end: end, mark: mark))
+            start = mark.upperBound
+        }
+        return marks
+    }
+
+    /// Where the prose names a title cut short, one of the title's forms
+    /// `needle`: before an ellipsis, the text from a word's start that opens
+    /// the title and stops short of its end, `cutTitleFloor` characters or
+    /// more, counting any spaces before the ellipsis as a name's cut counts
+    /// them (`cutTitle(in:)`). The place runs to the ellipsis's end, from the
+    /// earliest start each ellipsis allows.
+    private static func cutMentions(of needle: String, at cuts: [CutMark], inPlain haystack: String) -> [Range<String.Index>] {
+        guard needle.count > cutTitleFloor else { return [] }
+        let head = String(needle.prefix(cutTitleFloor))
+        return cuts.compactMap { cut in
+            // A cut opens the title, so it can't run far past the title's
+            // length: twice that, for the case-blind comparison's leeway.
+            let reach = haystack.index(cut.end, offsetBy: -2 * needle.count, limitedBy: haystack.startIndex)
+                ?? haystack.startIndex
+            var earliest: String.Index?
+            // To the ellipsis, not to `end`: a cut just past a space keeps
+            // it, so the title's opening can run into the spaces.
+            var searchEnd = cut.mark.lowerBound
+            while reach < searchEnd, let found = haystack.range(
+                of: head, options: [.backwards, .caseInsensitive, .diacriticInsensitive],
+                range: reach..<searchEnd, locale: .current
+            ) {
+                let before = found.lowerBound == haystack.startIndex ? nil : haystack[haystack.index(before: found.lowerBound)]
+                if !continuesAWord(before), opens(needle, with: haystack[found.lowerBound..<cut.end]) {
+                    earliest = found.lowerBound
+                }
+                searchEnd = haystack.index(before: found.upperBound)
+            }
+            return earliest.map { $0..<cut.mark.upperBound }
+        }
+    }
+
+    /// What comes before the ellipsis a name ends in, without the spaces
+    /// before it, when it is long enough to be a title cut short
+    /// (`cutTitleFloor`), or nil. Counted with those spaces, as the clamp's
+    /// limit counts a cut that falls just past one.
+    private static func cutTitle(in name: String) -> Substring? {
+        let name = needle(for: name)
+        guard name.hasSuffix(plainCutMark) else { return nil }
+        var kept = name.dropLast(plainCutMark.count)
+        guard kept.count >= cutTitleFloor else { return nil }
+        while let last = kept.last, last.isWhitespace { kept.removeLast() }
+        return kept
+    }
+
+    /// Whether `cut` opens the title form `needle` and stops short of its
+    /// end, blind to case and diacritics.
+    private static func opens(_ needle: String, with cut: some StringProtocol) -> Bool {
+        guard let range = needle.range(
+            of: cut, options: [.anchored, .caseInsensitive, .diacriticInsensitive], locale: .current
+        ) else { return false }
+        return range.upperBound < needle.endIndex
     }
 
     /// The same text to the comparison every match makes: blind to case and

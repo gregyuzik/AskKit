@@ -33,6 +33,17 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   prose that named it, so a follow-up naming it could fail as ungrounded. Matching now reads each title
   both as stored and as the clamp shows it, short of a cut, through the clamp's own steps, in prose and
   in the model's tile titles alike, and `AskEval` counts a title it names that way as named.
+- **A title the tool cut short names its row.** A tool clamps each title, as the README's sample and
+  the demo do with `AskPrompt.clamp(title, AskPrompt.shortClamp)`, so the model sees a title past 60
+  characters as its first 60 and an ellipsis, and names it so, as `AskReply`'s tile guide asks it to.
+  Matching compared that with the whole title: a pick or a superlative on such a row showed no tile,
+  the turn's referent was empty, and a follow-up that named the row as it was shown failed as
+  ungrounded. Now a tile title or a mention in prose that ends in an ellipsis, the clamp's "…" or three
+  periods, names the row whose title opens with what comes before it and goes on past it, at whatever
+  limit the tool clamped to, once that is 16 characters or more: fewer can be the model trailing off,
+  as in "You could play…". An exact title still comes first, so a title that ends in an ellipsis is
+  still that title, and a cut one comes before a near one. Titles that open alike were shown cut
+  alike: a tile title is the first of them read, and prose names them all.
 
 ## [0.7.1] - 2026-11-09
 

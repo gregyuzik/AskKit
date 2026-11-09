@@ -1608,6 +1608,25 @@ private extension Trait where Self == ConditionTrait {
         #expect(recording.answer?.text == "Try Goa tonight.")
     }
 
+    /// A title the tool cut is the one the model names: its pick shows that
+    /// row's tile, and a follow-up naming it as shown is grounded.
+    @Test func aPickNamedAsTheToolCutItShowsItsTileAndGroundsAFollowUp() async throws {
+        let domain = FakeDomain()
+        let trilogy = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy in Five Parts")
+        domain.bridge.rows.withLock { $0 = [FakeRow("Rumours"), trilogy] }
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        let shown = AskPrompt.clamp(trilogy.displayTitle, AskPrompt.shortClamp)
+        session.script(grounded("Read **\(shown)** next.", kind: AskQuestionKind.pick, tiles: [shown]))
+        let first = await record(engine.ask("What should I read?"))
+        #expect(try #require(first.answer).tiles == [trilogy])
+
+        session.script(FakeSession.Script(snapshots: [.answering("\(shown) is the longest.")], toolCallsAfter: 0))
+        let second = await record(engine.ask("Which is longest?"))
+        #expect(second.askError == nil)
+        #expect(try #require(second.answer).grounding == .followUp)
+    }
+
     @Test func aFollowUpThatReadsRowsOfItsOwnStillShowsATileAnEarlierTurnRead() async throws {
         // Its own rows are walked first, then the thread's, so a tile it names
         // from an earlier turn resolves instead of being dropped.
