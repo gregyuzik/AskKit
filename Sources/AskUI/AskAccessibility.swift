@@ -184,9 +184,10 @@ nonisolated public enum AskAnnouncement {
         guard let turn, turn.isComplete else { return nil }
         if let failure = turn.failure { return failure.message }
         if turn.answer?.isTruncated == true {
-            // The same distinction the note on screen makes: the deadline and
-            // a stop both set `isTruncated`, and saying "the time limit
-            // stopped it" to someone who tapped Stop is simply untrue.
+            // The same distinction the note on screen makes: the deadline,
+            // the token cap and a stop all set `isTruncated`, and saying "the
+            // time limit stopped it" to someone who tapped Stop is simply
+            // untrue.
             return turn.stopped
                 ? stoppedByReader
                 : String(

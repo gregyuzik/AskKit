@@ -240,6 +240,14 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    Under `.prose` the model chose nothing: the kind is `other`, with no tiles, not even rows the prose
    names.
 
+   A reply that stopped at its token cap (1,024 tokens on device; Private Cloud Compute's sessions have
+   none) is one the SDK ends as though it had finished, with no error and no reason, so the session marks
+   its last snapshot from the response's output count (`AskReplySnapshot.reachedTokenCap`). Judged as any
+   answer is, it is then kept as truncated by the deadline's rule (step 10), its routing line tagged
+   `answerCap`, and no refine pass runs on it. A plan or a refine pass's response that reaches its cap
+   throws instead, since cut inside its last field either can decode as a finished one: the plan fails
+   the turn (`planCap`), and the refine pass keeps the first answer (`answerCap`).
+
    An answer with tiles gets the domain's basis line, if it writes one. A proposal or payload a tool
    recorded rides along. A payload, the domain's own `Encodable` value, is encoded as JSON by AskKit and
    decoded by `payload(as:)`; a value JSON can't hold, or a `Data`, throws as it is recorded. A domain's
@@ -252,7 +260,8 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
     ([Triage](#triage)), and a Private Cloud Compute outage is handed down once ([The
     hand-down](#the-hand-down)). If the deadline passes with prose the policy keeps on screen, that prose
     becomes the answer, flagged as truncated, with the model's tiles and basis line only if the model had
-    begun its follow-ups, its last field. Otherwise the turn fails.
+    begun its follow-ups, its last field; a reply that stopped at its token cap is kept the same way
+    (step 9). Otherwise the turn fails.
 11. **Reveal and persistence.** The store applies each event to its `AskTurn`; the screen draws the prose
     in as it arrives (the reveal), then the answer's other pieces in waves. On `AskTurnEvent.restarted`
     the store clears what the thrown-away attempt left (house rule 5): a Stop before the new attempt's
@@ -487,6 +496,7 @@ asked for where no session was built yet:
 | Any other missing capability, an unsupported generation guide, or other content the model can't process | `.requestNotSupported` |
 | A timeout on device, or concurrent requests | `.couldNotAnswer` |
 | A rate limit on device | `.model(tag:)` |
+| A grounded retry's plan that reached its token cap | `.model(tag:)`, tagged `planCap` |
 
 Anything else becomes `.model(tag:)`, tagged with the error's case name, read by reflection, or else
 its domain and code, never the SDK's message, which can quote the reader's data. A tool's failure is
@@ -1097,7 +1107,7 @@ pointer.
 ### Accessibility
 
 - **Every terminal state is announced** at high priority (`AskAnnouncement`), once however many windows
-  show the store: an answer, one the deadline cut short, one the reader stopped ("You stopped this
+  show the store: an answer, one the deadline or its token cap cut short, one the reader stopped ("You stopped this
   answer", the line it shows), a failure, and an answer to a question whose photo no model saw
   ("Answer ready. It read your words only."). A failure, whose line may take VoiceOver's focus from the
   wait row, waits a beat, about a second, and is announced only if no line has claimed it

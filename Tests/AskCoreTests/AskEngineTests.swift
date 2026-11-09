@@ -1029,6 +1029,132 @@ private extension Trait where Self == ConditionTrait {
         #expect(log.discards.withLock { $0 }.contains { $0.reason == .deadlineWithNothingToKeep })
     }
 
+    // MARK: - The token cap
+
+    /// An engine whose turns run on device, the tier whose sessions are
+    /// capped.
+    private func makeOnDeviceEngine(domain: FakeDomain = FakeDomain()) -> (AskEngine<FakeDomain>, FakeSession, FakeLogSink) {
+        let (engine, seam, log) = makeEngine(
+            domain: domain, states: [.down(.privateCloud, .notEntitled), .serving(.onDevice)]
+        )
+        return (engine, seam.session(for: .onDevice), log)
+    }
+
+    /// **An answer that reached its token cap is truncated, as one the
+    /// deadline cut is.** The SDK stops it there without a word: in vultyr's
+    /// eval, 8 of 20 follow-ups in one arm stopped mid-sentence ("The incident
+    /// is titled "), with no kind, tiles or follow-ups after their prose, and
+    /// every one of them read as finished. Its prose is kept as far as it got,
+    /// and nothing it never wrote is made up. The same snapshot from a
+    /// generation the cap didn't stop finishes as any answer does.
+    @Test func anAnswerThatReachedItsTokenCapIsTruncated() async throws {
+        let words = "Cloudflare had a partial outage. The incident is titled "
+        let (engine, session, log) = makeOnDeviceEngine()
+        session.script(FakeSession.Script(snapshots: [.answering(words, reachedTokenCap: true)], toolCallsAfter: 1))
+        let recording = await record(engine.ask("What went wrong with Cloudflare this week?"))
+        #expect(recording.error == nil)
+        #expect(recording.partials == [words])
+        let answer = try #require(recording.answer)
+        #expect(answer.isTruncated)
+        #expect(answer.text == words)
+        #expect(answer.tiles.isEmpty)
+        #expect(answer.followUps.isEmpty)
+        #expect(answer.questionKind == nil)
+        #expect(answer.matches.count == FakeRow.six.count)
+        #expect(answer.grounding == .toolCall)
+        #expect(log.routings.withLock { $0 }.contains("onDevice stopped at its token cap: answerCap"))
+
+        let (finishing, finishingSession, finishingLog) = makeOnDeviceEngine()
+        finishingSession.script(FakeSession.Script(snapshots: [.answering(words)], toolCallsAfter: 1))
+        let finished = try #require(await record(finishing.ask("What went wrong with Cloudflare this week?")).answer)
+        #expect(!finished.isTruncated)
+        #expect(!finishingLog.routings.withLock { $0 }.contains { $0.contains("token cap") })
+    }
+
+    /// The model chooses its tiles before it writes its follow-ups, so a cap
+    /// that stopped it once they had begun keeps the finished tile list and
+    /// its basis line, as the deadline does, and drops the unfinished
+    /// follow-ups. Stopped sooner, it keeps no tiles; a kind that shows none
+    /// shows none however far the model got.
+    @Test func aCappedAnswerKeepsItsTilesOnlyOnceItsFollowUpsHadBegun() async throws {
+        var domain = FakeDomain()
+        domain.basisText = "The one you played least."
+        let (engine, session, _) = makeOnDeviceEngine(domain: domain)
+        session.scripts([
+            FakeSession.Script(
+                snapshots: [.answering("Play Rumours", tiles: ["Rumours"], followUps: ["Which of"], reachedTokenCap: true)],
+                toolCallsAfter: 1
+            ),
+            FakeSession.Script(
+                snapshots: [.answering("Play Rumours", tiles: ["Rumours"], reachedTokenCap: true)], toolCallsAfter: 1
+            ),
+            FakeSession.Script(
+                snapshots: [.answering(
+                    "Yes, two of them", kind: AskQuestionKind.yesNo, tiles: ["Rumours"], followUps: ["Which"],
+                    reachedTokenCap: true
+                )],
+                toolCallsAfter: 1
+            )
+        ])
+        let begun = try #require(await record(engine.ask("what should I play?", mode: .standalone)).answer)
+        #expect(begun.isTruncated)
+        #expect(begun.tiles.map(\.displayTitle) == ["Rumours"])
+        #expect(begun.basis == "The one you played least.")
+        #expect(begun.followUps.isEmpty)
+        let sooner = try #require(await record(engine.ask("what should I play?", mode: .standalone)).answer)
+        #expect(sooner.isTruncated)
+        #expect(sooner.tiles.isEmpty)
+        #expect(sooner.basis == nil)
+        let yesNo = try #require(await record(engine.ask("do I have two?", mode: .standalone)).answer)
+        #expect(yesNo.isTruncated)
+        #expect(yesNo.tiles.isEmpty)
+    }
+
+    /// A capped answer is the answer: the domain's refine pass revises a
+    /// finished one, and isn't asked.
+    @Test func aCappedAnswerIsNotRefined() async throws {
+        var domain = FakeDomain()
+        domain.refinement = AskAnswer(text: "Refined.")
+        let (engine, session, _) = makeOnDeviceEngine(domain: domain)
+        session.script(FakeSession.Script(
+            snapshots: [.answering("As far as it got", reachedTokenCap: true)], toolCallsAfter: 1
+        ))
+        let answer = try #require(await record(engine.ask("q")).answer)
+        #expect(answer.text == "As far as it got")
+        #expect(answer.isTruncated)
+        #expect(domain.refinedOn.recorded.isEmpty)
+    }
+
+    /// The cap excuses nothing: a capped first answer that read nothing is
+    /// ungrounded like any other, so under `.retrieval` it gets the grounded
+    /// retry and is never shown.
+    @Test func aCappedAnswerThatReadNothingStillGetsTheGroundedRetry() async throws {
+        let (engine, session, _) = makeOnDeviceEngine()
+        session.scripts([
+            FakeSession.Script(snapshots: [.answering("Invented, and cut", reachedTokenCap: true)], toolCallsAfter: 0),
+            FakeSession.Script(snapshots: [.answering("From the search.", followUps: ["Which?"])], toolCallsAfter: 0)
+        ])
+        let recording = await record(engine.ask("q"))
+        let answer = try #require(recording.answer)
+        #expect(answer.text == "From the search.")
+        #expect(!answer.isTruncated)
+        #expect(session.planCalls.withLock { $0 } == 1)
+        #expect(!recording.partials.contains("Invented, and cut"))
+    }
+
+    /// A plan the cap cut fails the turn rather than search for what it never
+    /// finished asking, and the log says why by its tag. The reader gets Try
+    /// Again.
+    @Test func aPlanThatReachedItsCapFailsTheTurnByItsTag() async {
+        let (engine, session, log) = makeOnDeviceEngine()
+        session.script(FakeSession.Script(snapshots: [.answering("Ungrounded.")], toolCallsAfter: 0))
+        session.planError.withLock { $0 = AskTokenCapReached.planCap }
+        let recording = await record(engine.ask("q"))
+        #expect(recording.askError == .model(tag: "planCap"))
+        #expect(recording.askError?.isRetryable == true)
+        #expect(log.routings.withLock { $0 }.contains("the grounded retry's planner failed on onDevice: planCap"))
+    }
+
     // MARK: - Hand-down
 
     @Test func anOutageOnTurnOneHandsDownWithRestarted() async {

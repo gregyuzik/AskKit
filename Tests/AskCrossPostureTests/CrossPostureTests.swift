@@ -1018,6 +1018,12 @@ extension CrossPostureTests {
         let snapshot = AskReplySnapshot(answer: "Two.", questionKind: "count")
         #expect(snapshot == AskReplySnapshot(answer: "Two.", questionKind: "count"))
         #expect(snapshot.tiles == nil)
+        // The last snapshot of a generation the token cap stopped, as a
+        // host's own session marks it.
+        var capped = AskReplySnapshot(answer: "The incident is titled ")
+        #expect(!capped.reachedTokenCap)
+        capped.reachedTokenCap = true
+        #expect(capped != AskReplySnapshot(answer: "The incident is titled "))
 
         #expect(AskTurnMode.conversation.joinsThread && AskTurnMode.reroll.joinsThread)
         #expect(!AskTurnMode.standalone.joinsThread)

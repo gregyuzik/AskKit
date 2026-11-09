@@ -333,11 +333,20 @@ nonisolated package enum AskContinuation {
     /// The longest on-device answer, in tokens: a guard against a runaway, not
     /// a length rule. Measured replies are 130–300 tokens; the SDK stops a
     /// response at the cap without throwing, which on a runaway is better than
-    /// the overflow it would otherwise reach.
+    /// the overflow it would otherwise reach. A streamed answer that reaches
+    /// it is kept as truncated (`AskReplySnapshot.reachedTokenCap`).
+    ///
+    /// **It is reached.** In vultyr's eval, 8 of 20 on-device follow-ups in
+    /// one arm ran to it, taking 30–36 s against 5–11 s for the rest, and
+    /// stopped mid-sentence ("The incident is titled "): the model copied a
+    /// straight double quote from a title into the answer, which ended the
+    /// field, and the generation ran on to the cap without the kind, tiles or
+    /// follow-ups after it.
     static let onDeviceAnswerCap = 1_024
 
     /// The longest on-device planner reply, in tokens. The planner writes a
-    /// handful of search arguments.
+    /// handful of search arguments. A plan that reaches it fails the grounded
+    /// retry (`AppleAskSession.plan(_:instructions:prompt:)` says why).
     static let onDevicePlanCap = 256
 
     /// Whether the next turn should roll the session over before sending, by
