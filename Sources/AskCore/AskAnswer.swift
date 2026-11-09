@@ -861,10 +861,12 @@ nonisolated final class AskDroppedRows: Sendable {
 /// forms are depends on the title alone.
 ///
 /// Emptied whole once it holds `capacity` titles: four times
-/// `AskCollector.maxThreadRows`, the most a scan reads at once, so a thread's
-/// rows stay in it while a long-lived process can't grow it without bound.
+/// `AskCollector.maxThreadRows` (200), the most a scan reads at once, so a
+/// thread's rows stay in it while a long-lived process can't grow it without
+/// bound. A number rather than that constant: this file builds on every
+/// platform, and `AskCollector` only where Foundation Models runs.
 nonisolated enum AskTitleForms {
-    static var capacity: Int { 4 * AskCollector<AskNoRow>.maxThreadRows }
+    static var capacity: Int { 800 }
 
     private static let known = Mutex<[String: [String]]>([:])
 
