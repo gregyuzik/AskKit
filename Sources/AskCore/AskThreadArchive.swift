@@ -110,12 +110,13 @@ nonisolated struct AskThreadIndex: Codable, Sendable, Equatable {
 
 /// What `AskThreadArchive.merge(_:filingIfNew:at:)` did.
 nonisolated enum AskArchiveMerge: Equatable, Sendable {
-    /// Filed, into the chat's earlier filing when it had one.
+    /// Filed, into the chat's earlier filing when it had one that reads
+    /// whole, and beside it when it had one that doesn't.
     case filed(AskThreadSummary)
     /// No filing is this chat, and none was made.
     case noSuchChat
-    /// Not written: the chat's filing can't be read whole, or the write
-    /// failed.
+    /// Not written: the chat's filing can't be read whole and the turns
+    /// weren't to be filed on their own, or the write failed.
     case notFiled
 }
 
@@ -285,7 +286,9 @@ public actor AskThreadArchive<Row: AskRow> {
     /// written.
     ///
     /// Capped like the thread, at `AskThreadStore.maxPersistedTurns`, oldest
-    /// turns dropped.
+    /// turns dropped. A row that won't encode is left out of its answer in
+    /// the filing, and costs it nothing else
+    /// (`AskThreadStore.encodeEntries(_:logger:)`).
     ///
     /// **Nil for turns there were means they are not filed**, and a caller
     /// must keep them where they are: not clear the thread they came from,
@@ -367,7 +370,10 @@ public actor AskThreadArchive<Row: AskRow> {
     /// chat's filing instead, a thread kept aside would cost the turns asked
     /// since, or the filing would cost the turns only it holds. Never into a
     /// filing that doesn't read whole: joined with what decoded, the rest
-    /// would be written over.
+    /// would be written over. Beside it instead, as a chat of their own, when
+    /// `filingIfNew`, as `archive(_:at:sparing:)` files a chat beside such a
+    /// filing: a thread set aside that waited for that filing to read whole
+    /// would wait for good, out of History all the while.
     func merge(_ entries: [AskThreadEntry<Row>], filingIfNew: Bool, at now: Date = .now) -> AskArchiveMerge {
         guard !entries.isEmpty else { return .notFiled }
         let index = readIndex()
@@ -377,15 +383,18 @@ public actor AskThreadArchive<Row: AskRow> {
         }
         guard let url = url(for: earlier.id) else { return .notFiled }
         let merged: [AskThreadEntry<Row>]
+        var id = earlier.id
         switch contents(of: url).read {
         case .thread(let filed, let dropped) where dropped == 0:
             merged = AskThreadEntry.merging(entries, into: filed)
         case .empty:
             merged = entries
-        default:
-            return .notFiled
+        case .thread, .unreadable:
+            guard filingIfNew else { return .notFiled }
+            merged = entries
+            id = UUID()
         }
-        return file(merged, as: earlier.id, in: index, at: now, sparing: nil).map(AskArchiveMerge.filed) ?? .notFiled
+        return file(merged, as: id, in: index, at: now, sparing: nil).map(AskArchiveMerge.filed) ?? .notFiled
     }
 
     /// File turns that are on screen and kept nowhere else yet, under `id`,
@@ -428,7 +437,10 @@ public actor AskThreadArchive<Row: AskRow> {
     /// read back says what came of it, and never offers the action again.
     /// Only the chat's file is written, since its title, dates and count are
     /// as they were, and only a filing every turn of which decodes: written
-    /// back from what decoded, it would lose the rest.
+    /// back from what decoded, it would lose the rest. A row in it that
+    /// decodes and won't encode is left out of its answer, as a filing leaves
+    /// one out (`AskThreadStore.encodeEntries(_:logger:)`): kept, it would
+    /// refuse the outcome every write.
     @discardableResult
     package func settleProposal(asked question: String, at askedAt: Date, with outcome: AskProposalOutcome) -> Bool {
         var settledAny = false
@@ -442,7 +454,7 @@ public actor AskThreadArchive<Row: AskRow> {
                   let settled = AskThreadEntry.settlingProposal(asked: question, at: askedAt, with: outcome, in: entries)
             else { continue }
             do {
-                try write(JSONEncoder().encode(settled), to: url)
+                try write(AskThreadStore<Row>.encodeEntries(settled, logger: logger), to: url)
                 settledAny = true
             } catch {
                 logger.error("a proposal's outcome could not be written to its chat: \(AskStoredFile.tag(for: error), privacy: .public)")
@@ -471,7 +483,7 @@ public actor AskThreadArchive<Row: AskRow> {
         guard let url = url(for: id),
               let summary = AskThreadSummary.of(kept, id: id, fallbackDate: now) else { return nil }
         do {
-            try write(JSONEncoder().encode(kept), to: url)
+            try write(AskThreadStore<Row>.encodeEntries(kept, logger: logger), to: url)
         } catch {
             logger.error("an earlier chat could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return nil

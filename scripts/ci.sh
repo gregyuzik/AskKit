@@ -382,6 +382,13 @@ step_api() {
   fail "a break you intend: add each line above, as it stands, to $allowlist, and give the break a CHANGELOG entry. Otherwise put the API back."
 }
 
+# How many tests passed, from a result bundle's summary. Python's own error is
+# dropped: the caller says what failed, and xcresulttool's error still shows.
+passes_in() { # result-bundle
+  xcrun xcresulttool get test-results summary --path "$1" --compact |
+    python3 -I -c 'import json, sys; print(int(json.load(sys.stdin).get("passedTests", 0)))' 2>/dev/null
+}
+
 # The package's tests on the iOS simulator, where every `os(iOS)` leg that
 # `swift test` on the Mac never compiles runs. A local run: not in the push
 # gate, since a simulator holds one test run at a time and the gate builds
@@ -412,8 +419,7 @@ step_test_ios() {
     { grep -E 'recorded an issue|error:' "$log" || true; } | head -20 >&2
     exit 1
   fi
-  passes=$(xcrun xcresulttool get test-results summary --path "$results" --compact |
-    python3 -I -c 'import json, sys; print(json.load(sys.stdin).get("passedTests", 0))')
+  passes=$(passes_in "$results") || fail "couldn't count the tests that passed in $results"
   if [ "$passes" -lt 1580 ]; then
     say "only $passes tests passed on iOS (minimum 1,580), so part of the suite likely didn't compile in — $results"
     exit 1
@@ -431,8 +437,14 @@ step_test_ios() {
 # built rather than from a cold DerivedData of Xcode's own.
 #
 # An argument names one test, `AskScreenSmokeTests/<test>`.
+#
+# xcodebuild's status says that no test failed, not that one ran: a run whose
+# every test skipped passes, and so may one whose TEST names no test, a typo.
+# So the run counts only with a test passed, read from the result bundle as
+# `test-ios` reads its count. Under `-only-testing` nothing outside TEST runs,
+# so with TEST that pass is TEST's.
 step_ui_smoke() { # [test]
-  local sim log="$logs/ui-smoke.log" results="$work/ui-smoke.xcresult" only=()
+  local sim log="$logs/ui-smoke.log" results="$work/ui-smoke.xcresult" only=() passes
   sim=$(simulator "iPhone 18 Pro")
   [ -z "${1:-}" ] || only=("-only-testing:AskKitDemoUITests/$1")
   # xcodebuild refuses a result bundle path that already exists.
@@ -447,6 +459,12 @@ step_ui_smoke() { # [test]
     exit 1
   fi
   grep -E 'Test Case .* (passed|failed)' "$log" || true
+  passes=$(passes_in "$results") || fail "couldn't count the tests that passed in $results"
+  if [ "$passes" -eq 0 ] && [ -n "${1:-}" ]; then
+    fail "AskKitDemoUITests/$1 didn't pass: it skipped, or names no test, so none ran — $results"
+  fi
+  [ "$passes" -gt 0 ] || fail "no UI test passed: every one skipped, or none ran — $results"
+  say "UI tests passed: $passes"
 }
 
 # EXCLUDED_ARCHS on the command line, because `AskKit-Package` is SwiftPM's

@@ -620,6 +620,9 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
     let generationsGated = Mutex(0)
     /// `makeSession` returns nil for these tiers.
     let refusesSession = Mutex<Set<AskTier>>([])
+    /// `makeSession` throws for these tiers: a session build that fails as
+    /// the network does.
+    let sessionFailures = Mutex<[AskTier: URLError]>([:])
     /// `makeSession` answers a request for a key's tier with its session in
     /// a box bound to the value's: a host's router handing back another
     /// tier's session.
@@ -677,6 +680,7 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
         instructions: String
     ) async throws -> AskSessionBox? {
         instructionsSeen.withLock { $0.append(instructions) }
+        if let failure = sessionFailures.withLock({ $0[tier] }) { throw failure }
         guard !refusesSession.withLock({ $0.contains(tier) }) else { return nil }
         let boxed = boxesAs.withLock { $0[tier] } ?? tier
         if buildsShapelessSessions.withLock({ $0 }) {
@@ -884,7 +888,10 @@ nonisolated struct FakeDomain: AskDomain {
         return "Answer from the tools." + (isConversation ? " You may use every tool." : "")
     }
 
-    var promptPrefix: String { "PREFIX\n" }
+    /// The domain's prompt prefix, when a test needs another than
+    /// `PREFIX` and a line break.
+    var promptPrefixOverride: String?
+    var promptPrefix: String { promptPrefixOverride ?? "PREFIX\n" }
 
     func promptLines(question: String, overview: AskOverview) async -> [String] {
         promptLineReads.record()

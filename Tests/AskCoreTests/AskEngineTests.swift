@@ -1608,6 +1608,25 @@ private extension Trait where Self == ConditionTrait {
         #expect(recording.answer?.text == "Try Goa tonight.")
     }
 
+    /// A title the tool cut is the one the model names: its pick shows that
+    /// row's tile, and a follow-up naming it as shown is grounded.
+    @Test func aPickNamedAsTheToolCutItShowsItsTileAndGroundsAFollowUp() async throws {
+        let domain = FakeDomain()
+        let trilogy = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy in Five Parts")
+        domain.bridge.rows.withLock { $0 = [FakeRow("Rumours"), trilogy] }
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        let shown = AskPrompt.clamp(trilogy.displayTitle, AskPrompt.shortClamp)
+        session.script(grounded("Read **\(shown)** next.", kind: AskQuestionKind.pick, tiles: [shown]))
+        let first = await record(engine.ask("What should I read?"))
+        #expect(try #require(first.answer).tiles == [trilogy])
+
+        session.script(FakeSession.Script(snapshots: [.answering("\(shown) is the longest.")], toolCallsAfter: 0))
+        let second = await record(engine.ask("Which is longest?"))
+        #expect(second.askError == nil)
+        #expect(try #require(second.answer).grounding == .followUp)
+    }
+
     @Test func aFollowUpThatReadsRowsOfItsOwnStillShowsATileAnEarlierTurnRead() async throws {
         // Its own rows are walked first, then the thread's, so a tile it names
         // from an earlier turn resolves instead of being dropped.
@@ -2205,12 +2224,52 @@ private extension Trait where Self == ConditionTrait {
         seam.refusesSession.withLock { $0 = [.privateCloud] }
         let failed = await record(engine.ask("second"))
         #expect(failed.askError != nil)
+        // No model saw the recap, so the turn draws no hairline saying so.
+        #expect(failed.summarizedCount == 0)
 
         seam.refusesSession.withLock { $0 = [] }
         session.script(grounded("Second."))
         let retried = await record(engine.ask("second"))
         #expect(retried.summarizedCount == 1)
         #expect(session.prompts.withLock { $0 }.last?.contains("<rows>Rumours</rows>") == true)
+    }
+
+    @Test func aRecapHandedDownBeforeItWasSentIsReportedOnce() async {
+        // Private Cloud Compute's session can't be built, so the turn goes
+        // to the device with the recap, and only the device's prompt held it.
+        var domain = FakeDomain()
+        domain.maxTurnsOverride = 1
+        let (engine, seam, _) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).script(grounded("First.", tiles: ["Rumours"]))
+        _ = await record(engine.ask("first"))
+        seam.sessionFailures.withLock { $0 = [.privateCloud: URLError(.notConnectedToInternet)] }
+        let device = seam.session(for: .onDevice)
+        device.script(grounded("Second."))
+        let recording = await record(engine.ask("second"))
+        #expect(recording.restarts == [.onDevice])
+        #expect(recording.summarizedCount == 1)
+        #expect(device.prompts.withLock { $0 }.first?.contains("<rows>Rumours</rows>") == true)
+    }
+
+    @Test func aRecapIsReportedBeforeTheFirstWordsItsSessionDraws() async throws {
+        // The grounded retry's re-ask runs on the session the recap went to,
+        // and reports it no second time.
+        var domain = FakeDomain()
+        domain.maxTurnsOverride = 1
+        let (engine, seam, _) = makeEngine(domain: domain, states: [.serving(.privateCloud)])
+        let session = seam.session(for: .privateCloud)
+        session.script(grounded("First.", tiles: ["Rumours"]))
+        _ = await record(engine.ask("first"))
+        session.scripts([
+            FakeSession.Script(snapshots: [.answering("Unread.")], toolCallsAfter: 0),
+            FakeSession.Script(snapshots: [.answering("From"), .answering("From the shelf.")], toolCallsAfter: 0)
+        ])
+        let recording = await record(engine.ask("second"))
+        #expect(recording.restarts == [.privateCloud], "the grounded retry ran")
+        #expect(recording.summarizedCount == 1)
+        let summarized = try #require(recording.events.firstIndex { if case .summarized = $0 { true } else { false } })
+        let firstPartial = try #require(recording.events.firstIndex { if case .partial = $0 { true } else { false } })
+        #expect(summarized < firstPartial)
     }
 
     @Test func aStandaloneAnswerStopsWhenItsCallerDoes() async {
@@ -2697,6 +2756,22 @@ private extension Trait where Self == ConditionTrait {
         _ = await record(engine.ask("q"))
         // Warmed once, not again for the same turn.
         #expect(seam.session(for: .privateCloud).prewarmCalls.withLock { $0 }.count == 1)
+    }
+
+    @Test func whatIsPrewarmedIsHowTheFirstPromptOpens() async throws {
+        // A prefix without a line break gets one in the prompt; the warm
+        // cache matches only what the prompt opens with (house rule 6).
+        var domain = FakeDomain()
+        domain.promptPrefixOverride = "Answer about my records."
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        await engine.prewarm()
+        let warmed = try #require(session.prewarmCalls.withLock { $0 }.first)
+        session.script(grounded("Answer."))
+        _ = await record(engine.ask("q"))
+        let prompt = try #require(session.prompts.withLock { $0 }.first)
+        #expect(prompt.hasPrefix(warmed))
+        #expect(prompt.hasPrefix("Answer about my records.\n"))
     }
 
     @Test func prewarmIsSkippedWhileAConversationIsKept() async {

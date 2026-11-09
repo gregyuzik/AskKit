@@ -184,9 +184,9 @@ public actor AskEngine<Domain: AskDomain> {
         // And a domain with no search under the grounded retry, which a
         // domain that retrieves has: it plans `SearchArguments` and runs
         // `search`. With `AskNoSearchArguments` there is nothing to plan, so no
-        // planner is asked, and the default search throws, so a first answer
-        // that calls no tool fails all the same, as under `.toolCall`. Under
-        // the other policies there is no retry to reach it.
+        // planner is asked, and the default search throws, so an answer on a
+        // fresh session that calls no tool fails all the same, as under
+        // `.toolCall`. Under the other policies there is no retry to reach it.
         if grounding == .retrieval, Domain.SearchArguments.self == AskNoSearchArguments.self {
             mistake("SearchArguments is AskNoSearchArguments under the grounded retry — a first answer that calls no tool has no search to plan, and the default search(_:context:) fails it as ungrounded")
         }
@@ -1012,7 +1012,6 @@ public actor AskEngine<Domain: AskDomain> {
         let carried = mode.joinsThread ? (conversation?.recapTail ?? restoredTail) : []
         let recap = AskContinuation.recap(from: carried, tier: tier)
         let wasSummarized = recap != nil
-        if wasSummarized { continuation.yield(.summarized) }
         // The session goes before the fresh one is built, and the tail it
         // carried waits in `restoredTail`: if the fresh one fails, Try Again
         // still starts from what the thread said.
@@ -1087,6 +1086,13 @@ public actor AskEngine<Domain: AskDomain> {
         var appRetrieved = false
         var answer: AskAnswer<Row>
         var abandoned: Bool
+        // Said once the recap is in a prompt about to be sent, and not as it
+        // is built: the session, the overview or the domain's lines can fail
+        // the attempt first, and a turn whose recap no model saw would draw
+        // the hairline saying the chat was summarized, and keep it on disk.
+        // Ahead of the stream, so ahead of its first words; the grounded
+        // retry re-asks on this session, whose transcript has the recap.
+        if wasSummarized { continuation.yield(.summarized) }
         do {
             (answer, abandoned) = try await stream(
                 question: question, prompt: prompt, images: sentPhotos,
@@ -1659,8 +1665,8 @@ public actor AskEngine<Domain: AskDomain> {
         // reason, and the session says so on the last snapshot
         // (`AskReplySnapshot.reachedTokenCap`). Logged by its tag, then
         // judged as any answer is: one with no prose fails, and one the policy
-        // doesn't keep is ungrounded, so a first answer still gets the
-        // grounded retry.
+        // doesn't keep is ungrounded, so an answer on a fresh session under
+        // `.retrieval` still gets the grounded retry.
         if outcome.reachedTokenCap {
             log.routing("\(tier.rawValue) stopped at its token cap: \(AskTriage.tag(for: AskTokenCapReached.answerCap))")
         }

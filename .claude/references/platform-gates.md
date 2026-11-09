@@ -30,8 +30,8 @@ in its file. Inside `AskTriage`, the `SystemLanguageModel.Error` branch and both
 
 **Ungated:**
 - `AskTier`, `AskRow`, `AskAnswer`, `AskQuestionKind`, `AskMarkdown`, `AskError` and `AskTurnEvent`;
-- `AskThreadStore`, `AskThreadArchive` and `AskFeedbackAttachments`;
-- `AskProposal`, `AskQuestionPhoto`, `AskLink` and `AskBrand`;
+- `AskThreadStore`, `AskThreadArchive`, `AskFeedbackAttachments` and `AskStoredFile`;
+- `AskProposal`, `AskPayloadCoding`, `AskQuestionPhoto`, `AskLink` and `AskBrand`;
 - `AskDeadline`, `AskGenerationGate`, `AskLogSink`, `AskPrompt` and `AskActivity`;
 - `AskGroundingPolicy`, `AskEvidencePresentation`, `AskModelStatus`, `AskDiagnostics`,
   `AskDevelopmentPark` and `AskInferenceHold`.
@@ -48,5 +48,5 @@ Don't "tidy" it into either list.
 - `AskArrivals`, the reveal's arithmetic, is ungated and imports Foundation and AskCore: its parse and
   bold marks are `AskMarkdown`'s, an ungated `package` piece of AskCore.
 - `AskHostFocus` is ungated and imports Foundation alone.
-- `AskWindowHeight` is `#if os(iOS)`.
-- `AskCommands` is `#if os(macOS)`.
+- `AskWindowHeight` and `AskScreenWindowEnvironment` are `#if os(iOS)`.
+- `AskCommands` and `AskNewestTurnCommand` are `#if os(macOS)`.

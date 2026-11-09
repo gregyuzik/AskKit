@@ -14,6 +14,64 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **A yes given again after one that failed off screen is carried out once, and its card says so.**
+  When a yes came to nothing after its chat had left the screen (New Chat in the same moment, or while
+  the perform ran and then failed), `AskConversationStore` kept that failure and wrote it over the turn
+  whenever the chat was read back. So a reader who opened the chat, said yes again and left while that
+  yes ran found the card, on opening the chat once more, saying it hadn't worked and offering the
+  action; the second yes's success found no turn waiting on it, the chat was saved as failed, and a tap
+  carried the action out a second time. A new yes now retires what came of the one before it, and the
+  chat read back shows the new yes under way, then what came of it.
+- **A row that won't encode costs its answer that row, not every save of its chat.** A host's row
+  can decode and still not encode, such as one holding a `Double` that is NaN or infinite, which a
+  default `JSONEncoder` refuses, or one whose own `encode(to:)` throws. The thread, a chat's filing and
+  a proposal's outcome were each encoded whole, so from the turn that read such a row on, every save of
+  the thread failed and a relaunch brought back only the turns before it, every yes to a proposal
+  failed with its save, New Chat couldn't file the chat, and no earlier chat opened while it was on
+  screen. Reads already salvaged row by row. Now a write that won't encode whole tries each row alone,
+  writes the turns without the ones that fail, in `matches` and `tiles` alike, and logs how many: the
+  turn keeps its question, prose, outcome and other rows, and an answer whose only tile went reads back
+  with none. A thread whose rows all encode is written as before, and one that still won't encode fails
+  as before.
+- **A title names its row as the clamp showed it to the model.** `AskPrompt.clamp` swaps a title's
+  angle brackets for ‹ ›, makes its tabs and line breaks spaces and drops what a reader can't see, and
+  the model names the row as it read it, but tile and mention matching compared the title as stored: a
+  row titled `<3 Love Songs>`, shown as `‹3 Love Songs›`, got no tile when the model chose it, and one
+  whose title held a tab, a zero-width space, a soft hyphen or a left-to-right mark wasn't found in
+  prose that named it, so a follow-up naming it could fail as ungrounded. Matching now reads each title
+  both as stored and as the clamp shows it, short of a cut, through the clamp's own steps, in prose and
+  in the model's tile titles alike, and `AskEval` counts a title it names that way as named.
+- **A title the tool cut short names its row.** A tool clamps each title, as the README's sample and
+  the demo do with `AskPrompt.clamp(title, AskPrompt.shortClamp)`, so the model sees a title past 60
+  characters as its first 60 and an ellipsis, and names it so, as `AskReply`'s tile guide asks it to.
+  Matching compared that with the whole title: a pick or a superlative on such a row showed no tile,
+  the turn's referent was empty, and a follow-up that named the row as it was shown failed as
+  ungrounded. Now a tile title or a mention in prose that ends in an ellipsis, the clamp's "…" or three
+  periods, names the row whose title opens with what comes before it and goes on past it, at whatever
+  limit the tool clamped to, once that is 16 characters or more: fewer can be the model trailing off,
+  as in "You could play…". An exact title still comes first, so a title that ends in an ellipsis is
+  still that title. Next comes a row whose whole title is what comes before the ellipsis, so
+  "Mission: Impossible…" names Mission: Impossible and not Mission: Impossible – Fallout, as a tile
+  and in prose that trails off after it: a model does that far oftener than a tool's limit lands on
+  the end of another row's title. Then a cut title, then a near one. Titles that open alike were
+  shown cut alike: a tile title is the first of them read, and prose names them all.
+- **A `promptPrefix` without a trailing newline ends its line.** The engine appended a domain's prefix
+  as it stood, so "Answer about my records." ran straight into the first of the domain's lines, or into
+  the question's `<user_request>` fence, where every line already ended in a newline. A non-empty
+  prefix that doesn't end in one now gets one in the prompt, after it, so what `prewarm` caches is
+  still how the prompt opens.
+- **A chat set aside beside a filing this build reads only in part reaches History.** A chat opened
+  from such a filing, asked on, then set aside because New Chat couldn't file it, was put back at the
+  next launch only into its earlier filing, which is never written over while some of its turns don't
+  decode. So it was never filed, stayed out of History, and was tried again at every launch. It is now
+  filed beside that filing, as New Chat files a chat beside one, and the filing stays as it was. An
+  original kept for a build that reads more still waits for its chat's filing to read whole.
+- **A turn draws "Earlier in this chat is summarized" only once a model was sent the recap.** The
+  engine reported `AskTurnEvent.summarized` as it built a fresh session's recap, before the session,
+  the overview and the domain's prompt lines were in hand, so a turn that failed on any of them, such
+  as a session the seam couldn't build, drew the hairline and kept it on disk, and one handed down
+  from such a failure reported it twice. It is now reported just before the prompt that carries the
+  recap is sent, still ahead of the answer's first words.
 - **A bank of tiles with no column maximum lays out under an unbounded width.** An `AskTileGrid` given
   `columns: .adaptive(minimum: 76, maximum: .infinity)`, the maximum `GridItem.adaptive` defaults to,
   put its first tile at an x of NaN and handed its parent a width that wasn't a number wherever it was

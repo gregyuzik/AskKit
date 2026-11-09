@@ -24,6 +24,10 @@ scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`.
   `ictool`, laid over the tile the card holds, its field and its words left as they are. GitHub
   shows a new card only once it's uploaded in the repository's settings.
 
+The three PNGs under `docs/images/` then go through `oxipng -o max --strip safe` when oxipng is
+installed (`brew install oxipng`), which is lossless and keeps their color profile; without it they
+stay as written, and the script says it skipped them.
+
 Needs macOS with Xcode (`swift` runs make-demo-symbol.swift, and `ictool` renders the images) and
 numpy, shapely and Pillow:
 
@@ -299,6 +303,18 @@ def render_social_preview() -> None:
         card.convert("RGB").save(IMAGES / "social-preview.png", optimize=True)
 
 
+def recompress(paths: list[Path]) -> None:
+    """The PNGs recompressed by oxipng, when it's installed: lossless, and `--strip safe` keeps the
+    chunks that change how an image draws, its color profile among them."""
+    names = ", ".join(str(path.relative_to(ROOT)) for path in paths)
+    oxipng = shutil.which("oxipng")
+    if oxipng is None:
+        print(f"skipped oxipng on {names}: it isn't installed (brew install oxipng)")
+        return
+    subprocess.run([oxipng, "-o", "max", "--strip", "safe", *map(str, paths)], check=True, capture_output=True)
+    print(f"recompressed {names} with oxipng, losslessly")
+
+
 def main() -> None:
     shapes = bubbles()
     write_icon(shapes)
@@ -309,6 +325,7 @@ def main() -> None:
     print(f"wrote {STACK.relative_to(ROOT)} (back, middle, front)")
     print(f"wrote {(IMAGES / 'icon.png').relative_to(ROOT)} and {(IMAGES / 'icon-dark.png').relative_to(ROOT)}")
     print(f"wrote {(IMAGES / 'social-preview.png').relative_to(ROOT)}")
+    recompress([IMAGES / "icon.png", IMAGES / "icon-dark.png", IMAGES / "social-preview.png"])
 
 
 if __name__ == "__main__":

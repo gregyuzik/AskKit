@@ -2480,6 +2480,42 @@ import Testing
         #expect(relaunched.proposalPhase(for: try #require(relaunched.turns.last)) == .done("Marked The Peregrine as lent."))
     }
 
+    @Test func whatCameOfAProposalItsFilingRefusedStillReadsBackWithTheChat() async throws {
+        // The perform returned after New Chat filed its chat, and the filing
+        // wouldn't take what came of it. Opened as filed, the card would say
+        // nobody knows what came of the yes, though this process does.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        let (domain, store, turn) = try await slowOfferingStore(threadURL: folder.thread, archiveDirectory: folder.archive)
+
+        store.confirmProposal(turn)
+        await domain.performed.isParked()
+        store.startOver()
+        await store.flushPersistence()
+        let filed = try #require(store.history.first)
+        try setMode(0o500, folder.archive)
+        domain.performed.release()
+        await store.flushProposal()
+        await store.flushPersistence()
+        let archive = AskThreadArchive<UIRow>(appDirectory: "unused", directory: folder.archive)
+        guard case .thread(let onDisk, _) = await archive.entries(for: filed.id) else {
+            Issue.record("the chat New Chat filed reads back")
+            return
+        }
+        #expect(onDisk.last?.proposalOutcome == .performing, "the folder refused the filing's write")
+
+        await store.openThread(filed)
+        let reopened = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: reopened) == .done("Marked The Peregrine as lent."))
+        store.confirmProposal(reopened)
+        await store.flushProposal()
+        await store.flushPersistence()
+        #expect(domain.performed.proposals.count == 1)
+        // And saved with the chat, now the thread.
+        let saved = await AskThreadStore<UIRow>(appDirectory: "unused", url: folder.thread).load().entries
+        #expect(saved.map(\.proposalOutcome) == [.confirmed("Marked The Peregrine as lent.")])
+    }
+
     @Test func aYesIsSavedBeforeTheAppIsAskedAndAfterAQuitItTakesNoTap() async throws {
         // An app quit while the domain works: the turn read back can't know
         // what came of the yes, and confirmed again it could be done twice.
@@ -2586,6 +2622,56 @@ import Testing
         store.confirmProposal(reopened)
         await store.flushProposal()
         #expect(domain.performed.proposals == [Self.lendBook])
+    }
+
+    @Test func aYesGivenAgainIsNotUndoneByWhatCameOfTheYesBeforeIt() async throws {
+        // The first yes came to nothing with its chat off screen, and the
+        // reader said yes again on the chat opened again. Read back while the
+        // second is out, the turn would take the first's failure: the card
+        // would offer the action as the second carries it out, the second's
+        // outcome would find no turn waiting on it, and a tap would do it
+        // twice.
+        let threadURL = temporaryLocation("askkit-offer-again").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-offer-again")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let (store, turn) = try await offeringStore(domain: domain, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        await store.flushPersistence()
+
+        // The first yes, refused: New Chat in the same moment.
+        store.confirmProposal(turn)
+        store.startOver()
+        await store.flushProposal()
+        await store.flushPersistence()
+        await store.openThread(try #require(store.history.first))
+        let offeredAgain = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: offeredAgain) == .failed(nil, canRetry: true))
+
+        // The second, out while its chat ends and opens again.
+        domain.performed.parks.withLock { $0 = true }
+        store.confirmProposal(offeredAgain)
+        await domain.performed.isParked()
+        store.startOver()
+        await store.flushPersistence()
+        await store.openThread(try #require(store.history.first))
+        let whileOut = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: whileOut) == .performing)
+
+        domain.performed.release()
+        await store.flushProposal()
+        await store.flushPersistence()
+        let settled = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: settled) == .done("Marked The Peregrine as lent."))
+        store.confirmProposal(settled)
+        await store.flushProposal()
+        #expect(domain.performed.proposals.count == 1)
+        let relaunched = makeStore(domain: domain, asker: ScriptedAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        await relaunched.restoreIfNeeded()
+        #expect(relaunched.proposalPhase(for: try #require(relaunched.turns.last)) == .done("Marked The Peregrine as lent."))
     }
 
     @Test func theDomainCarriesAProposalOutOffTheMainActor() async throws {

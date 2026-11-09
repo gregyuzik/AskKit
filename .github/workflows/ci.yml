@@ -82,14 +82,21 @@ jobs:
           if [ "$EVENT" != pull_request ]; then
             code=true
           else
+            # Captured first, so a `git diff` that fails fails the step. Read
+            # from a process substitution, whose status nothing checks, its
+            # failure would be a change to no file: every job skipped and
+            # `CI passed` passed.
+            files=$(git diff --no-renames --name-only HEAD^1 HEAD)
             while IFS= read -r f; do
               case "$f" in
+                # The one line an empty diff reads as: no file, so no code.
+                "") ;;
                 AGENTS.md|CHANGELOG.md|CODE_OF_CONDUCT.md|CONTRIBUTING.md|SECURITY.md|TRANSLATION.md|LICENSE) ;;
                 docs/*|.claude/*|.github/ISSUE_TEMPLATE/*) ;;
                 .github/PULL_REQUEST_TEMPLATE.md|.github/CODEOWNERS) ;;
                 *) code=true; break ;;
               esac
-            done < <(git diff --no-renames --name-only HEAD^1 HEAD)
+            done <<<"$files"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "Runs the build jobs: $code"

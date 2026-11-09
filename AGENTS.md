@@ -68,9 +68,9 @@ Deeper notes: `.claude/references/`.
   compile into the tree it proves.
   - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, actionlint and zizmor (offline,
     over `.github/`; ignore a finding inline with its reason, as the setup action does), `swiftlint
-    lint` (`trailing_comma` is on, `Package.swift` included), `scripts/check-strings.py`, the README
-    sample's check and the demo project file's checks. Repo settings allow GitHub-owned actions only,
-    pinned to a commit.
+    lint --strict` (`trailing_comma` is on, `Package.swift` included), `scripts/check-strings.py`, the
+    README sample's check and the demo project file's checks. Repo settings allow GitHub-owned actions
+    only, pinned to a commit.
   - `scripts/ci.sh api` runs `swift package diagnose-api-breaking-changes` against the newest `v*`
     tag in HEAD's history (CI's job checks out with `fetch-depth: 0` for it), on the macOS build's
     public and `package` API, in about 30 seconds, and fails on a removal, a rename, a changed

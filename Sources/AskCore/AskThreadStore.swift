@@ -269,6 +269,18 @@ nonisolated extension AskThreadEntry {
         }
     }
 
+    /// This turn with `answer` in place of its own, every other field as it
+    /// was: how a write leaves out a row that won't encode
+    /// (`AskThreadStore.encodeEntries(_:logger:)`).
+    func replacing(answer newAnswer: AskAnswer<Row>?) -> Self {
+        Self(
+            question: question, text: text, answer: newAnswer, failureMessage: failureMessage, failure: failure,
+            failureIsRetryable: failureIsRetryable, stopped: stopped, tier: tier, askedAt: askedAt,
+            summarizedBefore: summarizedBefore, feedback: feedback, proposalOutcome: proposalOutcome, photo: photo,
+            answerSawPhoto: answerSawPhoto
+        )
+    }
+
     /// `entries` with what came of the proposal made on the turn asked
     /// `question` at `askedAt` in place of the `.performing` it was written
     /// with, or nil where none of them is that turn waiting on its perform.
@@ -502,6 +514,50 @@ public actor AskThreadStore<Row: AskRow> {
         return (salvaged.entries, salvaged.dropped, droppedRows.total)
     }
 
+    /// `entries` as the thread's file and every chat's file hold them: the
+    /// whole list, encoded by a default `JSONEncoder`. Every write of turns
+    /// goes through this, the thread's (`save(_:)`), a chat's filing and a
+    /// proposal's outcome written into one (`AskThreadArchive`).
+    ///
+    /// **A row that won't encode costs its answer that row, never the
+    /// write.** The rows are the host's, and a row can decode and still not
+    /// encode: a `Double` that is infinite or NaN throws, as does a row whose
+    /// own `encode(to:)` does. Encoded whole, one such row failed every write
+    /// of its chat from the turn that read it on: a relaunch brought back only
+    /// the turns before it, no proposal could be confirmed, and New Chat could
+    /// not file the chat. So when the whole list won't encode, each row of
+    /// every answer is tried alone with the same encoder, the entries are
+    /// encoded without those that fail, in `matches` and `tiles` alike, and
+    /// the log counts them, as the read counts the rows that no longer decode
+    /// (`decodeEntries(from:)`): per list, never a title or the error. The
+    /// turn keeps its question, its prose, its outcome and its other rows,
+    /// and an answer whose every tile went is an answer with none.
+    ///
+    /// The whole list first, so a thread whose rows all encode is written as
+    /// it always was, for one encoding. One that still won't encode without
+    /// them, or none of whose rows failed alone, throws the first error, as
+    /// it always did.
+    static func encodeEntries(_ entries: [AskThreadEntry<Row>], logger: Logger) throws -> Data {
+        let encoder = JSONEncoder()
+        do {
+            return try encoder.encode(entries)
+        } catch {
+            var left = 0
+            let kept = entries.map { entry -> AskThreadEntry<Row> in
+                guard let answer = entry.answer else { return entry }
+                let written = answer.keepingRows { (try? encoder.encode($0)) != nil }
+                left += written.dropped
+                return written.dropped == 0 ? entry : entry.replacing(answer: written.answer)
+            }
+            guard left > 0, let data = try? encoder.encode(kept) else { throw error }
+            logger.error("""
+                \(left, privacy: .public) row(s) would not encode, and are left out of their answers on disk: \
+                \(AskStoredFile.tag(for: error), privacy: .public)
+                """)
+            return data
+        }
+    }
+
     /// Write the thread, and say whether it is on disk. An empty thread
     /// removes the file, as `clear()` does.
     ///
@@ -510,7 +566,9 @@ public actor AskThreadStore<Row: AskRow> {
     /// excluded from backup, and with complete file protection except on a
     /// Mac, so a whole chat transcript isn't readable on a device that is
     /// locked after being unlocked once. A thread past
-    /// `AskStoredFile.maxBytes` isn't written: it would never read back.
+    /// `AskStoredFile.maxBytes` isn't written: it would never read back. A
+    /// row that won't encode is left out of its answer on disk, and costs the
+    /// write nothing else (`encodeEntries(_:logger:)`).
     ///
     /// **False means these turns may not be on disk here.** A caller must then
     /// keep every other copy of them: not delete the chat it opened from the
@@ -526,7 +584,7 @@ public actor AskThreadStore<Row: AskRow> {
         guard let url else { return false }
         guard !entries.isEmpty else { return clear() }
         do {
-            try write(JSONEncoder().encode(Array(entries.suffix(Self.maxPersistedTurns))), to: url)
+            try write(Self.encodeEntries(Array(entries.suffix(Self.maxPersistedTurns)), logger: logger), to: url)
             return true
         } catch {
             logger.error("the Ask thread could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
@@ -603,8 +661,10 @@ public actor AskThreadStore<Row: AskRow> {
     /// - A thread set aside goes to the earlier chats: a newer build may have
     ///   written it, or the device was locked when it was read. Into the
     ///   filing its chat already has, if one does, so neither copy's turns are
-    ///   lost. Read only in part, what reads is filed and the file is kept
-    ///   whole as an original, for a build that reads the rest.
+    ///   lost, or beside that filing where this build can't read it whole, as
+    ///   New Chat files a chat beside one. Read only in part, what reads is
+    ///   filed and the file is kept whole as an original, for a build that
+    ///   reads the rest.
     /// - An original goes back into its own chat: the thread, when the thread
     ///   is that chat, or else the earlier chat that is. When neither is, the
     ///   reader deleted that chat or the cap trimmed it, and the original goes
