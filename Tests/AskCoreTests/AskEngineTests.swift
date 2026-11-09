@@ -5,7 +5,7 @@ import FoundationModels
 import Synchronization
 import Testing
 
-@testable import AskCore
+@_spi(AskKitInternal) @testable import AskCore
 
 /// Whether the Mac's load average over the last minute is past two a core.
 ///

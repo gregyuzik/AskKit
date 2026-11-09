@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// Prompt hygiene, in one place: the fences the reader's words and tool output
 /// are quoted inside, the sanitizer that stops either from closing a fence, and
@@ -624,7 +624,12 @@ nonisolated public enum AskPrompt {
     ///
     /// `locale` is `Locale.current`, as in Apple's sample, which takes in the
     /// person's language settings for the app. A test passes its own.
-    static func instructions(_ text: String, answerLanguage: String?, locale: Locale = .current) -> String {
+    ///
+    /// SPI (`AskKitInternal`): the engine builds every session's instructions
+    /// with it, and a host's live eval can build the same ones.
+    @_spi(AskKitInternal) public static func instructions(
+        _ text: String, answerLanguage: String?, locale: Locale = .current
+    ) -> String {
         let named = answerLanguage.flatMap { $0.isEmpty ? nil : $0 }
         var opening: [String] = []
         if !Locale.Language(identifier: "en_US").isEquivalent(to: locale.language),
