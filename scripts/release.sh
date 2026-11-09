@@ -66,18 +66,26 @@ case "$status" in
 esac
 
 # The section's heading, matched whole, with the version's dots taken literally.
+#
+# A reader that stops early, `grep -q` at its match or the awk below at the
+# next heading, takes its input from a here-string, never from a pipe: under
+# pipefail a writer still writing when the reader exits dies of SIGPIPE, and
+# the check fails on a CHANGELOG that is right. Fed by `printf |`, the link
+# checks failed 424 runs in 2,000 against 0.7.1's 60 KB CHANGELOG, and the
+# awk, which stops about 3 KB in, ends the script with status 141 every time
+# once the file is past the pipe's 64 KiB.
 changelog=$(git show "$sha:CHANGELOG.md")
 heading=$(printf '%s\n' "$changelog" |
   grep -E "^## \[${version//./\\.}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\$" || true)
 [ -n "$heading" ] ||
   fail "CHANGELOG.md on origin/main has no '## [$version] - YYYY-MM-DD' section: move Unreleased's entries under one, in a pull request"
-printf '%s\n' "$changelog" | grep -qF "[$version]: https://github.com/$repo/" ||
+grep -qF "[$version]: https://github.com/$repo/" <<<"$changelog" ||
   fail "CHANGELOG.md has no link for [$version] at its foot"
-printf '%s\n' "$changelog" | grep -qF "[Unreleased]: https://github.com/$repo/compare/$tag...HEAD" ||
+grep -qF "[Unreleased]: https://github.com/$repo/compare/$tag...HEAD" <<<"$changelog" ||
   fail "CHANGELOG.md's [Unreleased] link doesn't compare from $tag"
 # The section's body, up to the next version's heading or the links at the
 # foot, without the blank lines at either end.
-notes=$(printf '%s\n' "$changelog" | awk -v h="$heading" '
+notes=$(awk -v h="$heading" '
   $0 == h { on = 1; next }
   on && (/^## \[/ || /^\[[^]]+\]: /) { exit }
   on { line[++n] = $0 }
@@ -85,10 +93,10 @@ notes=$(printf '%s\n' "$changelog" | awk -v h="$heading" '
     first = 1; while (first <= n && line[first] ~ /^[[:space:]]*$/) first++
     last = n; while (last >= first && line[last] ~ /^[[:space:]]*$/) last--
     for (i = first; i <= last; i++) print line[i]
-  }')
+  }' <<<"$changelog")
 [ -n "$notes" ] || fail "CHANGELOG.md's [$version] section is empty"
 
-git show "$sha:SECURITY.md" | grep -qE "^\| ${minor//./\\.} \| Yes \|" ||
+grep -qE "^\| ${minor//./\\.} \| Yes \|" <<<"$(git show "$sha:SECURITY.md")" ||
   fail "SECURITY.md's table doesn't list $minor as supported"
 
 # The count of `CI passed` runs on the commit that succeeded.
@@ -163,7 +171,7 @@ else
   say "warning: gh release verify $tag found no attestation: check that releases are immutable (Settings, General, Releases)"
 fi
 
-if git show "$sha:.github/api-breakage-allowlist.txt" | grep -q '^API breakage: '; then
+if grep -q '^API breakage: ' <<<"$(git show "$sha:.github/api-breakage-allowlist.txt")"; then
   say "next: empty .github/api-breakage-allowlist.txt, keeping its comments, in a pull request: $tag is the API check's baseline now"
 fi
 say "$tag is out"

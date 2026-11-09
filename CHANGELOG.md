@@ -14,6 +14,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **A yes given again after one that failed off screen is carried out once, and its card says so.**
+  When a yes came to nothing after its chat had left the screen (New Chat in the same moment, or while
+  the perform ran and then failed), `AskConversationStore` kept that failure and wrote it over the turn
+  whenever the chat was read back. So a reader who opened the chat, said yes again and left while that
+  yes ran found the card, on opening the chat once more, saying it hadn't worked and offering the
+  action; the second yes's success found no turn waiting on it, the chat was saved as failed, and a tap
+  carried the action out a second time. A new yes now retires what came of the one before it, and the
+  chat read back shows the new yes under way, then what came of it.
 - **A row that won't encode costs its answer that row, not every save of its chat.** A host's row
   can decode and still not encode, such as one holding a `Double` that is NaN or infinite, which a
   default `JSONEncoder` refuses, or one whose own `encode(to:)` throws. The thread, a chat's filing and

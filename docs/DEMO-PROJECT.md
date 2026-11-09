@@ -10,7 +10,7 @@ library the first time. Both domains share one model seam, as a host's Asks woul
 turn going while the other is on screen. The demo declares no Private Cloud Compute entitlement, so it
 always answers on the device.
 
-Its Ask tab and its mark wear `askkit.bubbles`, a custom symbol in its asset catalog with an
+Its Ask tab wears `askkit.bubbles`, a custom symbol in its asset catalog, and its mark the symbol's
 `askkit.bubbles.fill` sibling: three speech bubbles of one size, each up and to the right of the one in
 front. `scripts/make-demo-symbol.swift` draws it. Its icon is the same three bubbles as plates of Liquid
 Glass, shading through `AskSpectrum.aurora`'s colors. `scripts/make-demo-icon.py` makes it from the
@@ -107,13 +107,10 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   `AskKitDemo/AskKitDemo_<platform>.entitlements` (`CODE_SIGN_ENTITLEMENTS`), a file per target so
   that Xcode's Signing & Capabilities changes one target at a time. They are live only in a signed
   build; the unsigned Mac app carries none and runs its arm64e slice without them.
-- **`WorkspaceSettings.xcsettings`** sets `iOSPackagesShouldBuildARM64e`,
-  `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e`. A SwiftPM package doesn't
-  follow the app to arm64e on its own: without them a Mac build stops at "Unable to resolve module
-  dependency: 'AskCore'", and a device build can't link AskCore and AskUI ("Undefined symbols for
-  architecture arm64e"). A host that turns Enhanced Security on needs the same keys, in its project's
-  `project.xcworkspace/xcshareddata/` or its workspace's `xcshareddata/`
-  ([ADOPTING.md's Enhanced Security](ADOPTING.md#enhanced-security)).
+- **`WorkspaceSettings.xcsettings`** sets the three keys that build the package arm64e, which
+  [ADOPTING.md's Enhanced Security](ADOPTING.md#enhanced-security) names for a host that turns it on.
+  Without them a Mac build stops at "Unable to resolve module dependency: 'AskCore'", and a device build
+  can't link AskCore and AskUI ("Undefined symbols for architecture arm64e").
 - **One target per platform**, `AskKitDemo_iOS`, `AskKitDemo_macOS` and `AskKitDemo_visionOS`, with a
   scheme apiece, each compiling `AskKitDemo/` and `Shared/` and linking AskCore and AskUI from the
   package at `..`. `AskKitDemo_macOS` is a plain window, not Catalyst, so it declares its own category
@@ -225,6 +222,10 @@ with the next one.
    `-askCaptureWindow /dev/fd/4 -askCaptureAfter 2` and `4>/dev/null` so it quits. `-askCaptureSize`
    also changes the window frame the demo saves, so read it before step 1
    (`defaults read com.example.askkitdemo`) and give this launch the old size.
+7. Recompress each image losslessly once it is in `docs/images/`, before committing it:
+   `oxipng -o max --strip safe docs/images/<file>.png` (`brew install oxipng`). The images are most of
+   the repository's history, which every SwiftPM client clones, so a retake should land as small as it
+   can.
 
 ## Imaging the iPhone screen
 
@@ -285,6 +286,7 @@ simulator for the whole run, so no test or other app comes to the front on it.
 
 6. Put the simulator back: `xcrun simctl status_bar <udid> clear`, its own appearance, the app's
    accessibility off (the same call with `0`), and the app quit.
+7. Recompress each image as in step 7 of [Imaging the Mac window](#imaging-the-mac-window).
 
 ## Imaging the Apple Vision Pro window
 
@@ -320,3 +322,4 @@ asked through lldb.
    images a second row at one height: their `width=` percentages are in proportion to each image's
    width over its height, 45% and 52%.
 7. Put the simulator back: the window at 1280x720, the app's accessibility off, and the app quit.
+8. Recompress `vision.png` as in step 7 of [Imaging the Mac window](#imaging-the-mac-window).

@@ -64,43 +64,29 @@ preview, the demo or a UI test arranges the screen around (`AskSimulatedFold`). 
 spells its import `@_spi(AskKitInternal) import AskCore` (or `AskUI`) sees it; a plain `import`
 elsewhere in the module and `@testable import` don't. An SPI declaration keeps its `nonisolated`
 spelling. Everything else is internal, or `package` where AskUI or a test target importing AskCore
-without `@testable` (`AskUITests`) reads it. AskKit has no third-party dependencies. `scripts/ci.sh api`
-compares `package` declarations too, so making a public one `package` prints no break; nor does an
-isolation change. Each goes in the CHANGELOG by hand.
+without `@testable` (`AskUITests`) reads it. AskKit has no third-party dependencies.
+[CONTRIBUTING.md](../CONTRIBUTING.md#pull-requests) says which changes between public and `package` the
+API check can't print, and how each is recorded.
 
-**The demo.** `Demo/` hosts two domains, switched between in the app: a library of thirty books,
-records, tools and clothes behind one search tool (`DemoDomain`), and an assistant with no rows
-(`DemoAssistantDomain`) that converts units with one tool, proposes reminders with another and answers
-anything else from the model alone. Their engines share one seam, as a process's Asks do, and each
-domain's store lives as long as the app, over a thread of its own (`DemoHost`).
-`Demo/AskKitDemo.xcodeproj` builds it as an iOS, macOS and visionOS app, with a UI-test bundle.
-Holding no Private Cloud Compute entitlement, declaring none to its seam and parked besides, it always
-answers on device ([Entitlements](#entitlements), [the development park](#the-development-park)).
+**The demo.** `Demo/` is an iOS, macOS and visionOS app hosting two domains, a library behind one search
+tool and an assistant with no rows, each with a store that lives as long as the app (`DemoHost`);
+[DEMO-PROJECT.md](DEMO-PROJECT.md) describes it and how to run it. Holding no Private Cloud Compute
+entitlement, declaring none to its seam and parked besides, it always answers on device
+([Entitlements](#entitlements), [the development park](#the-development-park)).
 
 ### What a host supplies
 
-AskKit needs one type from a host, an `AskDomain`, with three required members: `brand`, an
-`AskBrand` holding the host's own copy, the Application Support folder and the log subsystem every
-AskKit logger writes under; `makeTools(_:)`, the tools a session offers the model, which may read the
-host's data, work something out or propose an action; and
-`instructions(tier:isConversation:answerLanguage:)`.
-
-A domain over the reader's own rows gives four more: the associated types `Row`, an `AskRow`
-(`Codable`, `Sendable`, `Identifiable` and `Equatable`, with a `displayTitle` the model sees in tool
-output and writes back when it picks tiles), and `SearchArguments`, the `@Generable` arguments the
-grounded retry's planner fills in; `overview()`, what the reader has, by scope; and
-`search(_:context:)`, the grounded retry's search through the tool's own code, whose default exists
-only for `AskNoSearchArguments`, so a domain naming its own `SearchArguments` must write it.
+A host supplies one type, an `AskDomain`, and wires it to a seam, an engine, a store and the screen.
+[ADOPTING.md](ADOPTING.md) is the reference for both: [The domain](ADOPTING.md#the-domain) has the
+members with no default, [Optional members](ADOPTING.md#optional-members) the defaults a host reaches
+for first, [A domain without rows](ADOPTING.md#a-domain-without-rows) a domain whose tools read none,
+and [The seam, the store and the screen](ADOPTING.md#the-seam-the-store-and-the-screen) the wiring.
+Each member with a default is documented on `AskDomain`, and `Demo/AskKitDemo/App.swift` is the shape
+to copy.
 
 **Which answers are kept** is the domain's `grounding`, one `AskGroundingPolicy` for its life
-([house rule 2](#5-the-house-rules)):
-- `.retrieval`, the default: an answer that read nothing is never shown, and a first one gets the
-  grounded retry;
-- `.toolCall`: the same without the retry, so its search is never asked, for a domain whose every
-  question is a lookup or an action;
-- `.notRequired`: for a domain whose answers needn't rest on the reader's data, an answer nothing
-  grounded is kept and says so: `AskAnswer.grounding` records it, and its evidence line reads "Not
-  from this app's data" unless the domain words it.
+([house rule 2](#5-the-house-rules)): [step 8](#2-the-life-of-a-turn) of a turn says what each policy does
+with a turn that ends ungrounded, and `AskGroundingPolicy`'s cases say which domain each is for.
 
 **Which first screen an empty overview gets** is the brand's: with `nothingToAskCopy`, the
 nothing-to-ask screen, for a domain whose every question is about rows the reader owns; without it,
@@ -109,42 +95,12 @@ doesn't retrieve but gives the copy is logged as it is built: its default overvi
 show that screen to every reader.
 
 **A domain whose tools read no rows** names neither type: `Row` is then `AskNoRow`, a stand-in nothing
-needs to record, and `SearchArguments` is `AskNoSearchArguments`, which has no fields. Its `overview()`
-defaults to `.empty`, so its brand leaves out `nothingToAskCopy`. Under `.retrieval` its grounded
-retry asks no planner, having nothing to choose, and the default `search(_:context:)` fails the turn as
-ungrounded; the engine logs such a domain once, as it is built.
+needs to record, and `SearchArguments` is `AskNoSearchArguments`, which has no fields. Under
+`.retrieval` its grounded retry asks no planner, having nothing to choose, and the default
+`search(_:context:)` fails the turn as ungrounded; the engine logs such a domain once, as it is built.
 
-**What the model writes** is the domain's `replyShape`, one `AskReplyShape` for its life. `.full`, the
-default, is `AskReply`: the answer, its question kind, the rows to show as tiles, and the follow-ups.
-`.prose` is `AskProseReply`, the answer and follow-ups alone, for a domain whose answers never show
-tiles, such as one without rows: its model spends no window on a kind or a tile choice
-([Tiers and the seam](#tiers-and-the-seam)) and invents no tile titles, and its answers show none
-whatever rows are behind them.
-
-The rest have defaults, each documented on `AskDomain`: the prompt's lines and prefix, starters, the
-referent, persistence, the question kinds (`AskQuestionKind`), the deadline, photos, budgets per tier,
-the wait row's phrases, the basis and evidence lines, proposals, answers without a model
-(`deterministicAnswer(for:)`, and `answersWithoutModel`, which keeps the starters and the composer
-where no model can serve) and a refine pass. Two are traps: `promptPrefix` must stay byte-stable,
-because a warm session caches it, and `promptLines(question:overview:)` is asked only when a question
-starts a fresh session.
-
-The host wires them together:
-- It builds one `AppleModelSeam` (`AppleModelSeam.make(privateCloudCompute:)`, declaring whether the
-  app holds the Private Cloud Compute entitlement), one `AskEngine(domain:seam:)` and one
-  `AskConversationStore(engine:)`, which draws, keeps and performs by the engine's domain
-  (`AskEngine.domain`). `AskConversationStore(domain:engine:)` is for an `AskAnswering` engine, which
-  carries no domain.
-- It holds the store for the app's life, not in a view: a view's store loses the thread and any turn
-  in flight when a Mac `NavigationSplitView` rebuilds its detail, on every sidebar change.
-- It shows `AskScreen(store:)`, which takes the screen's options too; the modifiers (`mark(_:)`,
-  `tiles(_:)`, `evidenceDisclosure(_:)`, `answerFooter(_:)`) set the host's views one at a time.
-- Where a tile or a hand-off opens, it sets its own `AskItemRouter` or `AskDraftRouter` class as
-  `askItemOpener` or `askDraftOpener`.
-- On the Mac, it adds `AskCommands` to its scene's `.commands`: New Chat, Send and Stop in the File
-  menu, and the newest turn's Copy, Copy answer, Edit & Resend and Ask again.
-
-`Demo/AskKitDemo/App.swift` is the shape to copy.
+Two defaults are traps: `promptPrefix` must stay byte-stable, because a warm session caches it, and
+`promptLines(question:overview:)` is asked only when a question starts a fresh session.
 
 ## 2. The life of a turn
 
@@ -218,8 +174,8 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
      with the rows fenced in `<tool_result>` as data. `AskNoSearchArguments` has nothing to fill in, so no
      planner is asked and the search runs with no arguments. The conversation counts as retrieved by the
      app from then on. An ungrounded follow-up on a kept conversation fails with coaching.
-   - **`.toolCall`**: the same without the retry, so an ungrounded first answer fails with coaching at
-     once.
+   - **`.toolCall`**: the same without the retry, so an ungrounded answer fails with coaching at once,
+     on a fresh session as on a kept conversation.
    - **`.notRequired`**: it is kept, so no turn fails as ungrounded.
 
    The answer records what grounded it: a tool call, the app's search, the thread's rows on a follow-up,
@@ -347,7 +303,7 @@ developer's own, so `AskDevelopmentPark` keeps development builds off the tier, 
 2. a `swift test` runner (`swiftpm-testing-helper` or `xctest`, known by name);
 3. a Debug build;
 4. a simulator, in any configuration;
-5. a development-signed binary (`get-task-allow`).
+5. a development-signed binary (`get-task-allow`: a Profile run, or a Release build installed by hand).
 
 A parked process sends Private Cloud Compute nothing: no session, prewarm, locale probe or context-size
 read. The tier reads `.notEntitled`, which the settings card words as "isn't enabled in this build".
@@ -537,38 +493,30 @@ AskKit fences what it composes in five tags, held in one list that `AskPrompt`'s
 - **Neutering** (`AskPrompt.neuteringTags(_:)`) swaps ASCII angle brackets for `‹ ›`, so no tag can be
   spelled with them.
 
-**Tool output is untrusted.** It reaches the model as the tool returns it. Its rows are the reader's own
-data, so a tool shows at most `context.rowLimit` of them, and puts every field, a row's or not,
-through `AskPrompt.clamp(_:_:)` with `shortClamp` (60) or `longClamp` (220), as the demo's
-`DemoSearch.render` does. `clamp` neuters and flattens, then redacts, caps each character's scalars and
-trims until a pass changes nothing; past the limit it cuts and repeats until what is left fits,
-dropping a last character that would join the "…" it adds. So clamping twice changes nothing. A tool
-whose line breaks carry its layout can't clamp, so it redacts with `sanitizeForFence(_:)` as well as
-neutering, which alone leaves a tag in other brackets, its name in ASCII or in letters that normalize
-to it. Tool output takes no fence of its own and none of AskKit's tag names: in the grounded retry the
-engine fences the search's output in `<tool_result>` and redacts every AskKit tag inside, a wrapper's
-included.
+**Tool output is untrusted.** It reaches the model as the tool returns it, so a tool puts every field
+through `AskPrompt.clamp(_:_:)`, as the demo's `DemoSearch.render` does, and keeps the rest of
+[ADOPTING.md's rules for tools](ADOPTING.md#the-rules-for-tools); `clamp`'s doc comment says what each
+pass does. Tool output takes no fence of its own and none of AskKit's tag names: in the grounded
+retry the engine fences the search's output in `<tool_result>` and redacts every AskKit tag inside, a
+wrapper's included.
 
 The domain's `promptLines(question:overview:)` and `refine` get the reader's question clamped, not
 redacted, so a line quoting it is the host's to clamp. The rendered answer loses every link and image
 URL the markdown parse produced: the model writes a link's label and its destination, so a link would
 be a hidden tap target inside trusted app chrome.
 
-**The answer's language.** AskKit follows Apple's practice, from "Supporting languages and locales with
-Foundation Models". The engine opens every session's instructions with Apple's sentences, then a blank
-line and the domain's own words (`AskPrompt.instructions`):
-- the person's locale, in Apple's exact phrase, "The person's locale is ja_JP.", which Apple says "comes
-  from the model's training, and reduces the possibility of hallucinations in multilingual situations".
-  As in Apple's sample, it reads `Locale.current` and is left out for U.S. English;
-- "You MUST respond in Japanese.", where the seam names a language.
-
-The domain's instructions, tool descriptions and guides stay in English and name no language. Where the
-seam names none for a locale in another language, because the tier's `supportsLocale` check said no or
-couldn't say, neither sentence is sent and the answer is written in English.
+**The answer's language.** The engine opens every session's instructions with Apple's sentences for the
+person's locale and the answer's language, then a blank line and the domain's own words
+(`AskPrompt.instructions`, whose doc comment has each sentence and when it is left out).
+[ADOPTING.md's The answer's language](ADOPTING.md#the-answers-language) says what a domain writes, and
+when no language is named.
 
 ### Writing a domain's tools
 
-Measured on Apple's on-device model, in the evals of the three apps built on AskKit.
+Measured on Apple's on-device model, in the evals of the three apps built on AskKit. The lessons for a
+tool's author, with what was measured for each, are
+[ADOPTING.md's rules for tools](ADOPTING.md#the-rules-for-tools). What was measured on naming the
+answer's language, and dropped, stays here:
 
 - **The language: Apple's sentences, and nothing of AskKit's own**
   ([Prompts and fences](#prompts-and-fences)). Two more ways of naming it were measured, and dropped on
@@ -588,25 +536,6 @@ Measured on Apple's on-device model, in the evals of the three apps built on Ask
     with 20 of 212 follow-ups in Chinese against 44 of 216, and 2 refusals against none. With the line
     on, Klosyt's Japanese rose to 76 of 96 from 66, and its Korean (52 of 96 each) and English (119
     against 120 of 120) held.
-- **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
-  it, so each group's count goes on its own line, and the total after them.
-- **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an
-  English-tagged closet for "Grün" and "緑" and found nothing. Klosyt's search reads the app's own words
-  for its colours and categories that match nothing as the tags the rows are filed under, and green
-  answers went from 1 of 3 and 0 of 3 to 3 of 3.
-- **No argument the model has to make up.** A search whose empty query means everything takes the query
-  as optional.
-- **Guide patterns.** Apple's model refuses a `@Guide` pattern with a bracketed class, `\S`, `\p{L}` or a
-  lookahead. `.` works but cost about 82 s an answer; an alternation of the characters allowed works.
-- **No straight double quotes around a title in tool output.** The model copies the quote into its
-  answer, where it ends the guided string, and runs on to the token cap
-  ([ADOPTING.md](ADOPTING.md#the-rules-for-tools)).
-- **Whole values in a guided value list.** A value that begins with a word the model reaches for takes
-  every phrase that begins with it: vultyr's "this morning" took "this week"
-  ([ADOPTING.md](ADOPTING.md#the-rules-for-tools)).
-- **A dozen runs.** Three runs can't tell a prompt change from noise: one scenario's Korean pairing went
-  4 of 6 one night and 4 of 12 the next. Run each scenario 12 times, and count the proposing tools'
-  calls as well as the answers.
 
 ### Persistence and history
 
@@ -745,9 +674,9 @@ passes `onRunEval` and diagnostics are on (`showsDiagnostics`; nil, the default,
 `enabledByApp`. A TestFlight build is one whose app transaction StoreKit verified as signed in the
 sandbox (`AskDiagnostics.isTestFlight`), on every platform, the Mac included: read once a process, off
 the main actor, it is false until StoreKit answers, so the rows come in then. A Debug build never asks.
-A build under App Review most likely reads as TestFlight too, as nothing public in 27.2 tells the two
-apart on every platform, so a host that must keep the rows from a reviewer passes `showsDiagnostics`
-itself.
+A build under App Review most likely reads as TestFlight too (`AskDiagnostics.isTestFlight` says why);
+[ADOPTING.md](ADOPTING.md#optional-pieces)'s settings card row says how a host keeps the rows from a
+reviewer.
 
 The same switch turns on the feedback thumbs under answers. Either thumb on the latest turn of a kept
 conversation saves the session's feedback attachment locally (`AskFeedbackAttachments`, the newest 10
@@ -923,11 +852,10 @@ the host's accent, one to four lines tall with the draft. The host's hint takes 
 ellipsis if too long, so an empty field is one line tall; VoiceOver reads the hint whole. The hint sits
 where the draft's first line will be (`AskComposerHintLayout`): on the field's first baseline if it
 reports one, as the Mac's does, or else, as for UIKit's empty field on iOS and visionOS, where a typed
-line's baseline would be: the field's top on iOS, 2 pt down it on visionOS. Set on the top that field
-reports instead, from 0.3.0 to 0.3.1, the hint drew a line above the field's and held the empty capsule
-two lines tall. As the capsule grows its corners keep their one-line radius, centred on the circles at
-the bottom of the row, so the circles stay as far inside the edge at four lines as at one: a four-line
-capsule with ends 57 pt round ran them out over its rim.
+line's baseline would be: the field's top on iOS, 2 pt down it on visionOS. As the capsule grows its
+corners keep their one-line radius, centred on the circles at the bottom of the row, so the circles
+stay as far inside the edge at four lines as at one: a four-line capsule with ends 57 pt round ran them
+out over its rim.
 
 **Keys.** The software keyboard's Return inserts a newline, and the arrow sends. A hardware Return sends
 and Shift-Return inserts a newline; with nothing to send or a turn in flight a Return types nothing, and
@@ -1035,80 +963,16 @@ thread does the same, except on the Mac.
 
 Three tips point at what the screen keeps behind a long press, a shortcut menu or a swipe
 (`AskTips.swift`): the menu on a question, on iOS a touch's only way to Copy answer; "Don't suggest this"
-on a starter; and deleting one chat. Each message names its platform's gesture: touch and hold on iOS,
-pinch and hold on visionOS, and on the Mac the shortcut menu, since a finger may reach a Mac as well as a
-pointer.
-
-- **The host's TipKit.** AskKit never calls `Tips.configure`. A host that configures TipKit gets the
-  three beside its own, at its `displayFrequency` and under its `hideAllTipsForTesting()`; one that
-  doesn't sees none. Nothing is public.
-- **One at a time, the first that applies:** `AskTips.group` is a `TipGroup(.firstAvailable)`, question,
-  starter, chat. `.ordered` would let a tip the reader never meets, such as the chats' in a domain that
-  keeps none, hold the others back for good. The group is a `static let`, so iPhone Duo's fold, a size
-  class or a tab switch rebuilding the screen doesn't make a new one.
-- **Gates.** Each tip's one rule is a transient parameter in `AskTipGates`, which `AskScreen` writes from
-  the window the reader is in, only when one changes: the question's while the newest question is on
-  screen between the bars, under a finished answer with words in it (so its menu holds Copy answer), with
-  no turn in flight; the starter's while the ready first screen offers starters, never the one that can't
-  serve, whose one line says why (in Hebrew the tip covered "This language isn't supported by Apple
-  Intelligence yet", iPad mini, 2026-10-31); the chat's while the chats sheet, or the pane beside the
-  fold, shows a chat that can be deleted. None is true while the scene is inactive, an item is pushed or
-  typing has raised the composer. On the Mac the chats sheet, a window of its own, takes the key window
-  from the screen's, so the screen counts as the reader's while its sheet is up (`readerIsInWindow`);
-  without that the chat tip never came to the sheet. The parameters are spelled out (`Tips.Parameter`,
-  `Tips.Rule`), not `@Parameter` and `#Rule`: under strict memory safety the macro's expansion warns
-  where no `unsafe` can reach it.
-- **Settled before they open.** A gate closes at once and opens only after holding for half a second
-  (`AskTipGates.settling`), and a view draws its tip only while its settled gate is open and TipKit has
-  the tip current (`askTipGates`), since TipKit's status can lag a closed gate. iPhone Duo opened with
-  the keyboard up builds a new screen whose keyboard flag reaches it 12 ms late: written at once, the
-  starter's gate opened and closed again, and TipKit kept the tip current, up over the keyboard
-  (2026-10-31, two of two). A window at the back draws no tip. On visionOS a window resize settles the
-  gates again: a resize took the starter's popover away for good, at the new size and back at the old,
-  while TipKit held the tip current (Apple Vision Pro simulator). Each return counts as a display, which
-  costs nothing while no tip has a `MaxDisplayCount`.
-- **Retired where the action lands.** The question's goes in the closures behind its menu's four items,
-  which the menu, VoiceOver's actions and `AskCommands` share; the starter's in the decline, on the first
-  screen and on the follow-ups; the chat's in the one-chat delete, from either list. The × retires each
-  for good too.
-- **Placement** (house rule 4: no tip moves a frame). All three are popovers, each on a side named the
-  same way on every platform (`AskTipSide`). The Mac reads `arrowEdge` the other way round: on iOS and
-  visionOS it is the popover's edge with the arrow, so `.top` stood the chat tip under its row; on macOS,
-  the anchor's side the popover opens on, so `.top` stood it above. Walked on 2026-10-31 on the iPhone 18
-  Pro, iPad mini (A17 Pro), iPhone Duo and Apple Vision Pro simulators (27.2) and on macOS 27.2:
-  - The starter's stands above "Try asking", over copy already read, its arrow on the heading, on every
-    device and in every Duo pose: on the outer display on its side, in a tabletop below the fold, in a
-    book on the thread's side of it. Not on a chip, which is interactive glass: a popover on a button in
-    glass never presented. Drawn as a view in an overlay instead, it never showed on visionOS, laid its
-    words over the copy on the Mac and on iPad's wide column, and ran off the Duo's outer display on its
-    side and across the fold in a tabletop.
-  - The question's is on the newest question. On iOS and visionOS it stands above or below, whichever has
-    room: under a first question near the top of an iPhone, above a low one (either fixed edge covered
-    the bar or the composer). Never beside: left free to, the system stood it on the bubble's leading
-    side wherever the column had room, over the answer's first line on an iPad at regular width and
-    across the Duo's fold over the chats and their Delete All Chats. On the Mac it stands under the
-    bubble: left to choose, the system stood it above, over the toolbar and past the window's top edge,
-    and beside the bubble it hung 250 pt off a window 380 pt wide.
-  - The chat's stands under the first row that can be deleted, in the sheet and in the pane. Left to
-    choose, the system covered the sheet's Close and Delete All Chats on the iPhone.
-  - **A popover tip's anchor comes and goes with the tip** (`askPopoverTip`): a clear background there
-    only while its tip shows. A `.popoverTip` handed nil while its popover is up leaves it on screen for
-    good, over the old question after Ask again or a second question.
-- **Left as they are:**
-  - In a tabletop, the chats sheet's tip rides up over its own row: the system moves a popover clear of
-    the fold whatever its source, and under the row there is no room above the fold.
-  - Open flat on its side, the question tip under its question crosses the divider into the chats pane by
-    9 pt, clear of the chats. On the outer display on its side, the system's leading placement lays the
-    arrow's tip on the bubble's first letter.
-  - Closing iPhone Duo with the keyboard up hides the keyboard for up to a second under load, as the
-    scene moves displays, and the starter's gate can open in the gap; it closed again 377 ms later,
-    before TipKit had shown anything.
-  - At compact width in Hebrew the question popover is a few points short of its text, by TipKit's
-    sizing; no text is lost.
-  - On visionOS in a narrow window the question popover overhangs the window, which visionOS allows; its
-    × stays in reach.
-  - The Mac's popover keeps the width its text asks for, so in a window 380 pt wide the question tip
-    hangs 125 pt past the window's trailing edge.
+on a starter; and deleting one chat. AskKit never calls `Tips.configure`, so a host that configures
+TipKit gets them beside its own, and one that doesn't sees none. One shows at a time, the first that
+applies (`AskTips.group`), and only while its surface is on screen with nothing over it: `AskScreen`
+works that out in the window the reader is in and writes it to `AskTipGates`, a gate opening only once
+it has held for half a second. Each goes once the reader has done what it says, or closed it. All three
+are popovers, so no tip moves a frame (house rule 4), on a side named the same way on every platform
+(`AskTipSide`). The doc comments of `AskTips.swift`, `AskScreen.swift`'s tip gates, `AskFirstScreen`,
+`AskQuestionBubble`, `AskThreadHistoryList` and `AskChatsPane` say why each rule, gate and placement is
+what it is, with the walks behind them; [tips.md](../.claude/references/tips.md) has the walk itself and
+what it left as it is.
 
 ### Accessibility
 
@@ -1167,38 +1031,15 @@ pointer.
 - **Dynamic Type.** The mark scales with it, and a control's frame grows by what its glyph grows, not in
   proportion to the text (`AskGrowth`): in proportion, the composer's two circles left a 402 pt phone's
   field about 70 pt at the largest.
-- **Contrast.** On glass, text is held to 4.5:1 and a glyph to 3:1 against an estimated ground
-  (`AskGlassForeground`): secondary where it clears its bar, else primary. Where primary falls short too,
-  the glass gives way and the words stay hierarchical: on a light accent in dark mode the composer's
-  capsule wears 0.43 of yellow and 0.45 of mint, where white words keep 4.5:1
-  (`AskComposer.tint(for:isLight:)`), worked out on the accent as the screen resolves it, High Contrast
-  variant included. The question bubble is no glass but a fill of the accent at 60% on the content layer,
-  its ground worked out flat over the screen, and its words primary, or black on a light accent in dark
-  mode, where white falls under 4.5:1 and black does better (on yellow, white 3.29:1 and black 6.38:1;
-  `AskOnFill`). On the host's accent a glyph is the system's white, as its own prominent buttons draw it,
-  and black only where white falls under 3:1 and black does better (`AskOnAccent`). Words on a button
-  filled with the accent, the confirmation card's Confirm and the nothing-to-ask action, are held to
-  text's 4.5:1: black on the system blue (5.97:1, where white is 3.52:1), on #007AFF and on the system
-  red, and white on a dark accent (`AskOnAccentLabel`), the button wearing the accent they were judged
-  on. On visionOS, whose prominent button is a platter with no fill of the accent, the label is the
-  style's own. The send circle is filled with the accent flat, not its `Color.gradient`, whose lighter
-  top would leave white short of what it was judged on (`AskSendFill`). On a host's spectrum its glyph
-  follows a glyph's rule against the circle's lightest color, since no point between two stops is lighter
-  than the lighter of them (`AskSendGlyph`); `.aurora`'s circle runs from its blue to its violet, where
-  white holds 3.81:1, because its cyan (1.65:1), coral (2.39:1) and magenta (3.05:1) leave white no
-  margin. The confirmation card's "Not now", Try Again, and "Show options" on the settings card and the
-  quota banner are `.primary` on their style's ground (`.tint(.primary)`), where the accent fell under
-  4.5:1; the banner's is semibold, so it still stands apart from its sentence. Deemphasized text on an
-  opaque ground (`askDeemphasizedText`) is the secondary hue at 76% in light mode (5.31:1 on white, where
-  `.secondary` is 3.44:1), `.secondary` in dark mode, which the audit passes, and `.primary` under
-  Increase Contrast. The audit's contrast check runs in its own call, since combined with `.dynamicType`
-  and another check it fails text in both appearances at any strength: the demo's UI suite runs it, light
-  and dark, on the screen, the card, the nothing-to-ask button and the empty composer, and every other
-  check in a second call on the first screen, an answer with its tiles, a failure with Try Again and the
-  card. Confirm's black label passes it in light and dark, the nothing-to-ask button's in dark; the suite
-  lets through only what the audit misreads on glass: the starters' capsules, whose transparent corners
-  it takes for their ground, and in light the nothing-to-ask button, whose shaded fill and rim it fails
-  whatever the label.
+- **Contrast.** Text is held to 4.5:1 and a glyph to 3:1, WCAG 2's ratios, against its ground: on glass
+  an estimated ground, where the words stay hierarchical and the glass gives way where `.primary` falls
+  short too (`AskGlassForeground`, `AskComposer.tint(for:isLight:)`); on a fill of the host's accent or
+  spectrum, white or black, whichever clears the bar (`AskOnAccent`, `AskOnAccentLabel`, `AskOnFill`,
+  `AskSendGlyph`); on an opaque ground, deemphasized text in a stronger gray than `.secondary` in light
+  mode (`askDeemphasizedText`). Each ratio, the accents it was measured on and the reason for each choice
+  are in the doc comments of `AskContrast.swift`, `AskSpectrum.swift` and `AskComposer.swift`, and at
+  each button that wears `.tint(.primary)`; how the demo's UI suite runs Apple's audit on the real
+  pixels, and what it lets through, is in `AskScreenSmokeTests.swift`.
 - **Copying.** The question's Copy and Copy answer, from its menu or the Mac's menu bar, stay on the
   device, since either can quote the reader's data: `.localOnly` on iOS and visionOS, expiring after
   120 s, and `prepareForNewContents(with: .currentHostOnly)` on the Mac, with no expiry. Text selected

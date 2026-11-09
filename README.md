@@ -45,7 +45,7 @@ answers when it can, and the on-device model when it can't.
 - **Grounded answers.** By default an answer has to stand on your data: when the model doesn't search,
   the app searches for it and asks again.
 - **Both models, chosen for you.** Private Cloud Compute first, the on-device model otherwise, and a
-  turn handed down when Private Cloud Compute goes out mid-answer.
+  turn handed down when Private Cloud Compute goes out.
 - **Actions the reader confirms.** A tool can propose an action, such as adding a reminder, that runs
   only once the reader taps yes.
 - **The whole screen.** Streaming answers, tiles for the rows an answer names, follow-ups, chat
@@ -445,16 +445,17 @@ flowchart TD
     tier --> session["Session: kept, prewarmed,<br/>or fresh with a recap"]
     session --> model["Model streams and<br/>calls the domain's tools"]
     model --> verdict{"Grounded?"}
-    verdict -->|"no, a first question<br/>under .retrieval"| retry["Grounded retry:<br/>the app searches, asks again"]
     verdict -->|"yes"| answer["Answer: prose, tiles,<br/>a card, follow-ups"]
+    verdict -->|"no, on a fresh session<br/>under .retrieval"| retry["Grounded retry:<br/>the app searches, asks again"]
     retry --> answer
     verdict -->|"no, under .notRequired:<br/>kept, and says so"| answer
     verdict -->|"no, otherwise"| failure["Failure, triaged<br/>into an AskError"]
     model -->|"Private Cloud Compute goes out"| handdown["Hand-down, once,<br/>to the on-device model"]
     handdown --> session
-    answer --> reveal["Reveal"]
-    failure --> reveal
-    reveal --> disk["Written to disk<br/>when the turn ends"]
+    tier -->|"no model can serve"| failure
+    model -->|"refused, or out of time"| failure
+    answer --> thread["Shown in the thread, and written<br/>to disk when the turn ends"]
+    failure --> thread
 ```
 
 AskUI's store starts a turn and draws it, and AskCore's engine runs everything between: one turn at a
