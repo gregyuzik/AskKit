@@ -2224,12 +2224,52 @@ private extension Trait where Self == ConditionTrait {
         seam.refusesSession.withLock { $0 = [.privateCloud] }
         let failed = await record(engine.ask("second"))
         #expect(failed.askError != nil)
+        // No model saw the recap, so the turn draws no hairline saying so.
+        #expect(failed.summarizedCount == 0)
 
         seam.refusesSession.withLock { $0 = [] }
         session.script(grounded("Second."))
         let retried = await record(engine.ask("second"))
         #expect(retried.summarizedCount == 1)
         #expect(session.prompts.withLock { $0 }.last?.contains("<rows>Rumours</rows>") == true)
+    }
+
+    @Test func aRecapHandedDownBeforeItWasSentIsReportedOnce() async {
+        // Private Cloud Compute's session can't be built, so the turn goes
+        // to the device with the recap, and only the device's prompt held it.
+        var domain = FakeDomain()
+        domain.maxTurnsOverride = 1
+        let (engine, seam, _) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).script(grounded("First.", tiles: ["Rumours"]))
+        _ = await record(engine.ask("first"))
+        seam.sessionFailures.withLock { $0 = [.privateCloud: URLError(.notConnectedToInternet)] }
+        let device = seam.session(for: .onDevice)
+        device.script(grounded("Second."))
+        let recording = await record(engine.ask("second"))
+        #expect(recording.restarts == [.onDevice])
+        #expect(recording.summarizedCount == 1)
+        #expect(device.prompts.withLock { $0 }.first?.contains("<rows>Rumours</rows>") == true)
+    }
+
+    @Test func aRecapIsReportedBeforeTheFirstWordsItsSessionDraws() async throws {
+        // The grounded retry's re-ask runs on the session the recap went to,
+        // and reports it no second time.
+        var domain = FakeDomain()
+        domain.maxTurnsOverride = 1
+        let (engine, seam, _) = makeEngine(domain: domain, states: [.serving(.privateCloud)])
+        let session = seam.session(for: .privateCloud)
+        session.script(grounded("First.", tiles: ["Rumours"]))
+        _ = await record(engine.ask("first"))
+        session.scripts([
+            FakeSession.Script(snapshots: [.answering("Unread.")], toolCallsAfter: 0),
+            FakeSession.Script(snapshots: [.answering("From"), .answering("From the shelf.")], toolCallsAfter: 0)
+        ])
+        let recording = await record(engine.ask("second"))
+        #expect(recording.restarts == [.privateCloud], "the grounded retry ran")
+        #expect(recording.summarizedCount == 1)
+        let summarized = try #require(recording.events.firstIndex { if case .summarized = $0 { true } else { false } })
+        let firstPartial = try #require(recording.events.firstIndex { if case .partial = $0 { true } else { false } })
+        #expect(summarized < firstPartial)
     }
 
     @Test func aStandaloneAnswerStopsWhenItsCallerDoes() async {

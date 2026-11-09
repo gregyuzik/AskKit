@@ -1012,7 +1012,6 @@ public actor AskEngine<Domain: AskDomain> {
         let carried = mode.joinsThread ? (conversation?.recapTail ?? restoredTail) : []
         let recap = AskContinuation.recap(from: carried, tier: tier)
         let wasSummarized = recap != nil
-        if wasSummarized { continuation.yield(.summarized) }
         // The session goes before the fresh one is built, and the tail it
         // carried waits in `restoredTail`: if the fresh one fails, Try Again
         // still starts from what the thread said.
@@ -1087,6 +1086,13 @@ public actor AskEngine<Domain: AskDomain> {
         var appRetrieved = false
         var answer: AskAnswer<Row>
         var abandoned: Bool
+        // Said once the recap is in a prompt about to be sent, and not as it
+        // is built: the session, the overview or the domain's lines can fail
+        // the attempt first, and a turn whose recap no model saw would draw
+        // the hairline saying the chat was summarized, and keep it on disk.
+        // Ahead of the stream, so ahead of its first words; the grounded
+        // retry re-asks on this session, whose transcript has the recap.
+        if wasSummarized { continuation.yield(.summarized) }
         do {
             (answer, abandoned) = try await stream(
                 question: question, prompt: prompt, images: sentPhotos,

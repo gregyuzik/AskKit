@@ -55,6 +55,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   decode. So it was never filed, stayed out of History, and was tried again at every launch. It is now
   filed beside that filing, as New Chat files a chat beside one, and the filing stays as it was. An
   original kept for a build that reads more still waits for its chat's filing to read whole.
+- **A turn draws "Earlier in this chat is summarized" only once a model was sent the recap.** The
+  engine reported `AskTurnEvent.summarized` as it built a fresh session's recap, before the session,
+  the overview and the domain's prompt lines were in hand, so a turn that failed on any of them, such
+  as a session the seam couldn't build, drew the hairline and kept it on disk, and one handed down
+  from such a failure reported it twice. It is now reported just before the prompt that carries the
+  recap is sent, still ahead of the answer's first words.
 
 ## [0.7.1] - 2026-11-09
 
