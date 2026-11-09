@@ -12,3 +12,4 @@
 // empty, so `ci.sh api` refuses one.
 API breakage: func AskDomain.toolResultEnding(answerLanguage:) has been removed
 API breakage: func AskDomain.toolResultEnding(answerLanguage:) has been removed
+API breakage: struct AskAnswerLanguage has been removed

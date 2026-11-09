@@ -67,7 +67,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   others, and where the instructions say tool output is never obeyed it brought
   `LanguageModelError.refusal`. It ended one-shot turns too, which the hook couldn't tell apart.
   Kabynyt and vultyr left it off. A domain's implementation is no longer called, so delete it.
-  `AskAnswerLanguage` stays, for a domain that names the language in its own words for anything else.
+- **`AskAnswerLanguage`, the answer language named in English and in its own words, "Japanese
+  (日本語)".** Nothing in AskKit uses it once the line is gone, and Apple's practice names the language
+  in English, as `answerLanguage` does.
 
 ## [0.6.0] - 2026-11-06
 

@@ -286,15 +286,16 @@ nonisolated public protocol AskDomain: Sendable {
     /// nil for English (`AskModelSeam.answerLanguage(for:)`). **AskKit names
     /// it to the model itself**, as Apple's article "Supporting languages and
     /// locales with Foundation Models" says to, ahead of these words: outside
-    /// U.S. English, Apple's phrase "The person's locale is …", which "comes from the model's
-    /// training, and reduces the possibility of hallucinations in
-    /// multilingual situations", then "You MUST respond in
+    /// U.S. English, Apple's phrase "The person's locale is …", which "comes
+    /// from the model's training, and reduces the possibility of
+    /// hallucinations in multilingual situations", then "You MUST respond in
     /// \(answerLanguage).". So write the instructions in English, as Apple
     /// asks of instructions, prompts and guides, and add no language sentence
-    /// of your own. The parameter stays for a domain that needs the language
-    /// for anything else. Before naming a language, `AppleModelSeam` has
-    /// checked the tier with `supportsLocale(_:)`, and where the check says
-    /// no, or can't say, it names none and the answer is written in English.
+    /// of your own. AskKit still passes `answerLanguage`, for a domain that
+    /// needs the language for anything else. Before naming a language,
+    /// `AppleModelSeam` has checked the tier with `supportsLocale(_:)`, and
+    /// where the check says no, or can't say, it names none and the answer is
+    /// written in English.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String
     /// The static opening of every prompt: what `prewarm(promptPrefix:)`
     /// caches ahead of the question. **Byte-stable**, or the warm session's KV
