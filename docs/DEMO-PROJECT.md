@@ -107,13 +107,10 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   `AskKitDemo/AskKitDemo_<platform>.entitlements` (`CODE_SIGN_ENTITLEMENTS`), a file per target so
   that Xcode's Signing & Capabilities changes one target at a time. They are live only in a signed
   build; the unsigned Mac app carries none and runs its arm64e slice without them.
-- **`WorkspaceSettings.xcsettings`** sets `iOSPackagesShouldBuildARM64e`,
-  `macOSPackagesShouldBuildARM64e` and `visionOSPackagesShouldBuildARM64e`. A SwiftPM package doesn't
-  follow the app to arm64e on its own: without them a Mac build stops at "Unable to resolve module
-  dependency: 'AskCore'", and a device build can't link AskCore and AskUI ("Undefined symbols for
-  architecture arm64e"). A host that turns Enhanced Security on needs the same keys, in its project's
-  `project.xcworkspace/xcshareddata/` or its workspace's `xcshareddata/`
-  ([ADOPTING.md's Enhanced Security](ADOPTING.md#enhanced-security)).
+- **`WorkspaceSettings.xcsettings`** sets the three keys that build the package arm64e, which
+  [ADOPTING.md's Enhanced Security](ADOPTING.md#enhanced-security) names for a host that turns it on.
+  Without them a Mac build stops at "Unable to resolve module dependency: 'AskCore'", and a device build
+  can't link AskCore and AskUI ("Undefined symbols for architecture arm64e").
 - **One target per platform**, `AskKitDemo_iOS`, `AskKitDemo_macOS` and `AskKitDemo_visionOS`, with a
   scheme apiece, each compiling `AskKitDemo/` and `Shared/` and linking AskCore and AskUI from the
   package at `..`. `AskKitDemo_macOS` is a plain window, not Catalyst, so it declares its own category

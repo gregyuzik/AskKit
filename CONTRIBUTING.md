@@ -69,19 +69,12 @@ isn't executable.
 
 ## Strings
 
-Every user-facing string ships in 25 languages, from two String Catalogs:
-`Sources/AskUI/Resources/Localizable.xcstrings` and `Sources/AskCore/Resources/Localizable.xcstrings`.
-
-- A new key needs a translated unit in all 24 other locales, none left in `needs_review` or empty, or
-  `"shouldTranslate": false` for a string that isn't for translation, such as "Private Cloud Compute".
-- A lookup in the package takes `bundle: #bundle`, or it falls through to the host's bundle and shows the
-  key. `Text(verbatim:)` is for anything that isn't words.
-- `python3 scripts/check-strings.py`, which `scripts/ci.sh checks` runs, checks that each lookup takes
-  `bundle: #bundle` and finds its key in its own target's catalog, and that a key with a count in it
-  varies by plural. The catalogs themselves, their locales, plurals, placeholders and file format, are
-  checked by the maintainers' pre-push gate, with the String Catalog checker all their apps share,
-  which CI doesn't run. [TRANSLATION.md](TRANSLATION.md) has the rules, each locale's register and how
-  to edit a catalog.
+Every user-facing string ships in 25 languages, from two String Catalogs, AskCore's and AskUI's. A new
+key needs a translated unit in all 24 other locales, or `"shouldTranslate": false`, and every lookup in
+the package takes `bundle: #bundle`. `python3 scripts/check-strings.py`, which `scripts/ci.sh checks`
+runs, checks the source's lookups and count keys; the maintainers' pre-push gate grades the catalogs
+themselves. [TRANSLATION.md](TRANSLATION.md) has the rules each check enforces, each locale's register
+and how to edit a catalog.
 
 If you can't write all 24 translations, add the English key and say so in the pull request: the
 maintainer fills in the rest before merging, and their push gate fails until then.

@@ -110,6 +110,21 @@ model answers as if they held nothing.
 **The search is written once.** `search(_:context:)` runs the tool's own code, so the grounded retry reads
 and records the rows the tool would have.
 
+The evals of the three apps built on AskKit measured these too, on Apple's on-device model:
+- **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
+  it, so each group's count goes on its own line, and the total after them.
+- **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an
+  English-tagged closet for "Grün" and "緑" and found nothing. Klosyt's search reads the app's own words
+  for its colours and categories that match nothing as the tags the rows are filed under, and green
+  answers went from 1 of 3 and 0 of 3 to 3 of 3.
+- **No argument the model has to make up.** A search whose empty query means everything takes the query
+  as optional.
+- **Guide patterns.** Apple's model refuses a `@Guide` pattern with a bracketed class, `\S`, `\p{L}` or a
+  lookahead. `.` works but cost about 82 s an answer; an alternation of the characters allowed works.
+- **A dozen runs.** Three runs can't tell a prompt change from noise: one scenario's Korean pairing went
+  4 of 6 one night and 4 of 12 the next. Run each scenario 12 times, and count the proposing tools'
+  calls as well as the answers.
+
 ### Isolation and instructions
 
 AskKit builds with main-actor default isolation and `NonisolatedNonsendingByDefault`. In a target that
@@ -120,8 +135,7 @@ setting needs neither keyword: AskKit's public API is `nonisolated` throughout.
 
 Keep `instructions` to a few sentences that name only tools the session holds. Put mappings, such as
 which word means which category, in `@Guide`s and tool descriptions, where the model reads them as it
-uses them. ARCHITECTURE.md's [Writing a domain's tools](ARCHITECTURE.md#writing-a-domains-tools) has what
-was measured on Apple's model.
+uses them. [The rules for tools](#the-rules-for-tools) has what was measured on Apple's model.
 
 ### The answer's language
 
@@ -224,24 +238,24 @@ eligible developers on request ([Accessing Private Cloud Compute](https://develo
 your declaration of it, `AskPrivateCloudCompute.declared`; a network connection; and some of the reader's
 daily quota. Without the entitlement, every question goes to the on-device model.
 
-**A development build never reaches it by default.** Two checks stand in the way:
+**A development build never reaches it by default.** Two checks stand in the way, which
+ARCHITECTURE.md's [Entitlements](ARCHITECTURE.md#entitlements) and
+[The development park](ARCHITECTURE.md#the-development-park) describe in the order they run:
 - **The entitlement.** A request from a process without it is a fatal trap, not an error, so the seam
-  sends one only when you declared it and the running build doesn't prove it absent. The Mac and the
-  simulator read their entitlements exactly; on a device, a provisioning profile without it proves it
-  absent. TestFlight and App Store builds carry no profile, so your declaration is all there is: declare
-  it only when your entitlements file grants it.
+  sends one only when you declared it and the running build doesn't prove it absent. TestFlight and App
+  Store builds carry no profile, so your declaration is all there is: declare it only when your
+  entitlements file grants it.
 - **The development park.** The daily quota belongs to the iCloud account, and every development run
-  would spend the developer's own, so `AskDevelopmentPark` keeps off the tier a test host or `swift test`
-  run, a Debug build, a simulator, and a binary signed for development (`get-task-allow`: a Profile run,
-  or a Release build installed by hand). A parked process sends the tier nothing, not even a prewarm,
-  and its caption says "On device". **TestFlight and App Store builds are never parked.**
+  would spend the developer's own, so `AskDevelopmentPark` keeps development builds off the tier. A
+  parked process sends the tier nothing, and its caption says "On device". **TestFlight and App Store
+  builds are never parked.**
 
 To measure the tier in a development run, opt in from a build signed with the entitlement:
 `ASK_LIVE_PCC=1` in the environment (`yes` and `true` work too), the launch argument `-ASK_LIVE_PCC YES`,
 or your own closure passed to `AskDevelopmentPark.setAppOptIn(_:)`. The opt-in lifts the park and
-nothing else. A process outside an app's context, such as a command-line tool, fails every request at
-once with `LanguageModelError` −1 (`ModelManagerError 1001`), which AskKit reads as the tier being
-unreachable. ARCHITECTURE.md's "Entitlements" and "The development park" give the order of the checks.
+nothing else: a process outside an app's context, such as a command-line tool, still fails every request
+at once with `LanguageModelError` −1 (`ModelManagerError 1001`), at
+[Private Cloud Compute's context gate](ARCHITECTURE.md#private-cloud-computes-context-gate).
 
 **The daily quota.** Once the reader's quota is spent, the seam holds the tier until the reset, the turn
 that hit it is handed down to the on-device model, and a banner says when the quota comes back. Where the
@@ -250,10 +264,10 @@ nothing. Opening the screen warms no session, since a warm session there spends 
 one once the reader starts a question, by typing it or editing one a link left in the composer.
 
 **Holding every model call.** For a run that must not depend on a model, such as a store-screenshot
-capture, pass a closure to `AskInferenceHold.setHeld(_:)`. While it says so, the seam reads the on-device
-model as available and speaking the app's language without asking it, builds no session and runs no
-generation, and `AskGenerationGate.run` throws `AskInferenceHold.HeldError` for your own generations: the
-screen shows the intro a reader with a working model sees, in any language and on any simulator.
+capture, pass a closure to `AskInferenceHold.setHeld(_:)`. While it says so, no model is asked anything
+([The inference hold](ARCHITECTURE.md#the-inference-hold) says what the seam reads instead),
+`AskGenerationGate.run` throws `AskInferenceHold.HeldError` for your own generations, and the screen shows
+the intro a reader with a working model sees, in any language and on any simulator.
 
 ## What is stored, and where
 
@@ -275,10 +289,10 @@ folder, whichever app wrote it.
 | `ask-thread-unreadable-<id>.json`, `ask-thread-original-<id>.json` | A thread this build couldn't decode, or read only in part, set aside whole until a launch that reads it puts it back. |
 
 A turn is written when it ends, never while it streams. Writes are atomic, off the main actor, excluded
-from backup, and under complete file protection except on a Mac, whether the app runs there natively, as
-a Mac Catalyst build or as an iPhone or iPad app. There they keep the system's default class, readable
-from the first unlock until restart, because on macOS 27.2 complete protection fails every write while
-the Mac is locked. `persistence: .perLaunch` keeps the thread for the process only.
+from backup, and under complete file protection except on a Mac, where they keep the system's default
+class, readable from the first unlock until restart
+([Persistence and history](ARCHITECTURE.md#persistence-and-history) says why, and which builds count).
+`persistence: .perLaunch` keeps the thread for the process only.
 
 **What a turn sends to Private Cloud Compute.** On the device, nothing leaves it. On Private Cloud
 Compute a turn sends your instructions, your tools' definitions and AskKit's reply schema; the prompt
