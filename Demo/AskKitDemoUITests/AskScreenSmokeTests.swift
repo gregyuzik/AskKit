@@ -411,6 +411,111 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertFalse(pill.exists, "Upright again, nothing offers the way back.")
     }
 
+    /// A reader who scrolled up to an earlier answer and opened one of its
+    /// tiles is where they were when they come back: the thread coming back
+    /// into view is no new question. And a reader at the foot is still there.
+    ///
+    /// The failure it guards: the task that takes a new question to the foot
+    /// runs again each time the thread appears, and the thread glided to its
+    /// foot under the reader as Back landed, the earlier answer gone.
+    @MainActor
+    func testBackFromAPushedItemTheReaderIsWhereTheyLeftTheThread() throws {
+        let app = launchScripted(DemoLaunchArgument.push)
+        let place = scrollUpToTheFirstOfFiveTurns(in: app)
+        let banks = app.descendants(matching: .any).matching(identifier: Ids.results)
+        let bank = banks.allElementsBoundByIndex
+            .filter { $0.frame.minY > place.frame.maxY }
+            .min { $0.frame.minY < $1.frame.minY }
+        let tile = try XCTUnwrap(bank, "The first answer shows its tiles under its question.").buttons.element(boundBy: 0)
+        XCTAssertTrue(tile.isHittable, "The first answer's tile is in reach.")
+
+        tile.tap()
+        let detailTitle = app.staticTexts[DemoAccessibility.rowDetailTitle]
+        XCTAssertTrue(detailTitle.waitForExistence(timeout: uiTimeout), "The tile pushes its row.")
+        app.buttons["BackButton"].tap()
+        XCTAssertTrue(detailTitle.waitForNonExistence(timeout: uiTimeout))
+        assertTheReaderIsAt(place, in: app, "Back from the row")
+
+        // To the foot, and the newest answer's tile: back from its row, the
+        // reader is still at the foot.
+        element(Ids.jumpToLatest, in: app).tap()
+        let send = app.buttons[Ids.send]
+        XCTAssertLessThanOrEqual(settledNewestAnswer(in: app).maxY, send.frame.minY, "The pill takes the reader to the foot.")
+        let newestBank = banks.allElementsBoundByIndex
+            .filter { $0.isHittable }
+            .max { $0.frame.minY < $1.frame.minY }
+        try XCTUnwrap(newestBank, "The newest answer's tiles are in reach at the foot.").buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(detailTitle.waitForExistence(timeout: uiTimeout))
+        app.buttons["BackButton"].tap()
+        XCTAssertTrue(detailTitle.waitForNonExistence(timeout: uiTimeout))
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertLessThanOrEqual(settledNewestAnswer(in: app).maxY, send.frame.minY, "Back at the foot, the newest answer is in view,")
+        XCTAssertFalse(element(Ids.jumpToLatest, in: app).exists, "and nothing offers the way back to where the reader is.")
+    }
+
+    /// The same for a trip to another tab and back, which takes the thread
+    /// out of view and brings it back as a push does.
+    @MainActor
+    func testBackFromAnotherTabTheReaderIsWhereTheyLeftTheThread() throws {
+        let app = launchScripted(DemoLaunchArgument.tabs)
+        let place = scrollUpToTheFirstOfFiveTurns(in: app)
+        tab("Library", in: app).tap()
+        XCTAssertTrue(place.question.waitForNonExistence(timeout: uiTimeout), "The thread goes with its tab.")
+        tab("Ask", in: app).tap()
+        XCTAssertTrue(place.question.waitForExistence(timeout: uiTimeout))
+        assertTheReaderIsAt(place, in: app, "Back from the other tab")
+    }
+
+    /// Where a reader up the thread is: the first question, where it settled,
+    /// with the newest question out of view.
+    private struct ThreadPlace {
+        let question: XCUIElement
+        let frame: CGRect
+        let newest: XCUIElement
+    }
+
+    /// Ask five questions, so the thread is several screens long, then scroll
+    /// up until the first question is in reach, which leaves the newest one
+    /// out of view and offers the pill.
+    @MainActor
+    private func scrollUpToTheFirstOfFiveTurns(in app: XCUIApplication) -> ThreadPlace {
+        let field = app.textFields[Ids.field]
+        XCTAssertTrue(field.waitForExistence(timeout: uiTimeout))
+        let send = app.buttons[Ids.send]
+        let answers = app.descendants(matching: .any).matching(identifier: Ids.answer)
+        for index in 1...5 {
+            field.tap()
+            field.typeText("Question \(index) about my things")
+            send.tap()
+            XCTAssertTrue(answers.element(boundBy: index - 1).waitForExistence(timeout: turnTimeout))
+            wait(send, label: "Write a question")
+        }
+        let first = question("Question 1 about my things", in: app)
+        var swipes = 0
+        while !(first.exists && first.isHittable), swipes < 10 {
+            root(app).swipeDown()
+            swipes += 1
+        }
+        let frame = settledFrame(of: first)
+        XCTAssertTrue(first.isHittable, "The reader has scrolled up to the first question.")
+        let newest = question("Question 5 about my things", in: app)
+        XCTAssertFalse(newest.exists && newest.isHittable, "The newest question is out of view.")
+        XCTAssertTrue(element(Ids.jumpToLatest, in: app).waitForExistence(timeout: uiTimeout), "This far up, the pill offers the way back.")
+        return ThreadPlace(question: first, frame: frame, newest: newest)
+    }
+
+    /// The reader is still at `place` once any glide the thread's return
+    /// could start has had time to land: the first question where it was,
+    /// the newest still out of view, and the pill still offered.
+    @MainActor
+    private func assertTheReaderIsAt(_ place: ThreadPlace, in app: XCUIApplication, _ when: String) {
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertTrue(place.question.exists && place.question.isHittable, "\(when), the first question is still in reach,")
+        XCTAssertEqual(settledFrame(of: place.question).minY, place.frame.minY, accuracy: 4, "where it was,")
+        XCTAssertFalse(place.newest.exists && place.newest.isHittable, "the newest question is still out of view,")
+        XCTAssertTrue(element(Ids.jumpToLatest, in: app).exists, "and the pill still offers the way back.")
+    }
+
     /// The navigation bar minimizes for the reader and never for the follow,
     /// the keyboard opens it so Done can be reached, and Done leaves it open.
     /// The host's tab bar minimizes with it, for the reader alone too.

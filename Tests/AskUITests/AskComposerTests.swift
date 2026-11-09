@@ -266,6 +266,31 @@ nonisolated private struct AskContrastVariantColor: ShapeStyle, Hashable {
         #expect(sending != AskComposerCommand(sends: true, stops: true, actions: actions))
         #expect(sending != AskComposerCommand(sends: true, stops: false, actions: AskComposerActions()))
     }
+
+    /// Send with a question and no turn in flight, Stop with one, as the
+    /// circle does.
+    @Test func theMenuOffersWhatTheCircleDoes() {
+        let actions = AskComposerActions()
+        let asking = AskComposerCommand(isThinking: false, draft: "What's the oldest?", isEnabled: true, actions: actions)
+        #expect(asking.sends && !asking.stops)
+        let blank = AskComposerCommand(isThinking: false, draft: " \n ", isEnabled: true, actions: actions)
+        #expect(!blank.sends && !blank.stops)
+        let thinking = AskComposerCommand(isThinking: true, draft: "What's the oldest?", isEnabled: true, actions: actions)
+        #expect(!thinking.sends && thinking.stops)
+    }
+
+    /// **A disabled composer offers the menu nothing**, as its circle and its
+    /// shortcuts do nothing. `.disabled` reaches the composer's controls and
+    /// not a focused scene value, so ⌘Return still sent from the can't-serve
+    /// first screen with a draft in the field, and put a failed thread where
+    /// that screen had been.
+    @Test func aDisabledComposerOffersNothing() {
+        let actions = AskComposerActions()
+        let asking = AskComposerCommand(isThinking: false, draft: "What's the oldest?", isEnabled: false, actions: actions)
+        #expect(!asking.sends)
+        let thinking = AskComposerCommand(isThinking: true, draft: "", isEnabled: false, actions: actions)
+        #expect(!thinking.stops)
+    }
 }
 #endif
 

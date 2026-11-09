@@ -40,7 +40,8 @@ public import SwiftUI
 /// types, on the first character and the last one deleted, and as a turn
 /// starts and ends, so the menu's body runs then and not with every
 /// keystroke. Send is enabled while that composer has a question and no turn
-/// in flight, and Stop while a turn is in flight; with no Ask window focused,
+/// in flight, and Stop while a turn is in flight, as the composer's circle
+/// is, so neither while the composer is disabled; with no Ask window focused,
 /// both are disabled.
 ///
 /// **The newest turn's four after them**, the items of its question's menu,

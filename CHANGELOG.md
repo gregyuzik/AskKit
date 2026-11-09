@@ -72,6 +72,33 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   as a session the seam couldn't build, drew the hairline and kept it on disk, and one handed down
   from such a failure reported it twice. It is now reported just before the prompt that carries the
   recap is sent, still ahead of the answer's first words.
+- **A bank of tiles with no column maximum lays out under an unbounded width.** An `AskTileGrid` given
+  `columns: .adaptive(minimum: 76, maximum: .infinity)`, the maximum `GridItem.adaptive` defaults to,
+  put its first tile at an x of NaN and handed its parent a width that wasn't a number wherever it was
+  asked how wide it could be: in a `.fixedSize()`, a horizontal `ScrollView` or a `ViewThatFits`, the
+  non-finite geometry behind `LayoutSubview.place`'s assertion. AskKit's own columns are finite, so only
+  a host's could. Asked with an unbounded width, such a bank now answers with every tile in one row at
+  the minimum, the one finite width its columns name, and lays out that row when placed at it; a bank
+  with a maximum answers at the maximum, as before.
+- **A scope with no words reads as no scope.** A domain whose `evidenceScope(from:)` returned `""` or
+  whitespace got the evidence line "From 3 items in your ", and an `AskActivity` with a scope like it
+  got the wait row "Searching your …" or "Reading …". Each now reads as it does with no scope: "From 3
+  items", and "Thinking…".
+- **The Mac menu's Send and Stop follow a disabled composer.** `.disabled` reaches a composer's controls
+  and not what it hands the menu bar, so on the can't-serve first screen, whose composer is disabled,
+  File > Send (⌘Return) stayed enabled whenever the field held a draft, such as a host's
+  `prefill(_:send: false)` or words typed before Apple Intelligence went off, and sending put a failed
+  thread where that screen had been. The composer now offers the menu neither Send nor Stop while it is
+  disabled, as its circle offers neither.
+- **Coming back to the thread leaves the reader where they were.** A reader who scrolled up to an
+  earlier answer and opened one of its tiles in a pushed row, or went to another tab, came back to the
+  thread gliding to its foot, the answer they had been reading gone: the scroll that takes a new
+  question into view ran again each time the thread reappeared, and took the reader back down. It now
+  runs only for a last turn the screen hasn't seen arrive, the thread's first appearance and a new
+  question, so a restored conversation and a screen built mid-answer still open at the end, and for a
+  reader the thread was following down a streaming answer as it went, who comes back to the end of it
+  whether or not it finished meanwhile. Anyone else comes back to where they left the thread, with the
+  pill where it was, a card they had opened in the last answer included.
 
 ## [0.7.1] - 2026-11-09
 

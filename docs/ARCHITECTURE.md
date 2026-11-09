@@ -842,6 +842,9 @@ such as a photo still decoding, crosses its placeholder the same way (`AskPictur
   never the reader's doing, so a reader at the foot when one starts is there when it ends. A turned
   phone can report an offset that reads as a drag; taken for one, it left a reader 645 pt above the
   foot.
+- **Coming back.** The thread coming back into view, from a pushed item or another tab, is no new
+  question: a reader is where they left it, and only one the follow was taking down a streaming answer
+  is taken to its end.
 - **The motion.** A new question's scroll, the follow and the pill's jump share one curve, ease-out over
   0.25 s, with no travel under Reduce Motion; a resize's scroll is instant, the resize being the motion.
 - **The keyboard.** `scrollDismissesKeyboard(.immediately)` puts it away as a drag begins, except on

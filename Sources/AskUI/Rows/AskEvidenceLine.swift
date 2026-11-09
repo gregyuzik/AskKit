@@ -179,7 +179,9 @@ extension AskEvidenceLine {
         /// gave without a model, unless the domain set one; all of those are
         /// counted as before. Unknown is not a claim.
         ///
-        /// `scope` is asked only for the counted line, the one that names it.
+        /// `scope` is asked only for the counted line, the one that names it,
+        /// and one with no words is none: passed through, it read "From 3
+        /// items in your ", a sentence stopping short.
         init?(
             presentation: AskEvidencePresentation,
             grounding: AskGrounding?,
@@ -198,7 +200,8 @@ extension AskEvidenceLine {
                 if grounding == .nothing {
                     self = .ungrounded
                 } else if rowsBehind > 0 {
-                    self = .counted(rowsBehind, scope: scope())
+                    let scope = scope().flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                    self = .counted(rowsBehind, scope: scope)
                 } else {
                     return nil
                 }

@@ -30,17 +30,19 @@ nonisolated enum AskActivityPhrase {
         return fallback(for: activity)
     }
 
+    /// A scope with no words is no scope: set into its sentence, it read
+    /// "Searching your …" and "Reading …".
     static func fallback(for activity: AskActivity) -> String {
         switch activity {
         case .searching(let scope):
-            guard let scope else { return thinking }
+            guard let scope = named(scope) else { return thinking }
             return String(
                 localized: "Searching your \(scope)…",
                 bundle: #bundle,
                 comment: "Ask wait row while a tool looks through one part of the reader's library — the placeholder is that part's name."
             )
         case .reading(_, _, let scope):
-            guard let scope else { return thinking }
+            guard let scope = named(scope) else { return thinking }
             return String(
                 localized: "Reading \(scope)…",
                 bundle: #bundle,
@@ -55,6 +57,12 @@ nonisolated enum AskActivityPhrase {
                 comment: "Ask wait row when a turn threw away what it had and began again — because the model answered without reading anything, because the tier serving it went out, or because a follow-up outgrew the model's context and is being asked again on a fresh session."
             )
         }
+    }
+
+    /// `scope` where it has words in it, and nil where it is empty or
+    /// whitespace.
+    private static func named(_ scope: String?) -> String? {
+        scope.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
     }
 
     static var thinking: String {

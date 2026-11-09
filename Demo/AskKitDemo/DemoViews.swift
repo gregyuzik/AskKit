@@ -6,10 +6,10 @@ import SwiftUI
 /// screens: lit on the ready first screen and in the wait row, unlit on the
 /// other two first screens.
 ///
-/// A host's can be a glyph of its own, even one that moves. The demo's is its
-/// Ask tab's: `askkit.bubbles`, the custom symbol in its asset catalog drawn
-/// from its icon's three bubbles, lit in the tint as the tab draws it
-/// selected, and unlit in one tertiary ink.
+/// A host's can be a glyph of its own, even one that moves. The demo's is
+/// `askkit.bubbles.fill`, the sibling of its Ask tab's `askkit.bubbles` in its
+/// asset catalog, drawn from its icon's three bubbles: lit in the tint, and
+/// unlit in one tertiary ink.
 struct DemoMark: View {
     let isLit: Bool
 
