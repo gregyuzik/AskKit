@@ -94,8 +94,8 @@ only for `AskNoSearchArguments`, so a domain naming its own `SearchArguments` mu
 
 **Which answers are kept** is the domain's `grounding`, one `AskGroundingPolicy` for its life
 ([house rule 2](#5-the-house-rules)):
-- `.retrieval`, the default: an answer that read nothing is never shown, and a first one gets the
-  grounded retry;
+- `.retrieval`, the default: an answer that read nothing is never shown, and one on a fresh session
+  gets the grounded retry;
 - `.toolCall`: the same without the retry, so its search is never asked, for a domain whose every
   question is a lookup or an action;
 - `.notRequired`: for a domain whose answers needn't rest on the reader's data, an answer nothing
@@ -218,8 +218,8 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
      with the rows fenced in `<tool_result>` as data. `AskNoSearchArguments` has nothing to fill in, so no
      planner is asked and the search runs with no arguments. The conversation counts as retrieved by the
      app from then on. An ungrounded follow-up on a kept conversation fails with coaching.
-   - **`.toolCall`**: the same without the retry, so an ungrounded first answer fails with coaching at
-     once.
+   - **`.toolCall`**: the same without the retry, so an ungrounded answer fails with coaching at once,
+     on a fresh session as on a kept conversation.
    - **`.notRequired`**: it is kept, so no turn fails as ungrounded.
 
    The answer records what grounded it: a tool call, the app's search, the thread's rows on a follow-up,
