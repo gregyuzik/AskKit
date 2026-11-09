@@ -44,6 +44,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   as in "You could play…". An exact title still comes first, so a title that ends in an ellipsis is
   still that title, and a cut one comes before a near one. Titles that open alike were shown cut
   alike: a tile title is the first of them read, and prose names them all.
+- **A `promptPrefix` without a trailing newline ends its line.** The engine appended a domain's prefix
+  as it stood, so "Answer about my records." ran straight into the first of the domain's lines, or into
+  the question's `<user_request>` fence, where every line already ended in a newline. A non-empty
+  prefix that doesn't end in one now gets one in the prompt, after it, so what `prewarm` caches is
+  still how the prompt opens.
 
 ## [0.7.1] - 2026-11-09
 

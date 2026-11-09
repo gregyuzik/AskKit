@@ -2718,6 +2718,22 @@ private extension Trait where Self == ConditionTrait {
         #expect(seam.session(for: .privateCloud).prewarmCalls.withLock { $0 }.count == 1)
     }
 
+    @Test func whatIsPrewarmedIsHowTheFirstPromptOpens() async throws {
+        // A prefix without a line break gets one in the prompt; the warm
+        // cache matches only what the prompt opens with (house rule 6).
+        var domain = FakeDomain()
+        domain.promptPrefixOverride = "Answer about my records."
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        await engine.prewarm()
+        let warmed = try #require(session.prewarmCalls.withLock { $0 }.first)
+        session.script(grounded("Answer."))
+        _ = await record(engine.ask("q"))
+        let prompt = try #require(session.prompts.withLock { $0 }.first)
+        #expect(prompt.hasPrefix(warmed))
+        #expect(prompt.hasPrefix("Answer about my records.\n"))
+    }
+
     @Test func prewarmIsSkippedWhileAConversationIsKept() async {
         // A kept session already has its cache; warming beside it builds a
         // second one that is thrown away.

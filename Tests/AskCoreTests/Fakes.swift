@@ -884,7 +884,10 @@ nonisolated struct FakeDomain: AskDomain {
         return "Answer from the tools." + (isConversation ? " You may use every tool." : "")
     }
 
-    var promptPrefix: String { "PREFIX\n" }
+    /// The domain's prompt prefix, when a test needs another than
+    /// `PREFIX` and a line break.
+    var promptPrefixOverride: String?
+    var promptPrefix: String { promptPrefixOverride ?? "PREFIX\n" }
 
     func promptLines(question: String, overview: AskOverview) async -> [String] {
         promptLineReads.record()

@@ -754,7 +754,9 @@ nonisolated public enum AskPrompt {
 
     /// A prompt as the engine sends one: `prefix`, then `lines`, then the
     /// fenced question. An empty line is skipped, and each line ends in a
-    /// newline.
+    /// newline, the prefix too: one that doesn't end in a newline gets one,
+    /// so a domain's opening sentence never runs into the next line or the
+    /// question's fence.
     ///
     /// A fresh session's first prompt and the grounded retry's re-ask start
     /// with the domain's byte-stable prefix (what `prewarm` cached), and the
@@ -764,12 +766,13 @@ nonisolated public enum AskPrompt {
     /// The prefix must be byte-identical between the prewarm and the real
     /// turn, or the cache the prewarm built is thrown away (house rule 6).
     /// That is the whole point of `prewarm(promptPrefix:)`, and it is why the
-    /// prefix takes no arguments.
+    /// prefix takes no arguments. The newline goes after it, so the prompt
+    /// still opens with the prefix as prewarmed.
     ///
     /// SPI (`AskKitInternal`): the engine builds every prompt it sends, and a
     /// host's live eval can build the same one.
     @_spi(AskKitInternal) public static func promptText(prefix: String, lines: [String], question: String) -> String {
-        var text = prefix
+        var text = prefix.isEmpty || prefix.hasSuffix("\n") ? prefix : prefix + "\n"
         for line in lines where !line.isEmpty {
             text += line.hasSuffix("\n") ? line : line + "\n"
         }
