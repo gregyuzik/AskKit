@@ -70,7 +70,7 @@ In Xcode, File > Add Package Dependencies with this repository's URL, or in a `P
 
 ```swift
 platforms: [.iOS("27.2"), .macOS("27.2"), .visionOS("27.2")],
-dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.6.0")],
+dependencies: [.package(url: "https://github.com/gregyuzik/AskKit", from: "0.7.0")],
 // and in the target that shows the screen:
 dependencies: [.product(name: "AskCore", package: "AskKit"), .product(name: "AskUI", package: "AskKit")]
 ```
@@ -361,7 +361,7 @@ what it writes against the steps above.
 Add AskKit (https://github.com/gregyuzik/AskKit) to this app, so a reader can ask about the app's
 data in their own words.
 
-1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.6.0" to the app target, and
+1. Add the Swift package https://github.com/gregyuzik/AskKit from "0.7.0" to the app target, and
    link its AskCore and AskUI products. AskUI doesn't re-export AskCore, so a file that uses both
    imports both.
 2. Before writing code, read README.md, docs/ADOPTING.md and docs/ARCHITECTURE.md in that
