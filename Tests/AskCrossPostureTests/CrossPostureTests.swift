@@ -939,9 +939,6 @@ extension CrossPostureTests {
         #expect(japanese?.ownName == "日本語")
         #expect(japanese?.promptName == "Japanese (日本語)")
         #expect(AskAnswerLanguage(englishName: nil) == nil)
-        if let japanese {
-            #expect(domain.toolResultEnding(answerLanguage: japanese) == nil)
-        }
 
         let sink = CrossPostureQuietSink()
         sink.turn(AskTurnStats(tier: .onDevice))

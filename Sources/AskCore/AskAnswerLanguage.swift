@@ -1,19 +1,14 @@
 import Foundation
 
-#if canImport(FoundationModels) && !os(tvOS)
-import FoundationModels
-#endif
-
 /// The language a session's answers are asked for in, named the two ways a
 /// model reads it: in English, as the seam names it
 /// (`AskModelSeam.answerLanguage(for:)`), and in its own words, as
 /// "Japanese (日本語)".
 ///
-/// The engine hands one to `AskDomain.toolResultEnding(answerLanguage:)`
-/// outside English. A domain can build its own in
-/// `instructions(tier:isConversation:answerLanguage:)`, from the English name
-/// it is given there, so its instructions and its tool results name the
-/// language alike.
+/// AskKit tells the model the language itself, in English, as Apple's
+/// practice has it (`AskDomain.instructions(tier:isConversation:answerLanguage:)`).
+/// A domain that names the language anywhere else, in its own words too, can
+/// build one from the English name it is given there.
 nonisolated public struct AskAnswerLanguage: Sendable, Hashable {
     /// The language's English name, as the seam gave it: "Japanese", or
     /// "Chinese, Traditional" where the script matters.
@@ -61,50 +56,3 @@ nonisolated public struct AskAnswerLanguage: Sendable, Hashable {
         return own
     }
 }
-
-#if canImport(FoundationModels) && !os(tvOS)
-
-/// A domain's tool whose every result ends on the domain's line
-/// (`AskDomain.toolResultEnding(answerLanguage:)`), after a blank line. Its
-/// name, description and parameters are the tool's own, so the model is
-/// offered the same tool; only what it reads back grows by the line.
-nonisolated struct AskEndingTool<Arguments: ConvertibleFromGeneratedContent>: Tool {
-    let base: any Tool<Arguments, String>
-    let ending: String
-
-    var name: String { base.name }
-    var description: String { base.description }
-    var parameters: GenerationSchema { base.parameters }
-    var includesSchemaInInstructions: Bool { base.includesSchemaInInstructions }
-
-    @concurrent func call(arguments: Arguments) async throws -> String {
-        try await base.call(arguments: arguments) + "\n\n" + ending
-    }
-}
-
-/// How a session's tools take the domain's line at the end of their results.
-nonisolated enum AskToolEnding {
-    /// `tools`, in their order, each one whose output is `String` ending its
-    /// results on `ending`, and the names of the rest, passed through as they
-    /// are: only text has an end a line can follow.
-    static func wrap(_ tools: [any Tool], ending: String) -> (tools: [any Tool], passedThrough: [String]) {
-        var passedThrough: [String] = []
-        let wrapped = tools.map { tool -> any Tool in
-            guard let ended = ended(tool, ending: ending) else {
-                passedThrough.append(tool.name)
-                return tool
-            }
-            return ended
-        }
-        return (wrapped, passedThrough)
-    }
-
-    /// `tool` ending its results on `ending`, or nil when its output isn't
-    /// `String`.
-    private static func ended<T: Tool>(_ tool: T, ending: String) -> (any Tool)? {
-        guard let text = tool as? any Tool<T.Arguments, String> else { return nil }
-        return AskEndingTool(base: text, ending: ending)
-    }
-}
-
-#endif

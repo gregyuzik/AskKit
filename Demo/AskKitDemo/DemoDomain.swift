@@ -467,20 +467,19 @@ nonisolated struct DemoDomain: AskDomain {
         [DemoSearchTool(context: context)]
     }
 
-    /// Three sentences, and a fourth with an answer language: short, as house
-    /// rule 3 asks (`AskDomain.instructions(tier:isConversation:answerLanguage:)`
-    /// has the measurement). Every category and activity mapping that would
-    /// have gone here lives in the tool's `@Guide`s instead. `isConversation`
-    /// is unused here: the demo registers one tool and registers it always,
-    /// so there is nothing for a one-shot to narrow.
+    /// Three sentences: short, as house rule 3 asks
+    /// (`AskDomain.instructions(tier:isConversation:answerLanguage:)` has the
+    /// measurement), and none naming the answer's language, since AskKit adds
+    /// Apple's sentences for it. Every category and activity mapping that
+    /// would have gone here lives in the tool's `@Guide`s instead.
+    /// `isConversation` is unused here: the demo registers one tool and
+    /// registers it always, so there is nothing for a one-shot to narrow.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You answer questions about the things one person owns, and about nothing else.
-            Call search_my_things before you answer, and name only titles it returned.
-            Answer in two or three sentences of plain prose, with no headings and no lists.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
+        """
+        You answer questions about the things one person owns, and about nothing else.
+        Call search_my_things before you answer, and name only titles it returned.
+        Answer in two or three sentences of plain prose, with no headings and no lists.
+        """
     }
 
     /// Byte-stable: no date, no counts, nothing that moves between the warm

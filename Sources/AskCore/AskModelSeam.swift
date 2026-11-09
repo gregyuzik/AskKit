@@ -71,9 +71,10 @@ nonisolated public protocol AskModelSeam: Sendable {
     /// answer degrades to English rather than spending a request that bounces
     /// `unsupportedLanguageOrLocale`.
     ///
-    /// It reaches the model through
-    /// `AskDomain.instructions(tier:isConversation:answerLanguage:)`, which is
-    /// the only place an app can phrase it.
+    /// The engine tells the model, opening the session's instructions with
+    /// Apple's "You MUST respond in …" ahead of the domain's own words, and
+    /// passes it to `AskDomain.instructions(tier:isConversation:answerLanguage:)`
+    /// as well.
     func answerLanguage(for tier: AskTier) async -> String?
 }
 

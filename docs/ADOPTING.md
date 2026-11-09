@@ -62,7 +62,7 @@ your data gives all seven:
 | `brand` | An `AskBrand`: your copy, the Application Support folder the thread is kept in, and the log subsystem every AskKit logger writes under. `help`, the field's placeholder, is drawn on one line and cut off where it is wider than the field, so keep it to a few words. |
 | `overview()` | What the reader has to ask about: scopes and counts. |
 | `makeTools(_:)` | The tools a session offers the model, built around the `AskToolContext` it is handed. |
-| `instructions(tier:isConversation:answerLanguage:)` | The session's instructions: yours, and short. |
+| `instructions(tier:isConversation:answerLanguage:)` | The session's instructions: yours, short and in English. AskKit opens them with Apple's sentences for the locale and the language, so they name no language ([The answer's language](#the-answers-language)). |
 | `search(_:context:)` | The search the app runs when the model won't call a tool, through the tool's own code. |
 
 ### The rules for tools
@@ -81,6 +81,19 @@ holds each character to 16 Unicode scalars and redacts a fence tag in any spelli
 cuts to the limit, so clamping twice changes nothing; its doc comment has the spellings. For output whose
 line breaks carry its layout, use `AskPrompt.sanitizeForFence`, then `AskPrompt.neuteringTags`, which
 does the bracket swap alone.
+
+**No straight double quotes around a title or a name.** The model copies the quote into its answer,
+where it ends the guided-generation string the answer is written in. In vultyr's eval, 6 of 8 answers
+that ran to the token cap stopped right where a quoted title would open ("The incident is titled "), and
+the rest of the generation ran on to the cap. In Japanese the model closed a string with 」 instead, and
+ran away the same way. Leave titles and names bare, as the README's sample does.
+
+**A guided string's list of values takes whole values.** A value that begins with a word the model
+reaches for captures the whole phrase: once the model writes the word, the list leaves it one value to
+finish with. With vultyr's `since` limited to "overnight", "this morning" and "today", "this week" came
+out as "this morning" in every language. Taking out the value that began with "this" moved the misread
+to the nearest other value, and a longer list brought back a misread that had been fixed. Give the model
+a whole value for each thing it can mean, or take an integer, such as a number of days.
 
 **`context.rowLimit` caps what a result shows, not what a tool reads.** Read all that the call asks
 about, show the first `rowLimit` rows in the order that matters, and say how many more there were, as
@@ -103,6 +116,22 @@ which word means which category, in `@Guide`s and tool descriptions, where the m
 uses them. ARCHITECTURE.md's [Writing a domain's tools](ARCHITECTURE.md#writing-a-domains-tools) has what
 was measured on Apple's model.
 
+### The answer's language
+
+AskKit follows Apple's practice in [Supporting languages and locales with Foundation
+Models](https://developer.apple.com/documentation/foundationmodels/supporting-languages-and-locales-with-foundation-models).
+Write your instructions, tool descriptions and `@Guide`s in English, and name no language in them: the
+engine opens every session's instructions with Apple's sentences. The first is the person's locale in
+Apple's exact phrase, "The person's locale is ja_JP.", which Apple says "comes from the model's
+training, and reduces the possibility of hallucinations in multilingual situations"; as in Apple's
+sample, it reads `Locale.current` and is left out for U.S. English. The second, "You MUST respond in
+Japanese.", comes wherever the seam names a language, since the model otherwise answers in the language
+of its inputs. `AppleModelSeam` names one only once the tier's `supportsLocale(_:)` says it writes it.
+Where that says no, or can't say, it names none, and the answer is written in English, with neither
+sentence for a locale in another language. A request that still throws
+`LanguageModelError.unsupportedLanguageOrLocale` fails the turn as `.modelUnavailable(.languageNotSupported)`.
+`answerLanguage` still reaches `instructions(…)`, for a domain that needs the language for anything else.
+
 ### Optional members
 
 Everything else has a default, and each member's doc comment says what it does. The ones you will reach
@@ -116,7 +145,6 @@ for first:
 | `replyShape` | `.full` | The answer, its question kind, its tiles and the follow-ups (`.full`), or the answer and follow-ups alone (`.prose`). On the device the prose schema costs 192 tokens of the window, the full one 704. |
 | `promptLines(question:overview:)` | none | Lines such as today's date, sent when a question starts a fresh session. |
 | `promptPrefix` | empty | Fixed words that open every prompt. Keep them byte-stable: a warm session caches them. |
-| `toolResultEnding(answerLanguage:)` | none | A line added to the end of every tool result, and of the grounded retry's rows, when the answer language isn't English, such as "Write your answer in Japanese (日本語)." It raises answers in that language, but it can end the model's tool use early, before a second search or a proposal, and it has brought refusals: measure first ([Writing a domain's tools](ARCHITECTURE.md#writing-a-domains-tools)). |
 | `phrase(for:)`, `basis(for:)`, `evidenceScope(from:)` | none | The wait row's words for a tool event, a factual line under an answer's tiles, and the part of your data the evidence line names. |
 | `perform(_:)` | throws | Carries out a proposal the reader confirmed. |
 | `deterministicAnswer(for:)`, `answersWithoutModel` | none, false | An answer with no model, such as small talk, whose payload is your own type and whose throw fails the turn, and whether such answers cover your starters. If they do, a device where nothing can serve keeps the starters and the composer under its reason, and closes on your brand's `disclosureSentenceWithoutModel` in place of `disclosureSentence`, where you give one. |

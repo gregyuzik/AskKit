@@ -1015,6 +1015,59 @@ import Testing
         }
     }
 
+    // MARK: - Instructions
+
+    // Apple's opening, from "Supporting languages and locales with Foundation
+    // Models": the person's locale in Apple's exact phrase, then the language
+    // to respond in, a blank line ahead of the domain's words.
+
+    @Test func aNamedLanguageOpensWithThePersonsLocaleAndTheLanguage() {
+        #expect(
+            AskPrompt.instructions("Answer.", answerLanguage: "Japanese", locale: Locale(identifier: "ja_JP"))
+                == "The person's locale is ja_JP.\nYou MUST respond in Japanese.\n\nAnswer."
+        )
+        // As Apple's sample has it, the locale's identifier as it stands.
+        let calendar = Locale(identifier: "ja_JP@calendar=japanese")
+        #expect(
+            AskPrompt.instructions("Answer.", answerLanguage: "Japanese", locale: calendar)
+                == "The person's locale is \(calendar.identifier).\nYou MUST respond in Japanese.\n\nAnswer."
+        )
+    }
+
+    @Test func usEnglishTakesNoLocalePhrase() {
+        // Apple's own check, `isEquivalent(to:)`, which a bare "en" meets too.
+        #expect(AskPrompt.instructions("Answer.", answerLanguage: nil, locale: Locale(identifier: "en_US")) == "Answer.")
+        #expect(AskPrompt.instructions("Answer.", answerLanguage: nil, locale: Locale(identifier: "en")) == "Answer.")
+        // A language named under it still gets its sentence, without the phrase.
+        #expect(
+            AskPrompt.instructions("Answer.", answerLanguage: "Japanese", locale: Locale(identifier: "en_US"))
+                == "You MUST respond in Japanese.\n\nAnswer."
+        )
+    }
+
+    @Test func englishInAnotherRegionKeepsTheLocalePhrase() {
+        // The seam names no language for English, and Apple's sample keeps
+        // the phrase for every English but U.S. English.
+        #expect(
+            AskPrompt.instructions("Answer.", answerLanguage: nil, locale: Locale(identifier: "en_GB"))
+                == "The person's locale is en_GB.\n\nAnswer."
+        )
+    }
+
+    @Test func aLanguageTheSeamDidntNameTakesNoOpening() {
+        // A tier that doesn't write it, so the answer is written in English.
+        #expect(AskPrompt.instructions("Answer.", answerLanguage: nil, locale: Locale(identifier: "ja_JP")) == "Answer.")
+        #expect(AskPrompt.instructions("Answer.", answerLanguage: "", locale: Locale(identifier: "ja_JP")) == "Answer.")
+    }
+
+    @Test func emptyInstructionsAreTheOpeningAlone() {
+        #expect(
+            AskPrompt.instructions("", answerLanguage: "Japanese", locale: Locale(identifier: "ja_JP"))
+                == "The person's locale is ja_JP.\nYou MUST respond in Japanese."
+        )
+        #expect(AskPrompt.instructions("", answerLanguage: nil, locale: Locale(identifier: "en_US")).isEmpty)
+    }
+
     // MARK: - Photos
 
     @Test func aPhotoLineNamesThePhotoInClampedFencedWords() {

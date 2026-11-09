@@ -600,6 +600,43 @@ nonisolated public enum AskPrompt {
         return String(probe).count == 1
     }
 
+    /// A session's instructions as the engine builds them: Apple's opening for
+    /// the answer's language, then `text`, the domain's own words
+    /// (`AskDomain.instructions(tier:isConversation:answerLanguage:)`), after
+    /// a blank line. With no opening, `text` as it stands.
+    ///
+    /// The opening is the practice of Apple's article "Supporting languages
+    /// and locales with Foundation Models", as its sample code has it:
+    /// - **The person's locale**, in Apple's exact phrase,
+    ///   "The person's locale is \(locale.identifier).". Apple: "This special
+    ///   phrase comes from the model's training, and reduces the possibility
+    ///   of hallucinations in multilingual situations." Left out for U.S.
+    ///   English, by Apple's own check
+    ///   (`Locale.Language(identifier: "en_US").isEquivalent(to:)`), and for a
+    ///   locale in another language that `answerLanguage` doesn't name: the
+    ///   seam names none where a tier doesn't write the language, the case
+    ///   Apple says to check support for first, and the answer is written in
+    ///   English. English in another region, such as en_GB, keeps it, as
+    ///   Apple's sample does.
+    /// - **The language to respond in**, "You MUST respond in
+    ///   \(answerLanguage).", Apple's example, when the seam names one: by
+    ///   default the model responds in the language of its inputs.
+    ///
+    /// `locale` is `Locale.current`, as in Apple's sample, which takes in the
+    /// person's language settings for the app. A test passes its own.
+    static func instructions(_ text: String, answerLanguage: String?, locale: Locale = .current) -> String {
+        let named = answerLanguage.flatMap { $0.isEmpty ? nil : $0 }
+        var opening: [String] = []
+        if !Locale.Language(identifier: "en_US").isEquivalent(to: locale.language),
+           named != nil || locale.language.languageCode?.identifier == "en" {
+            opening.append("The person's locale is \(locale.identifier).")
+        }
+        if let named { opening.append("You MUST respond in \(named).") }
+        guard !opening.isEmpty else { return text }
+        let head = opening.joined(separator: "\n")
+        return text.isEmpty ? head : head + "\n\n" + text
+    }
+
     /// A prompt as the engine sends one: `prefix`, then `lines`, then the
     /// fenced question. An empty line is skipped, and each line ends in a
     /// newline.

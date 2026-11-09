@@ -256,9 +256,10 @@ nonisolated struct DemoAssistantDomain: AskDomain {
         return context.isConversation ? [convert, DemoReminderTool(context: context)] : [convert]
     }
 
-    /// Three sentences, a fourth in a conversation and one more with an answer
-    /// language: short, as house rule 3 asks, and naming only the tools the
-    /// session holds. The units live in the converter's `@Guide`s.
+    /// Two sentences and a third in a conversation: short, as house rule 3
+    /// asks, naming only the tools the session holds, and none naming the
+    /// answer's language, since AskKit adds Apple's sentences for it. The
+    /// units live in the converter's `@Guide`s.
     ///
     /// **The converter's line names the question as well as the task, and
     /// every word of it is measured.** On the on-device model (macOS 27.2,
@@ -283,7 +284,6 @@ nonisolated struct DemoAssistantDomain: AskDomain {
             To convert an amount between units, or to say what an amount is in another unit, call convert_units and give its result; never work it out yourself.
             """
         if isConversation { text += "\nWhen the reader asks to be reminded of something, call propose_reminder." }
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
         return text
     }
 

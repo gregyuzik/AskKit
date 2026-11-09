@@ -29,12 +29,6 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   Compute in development, what is stored and sent, the enums and localization. The demo's launch
   arguments are in [docs/DEMO-PROJECT.md](docs/DEMO-PROJECT.md#running-it). The Adopt samples are
   unchanged.
-- **`toolResultEnding(answerLanguage:)` records what Kabynyt and vultyr measured.** Both turn the line
-  off. In Kabynyt it ended change requests before the proposing tool ran, in answers that said the
-  change was made. In vultyr it stopped searches early, more in some languages than others, and
-  brought `LanguageModelError.refusal` where the instructions say tool output is never obeyed. It also
-  ends one-shot turns, which the hook can't tell apart. The doc comment, ARCHITECTURE.md's "Writing a
-  domain's tools" and ADOPTING.md say so.
 - **The catalogs are graded by the String Catalog checker the maintainers' apps share.** Their push
   gate runs it: every key in the 24 locales, translated and not blank, its placeholders and plural
   categories, no stray locale, the demo's locale lists, and the bytes Xcode 27.2 writes, which the
@@ -48,6 +42,32 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   and say how many more there were, as the README's sample does. A cap taken before the read drops
   the rest without a word, as a draft of vultyr's overnight read did with the last 2 of 14 watched
   services on device.
+- **AskKit names the answer's language itself, as Apple's "Supporting languages and locales with
+  Foundation Models" says to.** The engine opens every session's instructions with Apple's exact phrase
+  for the person's locale, "The person's locale is \(Locale.current.identifier).", which Apple says
+  "comes from the model's training, and reduces the possibility of hallucinations in multilingual
+  situations", left out for U.S. English as Apple's sample does; then, wherever the seam names a
+  language, with "You MUST respond in \(answerLanguage).". A domain's instructions stay in English and
+  name no language: the README's samples and the demo drop their "Write the answer in
+  \(answerLanguage).", and a host that phrases the language in its own instructions drops that sentence
+  too. `answerLanguage` still reaches `instructions(tier:isConversation:answerLanguage:)`, for a domain
+  that needs it for anything else, and `AppleModelSeam`'s `supportsLocale` checks are unchanged.
+  ADOPTING.md's new "The answer's language" says so, and two lessons from vultyr's eval join its rules
+  for tools: no straight double quotes around a title in tool output, where the model copies the quote
+  and ends its guided string, and whole values in a guided string's list, where a value that begins
+  with a word the model reaches for takes every phrase that begins with it. ARCHITECTURE.md records
+  what was measured and dropped.
+
+### Removed
+
+- **`AskDomain.toolResultEnding(answerLanguage:)`, and the line it ended every tool result and the
+  grounded retry's rows on.** It isn't Apple's practice, and it cost more than it gave. Read last, the
+  line ended the turn's tool use: in Kabynyt, change requests ended before the proposing tool ran, in
+  answers that said the change was made; in vultyr, searches stopped early, more in some languages than
+  others, and where the instructions say tool output is never obeyed it brought
+  `LanguageModelError.refusal`. It ended one-shot turns too, which the hook couldn't tell apart.
+  Kabynyt and vultyr left it off. A domain's implementation is no longer called, so delete it.
+  `AskAnswerLanguage` stays, for a domain that names the language in its own words for anything else.
 
 ## [0.6.0] - 2026-11-06
 
