@@ -1215,6 +1215,14 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// a chat read back before that write lands, or from a copy it didn't
     /// reach, still says what came of it (`withLateOutcomes`). In memory only:
     /// the write it backs is the one the disk may have refused.
+    ///
+    /// **Each belongs to the yes that produced it**, and the turn's next yes
+    /// retires it (`confirmProposal`). Kept, a failure would be read back over
+    /// that yes's `.performing`: the card would offer the action while it is
+    /// carried out, and a tap would do it twice. Until then it stays, whether
+    /// its write landed or not, since only it covers a copy the write missed.
+    /// Only a failure is ever followed by another yes: a card that says done
+    /// takes no tap.
     @ObservationIgnored private var lateProposalOutcomes: [DiskTurn: AskProposalOutcome] = [:]
 
     /// A turn as its chat's file knows it: its question, and when it was asked
@@ -1280,6 +1288,10 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// never returns holds up no chat. It is asked off the main actor
     /// (`perform(_:of:logSubsystem:)`).
     ///
+    /// A yes given again, on a card whose last one failed, retires what came
+    /// of that one (`lateProposalOutcomes`): the turn read back while this
+    /// one is out says it is under way, and this one's outcome lands on it.
+    ///
     /// A `.handOff` is never performed: the card opens the host's editor and
     /// calls `handOffProposal(_:line:)`, and a tap that reaches here for one
     /// is ignored rather than handed to `AskDomain.perform(_:)`.
@@ -1297,6 +1309,10 @@ public final class AskConversationStore<Domain: AskDomain> {
         let id = turn.id
         let diskTurn = DiskTurn(current)
         performingProposals.insert(diskTurn)
+        // What came of a yes before this one is that yes's, and read back over
+        // this one's `.performing` it would offer the action while this one
+        // carries it out (`lateProposalOutcomes`).
+        lateProposalOutcomes[diskTurn] = nil
         update(id) { turn in
             turn.isPerformingProposal = true
             turn.proposalOutcome = .performing
@@ -1414,6 +1430,11 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// in its chat opened again, and in the filing of its chat where that
     /// chat has ended since. Lost there, it would leave the filed card
     /// offering the action again, and a second yes would carry it out twice.
+    ///
+    /// Where the turn that made it has left the screen, it is kept as well
+    /// (`lateProposalOutcomes`), until the turn's next yes retires it. Its
+    /// write into the filing is queued here, before the reader can give that
+    /// yes, so it lands before the yes is saved and never over it.
     private func settleProposal(of id: UUID, _ diskTurn: DiskTurn, with outcome: AskProposalOutcome) async {
         performingProposals.remove(diskTurn)
         let leftTheScreen = turn(id) == nil
