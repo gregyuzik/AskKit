@@ -22,6 +22,10 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   a host's could. Asked with an unbounded width, such a bank now answers with every tile in one row at
   the minimum, the one finite width its columns name, and lays out that row when placed at it; a bank
   with a maximum answers at the maximum, as before.
+- **A scope with no words reads as no scope.** A domain whose `evidenceScope(from:)` returned `""` or
+  whitespace got the evidence line "From 3 items in your ", and an `AskActivity` with a scope like it
+  got the wait row "Searching your …" or "Reading …". Each now reads as it does with no scope: "From 3
+  items", and "Thinking…".
 
 ## [0.7.1] - 2026-11-09
 

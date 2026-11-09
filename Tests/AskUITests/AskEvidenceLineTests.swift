@@ -49,6 +49,20 @@ import Testing
         #expect(Self.content(Self.answer(), domain) == .counted(3, scope: Self.scope))
     }
 
+    /// **A scope with no words is no scope**, so the line counts alone. Passed
+    /// through, it read "From 3 items in your ", a sentence stopping short.
+    @Test func aBlankScopeIsNoScope() {
+        for scope in ["", " ", "\n", " \t "] {
+            let domain = WordingDomain(presentation: .counted, scope: scope)
+            #expect(Self.content(Self.answer(), domain) == .counted(3, scope: nil), "\(scope.debugDescription)")
+            #expect(
+                AskEvidenceLine.Content(presentation: .counted, grounding: .toolCall, rowsBehind: 3, scope: scope)
+                    == .counted(3, scope: nil),
+                "\(scope.debugDescription)"
+            )
+        }
+    }
+
     /// Grounded by a tool that read no rows, such as a clock: nothing to
     /// count, so no line. The ungrounded line is for an answer nothing
     /// grounded, and this one was.
