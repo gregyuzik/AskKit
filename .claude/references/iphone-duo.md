@@ -38,10 +38,12 @@ Why the fold is arranged as it is, with the measurements, is in ARCHITECTURE.md 
   arrangement alone, and no scene moves between displays under it: say so wherever a capture of it is
   used, and leave it off on the Duo. Two panes need 240 pt for the chats and 320 for the conversation, so
   an iPhone 18 Pro shows them only on its side, and an iPad Air 11-inch (M4) either way.
-- **The other first screens** want `-askFreshHistory`, which deletes what AskKit keeps for the demo:
-  `duo.sh open <pose> both` copies it out and back, and for a launch of your own, copy
-  `Library/Application Support/AskKitDemo` out of the demo's data container (`xcrun simctl
-  get_app_container <UDID> com.example.askkitdemo data`, asked for each time) and back after.
+- **The other first screens** want `-askFreshHistory`, which deletes what AskKit keeps for both of the
+  demo's domains, `Library/Application Support/AskKitDemo` and `AskKitDemoAssistant`, and the
+  `demo.domain` default that remembers which was on screen. `duo.sh open <pose> both` saves all three
+  and puts them back. For a launch of your own, copy both folders out of the demo's data container
+  (`xcrun simctl get_app_container <UDID> com.example.askkitdemo data`, asked for each time), note
+  `demo.domain` in its `Library/Preferences/com.example.askkitdemo.plist`, and put them back after.
   `-AppleLanguages "(he)" -askScriptedAnswer` is can't-serve with its starters, and without
   `-askScriptedAnswer` with none: the simulator's model doesn't write Hebrew.
 - **UI tests** (`AskKitDemoUITests`) tell the Duo by `SIMULATOR_MODEL_IDENTIFIER` (`iPhone19,4`; the
