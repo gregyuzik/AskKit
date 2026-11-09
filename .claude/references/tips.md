@@ -13,6 +13,8 @@ Vision Pro simulators (27.2) and on macOS 27.2. Beside what the comments hold:
 - The starter's tip stands above "Try asking", its arrow on the heading, on every device and in every Duo
   pose: on the outer display on its side, in a tabletop below the fold, in a book on the thread's side of
   it.
+- The chat's tip stands under the first row that can be deleted: left to choose, the system covered the
+  sheet's Close and Delete All Chats on the iPhone.
 - On visionOS a window resize settles the gates again, and each return counts as a display, which costs
   nothing while no tip has a `MaxDisplayCount`.
 
