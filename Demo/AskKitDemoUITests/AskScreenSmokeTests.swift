@@ -466,6 +466,90 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         assertTheReaderIsAt(place, in: app, "Back from the other tab")
     }
 
+    /// A reader the thread was taking down an answer as they went to another
+    /// tab comes back to the answer's end, though it landed while they were
+    /// away: the other half of a return, which the tests above leave out.
+    ///
+    /// The failure it guards: the answer grows while the thread is out of
+    /// view, where no follow runs, and by the return its stream has long
+    /// stopped, so nothing owns that growth and no pill reports it. With
+    /// `AskScrollFollow.threadDisappeared()` doing nothing, four runs of four
+    /// came back to the question with its answer under the composer.
+    ///
+    /// **The model's turn, because only the model streams.** A scripted
+    /// answer lands in the turn's first update, long before a tap can take
+    /// the reader away, and a held turn (`DemoLaunchArgument.holdTurn`) never
+    /// grows. The thread above it is scripted
+    /// (`launchOnASavedThreadThatScrolls`).
+    ///
+    /// **The reader goes at once, before the first words.** Gone a moment
+    /// after the follow's animated scroll to them, the thread was at its foot
+    /// on the return in two runs of two with the follow doing nothing: the
+    /// scroll view moved by the growth itself, which hides whether the follow
+    /// works. A row pushed from a tile is the same trip, but the reader gets
+    /// there after the first words, and with the follow doing nothing two
+    /// runs of three passed.
+    @MainActor
+    func testBackFromAnotherTabMidAnswerTheReaderIsAtItsEnd() throws {
+        let app = try launchOnASavedThreadThatScrolls(DemoLaunchArgument.tabs)
+        let field = app.textFields[Ids.field]
+        XCTAssertTrue(field.waitForExistence(timeout: uiTimeout))
+        field.tap()
+        field.typeText("What records do I own?")
+        let send = app.buttons[Ids.send]
+        send.tap()
+        // Read once, not waited for, so the reader is gone before the first words.
+        XCTAssertEqual(send.label, "Cancel", "The reader goes while the question is being answered.")
+        tab("Library", in: app).tap()
+        XCTAssertTrue(send.waitForNonExistence(timeout: uiTimeout), "The thread goes with its tab.")
+        // Past the demo's turn deadline (`DemoDomain.turnDeadline`, 45 s), so
+        // the turn has ended whichever way it went.
+        RunLoop.current.run(until: Date().addingTimeInterval(47))
+        tab("Ask", in: app).tap()
+        XCTAssertTrue(send.waitForExistence(timeout: uiTimeout))
+        // Over before the return, or the run proves nothing: a turn still
+        // answering is followed as any stream is.
+        XCTAssertEqual(send.label, "Write a question", "The answer was over by the time the reader came back.")
+
+        // Once any glide the return starts has landed: the newest answer, and
+        // the lowest of everything the thread shows, above the composer.
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertLessThanOrEqual(settledNewestAnswer(in: app).maxY, send.frame.minY, "Back from the other tab, the newest answer is in view,")
+        let parts = app.descendants(matching: .any).matching(NSPredicate(
+            format: "identifier IN %@", [Ids.answer, Ids.results, Ids.evidence, Ids.basis, Ids.followUps, Ids.retry]
+        ))
+        let foot = parts.allElementsBoundByIndex.map(\.frame.maxY).max() ?? .infinity
+        XCTAssertLessThanOrEqual(foot, send.frame.minY, "all of it above the composer,")
+        XCTAssertFalse(element(Ids.jumpToLatest, in: app).exists, "and nothing offers the way back to where the reader is.")
+    }
+
+    /// A saved thread long enough to scroll, launched with `arguments` and
+    /// nothing scripted: three scripted turns or more under `freshHistory`,
+    /// which keeps them, then a launch that reads them back at their foot.
+    /// Skips without a model, as `launch(_:)` does.
+    @MainActor
+    private func launchOnASavedThreadThatScrolls(_ arguments: String...) throws -> XCUIApplication {
+        guard case .available = SystemLanguageModel.default.availability else {
+            throw XCTSkip("No on-device model on this simulator — nothing to drive.")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.freshHistory, DemoLaunchArgument.scriptedAnswer]
+        app.launch()
+        XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
+        askUntilTheThreadOverflows(app)
+        // The last turn's save, which is written after the turn ends.
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        app.terminate()
+
+        app.launchArguments = [DemoLaunchArgument.hidesTips] + arguments
+        app.launch()
+        XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
+        let answers = app.descendants(matching: .any).matching(identifier: Ids.answer)
+        XCTAssertTrue(answers.firstMatch.waitForExistence(timeout: uiTimeout), "The thread is read back.")
+        return app
+    }
+
     /// Where a reader up the thread is: the first question, where it settled,
     /// with the newest question out of view.
     private struct ThreadPlace {
