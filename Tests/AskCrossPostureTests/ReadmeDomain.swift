@@ -101,12 +101,11 @@ nonisolated struct LibraryDomain: AskDomain {
     }
 
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You answer questions about the books one person owns, and about nothing else.
-            Call search_books before you answer, and name only titles it returned.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
+        // In English, naming no language: AskKit adds Apple's sentences for the locale and the language.
+        """
+        You answer questions about the books one person owns, and about nothing else.
+        Call search_books before you answer, and name only titles it returned.
+        """
     }
 
     func search(_ arguments: BookQuery, context: AskToolContext<Book>) async throws -> String {
@@ -176,7 +175,10 @@ import Testing
         #expect(domain.starters(overview: overview, window: 3).count == 2)
         let instructions = domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: "French")
         #expect(instructions.contains("search_books"))
-        #expect(instructions.hasSuffix("Write the answer in French."))
+        // No language sentence of the domain's own: AskKit opens the
+        // instructions with Apple's.
+        #expect(instructions == domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: nil))
+        #expect(!instructions.contains("French"))
 
         // The search the grounded retry runs, through the context the engine
         // builds for it: what it read lands in the collector, and what the

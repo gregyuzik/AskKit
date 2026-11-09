@@ -10,3 +10,6 @@
 // A comment starts with //. The digester reads this file through the C
 // preprocessor, and a line starting with # makes it read the whole list as
 // empty, so `ci.sh api` refuses one.
+API breakage: func AskDomain.toolResultEnding(answerLanguage:) has been removed
+API breakage: func AskDomain.toolResultEnding(answerLanguage:) has been removed
+API breakage: struct AskAnswerLanguage has been removed

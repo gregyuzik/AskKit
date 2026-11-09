@@ -625,12 +625,9 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
     /// `ShapelessSession`, which leaves the shaped stream to `AskSession`'s
     /// default.
     let buildsShapelessSessions = Mutex(false)
-    /// The instructions each session was built with — where the answer language
-    /// shows up, since only the domain can phrase it.
+    /// The instructions each session was built with: Apple's opening for the
+    /// answer language, which the engine adds, then the domain's words.
     let instructionsSeen = Mutex<[String]>([])
-    /// The tools each session was built with — where the domain's line at the
-    /// end of a tool result shows up, since the engine wraps them.
-    let toolsSeen = Mutex<[[any Tool]]>([])
     /// What `answerLanguage(for:)` reports.
     let language = Mutex<String?>(nil)
     /// A real generation gate for on-device generations, as `AppleModelSeam`
@@ -677,7 +674,6 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
         instructions: String
     ) async throws -> AskSessionBox? {
         instructionsSeen.withLock { $0.append(instructions) }
-        toolsSeen.withLock { $0.append(tools) }
         guard !refusesSession.withLock({ $0.contains(tier) }) else { return nil }
         let boxed = boxesAs.withLock { $0[tier] } ?? tier
         if buildsShapelessSessions.withLock({ $0 }) {
@@ -716,13 +712,13 @@ nonisolated final class FakeSeam: AskModelSeam, @unchecked Sendable {
 
 /// What a fake domain's `instructions` was asked for, in order.
 nonisolated final class InstructionsLog: @unchecked Sendable {
-    private let calls = Mutex<[(tier: AskTier, isConversation: Bool)]>([])
+    private let calls = Mutex<[(tier: AskTier, isConversation: Bool, answerLanguage: String?)]>([])
 
-    func record(tier: AskTier, isConversation: Bool) {
-        calls.withLock { $0.append((tier, isConversation)) }
+    func record(tier: AskTier, isConversation: Bool, answerLanguage: String?) {
+        calls.withLock { $0.append((tier, isConversation, answerLanguage)) }
     }
 
-    var recorded: [(tier: AskTier, isConversation: Bool)] { calls.withLock { $0 } }
+    var recorded: [(tier: AskTier, isConversation: Bool, answerLanguage: String?)] { calls.withLock { $0 } }
 }
 
 /// Whether each of a fake domain's searches ran inside a conversation, in
@@ -782,12 +778,6 @@ nonisolated struct FakeDomain: AskDomain {
     /// Rows the tool hands back. The tool records into the collector, so a test
     /// that wants a grounded turn scripts the session's `toolCallsAfter` too.
     var rows: [FakeRow] = FakeRow.six
-    /// What `makeTools` hands the session, once it has published the
-    /// collector and the relay.
-    var tools: [any Tool] = []
-    /// Whether `toolResultEnding(answerLanguage:)` asks for the line Klosyt's
-    /// eval measured, "Write your answer in Japanese (日本語).".
-    var endsToolResults = false
     var kinds: [AskQuestionKind] = AskQuestionKind.default
     var deadline: Duration = .seconds(45)
     /// Outranks `deadline` while set. A class, for `instructionsFor`'s reason.
@@ -876,23 +866,19 @@ nonisolated struct FakeDomain: AskDomain {
 
     func makeTools(_ context: AskToolContext<FakeRow>) -> [any Tool] {
         bridge.publish(context.collector, relay: context.relay)
-        return tools
-    }
-
-    func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String? {
-        endsToolResults ? "Write your answer in \(answerLanguage.promptName)." : nil
+        return []
     }
 
     /// Records what it was told, so a test can say the sentences and the tool
-    /// set were built from the same flag. A class, because `Mutex` is
-    /// non-Copyable and this domain is a struct.
+    /// set were built from the same flag, and which language it was handed.
+    /// A class, because `Mutex` is non-Copyable and this domain is a struct.
     let instructionsFor = InstructionsLog()
 
+    /// Names no language, as a domain's instructions don't: the engine opens
+    /// them with Apple's sentences for it.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        instructionsFor.record(tier: tier, isConversation: isConversation)
-        return "Answer from the tools."
-            + (isConversation ? " You may use every tool." : "")
-            + (answerLanguage.map { " Answer in \($0)." } ?? "")
+        instructionsFor.record(tier: tier, isConversation: isConversation, answerLanguage: answerLanguage)
+        return "Answer from the tools." + (isConversation ? " You may use every tool." : "")
     }
 
     var promptPrefix: String { "PREFIX\n" }

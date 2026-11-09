@@ -70,12 +70,11 @@ nonisolated struct AssistantDomain: AskDomain {
     }
 
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You are a helpful assistant inside an app. Answer in a few plain sentences.
-            To convert a distance, call convert_distance and give its result.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
+        // In English, naming no language: AskKit adds Apple's sentences for the locale and the language.
+        """
+        You are a helpful assistant inside an app. Answer in a few plain sentences.
+        To convert a distance, call convert_distance and give its result.
+        """
     }
 }
 
@@ -98,7 +97,10 @@ import Testing
         #expect(await domain.overview() == .empty)
         let instructions = domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: "French")
         #expect(instructions.contains("convert_distance"))
-        #expect(instructions.hasSuffix("Write the answer in French."))
+        // No language sentence of the domain's own: AskKit opens the
+        // instructions with Apple's.
+        #expect(instructions == domain.instructions(tier: .onDevice, isConversation: true, answerLanguage: nil))
+        #expect(!instructions.contains("French"))
 
         // The tool, through the context the engine builds for it: the call
         // is noted, no row is recorded, and what the model is shown is

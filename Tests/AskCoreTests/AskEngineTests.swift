@@ -5,7 +5,7 @@ import FoundationModels
 import Synchronization
 import Testing
 
-@testable import AskCore
+@_spi(AskKitInternal) @testable import AskCore
 
 /// Whether the Mac's load average over the last minute is past two a core.
 ///
@@ -53,20 +53,12 @@ private extension Trait where Self == ConditionTrait {
         domain: FakeDomain = FakeDomain(),
         states: [AskTierState] = [.serving(.privateCloud), .serving(.onDevice)],
         gate: AskGenerationGate? = nil,
-        clock: TestClock? = nil,
-        localization: String? = nil
+        clock: TestClock? = nil
     ) -> (AskEngine<FakeDomain>, FakeSeam, FakeLogSink) {
         // One bridge, so the session's scripted tool call records into the
         // collector the domain was handed.
         let seam = FakeSeam(status: AskModelStatus(), states: states, bridge: domain.bridge, gate: gate)
         let log = FakeLogSink()
-        if let localization {
-            let now: @Sendable () -> ContinuousClock.Instant = { clock?.now ?? ContinuousClock().now }
-            return (
-                AskEngine(domain: domain, seam: seam, log: log, answerLocalization: { localization }, clock: now),
-                seam, log
-            )
-        }
         guard let clock else { return (AskEngine(domain: domain, seam: seam, log: log), seam, log) }
         return (AskEngine(domain: domain, seam: seam, log: log) { clock.now }, seam, log)
     }
@@ -2941,104 +2933,55 @@ private extension Trait where Self == ConditionTrait {
 
     // MARK: - Answer language
 
-    @Test func theSeamsAnswerLanguageReachesTheInstructions() async {
-        // Only the seam knows whether a tier can write the app's language, and
-        // only the domain can phrase it — so it travels through
-        // `instructions(tier:answerLanguage:)` or not at all.
-        let (engine, seam, _) = makeEngine()
+    @Test func theInstructionsOpenWithApplesSentencesForTheSeamsLanguage() async {
+        // Apple's practice ("Supporting languages and locales with Foundation
+        // Models"): the person's locale, then "You MUST respond in …", ahead
+        // of the domain's words, which name no language. The locale phrase
+        // follows `Locale.current`, so its cases are `AskPromptTests`'; here,
+        // that every session's instructions open with the sentences.
+        let domain = FakeDomain()
+        let (engine, seam, _) = makeEngine(domain: domain)
         seam.language.withLock { $0 = "Danish" }
         seam.session(for: .privateCloud).script(grounded("Answer."))
         _ = await record(engine.ask("q"))
-        #expect(seam.instructionsSeen.withLock { $0 }.allSatisfy { $0.contains("Answer in Danish.") })
-        #expect(seam.instructionsSeen.withLock { $0 }.isEmpty == false)
+        let seen = seam.instructionsSeen.withLock { $0 }
+        let words = "Answer from the tools. You may use every tool."
+        #expect(!seen.isEmpty)
+        #expect(seen.allSatisfy { $0 == AskPrompt.instructions(words, answerLanguage: "Danish") })
+        #expect(seen.allSatisfy { $0.hasSuffix("You MUST respond in Danish.\n\n" + words) })
+        // The domain is handed the language as well, for whatever else it
+        // needs it for.
+        let asked = domain.instructionsFor.recorded
+        #expect(!asked.isEmpty)
+        #expect(asked.allSatisfy { $0.answerLanguage == "Danish" })
     }
 
-    @Test func anEnglishSeamAddsNoLanguageClause() async {
+    @Test func anEnglishSeamAddsNoLanguageSentence() async {
+        // English is asked for by naming no language, as is a tier that can't
+        // write the app's: no "You MUST respond in …", and the locale phrase
+        // only where Apple's sample has it, outside U.S. English.
         let (engine, seam, _) = makeEngine()
         seam.session(for: .privateCloud).script(grounded("Answer."))
         _ = await record(engine.ask("q"))
-        #expect(seam.instructionsSeen.withLock { $0 }.allSatisfy { !$0.contains("Answer in") })
+        let seen = seam.instructionsSeen.withLock { $0 }
+        let words = "Answer from the tools. You may use every tool."
+        #expect(!seen.isEmpty)
+        #expect(seen.allSatisfy { $0 == AskPrompt.instructions(words, answerLanguage: nil) })
+        #expect(seen.allSatisfy { !$0.contains("You MUST respond") })
     }
 
-    // MARK: - The domain's line at the end of a tool result
-
-    /// A domain with one text tool that asks for the line, in a Japanese app.
-    private func endingEngine(
-        endsToolResults: Bool = true, tools: [any Tool] = [EndingEchoTool()]
-    ) -> (AskEngine<FakeDomain>, FakeSeam, FakeLogSink) {
-        var domain = FakeDomain()
-        domain.tools = tools
-        domain.endsToolResults = endsToolResults
-        return makeEngine(domain: domain, localization: "ja")
-    }
-
-    @Test func outsideEnglishEveryToolResultEndsOnTheDomainsLine() async throws {
-        let (engine, seam, _) = endingEngine()
-        seam.language.withLock { $0 = "Japanese" }
-        seam.session(for: .privateCloud).script(grounded("Answer."))
-        _ = await record(engine.ask("q"))
-        let built = seam.toolsSeen.withLock { $0 }
-        #expect(!built.isEmpty)
-        for tools in built {
-            let tool = try #require(tools.first)
-            #expect(tool.name == "echo")
-            let result = try await callTool(tool, text: "green")
-            #expect(result == "Rows for green.\n\nWrite your answer in Japanese (日本語).")
-        }
-    }
-
-    @Test func inEnglishTheToolsAreTheDomainsOwn() async {
-        // The seam names no language, so the domain is asked for no line.
-        let (engine, seam, _) = endingEngine()
-        seam.session(for: .privateCloud).script(grounded("Answer."))
-        _ = await record(engine.ask("q"))
-        let built = seam.toolsSeen.withLock { $0 }
-        #expect(!built.isEmpty)
-        #expect(built.allSatisfy { $0.first is EndingEchoTool })
-    }
-
-    @Test func aDomainThatAsksForNoLineKeepsItsTools() async {
-        let (engine, seam, _) = endingEngine(endsToolResults: false)
-        seam.language.withLock { $0 = "Japanese" }
-        seam.session(for: .privateCloud).script(grounded("Answer."))
-        _ = await record(engine.ask("q"))
-        let built = seam.toolsSeen.withLock { $0 }
-        #expect(!built.isEmpty)
-        #expect(built.allSatisfy { $0.first is EndingEchoTool })
-    }
-
-    @Test func aToolThatReturnsNoTextIsPassedThroughAndNamed() async {
-        let (engine, seam, log) = endingEngine(tools: [EndingListTool(), EndingEchoTool()])
-        seam.language.withLock { $0 = "Japanese" }
-        seam.session(for: .privateCloud).script(grounded("Answer."))
-        _ = await record(engine.ask("q"))
-        let built = seam.toolsSeen.withLock { $0 }
-        #expect(!built.isEmpty)
-        #expect(built.allSatisfy { $0.first is EndingListTool && !($0.last is EndingEchoTool) })
-        #expect(log.routings.withLock { $0 }.contains { $0.contains("no text") && $0.contains("list") })
-    }
-
-    @Test func theRetrysRowsEndOnTheLineInsideTheFence() async {
-        // The rows the app finds for the model read as a tool's result would.
-        let (engine, seam, _) = endingEngine()
+    @Test func theRetrysRowsAreFencedAsTheSearchWroteThem() async {
+        // Outside English too: the language is the instructions' to give, and
+        // nothing follows the rows inside the fence.
+        let (engine, seam, _) = makeEngine()
         seam.language.withLock { $0 = "Japanese" }
         let session = seam.session(for: .privateCloud)
         session.script(FakeSession.Script(snapshots: [.answering("Answer.")], toolCallsAfter: 0))
         _ = await record(engine.ask("q"))
         let prompts = session.prompts.withLock { $0 }
+        let rows = FakeRow.six.map(\.displayTitle).joined(separator: "\n")
         #expect(prompts.count == 2)
-        #expect(prompts.last?.contains("Abbey Road") == true)
-        #expect(prompts.last?.contains("\n\nWrite your answer in Japanese (日本語).</tool_result>") == true)
-    }
-
-    @Test func inEnglishTheRetrysRowsEndAsTheSearchWroteThem() async {
-        let (engine, seam, _) = endingEngine()
-        let session = seam.session(for: .privateCloud)
-        session.script(FakeSession.Script(snapshots: [.answering("Answer.")], toolCallsAfter: 0))
-        _ = await record(engine.ask("q"))
-        let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 2)
-        #expect(prompts.last?.contains("Write your answer") == false)
+        #expect(prompts.last?.contains("<tool_result>\(rows)</tool_result>") == true)
     }
 
     // MARK: - The generation gate

@@ -33,6 +33,10 @@ import Synchronization
         #expect(AskPrompt.clampQuestion(String(repeating: "a", count: 600)).count == AskPrompt.maxQuestionLength)
         let prompt = AskPrompt.promptText(prefix: "Rows:\n", lines: ["One row.", ""], question: "how <many>?")
         #expect(prompt == "Rows:\nOne row.\n<user_request>how ‹many›?</user_request>")
+        let instructions = AskPrompt.instructions(
+            "Answer.", answerLanguage: "Japanese", locale: Locale(identifier: "ja_JP")
+        )
+        #expect(instructions == "The person's locale is ja_JP.\nYou MUST respond in Japanese.\n\nAnswer.")
     }
 }
 

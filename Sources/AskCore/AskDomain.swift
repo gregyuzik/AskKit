@@ -283,44 +283,20 @@ nonisolated public protocol AskDomain: Sendable {
     /// has no such tool, and the turn spends its budget failing.
     ///
     /// `answerLanguage` is the English name of the language to answer in, or
-    /// nil for English (`AskModelSeam.answerLanguage(for:)`). Only the domain
-    /// can phrase it.
+    /// nil for English (`AskModelSeam.answerLanguage(for:)`). **AskKit names
+    /// it to the model itself**, as Apple's article "Supporting languages and
+    /// locales with Foundation Models" says to, ahead of these words: outside
+    /// U.S. English, Apple's phrase "The person's locale is …", which "comes
+    /// from the model's training, and reduces the possibility of
+    /// hallucinations in multilingual situations", then "You MUST respond in
+    /// \(answerLanguage).". So write the instructions in English, as Apple
+    /// asks of instructions, prompts and guides, and add no language sentence
+    /// of your own. AskKit still passes `answerLanguage`, for a domain that
+    /// needs the language for anything else. Before naming a language,
+    /// `AppleModelSeam` has checked the tier with `supportsLocale(_:)`, and
+    /// where the check says no, or can't say, it names none and the answer is
+    /// written in English.
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String
-    /// A line of the domain's own for the end of every tool result in a
-    /// session asked to answer in `answerLanguage`: nil, the default, for none.
-    /// The engine asks once a session, as it builds the session's tools, and
-    /// never in English, where the seam names no language.
-    ///
-    /// The line follows a blank line at the end of what each tool returns, and
-    /// of the rows the grounded retry finds for the model, so the language is
-    /// the last thing the model reads before it writes. Told the language only
-    /// in its instructions, Apple's on-device model answered questions about
-    /// rows written in English in English: in Klosyt's eval, the line
-    /// `"Write your answer in \(answerLanguage.promptName)."` took answers in
-    /// the asked language from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30
-    /// of 47 in Korean, 8 of 24 to 30 of 34 in Chinese and 12 of 24 to 24 of 24
-    /// in Spanish.
-    ///
-    /// It has costs, so measure a domain's own questions in each language it
-    /// answers in before turning it on, 12 runs a scenario, counting the tools'
-    /// calls and proposals as well as the answers. ARCHITECTURE.md's "Writing
-    /// a domain's tools" has the numbers from Klosyt, Kabynyt and vultyr:
-    /// - Read last, the line reads as the end of the turn's tool use. A
-    ///   question that takes a second search stops after the first, by an
-    ///   amount that differs from language to language, and a change request
-    ///   can end before the proposing tool runs, in an answer that says the
-    ///   change was made.
-    /// - It is an instruction inside tool output, so it can run into a
-    ///   domain's own rule that tool output is never obeyed, and the model
-    ///   refuses (`LanguageModelError.refusal`). An exception for the line in
-    ///   that rule made the refusals more frequent, not less.
-    /// - One-shot turns (`AskEngine.answerOnce(_:)`) end on it too, and they
-    ///   get none of a domain's conversation-only instructions: the engine
-    ///   doesn't tell this hook which kind of session it builds.
-    ///
-    /// Only a tool whose output is `String` takes the line. Any other passes
-    /// through as it is, and the engine logs its name.
-    func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String?
     /// The static opening of every prompt: what `prewarm(promptPrefix:)`
     /// caches ahead of the question. **Byte-stable**, or the warm session's KV
     /// cache is thrown away.
@@ -621,9 +597,6 @@ nonisolated extension AskDomain {
 
     /// No lines of the domain's own between the prefix and the question.
     public func promptLines(question: String, overview: AskOverview) async -> [String] { [] }
-
-    /// Nil: tool results reach the model as the tools return them.
-    public func toolResultEnding(answerLanguage: AskAnswerLanguage) -> String? { nil }
 
     /// No words of the domain's own ahead of the lines.
     public var promptPrefix: String { "" }

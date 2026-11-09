@@ -118,12 +118,11 @@ nonisolated struct LibraryDomain: AskDomain {
     }
 
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You answer questions about the books one person owns, and about nothing else.
-            Call search_books before you answer, and name only titles it returned.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
+        // In English, naming no language: AskKit adds Apple's sentences for the locale and the language.
+        """
+        You answer questions about the books one person owns, and about nothing else.
+        Call search_books before you answer, and name only titles it returned.
+        """
     }
 
     func search(_ arguments: BookQuery, context: AskToolContext<Book>) async throws -> String {
@@ -341,12 +340,11 @@ nonisolated struct AssistantDomain: AskDomain {
     }
 
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String {
-        var text = """
-            You are a helpful assistant inside an app. Answer in a few plain sentences.
-            To convert a distance, call convert_distance and give its result.
-            """
-        if let answerLanguage { text += "\nWrite the answer in \(answerLanguage)." }
-        return text
+        // In English, naming no language: AskKit adds Apple's sentences for the locale and the language.
+        """
+        You are a helpful assistant inside an app. Answer in a few plain sentences.
+        To convert a distance, call convert_distance and give its result.
+        """
     }
 }
 ```

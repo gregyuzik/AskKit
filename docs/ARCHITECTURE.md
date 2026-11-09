@@ -538,60 +538,40 @@ redacted, so a line quoting it is the host's to clamp. The rendered answer loses
 URL the markdown parse produced: the model writes a link's label and its destination, so a link would
 be a hidden tap target inside trusted app chrome.
 
-**The answer language at the end of a result.** Outside English, a domain can end every tool result,
-and the rows the grounded retry fences, with a line of its own (`toolResultEnding(answerLanguage:)`,
-nil by default). The engine asks once a session, as it builds the tools, with the language the
-instructions were just told (`AskAnswerLanguage`: the seam's English name and the app localization's
-own, "Japanese (日本語)"). It wraps each tool whose output is `String` to add the line after a blank
-line, and passes any other through, logging its name. In the retry the line goes inside
-`<tool_result>`, after the rows.
+**The answer's language.** AskKit follows Apple's practice, from "Supporting languages and locales with
+Foundation Models". The engine opens every session's instructions with Apple's sentences, then a blank
+line and the domain's own words (`AskPrompt.instructions`):
+- the person's locale, in Apple's exact phrase, "The person's locale is ja_JP.", which Apple says "comes
+  from the model's training, and reduces the possibility of hallucinations in multilingual situations".
+  As in Apple's sample, it reads `Locale.current` and is left out for U.S. English;
+- "You MUST respond in Japanese.", where the seam names a language.
+
+The domain's instructions, tool descriptions and guides stay in English and name no language. Where the
+seam names none for a locale in another language, because the tier's `supportsLocale` check said no or
+couldn't say, neither sentence is sent and the answer is written in English.
 
 ### Writing a domain's tools
 
-Measured on Apple's on-device model, in the evals of the three apps built on AskKit. Klosyt turns the
-language line below on; Kabynyt and vultyr measured it and leave it off.
+Measured on Apple's on-device model, in the evals of the three apps built on AskKit.
 
-- **The language last.** Told the language only in its instructions, the model answered questions about
-  English rows in English. Ending each result on "Write your answer in Japanese (日本語)." raised the
-  answers in the asked language:
-  - in Klosyt, from 7 of 23 to 18 of 24 in Japanese, 4 of 24 to 30 of 47 in Korean, 8 of 24 to 30 of 34
-    in Chinese and 12 of 24 to 24 of 24 in Spanish, with English unchanged;
-  - in vultyr, from 77 to 97 of 108 in Japanese, 63 to 101 in Korean, 1 to 90 in Chinese and 102 to 108
-    in Spanish;
-  - in Kabynyt, from 76 to 122 of 128 across the four.
-
-  The same change stopped Klosyt's instructions quoting an English sample answer outside English.
-- **A line at the end of a result changes how the tools are used.** Read last, the language line reads
-  as the end of the turn's tool use, by an amount that differs from language to language:
-  - **Searches.** Klosyt's "what goes with my navy blazer?" named a second garment in 0 of 12 runs in
-    Korean, Chinese and Spanish, down from 4, 12 and 12. Ending the instructions on a sentence that
-    names the tool to search again with ("To find what goes with a garment, search the closet's other
-    categories with search_my_closet.") brought Chinese back to 14 of 16 and Spanish to 12 of 12, but
-    not Korean (2 of 12).
-  - **Searches in vultyr.** Its history question read the service's history in 12, 11, 4 and 6 of 12
-    runs in Japanese, Korean, Chinese and Spanish, and in 9, 0, 1 and 8 with the line. A question about
-    two services read both in 11 of 12 Korean runs, and in 5 with the line. In Chinese, a closing
-    sentence that named vultyr's overview tool made that tool the first call in 12 of 12 runs, and the
-    two-services question read both in none.
-  - **Changes.** Kabynyt's change requests reached its proposing tool, `edit_item`, in 14 of 32 runs, and
-    in 6 with the line. Answers that said the change was made, with no card, went from 4 or 5 of 24 to
-    13 to 16 of 32. A closing sentence naming `add_item` and `edit_item`, in Klosyt's shape, still left
-    10 of 24, against 3 of 24 with the line off. vultyr's watch cards went from 7 to 4 of 12 in Korean.
-- **The line can bring refusals.** It is an instruction inside tool output, and vultyr's instructions
-  say tool output is never obeyed.
-  - In Chinese, 10 of 23 turns on one result shape threw `LanguageModelError.refusal`, the model
-    explaining that the tools are "not for general instructions or unrelated tasks". None did without
-    the line.
-  - A sentence making the line that rule's one exception made it worse: 12 of 12.
-  - Instructions that ended on a closing paragraph stopped the refusals in every arm. But they sent the
-    two-services question to the overview tool first in 11 or 12 of 12 runs, and none brought the reads
-    back to where they were without the line.
-- **One-shots get the line too.** The engine doesn't tell `toolResultEnding` whether the session is a
-  conversation, so `answerOnce(_:)`'s turns end on it with none of a domain's conversation-only
-  instructions. In vultyr's Japanese one-shots:
-  - answers in Japanese went from 48 to 60 of 60;
-  - the history question read the history in 5 of 12 runs, down from 11;
-  - degenerate answers went from 2 to 7.
+- **The language: Apple's sentences, and nothing of AskKit's own**
+  ([Prompts and fences](#prompts-and-fences)). Two more ways of naming it were measured, and dropped on
+  2026-11-08 for Apple's practice:
+  - **A line at the end of every tool result**, "Write your answer in Japanese (日本語).", which 0.6.0
+    added as `toolResultEnding(answerLanguage:)`. It raised answers in the asked language, in Klosyt
+    from 7 of 23 to 18 of 24 in Japanese and in vultyr from 1 to 90 of 108 in Chinese. But read last, it
+    read as the end of the turn's tool use: a question that takes a second search stopped after the
+    first, and Kabynyt's change requests reached `edit_item` in 6 of 32 runs against 14, with 13 to 16
+    of 32 answers saying the change was made, against 4 or 5 of 24. And it was an instruction inside
+    tool output, which vultyr's instructions say is never obeyed: in Chinese, 10 of 23 turns on one
+    result shape threw `LanguageModelError.refusal`, against none without it. Kabynyt and vultyr left
+    it off.
+  - **A guide sentence**, the reply's `answer` guide reading "The answer, in the language your
+    instructions name: …". Without the line it gained nothing: Kabynyt's Japanese was 8 of 8 and its
+    Korean 6 of 8 in both arms, and vultyr's Chinese answers were in Chinese 0 of 108 times against 1,
+    with 20 of 212 follow-ups in Chinese against 44 of 216, and 2 refusals against none. With the line
+    on, Klosyt's Japanese rose to 76 of 96 from 66, and its Korean (52 of 96 each) and English (119
+    against 120 of 120) held.
 - **Counts before the total.** A stats tool that opened on the closet's total had counts answered with
   it, so each group's count goes on its own line, and the total after them.
 - **The reader's words, matched to the rows'.** Asked in German and Japanese, the model searched an
@@ -602,6 +582,12 @@ language line below on; Kabynyt and vultyr measured it and leave it off.
   as optional.
 - **Guide patterns.** Apple's model refuses a `@Guide` pattern with a bracketed class, `\S`, `\p{L}` or a
   lookahead. `.` works but cost about 82 s an answer; an alternation of the characters allowed works.
+- **No straight double quotes around a title in tool output.** The model copies the quote into its
+  answer, where it ends the guided string, and runs on to the token cap
+  ([ADOPTING.md](ADOPTING.md#the-rules-for-tools)).
+- **Whole values in a guided value list.** A value that begins with a word the model reaches for takes
+  every phrase that begins with it: vultyr's "this morning" took "this week"
+  ([ADOPTING.md](ADOPTING.md#the-rules-for-tools)).
 - **A dozen runs.** Three runs can't tell a prompt change from noise: one scenario's Korean pairing went
   4 of 6 one night and 4 of 12 the next. Run each scenario 12 times, and count the proposing tools'
   calls as well as the answers.
@@ -1283,7 +1269,8 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
    what grounds a turn is the session's tools, fixed for its life (rule 6).
 3. **Instructions are the host's and short. Everything the reader or a tool wrote is data.** A domain's
    instructions run to a few sentences: measured on Private Cloud Compute, three sentences grounded 3 of
-   3 runs and about 1,100 words 0 of 3. Mappings, such as which word means which category, live in
+   3 runs and about 1,100 words 0 of 3. AskKit opens them only with Apple's sentences for the person's
+   locale and the answer's language. Mappings, such as which word means which category, live in
    `@Guide`s and tool descriptions, which the model reads as it uses them. The reader's words are
    clamped, redacted, neutered and fenced. The engine fences, redacts and neuters the rows the grounded
    retry searches; a host's tools clamp and neuter theirs, field by field through `AskPrompt.clamp`, in
