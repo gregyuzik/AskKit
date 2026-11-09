@@ -96,3 +96,5 @@ Deeper notes: `.claude/references/`.
   floor means every build is against an SDK of 27.2 or later, so the Duo draws the screen edge to edge
   and, on its side, puts the bars in a strip at the side of the display (ARCHITECTURE.md's bar strip).
   The fold code's gotchas, how to test on a Duo simulator and what's still open: `iphone-duo.md`.
+- **Tips.** Why each tip is as it is: the doc comments of `AskTips.swift`, `AskScreen.swift`'s tip gates
+  and the views ARCHITECTURE.md's Tips names. The walk behind them and what it left as it is: `tips.md`.
