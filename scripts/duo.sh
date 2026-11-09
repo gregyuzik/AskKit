@@ -26,8 +26,9 @@
 #                                 first  the first screen of a domain that keeps
 #                                        no chats, at rest and with the keyboard up
 #                                 both   the first screen across both panes. It
-#                                        starts from no saved chats, so the saved
-#                                        ones are copied out first and put back
+#                                        starts from no saved chats and no
+#                                        remembered domain, so what the demo
+#                                        keeps is copied out first and put back
 #                                 all    the three, in that order
 #   record <name> outer|inner [arguments...]
 #                               record a launch on one display, keep what the demo
@@ -162,33 +163,36 @@ open_first() {
   shot_typing "$1-firstkb" -askTabs -askSlot -askScriptedAnswer -askResetThread
 }
 
-# `-askFreshHistory` deletes the saved chats, so they are copied out first and
-# put back however the run ends: a launch or a still that fails exits the
-# script, and the trap restores them on the way out. The copy goes only once
-# it is back, so one found at the start is a run's that couldn't put it back,
-# perhaps the only copy of those chats, and this stops rather than overwrite
-# it. The container's path is asked for each time: installing the demo again
-# moves it.
+# What `-askFreshHistory` deletes (`DemoHost.atLaunch()`): each domain's folder
+# under Application Support, which holds everything AskKit keeps for it, and
+# the default that remembers which domain the demo was left on.
+history_folders="AskKitDemo AskKitDemoAssistant"
+domain_key=demo.domain
+
+# So what of those there is gets copied out first and put back however the run
+# ends: a launch or a still that fails exits the script, and the trap restores
+# them on the way out. The copy goes only once all of it is back, so one found
+# at the start is a run's that couldn't put it back, perhaps the only copy of
+# those chats, and this stops rather than overwrite it. The container's path is
+# asked for each time: installing the demo again moves it.
 open_both() {
-  saved="$(xcrun simctl get_app_container "$duo" "$bundle" data)/Library/Application Support/AskKitDemo"
-  keep="$out/saved-chats"
+  container=$(xcrun simctl get_app_container "$duo" "$bundle" data)
+  support="$container/Library/Application Support"
+  # The demo's defaults as a `defaults` domain: their plist's path, less .plist.
+  prefs="$container/Library/Preferences/$bundle"
+  keep="$out/saved-history"
   if [ -e "$keep" ]; then
-    echo "duo: $PWD/$keep holds saved chats an earlier run copied out and didn't put back, perhaps their only copy." >&2
-    echo "duo: put them back with: rm -rf \"$saved\" && cp -R \"$PWD/$keep\" \"$saved\" && rm -rf \"$PWD/$keep\"" >&2
+    echo "duo: $PWD/$keep holds what an earlier run copied out before -askFreshHistory and didn't put back, perhaps the only copy of those chats." >&2
+    echo "duo: put it back with:" >&2
+    put_back_commands >&2
     echo "duo: or, if the demo's chats are the ones you want, remove $PWD/$keep. Then run this again." >&2
     exit 1
   fi
   xcrun simctl terminate "$duo" "$bundle" 2>/dev/null || true
-  if [ -d "$saved" ]; then
-    mkdir -p "$out"
-    # A partial copy can go: nothing has been deleted yet.
-    cp -R "$saved" "$keep" || {
-      rm -rf "$keep"
-      echo "duo: couldn't copy the saved chats out, so nothing was deleted" >&2
-      exit 1
-    }
+  save_history
+  if [ -e "$keep" ]; then
     # sh runs an EXIT trap on `exit`, not on a signal, so the signals exit.
-    trap restore_chats EXIT
+    trap restore_history EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
   fi
@@ -196,22 +200,86 @@ open_both() {
   shot_typing "$1-bothkb" -askTabs -askSlot -askScriptedAnswer -askFreshHistory
   shot "$1-bar-both" -askScriptedAnswer -askFreshHistory
   trap - EXIT INT TERM
-  restore_chats
+  restore_history
 }
 
-# Puts back what `open_both` copied out, and deletes the copy only once it is
-# back. A failure leaves the copy where it is and says so.
-restore_chats() {
+# Copies what of `history_folders` and `domain_key` there is into $keep: each
+# folder whole, and the domain as a file of its own, read from the plist the
+# demo, ended first, has written. By plistlib, since plutil reads a key path,
+# which takes the key's dot for a separator. A partial copy goes, since nothing
+# has been deleted yet, and the run stops.
+save_history() {
+  for folder in $history_folders; do
+    [ -d "$support/$folder" ] || continue
+    if ! { mkdir -p "$keep" && cp -R "$support/$folder" "$keep/$folder"; }; then
+      abandon_save
+    fi
+  done
+  if [ -f "$prefs.plist" ] && domain=$(python3 -I -c '
+import plistlib, sys
+with open(sys.argv[1], "rb") as f:
+    value = plistlib.load(f).get(sys.argv[2])
+if not isinstance(value, str):
+    sys.exit(1)
+print(value)' "$prefs.plist" "$domain_key" 2>/dev/null); then
+    if ! { mkdir -p "$keep" && printf '%s\n' "$domain" >"$keep/$domain_key"; }; then
+      abandon_save
+    fi
+  fi
+}
+
+abandon_save() {
+  rm -rf "$keep"
+  echo "duo: couldn't copy the saved chats out, so nothing was deleted" >&2
+  exit 1
+}
+
+# Puts back what `save_history` copied out, and deletes the copy only once all
+# of it is back. A failure leaves the copy where it is and says so.
+#
+# The domain goes back through `defaults` run in the simulator, not as a file:
+# the demo reads its defaults through the simulator's preferences daemon, which
+# caches them. It is read back the same way, since nothing else shows that the
+# write took.
+restore_history() {
   [ -d "$keep" ] || return 0
   xcrun simctl terminate "$duo" "$bundle" 2>/dev/null || true
-  if rm -rf "$saved" && cp -R "$keep" "$saved"; then
+  back=1
+  for folder in $history_folders; do
+    [ -d "$keep/$folder" ] || continue
+    if ! { rm -rf "${support:?}/$folder" && cp -R "$keep/$folder" "$support/$folder"; }; then
+      back=0
+    fi
+  done
+  if [ -f "$keep/$domain_key" ]; then
+    domain=$(cat "$keep/$domain_key")
+    if ! xcrun simctl spawn "$duo" defaults write "$prefs" "$domain_key" -string "$domain" ||
+      [ "$(xcrun simctl spawn "$duo" defaults read "$prefs" "$domain_key" 2>/dev/null)" != "$domain" ]; then
+      back=0
+    fi
+  fi
+  if [ "$back" = 1 ]; then
     rm -rf "$keep"
     # stderr, which a trap that fires inside `launch`'s `>/dev/null` still reaches.
-    echo "duo: the saved chats are back" >&2
+    echo "duo: what -askFreshHistory deleted is back" >&2
   else
-    echo "duo: couldn't put the saved chats back: they are in $PWD/$keep" >&2
+    echo "duo: couldn't put all of it back: the copy is in $PWD/$keep" >&2
+    put_back_commands >&2
     return 1
   fi
+}
+
+# The commands that put back, by hand, the copy in $keep.
+put_back_commands() {
+  for folder in $history_folders; do
+    if [ -d "$keep/$folder" ]; then
+      echo "  rm -rf \"$support/$folder\" && cp -R \"$PWD/$keep/$folder\" \"$support/$folder\""
+    fi
+  done
+  if [ -f "$keep/$domain_key" ]; then
+    echo "  xcrun simctl spawn $duo defaults write \"$prefs\" $domain_key -string \"$(cat "$keep/$domain_key")\""
+  fi
+  echo "  rm -rf \"$PWD/$keep\""
 }
 
 # The strip is the display's trailing 84 pt, with the outer display upright
