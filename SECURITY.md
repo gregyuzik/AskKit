@@ -23,11 +23,13 @@ AskKit is at 0.x, and fixes land in the newest minor version only.
 ## In scope
 
 - **Text the host didn't write, speaking as the host.** AskKit fences what it composes (the reader's
-  question, the recap of earlier turns, the rows its grounded retry reads), redacts its own fence tags
-  inside them in any spelling that compatibility decomposition (NFKD) maps to the tag once marks are
-  dropped, and strips links and images from the rendered answer. A question, title or row that escapes
-  its fence in such a spelling is a vulnerability, as is an answer that renders a link.
-  `docs/ARCHITECTURE.md` lists the fences under "Prompts and fences"; its house rule 3 says why.
+  question, the recap of earlier turns, the rows its grounded retry reads), drops from them what draws
+  nothing and every control but the tab and the line breaks, turns their straight double quotes into ″,
+  redacts its own fence tags inside them in any spelling that compatibility decomposition (NFKD) maps
+  to the tag once marks are dropped, and strips links and images from the rendered answer. A question,
+  title or row that escapes its fence in such a spelling is a vulnerability, as is an answer that
+  renders a link. `docs/ARCHITECTURE.md` lists the fences under "Prompts and fences"; its house
+  rule 3 says why.
 - **Words sent that the reader didn't see.** An Ask link's question and a follow-up chip lose what draws
   nothing (tag characters, the other invisible format characters and bidi controls) before the reader
   sees them, so what is sent is what was shown. Text that reaches the model from either without showing

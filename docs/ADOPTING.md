@@ -20,7 +20,8 @@ Both products build for iOS, macOS, visionOS, tvOS and watchOS, so a shared pack
 but Ask shows only on iOS, macOS and visionOS. On tvOS, AskCore compiles out its Foundation Models half
 (`AskDomain` and the engine), and on watchOS also whatever names `SystemLanguageModel`, such as
 `AppleModelSeam`; `AppleAskSession` names nothing the watch lacks, and builds there. A target that builds
-for tvOS wraps its domain in `#if canImport(FoundationModels) && !os(tvOS)`, as the README's samples do.
+for tvOS wraps its domain in `#if canImport(FoundationModels) && !os(tvOS)`, as the README's sample
+files, `ReadmeDomain.swift` and `ReadmeAssistantDomain.swift`, do.
 
 ### Enhanced Security
 
