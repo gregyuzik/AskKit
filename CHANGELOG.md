@@ -26,6 +26,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   whitespace got the evidence line "From 3 items in your ", and an `AskActivity` with a scope like it
   got the wait row "Searching your …" or "Reading …". Each now reads as it does with no scope: "From 3
   items", and "Thinking…".
+- **The Mac menu's Send and Stop follow a disabled composer.** `.disabled` reaches a composer's controls
+  and not what it hands the menu bar, so on the can't-serve first screen, whose composer is disabled,
+  File > Send (⌘Return) stayed enabled whenever the field held a draft, such as a host's
+  `prefill(_:send: false)` or words typed before Apple Intelligence went off, and sending put a failed
+  thread where that screen had been. The composer now offers the menu neither Send nor Stop while it is
+  disabled, as its circle offers neither.
 
 ## [0.7.1] - 2026-11-09
 

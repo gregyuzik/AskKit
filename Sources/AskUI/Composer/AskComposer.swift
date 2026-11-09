@@ -73,6 +73,9 @@ public struct AskComposer: View {
     /// object for the composer's life, so the value handed up compares equal
     /// until what it says changes.
     @State private var commandActions = AskComposerActions()
+    /// Whether the composer is enabled, which the menu bar's Send and Stop
+    /// follow as its own controls do (`AskComposerCommand`).
+    @Environment(\.isEnabled) private var isEnabled
     #endif
 
     /// Creates a composer.
@@ -220,8 +223,9 @@ public struct AskComposer: View {
         // holding this pass's closures, so the value changes only when
         // `sends` or `stops` does, not with every character typed.
         .focusedSceneValue(\.askComposer, AskComposerCommand(
-            sends: !isThinking && !trimmed.isEmpty,
-            stops: isThinking,
+            isThinking: isThinking,
+            draft: draft,
+            isEnabled: isEnabled,
             actions: commandActions.holding(send: onSend, stop: onStop)
         ))
         #endif
@@ -693,9 +697,10 @@ enum AskComposerWords {
 /// the composer's for its life and compares by identity, so the value changes
 /// only when the menu's items should.
 struct AskComposerCommand: Equatable {
-    /// Whether there is a question to send and no turn in flight.
+    /// Whether there is a question to send, no turn in flight and the
+    /// composer is enabled.
     let sends: Bool
-    /// Whether a turn is in flight.
+    /// Whether a turn is in flight and the composer is enabled.
     let stops: Bool
     let actions: AskComposerActions
 
@@ -711,6 +716,23 @@ struct AskComposerCommand: Equatable {
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.sends == rhs.sends && lhs.stops == rhs.stops && lhs.actions === rhs.actions
+    }
+}
+
+extension AskComposerCommand {
+    /// What a composer offers the menu bar: Send while `draft` holds more
+    /// than whitespace and no turn is in flight, Stop while one is, and
+    /// neither while the composer is disabled.
+    ///
+    /// **`isEnabled` is the composer's environment**, which `.disabled` on it
+    /// or on anything round it sets. `.disabled` reaches the composer's
+    /// controls and not the value it hands up, so without it ⌘Return sent the
+    /// draft from `AskScreen`'s can't-serve first screen, whose composer is
+    /// disabled (`composerIsDisabled`), and a failed thread took that
+    /// screen's place.
+    init(isThinking: Bool, draft: String, isEnabled: Bool, actions: AskComposerActions) {
+        let hasQuestion = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        self.init(sends: isEnabled && !isThinking && hasQuestion, stops: isEnabled && isThinking, actions: actions)
     }
 }
 
