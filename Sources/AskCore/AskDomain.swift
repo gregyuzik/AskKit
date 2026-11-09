@@ -299,7 +299,9 @@ nonisolated public protocol AskDomain: Sendable {
     func instructions(tier: AskTier, isConversation: Bool, answerLanguage: String?) -> String
     /// The static opening of every prompt: what `prewarm(promptPrefix:)`
     /// caches ahead of the question. **Byte-stable**, or the warm session's KV
-    /// cache is thrown away.
+    /// cache is thrown away. A prefix that doesn't end in a newline gets one
+    /// in the prompt, after it, as each of `promptLines(question:overview:)`
+    /// does.
     ///
     /// Empty by default: a fresh session's prompt then opens with the recap
     /// and the domain's lines, and a warm session caches no words ahead of

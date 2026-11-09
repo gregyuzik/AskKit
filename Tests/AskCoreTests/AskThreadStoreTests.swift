@@ -192,6 +192,79 @@ import Testing
         #expect(entry.answerSawPhoto)
     }
 
+    // MARK: - A row that won't encode
+
+    /// A turn whose answer read `rows` and shows `tiles`.
+    private func rated(_ question: String, _ rows: [RatedRow], tiles: [RatedRow] = []) -> AskThreadEntry<RatedRow> {
+        AskThreadEntry(
+            question: question, text: "answer to \(question)",
+            answer: AskAnswer(text: "answer to \(question)", matches: rows, tiles: tiles),
+            tier: .privateCloud, askedAt: Date(timeIntervalSince1970: 1_750_000_000)
+        )
+    }
+
+    @Test(arguments: [RatedRow("2", "Two", rating: .nan), RatedRow("2", "Two", refuses: true)])
+    func aRowThatWontEncodeCostsOnlyItself(_ unwritable: RatedRow) async throws {
+        // A rating JSON can't hold, or a row's own encoding that throws.
+        // Written whole, the thread failed every save from the turn that read
+        // it on, and a relaunch brought back only the turns before it.
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = AskThreadStore<RatedRow>(appDirectory: "unused", url: url)
+        let good = rated("a", [RatedRow("1", "One")])
+        let bad = rated("b", [unwritable, RatedRow("3", "Three")], tiles: [unwritable])
+        #expect(await store.save([good, bad]))
+        let loaded = await store.load().entries
+        #expect(loaded.map(\.question) == ["a", "b"])
+        #expect(loaded.first?.answer?.matches.map(\.id) == ["1"])
+        // The turn keeps its prose and its other rows, and is still an
+        // answer once its only tile has gone: one with no tile.
+        let answer = try #require(loaded.last?.answer)
+        #expect(answer.text == "answer to b")
+        #expect(answer.matches.map(\.id) == ["3"])
+        #expect(answer.tiles.isEmpty)
+    }
+
+    @Test func aTurnWrittenWithoutARowKeepsEveryOtherField() async throws {
+        // The write rebuilds the turn without the row, and nothing else of it
+        // may go: a proposal's outcome lost would offer its action again.
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = AskThreadStore<RatedRow>(appDirectory: "unused", url: url)
+        let proposal = AskProposal(title: "Lend Two", actionLabel: "Lend")
+        func turn(_ rows: [RatedRow]) throws -> AskThreadEntry<RatedRow> {
+            AskThreadEntry(
+                question: "Can I lend Two?", text: "Two is yours to lend.",
+                answer: try AskAnswer(
+                    text: "Two is yours to lend.", matches: rows, tiles: rows, followUps: ["And Three?"],
+                    questionKind: AskQuestionKind.pick, isTruncated: true, basis: "Rated highest.", payload: [1969],
+                    proposal: proposal, grounding: .toolCall
+                ),
+                tier: .onDevice, askedAt: Date(timeIntervalSince1970: 1_750_000_000), summarizedBefore: true,
+                feedback: .positive, proposalOutcome: .confirmed("Lent."),
+                photo: AskQuestionPhoto(label: "A sleeve", reference: "asset-2"), answerSawPhoto: true
+            )
+        }
+        #expect(await store.save([try turn([RatedRow("2", "Two", rating: .nan), RatedRow("3", "Three")])]))
+        #expect(await store.load().entries == [try turn([RatedRow("3", "Three")])])
+    }
+
+    @Test func aThreadThatStillWontEncodeFailsAndLeavesTheOneOnDisk() async throws {
+        // A date JSON can't hold is no row's to leave out: the write fails as
+        // it always did, and the thread on disk is what it was.
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = AskThreadStore<RatedRow>(appDirectory: "unused", url: url)
+        #expect(await store.save([rated("a", [RatedRow("1", "One")])]))
+        let before = try Data(contentsOf: url)
+        let undatable = AskThreadEntry(
+            question: "b", text: "B", answer: AskAnswer(text: "B", matches: [RatedRow("2", "Two", rating: .nan)]),
+            askedAt: Date(timeIntervalSinceReferenceDate: .infinity)
+        )
+        #expect(await !store.save([rated("a", [RatedRow("1", "One")]), undatable]))
+        #expect(try Data(contentsOf: url) == before)
+    }
+
     // MARK: - A thread that couldn't be read
 
     /// A private folder holding the thread, for the tests that look beside it:
@@ -674,6 +747,56 @@ import Testing
         #expect(await store.recoverSetAside(into: archive) == 0)
         #expect(await archive.summaries().isEmpty)
         #expect(setAsideFiles(in: folder).count == 1)
+    }
+
+    @Test func aThreadSetAsideWhoseFilingReadsOnlyInPartIsFiledBesideIt() async throws {
+        // A chat opened from a filing this build reads in part, asked on,
+        // then set aside by a New Chat whose filing failed. Joined with what
+        // decoded, the filing would lose the turns that didn't, so it was
+        // never filed at all and came back at every launch. Filed beside
+        // that filing instead, which stays as it was.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let archive = archive(in: folder)
+        let first = try #require(await archive.archive([dated("first", 1000), dated("second", 2000)]))
+        let filed = folder.appending(path: "threads/\(first.id.uuidString).json")
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: filed)) as? [[String: Any]])
+        turns[1]["question"] = 12_345
+        let altered = try JSONSerialization.data(withJSONObject: turns)
+        try altered.write(to: filed)
+
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.save([dated("first", 1000), dated("second", 2000), dated("third", 3000)]))
+        #expect(await store.setAside())
+        #expect(await store.recoverSetAside(into: archive) == 1)
+        #expect(setAsideFiles(in: folder).isEmpty)
+        #expect(try Data(contentsOf: filed) == altered)
+        let summaries = await archive.summaries()
+        #expect(summaries.count == 2)
+        let beside = try #require(summaries.first { $0.id != first.id })
+        #expect(await archive.entries(for: beside.id).entries.map(\.question) == ["first", "second", "third"])
+    }
+
+    @Test func anOriginalWhoseFilingReadsOnlyInPartStillWaits() async throws {
+        // An original's turns are on screen in its chat already, as far as
+        // they decode: filed beside a filing that reads in part, the chat
+        // would be listed twice, so the original waits for a build that
+        // reads the filing whole.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let archive = archive(in: folder)
+        let first = try #require(await archive.archive([dated("first", 1000), dated("second", 2000)]))
+        let filed = folder.appending(path: "threads/\(first.id.uuidString).json")
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: filed)) as? [[String: Any]])
+        turns[1]["question"] = 12_345
+        try JSONSerialization.data(withJSONObject: turns).write(to: filed)
+        let original = folder.appending(path: "ask-thread-original-\(UUID().uuidString).json")
+        try JSONEncoder().encode([dated("first", 1000), dated("second", 2000)]).write(to: original)
+
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.recoverSetAside(into: archive) == 0)
+        #expect(originalFiles(in: folder) == [original])
+        #expect(await archive.summaries().map(\.id) == [first.id])
     }
 
     @Test func aThreadSetAsideStaysUntilTheEarlierChatsHaveIt() async throws {

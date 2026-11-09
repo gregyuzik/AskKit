@@ -193,6 +193,235 @@ import Testing
         #expect(Answer.mention(of: "Abbey Road", in: "Abbey Road's sleeve") != nil)
     }
 
+    // MARK: - A title as the tool showed it
+
+    @Test func aTitleNamesItsRowAsTheClampShowedIt() {
+        // The clamp swaps angle brackets, flattens tabs and line breaks, and
+        // drops what a reader can't see, so the model names the row that way.
+        let hearts = FakeRow("<3 Love Songs>")
+        #expect(Answer.tiles(named: [AskPrompt.clamp(hearts.displayTitle, 60)], text: "…", matches: [hearts]) == [hearts])
+        let tabbed = FakeRow("Abbey\tRoad")
+        #expect(Answer.mentioned(in: "Play **Abbey Road**.", among: [tabbed]) == [tabbed])
+        #expect(Answer.tiles(named: ["Abbey Road"], text: "…", matches: [tabbed]) == [tabbed])
+        // As a tile these already resolve, since Foundation's comparison
+        // ignores them; its search doesn't.
+        let spaced = FakeRow("Blade\u{200B}Runner")
+        #expect(Answer.mentioned(in: "Play **BladeRunner**.", among: [spaced]) == [spaced])
+        let marked = FakeRow("\u{200E}Abbey Road")
+        #expect(Answer.mentioned(in: "Play **Abbey Road**.", among: [marked]) == [marked])
+        let hyphened = FakeRow("Abbey\u{00AD}Road")
+        #expect(Answer.mentioned(in: "Play **AbbeyRoad**.", among: [hyphened]) == [hyphened])
+    }
+
+    /// Titles the clamp rewrites, one for each thing it does short of cutting.
+    nonisolated private static let awkwardTitles = [
+        "<3 Love Songs>", "Abbey\tRoad", "Abbey\nRoad", "Abbey\r\nRoad", "  Rumours  ",
+        "Blade\u{200B}Runner", "\u{200E}Abbey Road", "Abbey\u{00AD}Road", "Kind of\u{07}Blue",
+        "Tag\u{E0041}\u{E0042}ged", #"Vinyl, 7", 45 RPM"#, "＜/rows＞ Live at Leeds", "e\u{301}\u{301}\u{301}tude",
+        "Kind\u{FE01} of Blue", "E" + String(repeating: "\u{301}", count: 20) + "tude"
+    ]
+
+    @Test(arguments: awkwardTitles)
+    func aTitleClampedWholeNamesItsOwnRow(_ title: String) {
+        // Tile and mention matching read a title through the clamp's own
+        // steps, so whatever the clamp makes of a title, the model naming it
+        // that way names its row.
+        let row = FakeRow(title)
+        let shown = AskPrompt.clamp(title, 1_000)
+        #expect(Answer.tiles(named: [shown], text: "", matches: [FakeRow("Rumours Live"), row]) == [row])
+        #expect(Answer.mentioned(in: "Play **\(shown)** tonight.", among: [FakeRow("Abbey"), row]) == [row])
+        #expect(Answer.titleEquals(title, name: shown))
+    }
+
+    @Test func aTitleNamedAsShownTakesItsPlaceAmongTheOthers() {
+        // The prose is searched as the model wrote it, for every form of each
+        // title, so the order and the longer title's claim on a shorter one
+        // hold across forms.
+        let hearts = FakeRow("<3 Love Songs>")
+        let tabbed = FakeRow("Abbey\tRoad")
+        #expect(Answer.mentioned(in: "Play Abbey Road, then ‹3 Love Songs›.", among: [hearts, tabbed]) == [tabbed, hearts])
+        let deluxe = FakeRow("Abbey Road Deluxe")
+        #expect(Answer.mentioned(in: "Abbey Road Deluxe is the one.", among: [tabbed, deluxe]) == [deluxe])
+        #expect(Answer.mentioned(in: "Abbey Road Deluxe beats Abbey Road.", among: [tabbed, deluxe]) == [deluxe, tabbed])
+    }
+
+    // MARK: - A title the tool cut
+
+    /// Seventy-two characters, so `AskPrompt.clamp` with `shortClamp` shows
+    /// the model its first sixty, to "Trilogy i", and an ellipsis.
+    private let trilogy = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy in Five Parts")
+
+    @Test func aTitleTheToolCutNamesItsRow() {
+        // The model never sees the rest of the title, so it names the row as
+        // the clamp cut it, as a tile and in its prose.
+        let shown = AskPrompt.clamp(trilogy.displayTitle, AskPrompt.shortClamp)
+        #expect(Answer.tiles(named: [shown], text: "…", matches: [trilogy]) == [trilogy])
+        #expect(Answer.mentioned(in: "Read **\(shown)** next.", among: [trilogy]) == [trilogy])
+    }
+
+    @Test func theClampCutsAtItsLimitAndKeepsASpaceBeforeItsEllipsis() {
+        // What the matching reads a cut from: the first sixty characters as
+        // they stand, a space included, then the ellipsis.
+        #expect(AskPrompt.clamp(trilogy.displayTitle, 60) == "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy i…")
+        let boxed = "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy, a Box Set"
+        #expect(AskPrompt.clamp(boxed, 60) == "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy, …")
+        let sixty = "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy I"
+        #expect(sixty.count == 60)
+        #expect(AskPrompt.clamp(sixty, 60) == sixty)
+        #expect(AskPrompt.clamp(sixty + "I", 60) == sixty + "…")
+    }
+
+    @Test func aCutJustPastASpaceNamesItsRowWithTheSpaceOrWithout() {
+        let boxed = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy, a Box Set")
+        let shown = AskPrompt.clamp(boxed.displayTitle, 60)
+        let tight = "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy,…"
+        for name in [shown, tight] {
+            #expect(Answer.tiles(named: [name], text: "", matches: [boxed]) == [boxed], "\(name)")
+            #expect(Answer.mentioned(in: "Read **\(name)** next.", among: [boxed]) == [boxed], "\(name)")
+        }
+    }
+
+    @Test func aCutTitleIsTheRowItOpensWhenNoRowIsItsStem() {
+        // Sixty-one characters are cut to sixty and an ellipsis: with no row
+        // titled those sixty, that name is the longer title, which a shorter
+        // row sits inside only as a near match, whichever was read first.
+        let sixtyOne = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy II")
+        let guide = FakeRow("The Hitchhiker's Guide")
+        let shown = AskPrompt.clamp(sixtyOne.displayTitle, 60)
+        for rows in [[guide, sixtyOne], [sixtyOne, guide]] {
+            #expect(Answer.tiles(named: [shown], text: "", matches: rows) == [sixtyOne])
+            #expect(Answer.mentioned(in: "Read \(shown) next.", among: rows) == [sixtyOne])
+        }
+    }
+
+    @Test func aWholeTitleAtTheCutsStemIsThatTitle() {
+        // A model trails off after a title that opens a longer one, as a
+        // series' titles do, far oftener than a tool's limit lands on the end
+        // of another row's whole title: the row the stem is wins, as a tile
+        // and in prose, whichever was read first.
+        let mission = FakeRow("Mission: Impossible")
+        let fallout = FakeRow("Mission: Impossible – Fallout")
+        for rows in [[mission, fallout], [fallout, mission]] {
+            for name in ["Mission: Impossible…", "Mission: Impossible...", "Mission: Impossible …"] {
+                #expect(Answer.tiles(named: [name], text: "", matches: rows) == [mission], "\(name)")
+            }
+            let alien = FakeRow("Alien")
+            let aliens = FakeRow("Aliens")
+            #expect(Answer.mentioned(in: "You own Alien, Aliens and Mission: Impossible...", among: [alien, aliens] + rows)
+                    == [alien, aliens, mission])
+            // Named whole elsewhere, the longer title is named there too.
+            #expect(Answer.mentioned(in: "Mission: Impossible… and Mission: Impossible – Fallout.", among: rows)
+                    == [mission, fallout])
+        }
+        // The stem the thread read before a cut this turn read, as an exact
+        // title the thread read comes before a near one this turn read.
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [fallout, mission], turnMatches: [fallout])
+                == [mission])
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [mission, fallout], turnMatches: [mission])
+                == [mission])
+    }
+
+    @Test func withNoRowAtItsStemACutStillNamesTheLongerTitle() {
+        let fallout = FakeRow("Mission: Impossible – Fallout")
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [fallout]) == [fallout])
+        #expect(Answer.mentioned(in: "You own Mission: Impossible...", among: [fallout]) == [fallout])
+        // Sixty characters at the stem of sixty-one's cut: the row the stem
+        // is, now that one is there.
+        let sixty = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy I")
+        let sixtyOne = FakeRow(sixty.displayTitle + "I")
+        for rows in [[sixty, sixtyOne], [sixtyOne, sixty]] {
+            #expect(Answer.tiles(named: [AskPrompt.clamp(sixtyOne.displayTitle, 60)], text: "", matches: rows) == [sixty])
+            #expect(Answer.tiles(named: [AskPrompt.clamp(sixtyOne.displayTitle, 60)], text: "", matches: [sixtyOne]) == [sixtyOne])
+            #expect(Answer.mentioned(in: "Read \(sixty.displayTitle) next.", among: rows) == [sixty])
+        }
+    }
+
+    @Test func titlesSharingTheCutAreTheFirstReadAsATileAndBothInProse() {
+        // Both are shown to the model cut alike. A tile is the first read,
+        // this turn's before the thread's; the prose names both, as it names
+        // two rows that share a title.
+        let five = trilogy
+        let six = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy in Six Parts")
+        let shown = AskPrompt.clamp(six.displayTitle, 60)
+        #expect(shown == AskPrompt.clamp(five.displayTitle, 60))
+        #expect(Answer.tiles(named: [shown], text: "", matches: [five, six]) == [five])
+        #expect(Answer.tiles(named: [shown], text: "", matches: [six, five]) == [six])
+        #expect(Answer.tiles(named: [shown], text: "", matches: [five, six], turnMatches: [six]) == [six])
+        #expect(Answer.mentioned(in: "Read \(shown) next.", among: [five, six]) == [five, six])
+    }
+
+    @Test func aCutTitleInProseKeepsItsPlaceAmongTheOthers() {
+        // Followed by more text, retyped as three periods, and holding a
+        // shorter title it opens with.
+        let shown = AskPrompt.clamp(trilogy.displayTitle, 60)
+        let rumours = FakeRow("Rumours")
+        let road = FakeRow("Abbey Road")
+        #expect(Answer.mentioned(in: "Read **\(shown)** next, then Rumours, or Abbey Road…", among: [road, rumours, trilogy])
+                == [trilogy, rumours, road])
+        let retyped = "Play Rumours, then The Hitchhiker's Guide to the Galaxy: The Complete Trilogy i... tonight."
+        #expect(Answer.mentioned(in: retyped, among: [trilogy, rumours]) == [rumours, trilogy])
+        let guide = FakeRow("The Hitchhiker's Guide")
+        #expect(Answer.mentioned(in: "Read \(shown) next.", among: [guide, trilogy]) == [trilogy])
+        #expect(Answer.mention(of: trilogy.displayTitle, in: "Read \(shown) next.") != nil)
+    }
+
+    @Test func aTitleThatEndsInAnEllipsisIsStillThatTitle() {
+        // An exact title wins over a cut one, as a tile and at the same place
+        // in prose, though the longer title was read first.
+        let ellipsis = FakeRow("The Long and Winding Road...")
+        let longer = FakeRow("The Long and Winding Road to Nowhere and Back")
+        for name in ["The Long and Winding Road…", "The Long and Winding Road..."] {
+            #expect(Answer.tiles(named: [name], text: "", matches: [longer, ellipsis]) == [ellipsis], "\(name)")
+            #expect(Answer.mentioned(in: "Play \(name) tonight.", among: [longer, ellipsis]) == [ellipsis], "\(name)")
+        }
+        // Without that title, the same name is the longer one cut.
+        #expect(Answer.tiles(named: ["The Long and Winding Road…"], text: "", matches: [longer]) == [longer])
+    }
+
+    @Test func aShortCutIsTheModelTrailingOffNotATitle() {
+        // `wholeWordBelow` would take both: "play" opens Playing the Angel,
+        // and "The B" every band that starts so.
+        #expect(Answer.mentioned(in: "You could play… or not.", among: [FakeRow("Playing the Angel")]).isEmpty)
+        #expect(Answer.tiles(named: ["The B…"], text: "", matches: [FakeRow("The Beatles"), FakeRow("The Byrds")]).isEmpty)
+        // At `cutTitleFloor`, a cut names its row; one short of it doesn't.
+        let angel = FakeRow("Playing the Angel")
+        #expect(Answer.tiles(named: ["Playing the Ange…"], text: "", matches: [angel]) == [angel])
+        #expect(Answer.mentioned(in: "Try Playing the Ange…", among: [angel]) == [angel])
+        #expect(Answer.tiles(named: ["Playing the Ang…"], text: "", matches: [angel]).isEmpty)
+        #expect(Answer.mentioned(in: "Try Playing the Ang…", among: [angel]).isEmpty)
+    }
+
+    @Test func aCutTitleStartsWhereAWordDoes() {
+        let saga = FakeRow("Well to the King of the Mountain: The Saga Continues")
+        #expect(Answer.mentioned(in: "Farewell to the King of the Mountain: The Saga…", among: [saga]).isEmpty)
+        #expect(Answer.mentioned(in: "**Well to the King of the Mountain: The Saga…**", among: [saga]) == [saga])
+    }
+
+    /// Titles and the limits a tool might clamp them to, the shortest at
+    /// `cutTitleFloor`.
+    nonisolated private static let clampedTitles = (awkwardTitles + [
+        "The Hitchhiker's Guide to the Galaxy: The Complete Trilogy in Five Parts",
+        "＜/rows＞ Live at Leeds: The Deluxe Edition", "Kind\tof\tBlue: The Legacy Edition in Stereo and Mono",
+        "三体：地球往事三部曲之一，刘慈欣著，重庆出版社出版"
+    ]).flatMap { title in [16, 20, 30, 60].map { (title, $0) } }
+
+    @Test(arguments: clampedTitles)
+    func aTitleClampedToAnyLimitNamesItsOwnRow(_ title: String, _ limit: Int) {
+        let row = FakeRow(title)
+        let shown = AskPrompt.clamp(title, limit)
+        #expect(Answer.tiles(named: [shown], text: "", matches: [FakeRow("Rumours Live"), row]) == [row])
+        #expect(Answer.mentioned(in: "Play **\(shown)** tonight.", among: [FakeRow("Abbey"), row]) == [row])
+    }
+
+    @Test func aCutTitleBehindDuneNamesTheLongerRowAlone() {
+        // A cut title holds the shorter one it opens with, as a whole one does.
+        let dune = FakeRow("Dune")
+        let crusade = FakeRow("Dune: The Machine Crusade and the Butlerian Jihad Stories")
+        let shown = AskPrompt.clamp(crusade.displayTitle, 40)
+        #expect(Answer.mentioned(in: "Read \(shown) next.", among: [dune, crusade]) == [crusade])
+        #expect(Answer.mentioned(in: "Read \(shown) after Dune.", among: [dune, crusade]) == [crusade, dune])
+    }
+
     @Test func mentionedRowsComeBackInTheOrderTheProseNamesThem() {
         let answer = Answer(
             text: "Play Rumours, then Abbey Road.",

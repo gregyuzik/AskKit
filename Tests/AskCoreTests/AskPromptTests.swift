@@ -1080,6 +1080,16 @@ import Testing
         #expect(prompt == "P\na\n<user_request>q</user_request>")
     }
 
+    @Test func aPrefixWithoutALineBreakEndsItsLineAsALineDoes() {
+        // Run on, the domain's opening sentence and the next line, or the
+        // question's fence, would read as one.
+        #expect(AskPrompt.promptText(prefix: "Answer about my records.", lines: ["Now: today."], question: "q")
+                == "Answer about my records.\nNow: today.\n<user_request>q</user_request>")
+        #expect(AskPrompt.promptText(prefix: "Answer about my records.", lines: [], question: "q")
+                == "Answer about my records.\n<user_request>q</user_request>")
+        #expect(AskPrompt.promptText(prefix: "", lines: [], question: "q") == "<user_request>q</user_request>")
+    }
+
     @Test func aForgedFenceInTheQuestionClosesNothingAndOpensNothing() {
         // The reader's own words, or an `AskLink` prefill they then send: a
         // closing tag broken over a line, then an opening one with an attribute.

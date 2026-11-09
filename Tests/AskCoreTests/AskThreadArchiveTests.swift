@@ -579,6 +579,76 @@ import Testing
         directory.appending(path: "\(id.uuidString).json")
     }
 
+    // MARK: - A row that won't encode
+
+    /// A chat whose second turn read a row that won't encode, `unwritable`,
+    /// beside one that will, and shows it as its only tile.
+    private func ratedChat(_ unwritable: RatedRow, outcome: AskProposalOutcome? = nil) -> [AskThreadEntry<RatedRow>] {
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        return [
+            AskThreadEntry(
+                question: "Which records?", text: "One.",
+                answer: AskAnswer(text: "One.", matches: [RatedRow("1", "One")], tiles: [RatedRow("1", "One")]),
+                tier: .privateCloud, askedAt: start
+            ),
+            AskThreadEntry(
+                question: "Can I lend Two?", text: "Two.",
+                answer: AskAnswer(text: "Two.", matches: [unwritable, RatedRow("3", "Three")], tiles: [unwritable]),
+                tier: .privateCloud, askedAt: start.addingTimeInterval(60), proposalOutcome: outcome
+            )
+        ]
+    }
+
+    @Test(arguments: [RatedRow("2", "Two", rating: .nan), RatedRow("2", "Two", refuses: true)])
+    func aChatWithARowThatWontEncodeIsFiledWithoutIt(_ unwritable: RatedRow) async throws {
+        // Encoded whole, the chat could never be filed: New Chat kept it on
+        // screen, and no earlier chat would open in its place.
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "askkit-archive-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let archive = AskThreadArchive<RatedRow>(appDirectory: "unused", directory: directory)
+        let summary = try #require(await archive.archive(ratedChat(unwritable)))
+        guard case .thread(let read, 0) = await archive.entries(for: summary.id) else {
+            Issue.record("the filing reads back whole")
+            return
+        }
+        #expect(read.map(\.question) == ["Which records?", "Can I lend Two?"])
+        #expect(read.first?.answer?.tiles.map(\.id) == ["1"])
+        #expect(read.last?.answer?.text == "Two.")
+        #expect(read.last?.answer?.matches.map(\.id) == ["3"])
+        #expect(read.last?.answer?.tiles.isEmpty == true)
+    }
+
+    @Test func whatCameOfAProposalIsWrittenIntoAFilingWithARowThatWontEncode() async throws {
+        // A row filed before its type had a rating reads back unrated
+        // (`.nan`), and so won't encode: written whole, the filing would never
+        // take what came of the proposal, and the card would wait on it.
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "askkit-archive-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let archive = AskThreadArchive<RatedRow>(appDirectory: "unused", directory: directory)
+        let entries = ratedChat(RatedRow("2", "Two"), outcome: .performing)
+        let summary = try #require(await archive.archive(entries))
+        let filed = file(for: summary.id, in: directory)
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: filed)) as? [[String: Any]])
+        var answer = try #require(turns[1]["answer"] as? [String: Any])
+        var matches = try #require(answer["matches"] as? [[String: Any]])
+        matches[0]["rating"] = nil
+        answer["matches"] = matches
+        turns[1]["answer"] = answer
+        try JSONSerialization.data(withJSONObject: turns).write(to: filed)
+
+        let askedAt = try #require(entries[1].askedAt)
+        #expect(await archive.settleProposal(asked: "Can I lend Two?", at: askedAt, with: .confirmed("Lent.")))
+        guard case .thread(let read, 0) = await archive.entries(for: summary.id) else {
+            Issue.record("the filing reads back whole")
+            return
+        }
+        #expect(read.map(\.proposalOutcome) == [nil, .confirmed("Lent.")])
+        #expect(read.last?.answer?.matches.map(\.id) == ["3"])
+        #expect(read.last?.answer?.tiles.map(\.id) == ["2"])
+    }
+
     @Test func aFilingThatCannotBeWrittenReturnsNoSummary() async throws {
         // The caller's signal not to delete or overwrite the thread it filed.
         let (archive, directory) = makeArchive()
