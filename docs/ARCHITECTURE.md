@@ -521,13 +521,19 @@ AskKit fences what it composes in five tags, held in one list that `AskPrompt`'s
   stack any number of combining marks), redacted, neutered and fenced in `<user_request>`. Thread
   titles and a photo's label are clamped to 60 characters, flattened, redacted and neutered; the label
   is fenced in `<rows>`, as a recap's titles are.
+- **Dropping and swapping**, the first thing `AskPrompt.sanitizeForFence(_:)` does: what a reader can't
+  see goes as it goes from the question (tag characters, bidi controls, a run of joiners, the other
+  format characters), and so does every C0 and C1 control but the tab and the line breaks, and a
+  straight double quote becomes `″`, which the model can copy into its answer without ending the
+  answer's string. Every path that sanitizes does all three before it redacts.
 - **Redacting** (`AskPrompt.sanitizeForFence(_:)`) turns each of AskKit's fence tags, opening or closing,
   into `[redacted]` in any spelling that compatibility decomposition (NFKD) maps to the tag once marks
   are dropped: any case, whitespace or attributes; a combining mark or a format character beside a
   bracket or inside the name; punctuation after the name; the fullwidth, small and negated brackets
   (`＜ ＞`, `﹤ ﹥`, `≮ ≯`); and letter forms such as mathematical, circled, ligature and precomposed
-  letters. Nothing else: other brackets stay, as does a tag spelled with a Latin-looking letter of
-  another script (Cyrillic `о`) or a slash-like character (`⁄`, `∕`), which normalize to no ASCII.
+  letters. Nothing else is redacted: other brackets stay, as does a tag spelled with a Latin-looking
+  letter of another script (Cyrillic `о`) or a slash-like character (`⁄`, `∕`), which normalize to no
+  ASCII.
 - **Neutering** (`AskPrompt.neuteringTags(_:)`) swaps ASCII angle brackets for `‹ ›`, so no tag can be
   spelled with them.
 

@@ -603,8 +603,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// of a mention, so which form either side used stops mattering.
     ///
     /// The double prime (`″`) is a straight double quote as the model reads
-    /// one: `AskPrompt.clamp` and the grounded retry's rows swap each for it,
-    /// so an answer that copies `7″` still names the row titled `7"`.
+    /// one: `AskPrompt.sanitizeForFence`, which every fenced path runs, swaps
+    /// each for it, so an answer that copies `7″` still names the row titled
+    /// `7"`.
     static func plainPunctuation(_ text: String) -> String {
         var out = text
         for (fancy, plain) in [("…", "..."), ("’", "'"), ("‘", "'"), ("“", "\""), ("”", "\""), ("″", "\""), ("—", "-"), ("–", "-")] {

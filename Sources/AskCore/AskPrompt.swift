@@ -19,9 +19,11 @@ public import Foundation
 /// returns reaches the model as it stands, and its rows are the reader's own
 /// data, so a tool puts each field through `clamp(_:_:)` with `shortClamp` or
 /// `longClamp`, or, where its line breaks carry the layout the model reads,
-/// through `neuteringTags(_:)`. `sanitizeForFence(_:)` redacts AskKit's own
-/// fence tags and leaves every other bracket alone; `clamp` runs it too, and
-/// `neuteringTags` doesn't.
+/// through `sanitizeForFence(_:)`, then `neuteringTags(_:)`.
+/// `sanitizeForFence(_:)` drops what a reader can't see and the control
+/// characters, turns straight double quotes into double primes and redacts
+/// AskKit's own fence tags, leaving every other bracket alone; `clamp` runs
+/// it too, and `neuteringTags` doesn't.
 nonisolated public enum AskPrompt {
     /// Longest question that reaches a model. Anything past this is a
     /// paste, not a question, and it costs context the tools need.
@@ -44,6 +46,22 @@ nonisolated public enum AskPrompt {
     /// reader's, a model's or a tool's text: each of AskKit's fence tags,
     /// opening or closing, becomes `[redacted]`, and every other bracket is
     /// left alone.
+    ///
+    /// **First, what a reader can't see goes, and the quote that would end
+    /// the answer.** Before it reads for a tag, it drops what
+    /// `droppingInvisibles(_:)` drops from the question: Unicode tag
+    /// characters, which spell an order in ASCII and draw nothing; bidi
+    /// controls, which draw text in another order than it is sent; a run of
+    /// joiners and every other format character, keeping the joiners,
+    /// selectors and subdivision flags real text spells. It drops every C0
+    /// and C1 control too (`droppingControls(_:)`), but the tab and the line
+    /// breaks, which are layout. And it turns each straight double quote into
+    /// a double prime (`neuteringQuotes(_:)`; `clamp(_:_:)` says why). Every
+    /// path that fences runs this, so each gets all three: the question's
+    /// fence, the recaps, a photo's label, the grounded retry's rows, the
+    /// clamp, and a tool's output that keeps its lines. A scalar that sat
+    /// inside a tag goes before the tag is read: a control there ended the
+    /// name, so `＜/ro␇ws＞` passed as another word.
     ///
     /// Case-insensitive, and tolerant of any whitespace inside the tag,
     /// newlines included, and of attributes: an XML-ish parser reading the
@@ -92,6 +110,10 @@ nonisolated public enum AskPrompt {
     /// "3 < rows", is a comparison and stays; a slash or a newline in that
     /// gap still makes it a tag.
     public static func sanitizeForFence(_ input: String) -> String {
+        // The controls before the invisibles: a joiner stays after anything
+        // but a joiner, so two parted by a bell would both stay, and the
+        // bell's going would leave them a run.
+        let input = neuteringQuotes(droppingInvisibles(droppingControls(input)))
         let known = Set(fenceTags.map { $0.lowercased() })
         let longest = fenceTags.map(\.unicodeScalars.count).max() ?? 0
         let scalars = input.unicodeScalars
@@ -315,14 +337,33 @@ nonisolated public enum AskPrompt {
     /// quote under a combining mark is one Character with it, and still
     /// U+0022 to the model.
     ///
-    /// `clamp(_:_:)` runs it on every field, and the engine on the grounded
-    /// retry's rows, beside `neuteringTags(_:)`, which is named for tags and
-    /// leaves quotes alone.
+    /// `sanitizeForFence(_:)` runs it, so every fenced path does;
+    /// `neuteringTags(_:)` is named for tags and leaves quotes alone.
     static func neuteringQuotes(_ text: String) -> String {
         let swapped = text.unicodeScalars.map { scalar -> Unicode.Scalar in
             scalar == "\"" ? "″" : scalar
         }
         return String(String.UnicodeScalarView(swapped))
+    }
+
+    /// `text` without its C0 and C1 controls (U+0000 to U+001F, U+007F to
+    /// U+009F), but for the tab and the line breaks a `Character` reads as
+    /// one (LF, VT, FF, CR and NEL). A control draws nothing a reader sees,
+    /// and reaches the model all the same; the tab and the line breaks are
+    /// layout, which output laid out in lines keeps and `clamp(_:_:)` makes
+    /// spaces.
+    ///
+    /// `sanitizeForFence(_:)` runs it, so every fenced path does.
+    static func droppingControls(_ text: String) -> String {
+        var out = String.UnicodeScalarView()
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x09...0x0D, 0x85: out.append(scalar)
+            case 0x00...0x1F, 0x7F...0x9F: continue
+            default: out.append(scalar)
+            }
+        }
+        return String(out)
     }
 
     /// The question as it reaches a prompt: trimmed of whitespace and
@@ -347,7 +388,8 @@ nonisolated public enum AskPrompt {
     }
 
     /// `text` without what a reader can't see: every question the engine is
-    /// asked and each question a recap quotes, before either is clamped, and
+    /// asked and each question a recap quotes, before either is clamped;
+    /// everything `sanitizeForFence(_:)` reads, so every fenced path; and
     /// the words that reach the composer or a chip from neither the reader
     /// nor the host, an `AskLink`'s question and the follow-ups a model
     /// writes. Whatever is left is what the reader saw, or sees before they
@@ -443,22 +485,28 @@ nonisolated public enum AskPrompt {
         recommendedSubdivisionFlags.contains(character.unicodeScalars.map(\.value))
     }
 
-    /// The question in its fence: clamped, any fence tag in it redacted, then
-    /// every angle bracket swapped for its lookalike, the order the rows get
-    /// in the grounded retry. The reader's own words, typed or an `AskLink`
-    /// prefill they sent, get what titles, labels and tool rows get, so no tag
-    /// can be spelled inside the fence in ASCII brackets, and no fence tag in
-    /// the other brackets `sanitizeForFence(_:)` reads.
+    /// The question in its fence: clamped, sanitized (its invisibles and
+    /// controls dropped, its straight double quotes turned into double primes
+    /// and any fence tag in it redacted), then every angle bracket swapped for
+    /// its lookalike, the order the rows get in the grounded retry. The
+    /// reader's own words, typed or an `AskLink` prefill they sent, get what
+    /// titles, labels and tool rows get, so no tag can be spelled inside the
+    /// fence in ASCII brackets, no fence tag in the other brackets
+    /// `sanitizeForFence(_:)` reads, and no quote they typed can end the
+    /// answer's string. Only the prompt's copy is fenced: the thread shows
+    /// the question as the reader typed it.
     static func fencedQuestion(_ question: String) -> String {
         "<user_request>" + neuteringTags(sanitizeForFence(clampQuestion(question))) + "</user_request>"
     }
 
-    /// Untrusted text as it may appear in a prompt: ASCII angle brackets
-    /// replaced with their single-glyph lookalikes so no tag can be spelled
-    /// with them, straight double quotes with double primes (`″`), any of
-    /// AskKit's fence tags spelled in other brackets redacted, newlines
-    /// collapsed to spaces, and the whole clamped. Text longer than `limit`
-    /// keeps its first `limit` characters, then a "…".
+    /// Untrusted text as it may appear in a prompt: tabs and newlines
+    /// collapsed to spaces, what a reader can't see and every other control
+    /// dropped, straight double quotes turned into double primes (`″`),
+    /// ASCII angle brackets replaced with their single-glyph lookalikes so no
+    /// tag can be spelled with them, any of AskKit's fence tags spelled in
+    /// other brackets redacted, and the whole clamped. The drops, the quote
+    /// swap and the redaction are `sanitizeForFence(_:)`'s. Text longer than
+    /// `limit` keeps its first `limit` characters, then a "…".
     ///
     /// **A clamped field can't end the answer's string.** Apple's on-device
     /// model writes its answer inside a guided-generation JSON string, and
@@ -467,9 +515,18 @@ nonisolated public enum AskPrompt {
     /// incident is titled ") and the generation runs on to the token cap.
     /// So each one becomes a double prime (U+2033), which looks like it and
     /// ends nothing, as in `Vinyl, 7″, 45 RPM` or `The ″Best″ Album`
-    /// (`neuteringQuotes(_:)`). One scalar for one and one character for one,
-    /// so the limit and the scalar cap fall where they did, and nothing after
-    /// the swap writes a quote for a second clamp to find.
+    /// (`neuteringQuotes(_:)`, which the sanitizer runs). One scalar for one
+    /// and one character for one, so the limit and the scalar cap fall where
+    /// they did, and nothing after the swap writes a quote for a second clamp
+    /// to find.
+    ///
+    /// **Nor can it carry what the reader can't see.** Tool rows, such as
+    /// catalog titles and web imports, can hold Unicode tag characters that
+    /// spell an order in ASCII, bidi controls and runs of joiners, which the
+    /// question path drops (`droppingInvisibles(_:)`), and C0 and C1
+    /// controls. The sanitizer drops them before it reads for a tag, keeping
+    /// the joiners, selectors and subdivision flags real text spells; the
+    /// tab and the line breaks it keeps are spaces here by then.
     ///
     /// Each character also keeps at most its first 16 Unicode scalars, so the
     /// result holds no more than `16 × limit + 1` of them. The limit counts
@@ -486,37 +543,39 @@ nonisolated public enum AskPrompt {
     /// normalize to ASCII, so `＜/tool_result＞` is the fence's closer to a
     /// model that normalizes, and so is `＜/𝐭𝐨𝐨𝐥_𝐫𝐞𝐬𝐮𝐥𝐭＞`.
     ///
-    /// The swap runs first, so an ASCII tag comes out as `‹rows›`, and only a
-    /// tag in other brackets loses its text. The
+    /// The bracket swap runs first, so an ASCII tag comes out as `‹rows›`,
+    /// and only a tag in other brackets loses its text. The
     /// sanitizer closes a tag on `›` as on `>`, so `＜/rows>` is caught after
     /// the swap has turned its `>`, here and by a caller that sanitizes the
-    /// result again and finds nothing left. It reads the text with its
-    /// newlines already spaces, as the model will.
+    /// result again and finds nothing left. It reads the text with its tabs
+    /// and newlines already spaces, as the model will.
     ///
-    /// The tags and the scalar cap go before the cut, so the limit counts
-    /// `[redacted]`, and a tag that straddles the limit can't be cut into a
-    /// half-tag that slips past: `＜/user_req…` is no fence tag to the
+    /// The sanitizer and the scalar cap go before the cut, so the limit
+    /// counts `[redacted]`, and a tag that straddles the limit can't be cut
+    /// into a half-tag that slips past: `＜/user_req…` is no fence tag to the
     /// sanitizer, but a model reads where it was going. Each can make work
-    /// for the other, so the text is redacted and capped again until a pass
-    /// changes nothing: the cap can drop a run of Prepend format scalars
-    /// that parted a fence tag's name from its `＞`, and a redaction can
-    /// join what follows a tag to its `]`, a character over the cap.
+    /// for the other, so the text is sanitized and capped again until a pass
+    /// changes nothing: a redaction can join what follows a tag to its `]`,
+    /// and a scalar the sanitizer drops can join the characters either side
+    /// of it, either one a character over the cap; and the trim can leave a
+    /// joiner first, where the sanitizer drops it.
     /// The kept text is read the same way before the "…" goes on, for the
     /// openers the cut makes: a cut just past a fence tag's name inside a
     /// longer one, as in `＜/tool_results＞`, leaves the tag's opener.
     /// `[redacted]` can be more characters than what it replaced, so a pass
     /// that redacts anything cuts the text to the limit again and is read
     /// again, until one finds nothing. Each pass that redacts takes away an
-    /// opening bracket, and the cap, the trim and the cut add none and only
-    /// ever drop scalars, so the passes end. A last character that would
-    /// join the "…", as a run of Prepend scalars joins anything, goes before
-    /// it. The result is never longer than the limit and the "…", and
-    /// clamping it again changes nothing. A negative limit reads as zero.
+    /// opening bracket, and the sanitizer's drops and swap, the cap, the trim
+    /// and the cut add none, and only ever drop scalars or swap one for one,
+    /// so the passes end. A last character that would join the "…", as a
+    /// run of Prepend scalars joins anything, goes before it. The result is
+    /// never longer than the limit and the "…", and clamping it again changes
+    /// nothing. A negative limit reads as zero.
     public static func clamp(_ text: String, _ limit: Int) -> String {
         let limit = max(0, limit)
         var kept = settled(
-            neuteringQuotes(neuteringTags(text))
-                .split(whereSeparator: \.isNewline)
+            neuteringTags(text)
+                .split(whereSeparator: { $0.isNewline || $0 == "\t" })
                 .joined(separator: " "),
             trimmingItsEnd: true
         )
@@ -528,9 +587,9 @@ nonisolated public enum AskPrompt {
         return cut ? boundingScalars(kept, before: "…") + "…" : kept
     }
 
-    /// `text` redacted, held to the scalar cap and trimmed of whitespace,
-    /// over and over until a pass changes nothing, so the sanitizer and the
-    /// cap would each leave it as it is.
+    /// `text` sanitized (`sanitizeForFence(_:)`), held to the scalar cap and
+    /// trimmed of whitespace, over and over until a pass changes nothing, so
+    /// the sanitizer and the cap would each leave it as it is.
     ///
     /// `trimmingItsEnd` false trims only the start, for a text that was
     /// just cut: what it keeps before its "…" is the first characters as
