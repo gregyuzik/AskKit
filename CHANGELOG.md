@@ -50,8 +50,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   periods, names the row whose title opens with what comes before it and goes on past it, at whatever
   limit the tool clamped to, once that is 16 characters or more: fewer can be the model trailing off,
   as in "You could play…". An exact title still comes first, so a title that ends in an ellipsis is
-  still that title, and a cut one comes before a near one. Titles that open alike were shown cut
-  alike: a tile title is the first of them read, and prose names them all.
+  still that title. Next comes a row whose whole title is what comes before the ellipsis, so
+  "Mission: Impossible…" names Mission: Impossible and not Mission: Impossible – Fallout, as a tile
+  and in prose that trails off after it: a model does that far oftener than a tool's limit lands on
+  the end of another row's title. Then a cut title, then a near one. Titles that open alike were
+  shown cut alike: a tile title is the first of them read, and prose names them all.
 - **A `promptPrefix` without a trailing newline ends its line.** The engine appended a domain's prefix
   as it stood, so "Answer about my records." ran straight into the first of the domain's lines, or into
   the question's `<user_request>` fence, where every line already ended in a newline. A non-empty

@@ -423,7 +423,8 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// characters, then an ellipsis (`AskPrompt.cutMark`), which the model may
     /// retype as three periods. So a name or a mention that ends in one names
     /// the row whose title, as shown or as stored (`needles(for:)`), opens
-    /// with what comes before it and goes on past it.
+    /// with what comes before it and goes on past it, unless a row's whole
+    /// title is what comes before it: then it names that row.
     ///
     /// Shorter than this, what comes before an ellipsis can be the model
     /// trailing off after a word or three, and a word can open a title: "You
@@ -455,9 +456,10 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         // A title inside a longer one the prose names is that one's mention:
         // "Aliens" does not also name Alien, nor "Dune Messiah" Dune, nor a
         // title cut short ("Dune: The Machine Crusade and the Butlerian…") the
-        // Dune it opens with. The shorter title counts only where the prose
-        // names it outside every longer title it names: at a place no other
-        // row's place holds (`Place.holds(_:)`). Only the rows already named
+        // Dune it opens with, unless all that comes before the ellipsis is
+        // that title ("Mission: Impossible…"). The shorter title counts only
+        // where the prose names it outside every longer title it names: at a
+        // place no other row's place holds (`Place.holds(_:)`). Only the rows already named
         // are compared, so the cost is the few titles an answer names, never
         // every row read.
         var kept: [(row: Row, at: String.Index)] = []
@@ -473,18 +475,38 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     }
 
     /// Where the prose, its punctuation made plain, names a title, and
-    /// whether it names it cut short.
+    /// whether it names it cut short: then `stemEnd` is where the text
+    /// before the ellipsis ends, short of any spaces before it, and the
+    /// place runs on through the ellipsis.
     private struct Place {
         let range: Range<String.Index>
-        let isCut: Bool
+        var stemEnd: String.Index?
 
-        /// Whether this place, another row's, is where `place` is named: it
-        /// takes in `place` and runs further, or is the same place with the
-        /// title whole where `place` is cut. A title that ends in an ellipsis
-        /// is that title, not the start of a longer one.
+        var isCut: Bool { stemEnd != nil }
+
+        /// Whether this place, another row's, is where `place` is named.
+        ///
+        /// - A title whole where the stem of a cut stands, from its start to
+        ///   its stem's end, is the place's: the model trailed off after the
+        ///   title, as in "…and Mission: Impossible…", far oftener than a
+        ///   tool's limit lands on the end of another row's whole title. It
+        ///   holds the cut, and the cut doesn't hold it.
+        /// - Otherwise a place holds one it takes in and runs further than,
+        ///   or the same place with the title whole where `place` is cut: a
+        ///   title that ends in an ellipsis is that title, not the start of a
+        ///   longer one.
         func holds(_ place: Place) -> Bool {
+            if place.isWholeTitle(atTheStemOf: self) { return false }
+            if isWholeTitle(atTheStemOf: place) { return true }
             guard range.lowerBound <= place.range.lowerBound, place.range.upperBound <= range.upperBound else { return false }
             return range != place.range || (place.isCut && !isCut)
+        }
+
+        /// Whether this is a whole title that runs from where `cut` starts to
+        /// its stem's end.
+        private func isWholeTitle(atTheStemOf cut: Place) -> Bool {
+            guard !isCut, let stemEnd = cut.stemEnd else { return false }
+            return range.lowerBound == cut.range.lowerBound && range.upperBound == stemEnd
         }
     }
 
@@ -495,10 +517,8 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         let forms = needles(for: title)
         var places: [Place] = []
         for form in forms {
-            places += mentions(of: form, inPlain: haystack).map { Place(range: $0, isCut: false) }
-            if !cuts.isEmpty {
-                places += cutMentions(of: form, at: cuts, inPlain: haystack).map { Place(range: $0, isCut: true) }
-            }
+            places += mentions(of: form, inPlain: haystack).map { Place(range: $0) }
+            if !cuts.isEmpty { places += cutMentions(of: form, at: cuts, inPlain: haystack) }
         }
         return places.sorted { $0.range.lowerBound < $1.range.lowerBound }
     }
@@ -559,8 +579,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     }
 
     /// Resolve the model's tile titles to rows: an exact title first, in
-    /// `turn` and then in `thread`, then a title cut short, and only then a
-    /// near one, each in the same order. A near match is for a model that
+    /// `turn` and then in `thread`, then the title before a name's ellipsis,
+    /// then a title cut short, and only then a near one, each in the same
+    /// order. A near match is for a model that
     /// paraphrased; when the title it wrote is a row, that row is the one it
     /// meant, so "Aliens" is never Alien for having been read first, nor
     /// "Dune" Dune Messiah. A title that resolves to nothing is dropped: a
@@ -569,13 +590,17 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// **A title cut short, after an exact one and before a near one.** A
     /// name that ends in an ellipsis, as the clamp ends a title it cut, names
     /// the row whose title opens with what comes before it and goes on past
-    /// it (`cutTitleFloor`), in `turn` and then in `thread`. Before a near
-    /// match, since the row whose title is the cut's text alone, without its
-    /// ellipsis, was shown to the model whole and is a near match to every
-    /// cut of a longer one; after an exact one, so a title that itself ends
-    /// in an ellipsis is still that title. Titles that open with the same
-    /// characters were shown cut there alike, so a cut name is the first of
-    /// them read, this turn's before the thread's.
+    /// it (`cutTitleFloor`), in `turn` and then in `thread`. After an exact
+    /// one, so a title that itself ends in an ellipsis is still that title.
+    /// After the row whose whole title is what comes before the ellipsis,
+    /// too, so "Mission: Impossible…" is Mission: Impossible and not
+    /// Mission: Impossible – Fallout: a model trails off after a title that
+    /// opens a longer one, as a series' titles do, far oftener than a tool's
+    /// limit lands on the end of another row's whole title. Before a near
+    /// match, since a shorter row inside the cut's text is a near match to
+    /// every cut of a longer one. Titles that open with the same characters
+    /// were shown cut there alike, so a cut name is the first of them read,
+    /// this turn's before the thread's.
     ///
     /// **The nearest near match, not the first.** Of the rows a paraphrase
     /// matches, the one sharing the most of it wins: the length of whichever
@@ -592,6 +617,10 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
                 rows.first { !seen.contains($0.id) && titleEquals($0.displayTitle, name: name) }
             }
             let cut = cutTitle(in: name)
+            func firstOnTheStem(in rows: [Row]) -> Row? {
+                guard let cut else { return nil }
+                return rows.first { !seen.contains($0.id) && titleEquals($0.displayTitle, name: String(cut)) }
+            }
             func firstCut(in rows: [Row]) -> Row? {
                 guard let cut else { return nil }
                 return rows.first { !seen.contains($0.id) && needles(for: $0.displayTitle).contains { opens($0, with: cut) } }
@@ -605,6 +634,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
                 return best?.row
             }
             let hit = firstExact(in: turn) ?? firstExact(in: thread)
+                ?? firstOnTheStem(in: turn) ?? firstOnTheStem(in: thread)
                 ?? firstCut(in: turn) ?? firstCut(in: thread)
                 ?? nearest(in: turn) ?? nearest(in: thread)
             guard let hit else { continue }
@@ -719,7 +749,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// more, counting any spaces before the ellipsis as a name's cut counts
     /// them (`cutTitle(in:)`). The place runs to the ellipsis's end, from the
     /// earliest start each ellipsis allows.
-    private static func cutMentions(of needle: String, at cuts: [CutMark], inPlain haystack: String) -> [Range<String.Index>] {
+    private static func cutMentions(of needle: String, at cuts: [CutMark], inPlain haystack: String) -> [Place] {
         guard needle.count > cutTitleFloor else { return [] }
         let head = String(needle.prefix(cutTitleFloor))
         return cuts.compactMap { cut in
@@ -741,7 +771,7 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
                 }
                 searchEnd = haystack.index(before: found.upperBound)
             }
-            return earliest.map { $0..<cut.mark.upperBound }
+            return earliest.map { Place(range: $0..<cut.mark.upperBound, stemEnd: cut.end) }
         }
     }
 

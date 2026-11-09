@@ -281,16 +281,57 @@ import Testing
         }
     }
 
-    @Test func aCutTitleIsTheRowItOpensNotTheRowItsTextIs() {
-        // Sixty characters are shown whole, and sixty-one cut to those sixty
-        // and an ellipsis: that name is the longer title, which the shorter
-        // one sits inside as a near match, whichever was read first.
+    @Test func aCutTitleIsTheRowItOpensWhenNoRowIsItsStem() {
+        // Sixty-one characters are cut to sixty and an ellipsis: with no row
+        // titled those sixty, that name is the longer title, which a shorter
+        // row sits inside only as a near match, whichever was read first.
+        let sixtyOne = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy II")
+        let guide = FakeRow("The Hitchhiker's Guide")
+        let shown = AskPrompt.clamp(sixtyOne.displayTitle, 60)
+        for rows in [[guide, sixtyOne], [sixtyOne, guide]] {
+            #expect(Answer.tiles(named: [shown], text: "", matches: rows) == [sixtyOne])
+            #expect(Answer.mentioned(in: "Read \(shown) next.", among: rows) == [sixtyOne])
+        }
+    }
+
+    @Test func aWholeTitleAtTheCutsStemIsThatTitle() {
+        // A model trails off after a title that opens a longer one, as a
+        // series' titles do, far oftener than a tool's limit lands on the end
+        // of another row's whole title: the row the stem is wins, as a tile
+        // and in prose, whichever was read first.
+        let mission = FakeRow("Mission: Impossible")
+        let fallout = FakeRow("Mission: Impossible – Fallout")
+        for rows in [[mission, fallout], [fallout, mission]] {
+            for name in ["Mission: Impossible…", "Mission: Impossible...", "Mission: Impossible …"] {
+                #expect(Answer.tiles(named: [name], text: "", matches: rows) == [mission], "\(name)")
+            }
+            let alien = FakeRow("Alien")
+            let aliens = FakeRow("Aliens")
+            #expect(Answer.mentioned(in: "You own Alien, Aliens and Mission: Impossible...", among: [alien, aliens] + rows)
+                    == [alien, aliens, mission])
+            // Named whole elsewhere, the longer title is named there too.
+            #expect(Answer.mentioned(in: "Mission: Impossible… and Mission: Impossible – Fallout.", among: rows)
+                    == [mission, fallout])
+        }
+        // The stem the thread read before a cut this turn read, as an exact
+        // title the thread read comes before a near one this turn read.
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [fallout, mission], turnMatches: [fallout])
+                == [mission])
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [mission, fallout], turnMatches: [mission])
+                == [mission])
+    }
+
+    @Test func withNoRowAtItsStemACutStillNamesTheLongerTitle() {
+        let fallout = FakeRow("Mission: Impossible – Fallout")
+        #expect(Answer.tiles(named: ["Mission: Impossible…"], text: "", matches: [fallout]) == [fallout])
+        #expect(Answer.mentioned(in: "You own Mission: Impossible...", among: [fallout]) == [fallout])
+        // Sixty characters at the stem of sixty-one's cut: the row the stem
+        // is, now that one is there.
         let sixty = FakeRow("The Hitchhiker's Guide to the Galaxy: The Complete Trilogy I")
         let sixtyOne = FakeRow(sixty.displayTitle + "I")
         for rows in [[sixty, sixtyOne], [sixtyOne, sixty]] {
-            #expect(Answer.tiles(named: [AskPrompt.clamp(sixtyOne.displayTitle, 60)], text: "", matches: rows) == [sixtyOne])
-            #expect(Answer.tiles(named: [AskPrompt.clamp(sixty.displayTitle, 60)], text: "", matches: rows) == [sixty])
-            #expect(Answer.mentioned(in: "Read \(AskPrompt.clamp(sixtyOne.displayTitle, 60)) next.", among: rows) == [sixtyOne])
+            #expect(Answer.tiles(named: [AskPrompt.clamp(sixtyOne.displayTitle, 60)], text: "", matches: rows) == [sixty])
+            #expect(Answer.tiles(named: [AskPrompt.clamp(sixtyOne.displayTitle, 60)], text: "", matches: [sixtyOne]) == [sixtyOne])
             #expect(Answer.mentioned(in: "Read \(sixty.displayTitle) next.", among: rows) == [sixty])
         }
     }
