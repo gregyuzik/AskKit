@@ -12,6 +12,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-09
+
+Fenced text that reaches the model loses its straight double quotes and what a reader can't see, and
+the proposal receipt names its button bare.
+
 ### Changed
 
 - **`AskProposal.modelReceipt(notYet:)` names the card's button bare.** Its receipt now ends "Nothing
@@ -760,7 +765,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/gregyuzik/AskKit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/gregyuzik/AskKit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/gregyuzik/AskKit/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/gregyuzik/AskKit/compare/v0.4.0...v0.5.0
