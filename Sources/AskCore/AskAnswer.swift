@@ -23,9 +23,10 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// when it said the answer is all of them; or, when none of its names
     /// resolve to a row, the rows the prose names. Empty for a count, a total
     /// or a yes-or-no. A truncated answer keeps the model's choice only when
-    /// the deadline cut it once its follow-ups had begun, and a stopped one
-    /// keeps none. A deterministic answer's, and a refine pass's, are the
-    /// domain's. Whoever chose them, the engine hands out at most `maxTiles`.
+    /// the deadline or its token cap cut it once its follow-ups had begun, and
+    /// a stopped one keeps none. A deterministic answer's, and a refine
+    /// pass's, are the domain's. Whoever chose them, the engine hands out at
+    /// most `maxTiles`.
     public let tiles: [Row]
     /// Up to two questions offered as the next thing to ask, cleaned to plain
     /// text (`cleanedFollowUps(_:)`), except a deterministic answer's, which
@@ -38,15 +39,18 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// (`AskQuestionKind.showNoTiles`): a list of English cues would decide
     /// nothing in the other 24 languages (house rule 7).
     public let questionKind: AskQuestionKind?
-    /// The answer ended part-way: the turn's deadline cut the stream, or the
-    /// reader stopped a turn that had already written something
-    /// (`AskThreadEntry.stopped` tells the two apart). `text` is as far as it
-    /// got, kept by the rule a finished answer is kept by: grounded, unless
-    /// the domain's policy keeps answers nothing grounded
+    /// The answer ended part-way: the turn's deadline cut the stream, the
+    /// model's reply reached its token cap (`AskReplySnapshot.reachedTokenCap`),
+    /// which the SDK ends as though it had finished, or the reader stopped a
+    /// turn that had already written something (`AskThreadEntry.stopped`
+    /// tells a stop from the other two). `text` is as far as it got, kept by
+    /// the rule a finished answer is kept by: grounded, unless the domain's
+    /// policy keeps answers nothing grounded
     /// (`AskGroundingPolicy.notRequired`). The model chooses its tiles after
-    /// its prose and writes its follow-ups after them, so a deadline that cut
-    /// it once the follow-ups had begun keeps the finished tile list, with its
-    /// basis line; cut sooner, or stopped by the reader, it has no tiles.
+    /// its prose and writes its follow-ups after them, so a deadline or a cap
+    /// that cut it once the follow-ups had begun keeps the finished tile list,
+    /// with its basis line; cut sooner, or stopped by the reader, it has no
+    /// tiles.
     public let isTruncated: Bool
     /// The domain's factual sentence about why the answer chose what it shows
     /// (`AskDomain.basis(for:)`), never sentiment, never a percentage. Asked

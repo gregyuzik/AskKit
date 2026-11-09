@@ -7,10 +7,11 @@ public import SwiftUI
 /// prose above it is real, kept by the rule a finished answer is kept by, just
 /// unfinished.
 ///
-/// **Two causes, two sentences.** `isTruncated` means both "the deadline
-/// stopped it" and "the reader stopped it", and `AskTurn.stopped` tells the
-/// two apart, so the note never blames the time limit for the reader's own
-/// Stop.
+/// **Two sentences for three causes.** `isTruncated` means "the deadline
+/// stopped it", "the token cap stopped it" or "the reader stopped it", and
+/// `AskTurn.stopped` tells the reader's stop from the other two, so the note
+/// never blames the time limit for the reader's own Stop. The deadline and the
+/// cap share "Answer cut short", which is true of both.
 struct AskTruncatedNote: View {
     private let byReader: Bool
 

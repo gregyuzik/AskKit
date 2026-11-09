@@ -48,6 +48,11 @@ nonisolated public protocol AskSession: Sendable {
     ///
     /// Snapshots are cumulative, not deltas: replace state, never append. The
     /// same holds for the two streams below.
+    ///
+    /// A generation that stops at a token cap, which the SDK ends without an
+    /// error, says so on its last snapshot (`AskReplySnapshot.reachedTokenCap`),
+    /// and the engine keeps what it wrote as a truncated answer. Unsaid, the
+    /// cut-off reply reads as a finished one.
     func stream(
         prompt: String,
         temperature: Double,

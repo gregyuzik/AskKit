@@ -12,6 +12,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Added
+
+- **`AskReplySnapshot.reachedTokenCap`**, set on the last snapshot of a generation that stopped at the
+  token cap its request set, which the SDK does without an error or a finish reason. `AppleAskSession`
+  sets it from the response's output count; a host's own session may set it too, and the engine keeps
+  that answer as truncated.
+
 ### Changed
 
 - **The demo's Ask tab and mark wear the icon's three bubbles.** `askkit.bubbles`, a custom symbol in
@@ -70,6 +77,25 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 - **`AskAnswerLanguage`, the answer language named in English and in its own words, "Japanese
   (日本語)".** Nothing in AskKit uses it once the line is gone, and Apple's practice names the language
   in English, as `answerLanguage` does.
+
+### Fixed
+
+- **An answer that stops at its token cap is marked truncated.** The SDK ends a response at
+  `maximumResponseTokens` as though it had finished, and SDK 27 gives no finish reason, so an on-device
+  answer cut at `AppleAskSession.onDeviceAnswerCap` (1,024 tokens) read as finished, its
+  `AskAnswer.isTruncated` false. In vultyr's eval, 8 of 20 follow-ups in one arm stopped there
+  mid-sentence ("The incident is titled "), taking 30–36 s against 5–11 s for the rest, and every run
+  counted none cut: the model had copied a straight double quote from a title into the answer, which
+  ended the field, and the generation ran on to the cap without the fields after it. `AppleAskSession`
+  now reads the response's output count against its cap, and the engine keeps such an answer as it
+  keeps one the deadline cut: its text as far as it got, its tiles only once its follow-ups had begun,
+  no follow-ups or kind, and no refine pass, with a routing line tagged `answerCap`.
+- **A plan the token cap cut fails the grounded retry instead of running.** Cut inside its last field,
+  a plan can decode as a finished one: with a scripted provider, `{"query":"vinyl reco` read as a
+  search for "vinyl reco". `AppleAskSession.plan` now throws one that reached `onDevicePlanCap`, and the
+  turn fails with `AskError.model(tag: "planCap")`, which offers Try Again. A refine pass's response that
+  reaches the answer cap throws the same way (`answerCap`), so the engine keeps the first answer rather
+  than one the cap cut.
 
 ## [0.6.0] - 2026-11-06
 

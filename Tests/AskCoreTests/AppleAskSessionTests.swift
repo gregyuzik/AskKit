@@ -40,11 +40,15 @@ nonisolated private let onAVirtualizedSimulator: Bool = {
 )
 struct AppleAskSessionTests {
 
-    private func makeSession(_ responses: [ScriptedResponse?]) -> AppleAskSession {
+    private func makeSession(
+        _ responses: [ScriptedResponse?], answerCap: Int? = nil, planCap: Int? = nil
+    ) -> AppleAskSession {
         let model = ScriptedModel(responses: responses)
         return AppleAskSession(
             session: LanguageModelSession(model: model, instructions: "Answer."),
-            contextSize: 4096
+            contextSize: 4096,
+            answerCap: answerCap,
+            planCap: planCap
         ) { instructions in
             LanguageModelSession(model: model, instructions: instructions)
         }
@@ -194,6 +198,99 @@ struct AppleAskSessionTests {
         try await drain(session, "one")
         _ = try await session.plan(AskReply.self, instructions: "Plan.", prompt: "one")
         #expect(recorder.caps == [nil, nil])
+    }
+
+    // MARK: - Reaching a cap
+
+    /// What vultyr's eval saw the on-device model stop at: a straight double
+    /// quote copied from a title ended `answer`, and the generation ran on to
+    /// the cap, so the reply never closes and has nothing after its prose.
+    private static let cutAtTheQuote = #"{"answer":"The incident is titled ""#
+
+    /// A plan the cap cut inside its only field.
+    private static let cutPlan = #"{"query":"vinyl reco"#
+
+    /// The last snapshot of a stream: where the stream says how it ended.
+    private func lastSnapshot(
+        _ session: AppleAskSession, _ prompt: String, shape: AskReplyShape = .full
+    ) async throws -> AskReplySnapshot? {
+        var last: AskReplySnapshot?
+        for try await snapshot in session.stream(
+            prompt: prompt, images: [], temperature: 0, reasoningLevel: nil, includeSchemaInPrompt: true, shape: shape
+        ) {
+            last = snapshot
+        }
+        return last
+    }
+
+    /// **The SDK stops a response at its cap without throwing**, and SDK 27
+    /// gives no finish reason. What it does give is the response's output
+    /// count, on every snapshot, and the last snapshot carries the count the
+    /// response ended on: an answer that stopped at the cap says so there, in
+    /// either reply shape.
+    @Test func anAnswerThatReachesItsCapSaysSoOnItsLastSnapshot() async throws {
+        let capped = ScriptedResponse(input: 100, output: 1_024, reply: Self.cutAtTheQuote)
+        let full = try #require(try await lastSnapshot(makeSession([capped], answerCap: 1_024), "one"))
+        #expect(full.reachedTokenCap)
+        #expect(full.answer == "The incident is titled ")
+        #expect(full.followUps == nil)
+        let prose = try #require(
+            try await lastSnapshot(makeSession([capped], answerCap: 1_024), "one", shape: .prose)
+        )
+        #expect(prose.reachedTokenCap)
+        #expect(prose.answer == "The incident is titled ")
+    }
+
+    /// The count decides, since it is all the SDK says: the same unfinished
+    /// reply a token under the cap was not stopped by it. Nor was a finished
+    /// one, nor any answer on a session with no cap, as Private Cloud
+    /// Compute's sessions are.
+    @Test func anAnswerUnderItsCapOrOnAnUncappedSessionDoesNotSaySo() async throws {
+        let under = makeSession([ScriptedResponse(input: 100, output: 1_023, reply: Self.cutAtTheQuote)], answerCap: 1_024)
+        #expect(try await lastSnapshot(under, "one")?.reachedTokenCap == false)
+        let finished = makeSession([ScriptedResponse(input: 100, output: 300)], answerCap: 1_024)
+        #expect(try await lastSnapshot(finished, "one")?.reachedTokenCap == false)
+        let uncapped = makeSession([ScriptedResponse(input: 100, output: 40_000, reply: Self.cutAtTheQuote)])
+        #expect(try await lastSnapshot(uncapped, "one")?.reachedTokenCap == false)
+    }
+
+    /// **A plan the cap cut can decode as a finished one.** Cut inside its
+    /// last field, `{"query":"vinyl reco` decodes as a search for "vinyl
+    /// reco", which the grounded retry would run as the planner's choice. One
+    /// that reached its cap throws instead; the same plan a token under the
+    /// cap is the planner's.
+    @Test func aPlanThatReachesItsCapThrowsRatherThanPassForAFinishedOne() async throws {
+        let capped = makeSession(
+            [ScriptedResponse(input: 50, output: 256, reply: Self.cutPlan)], answerCap: 1_024, planCap: 256
+        )
+        await #expect(throws: AskTokenCapReached.planCap) {
+            _ = try await capped.plan(FakeSearchArguments.self, instructions: "Plan.", prompt: "one")
+        }
+        let under = makeSession(
+            [ScriptedResponse(input: 50, output: 255, reply: Self.cutPlan)], answerCap: 1_024, planCap: 256
+        )
+        #expect(try await under.plan(FakeSearchArguments.self, instructions: "Plan.", prompt: "one").query == "vinyl reco")
+    }
+
+    /// The same for a refine pass, a response on the answer's own session: a
+    /// reply the cap cut throws rather than replace the first answer, and
+    /// still counts, since what it wrote is on the session and the next
+    /// question's rollover reads it. The reply is one field cut short, which
+    /// decodes; an `AskReply` cut before its last fields fails the SDK's own
+    /// parse, with a `GeneratedContent.ParsingError`.
+    @Test func aRefinePassThatReachesItsCapThrowsAndStillCounts() async throws {
+        let capped = makeSession([ScriptedResponse(input: 100, output: 1_024, reply: Self.cutPlan)], answerCap: 1_024)
+        await #expect(throws: AskTokenCapReached.answerCap) {
+            _ = try await capped.respond(
+                FakeSearchArguments.self, images: [], prompt: "Refine.", temperature: 0, reasoningLevel: nil
+            )
+        }
+        #expect(await capped.usage()?.outputTokens == 1_024)
+        let under = makeSession([ScriptedResponse(input: 100, output: 1_023, reply: Self.cutPlan)], answerCap: 1_024)
+        let refined = try await under.respond(
+            FakeSearchArguments.self, images: [], prompt: "Refine.", temperature: 0, reasoningLevel: nil
+        )
+        #expect(refined.query == "vinyl reco")
     }
 
     // MARK: - Reply shapes
@@ -408,15 +505,19 @@ nonisolated final class OptionsRecorder: Sendable {
 }
 
 /// The counts one request reports: its input, the whole transcript it was
-/// sent, and its output.
+/// sent, and its output. And, when a test sets it, the text it replies with.
 ///
 /// Sent after the text. When makes no difference here: with a provider, the SDK
 /// hands the stream nothing until `respond` returns (measured on SDK 27), so a
-/// scripted answer cannot be cut short partway.
+/// scripted answer cannot be cut short partway. A reply a cap cut is scripted
+/// whole, as `reply`, with the count it ended on.
 nonisolated struct ScriptedResponse: Hashable, Sendable {
     var input: Int
     var cached = 0
     var output: Int
+    /// The reply in place of `ScriptedExecutor`'s own for the schema asked
+    /// for, or nil for that one.
+    var reply: String?
 }
 
 /// Answers request *n* of a session with `responses[n - 1]`; nil there, or a
@@ -473,15 +574,16 @@ nonisolated final class ScriptedExecutor: LanguageModelExecutor {
     ) async throws {
         model.recorder?.record(request.generationOptions.maximumResponseTokens)
         model.schemas?.record(request.schema)
-        let reply = Self.asksForProse(request.schema) ? Self.proseReply : Self.reply
         // Which request this is, from the session's own transcript rather than
         // a counter: the suite runs in parallel.
         let index = request.transcript.reduce(into: -1) { index, entry in
             if case .prompt = entry { index += 1 }
         }
+        let response = model.responses.indices.contains(index) ? model.responses[index] : nil
+        let reply = response?.reply ?? (Self.asksForProse(request.schema) ? Self.proseReply : Self.reply)
         await channel.send(.response(action: .appendText(String(reply.prefix(20)), tokenCount: 3)))
         await channel.send(.response(action: .appendText(String(reply.dropFirst(20)), tokenCount: 3)))
-        guard model.responses.indices.contains(index), let response = model.responses[index] else { return }
+        guard let response else { return }
         await channel.send(.response(action: .updateUsage(
             input: .init(totalTokenCount: response.input, cachedTokenCount: response.cached),
             output: .init(totalTokenCount: response.output, reasoningTokenCount: 0)

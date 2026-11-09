@@ -618,7 +618,8 @@ public actor AppleModelSeam: AskModelSeam {
     /// not be reached (undeclared, proved absent or parked), the on-device
     /// model isn't available, or the host holds inference. On device, an answer is capped at 1,024 tokens
     /// and a plan at 256 (`AppleAskSession.onDeviceAnswerCap` and
-    /// `onDevicePlanCap`); Private Cloud Compute's sessions have no cap.
+    /// `onDevicePlanCap`, which say what reaching each does); Private Cloud
+    /// Compute's sessions have no cap.
     public func makeSession(
         tier: AskTier,
         tools: [any Tool],

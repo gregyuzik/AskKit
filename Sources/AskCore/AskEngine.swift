@@ -1608,13 +1608,33 @@ public actor AskEngine<Domain: AskDomain> {
             )
         }
 
-        // The ceiling. A stream the policy keeps that had written something
-        // is worth more truncated than erased: grounded, it is the reader's
-        // own data, correctly, just unfinished (house rule 5). It keeps its tiles once the model
-        // has begun its follow-ups, which it writes after them, so the list
-        // is finished, and explains them with the basis line as any answer
-        // with tiles is. Before that the list may be cut short, and none is
-        // kept. The follow-ups themselves are unfinished, and go.
+        // An answer cut part-way, by the ceiling or the token cap, from the
+        // last snapshot it reached, its prose `partial`. A stream the policy
+        // keeps that had written something is worth more truncated than
+        // erased: grounded, it is the reader's own data, correctly, just
+        // unfinished (house rule 5). It keeps its tiles once the model has
+        // begun its follow-ups, which it writes after them, so the list is
+        // finished, and explains them with the basis line as any answer with
+        // tiles is. Before that the list may be cut short, and none is kept.
+        // The follow-ups themselves are unfinished, and go. The proposal
+        // stays: the cut took the prose, not the tool that proposed, and
+        // nothing is done until the reader confirms.
+        func truncated(_ snapshot: AskReplySnapshot, text partial: String) async -> AskAnswer<Row> {
+            let tiles = snapshot.followUps == nil ? [] : chosenTiles(
+                snapshot.tiles, showsEveryMatch: snapshot.showsEveryMatch,
+                kind: domain.normalizedKind(snapshot.questionKind), text: partial
+            )
+            let answer = AskAnswer<Row>(
+                text: partial, matches: rows, tiles: tiles, followUps: [],
+                questionKind: nil, isTruncated: true,
+                encodedPayload: await collector.turnPayload,
+                proposal: await collector.turnProposal,
+                grounding: stats.grounding
+            )
+            return answer.replacing(basis: basis(for: answer))
+        }
+
+        // The ceiling: the deadline cut the stream where `streamed` got to.
         guard let outcome else {
             let snapshot = streamed.withLock { $0 }
             let partial = AskPrompt.partialText(snapshot.answer ?? "")
@@ -1625,24 +1645,22 @@ public actor AskEngine<Domain: AskDomain> {
             }
             stats.characters = partial.count
             logTurn(stats)
-            // The proposal too: the ceiling cut the prose, not the tool that
-            // proposed, and nothing is done until the reader confirms.
-            let tiles = snapshot.followUps == nil ? [] : chosenTiles(
-                snapshot.tiles, showsEveryMatch: snapshot.showsEveryMatch,
-                kind: domain.normalizedKind(snapshot.questionKind), text: partial
-            )
-            var answer = AskAnswer<Row>(
-                text: partial, matches: rows, tiles: tiles, followUps: [],
-                questionKind: nil, isTruncated: true,
-                encodedPayload: await collector.turnPayload,
-                proposal: await collector.turnProposal,
-                grounding: stats.grounding
-            )
-            answer = answer.replacing(basis: basis(for: answer))
+            let answer = await truncated(snapshot, text: partial)
             outlet.answer(answer)
             // Abandoned, not stopped: the generation may still be writing on
             // the session.
             return (answer, true)
+        }
+
+        // **The token cap.** The SDK ends a response that reaches the cap
+        // its request set as though it had finished, with no error and no
+        // reason, and the session says so on the last snapshot
+        // (`AskReplySnapshot.reachedTokenCap`). Logged by its tag, then
+        // judged as any answer is: one with no prose fails, and one the policy
+        // doesn't keep is ungrounded, so a first answer still gets the
+        // grounded retry.
+        if outcome.reachedTokenCap {
+            log.routing("\(tier.rawValue) stopped at its token cap: \(AskTriage.tag(for: AskTokenCapReached.answerCap))")
         }
 
         let raw = outcome.answer ?? ""
@@ -1655,6 +1673,20 @@ public actor AskEngine<Domain: AskDomain> {
             log.discard(AskDiscard(tier: tier, reason: .ungrounded, text: raw))
             logTurn(stats)
             throw AskError.ungrounded
+        }
+
+        // A capped answer the policy keeps is truncated by the ceiling's
+        // rules, and it is the answer: no refine pass revises it. Not
+        // abandoned, since its generation has returned, so the conversation
+        // goes on from it as from a finished one, and the rollover reads what
+        // it cost.
+        if outcome.reachedTokenCap {
+            let partial = AskPrompt.partialText(raw)
+            stats.characters = partial.count
+            logTurn(stats)
+            let answer = await truncated(outcome, text: partial)
+            outlet.answer(answer)
+            return (answer, false)
         }
 
         let text = AskPrompt.tidy(raw)

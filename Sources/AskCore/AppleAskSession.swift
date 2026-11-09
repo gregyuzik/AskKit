@@ -42,11 +42,15 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
 
     /// The on-device answer cap `AppleModelSeam` gives its sessions, in
     /// tokens: a guard against a runaway answer in the device's small window,
-    /// which the engine's rollover allows for.
+    /// which the engine's rollover allows for. The SDK stops an answer there
+    /// without throwing, so a streamed one that reaches it says so on its last
+    /// snapshot (`AskReplySnapshot.reachedTokenCap`), and the engine keeps it
+    /// as truncated; a refine pass's response that reaches it throws.
     public static let onDeviceAnswerCap = AskContinuation.onDeviceAnswerCap
 
     /// The on-device planner cap `AppleModelSeam` gives its sessions, in
-    /// tokens: a plan is a handful of search arguments.
+    /// tokens: a plan is a handful of search arguments. A plan that reaches it
+    /// throws, since cut inside its last field it can decode as a finished one.
     public static let onDevicePlanCap = AskContinuation.onDevicePlanCap
 
     /// A session the engine can run turns on.
@@ -58,7 +62,7 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
     ///     built. Nil leaves the domain's turn count as the only budget.
     ///   - answerCap: the most tokens one answer may run to, or nil for the
     ///     model's whole window. An on-device session takes
-    ///     `onDeviceAnswerCap`.
+    ///     `onDeviceAnswerCap`, which says what reaching it does.
     ///   - planCap: the same for the grounded retry's planner. An on-device
     ///     session takes `onDevicePlanCap`.
     ///   - noteFailure: hears every raw failure before the engine triages it,
@@ -120,9 +124,11 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
 
     /// One generation of the reply `shape` names, `AskReply` or
     /// `AskProseReply`, with `images` after the prompt's words, capped at
-    /// `answerCap` tokens. The snapshots update `usage()` as they arrive, and
-    /// a failure goes to `noteFailure` before the stream throws it. Letting
-    /// the stream go cancels the generation. Read inside
+    /// `answerCap` tokens: a generation that reaches the cap, which the SDK
+    /// ends without an error, says so on its last snapshot
+    /// (`AskReplySnapshot.reachedTokenCap`). The snapshots update `usage()` as
+    /// they arrive, and a failure goes to `noteFailure` before the stream
+    /// throws it. Letting the stream go cancels the generation. Read inside
     /// `AskGenerationGate.run`, the generation gate moves on only once the
     /// generation has returned, not when the reader lets go.
     public func stream(
@@ -210,7 +216,13 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
                         // output so far, so a stream the deadline abandons still
                         // leaves its size behind.
                         self.noteUsage(partial.usage)
-                        continuation.yield(snapshot(partial.content))
+                        var reply = snapshot(partial.content)
+                        // From the output count alone, not `noteUsage`'s
+                        // reading: the SDK counts the output as it arrives,
+                        // before a provider has reported the input. The last
+                        // snapshot carries the count the response ended on.
+                        reply.reachedTokenCap = Self.reachedCap(partial.usage.output.totalTokenCount, cap: answerCap)
+                        continuation.yield(reply)
                     }
                     continuation.finish()
                 } catch {
@@ -240,6 +252,13 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
 
     /// The grounded retry's plan: one response of `type` from a new session
     /// with no tools, on this session's model, capped at `planCap` tokens.
+    ///
+    /// **A plan that reaches the cap throws**, its tag `planCap`
+    /// (`AskTriage.tag(for:)`). The SDK ends it there without an error, and
+    /// cut inside its last field it can decode as a finished plan:
+    /// `{"query":"vinyl reco` decodes as a search for "vinyl reco" (measured
+    /// with a scripted provider), which the grounded retry would run as the
+    /// planner's choice.
     public func plan<Arguments: Generable & Sendable>(
         _ type: Arguments.Type,
         instructions: String,
@@ -249,19 +268,29 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
         // reply is the search arguments. On the tier's own model, since the
         // answer it plans for is the one that model will write.
         let planner = makePlanner(instructions)
+        let response: LanguageModelSession.Response<Arguments>
         do {
-            return try await planner.respond(
+            response = try await planner.respond(
                 to: prompt, generating: type, options: GenerationOptions(maximumResponseTokens: planCap)
-            ).content
+            )
         } catch {
             await noteFailure?(error)
             throw error
         }
+        if Self.reachedCap(response.usage.output.totalTokenCount, cap: planCap) {
+            throw AskTokenCapReached.planCap
+        }
+        return response.content
     }
 
     /// One response of `type` on this session, with `images` ahead of the
     /// prompt, capped at `answerCap` tokens. Its usage becomes `usage()`'s
     /// reading.
+    ///
+    /// A response that reaches the cap throws, its tag `answerCap`, for
+    /// `plan(_:instructions:prompt:)`'s reason: what it wrote can decode as a
+    /// finished reply. Its usage is still read first, since what it wrote is
+    /// on the session.
     public func respond<Content: Generable & Sendable>(
         _ type: Content.Type,
         images: [AskImageAttachment],
@@ -289,7 +318,24 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
         // The refine pass is a response on THIS session, and the newest one:
         // what the next turn's request starts from includes it.
         noteUsage(response.usage)
+        if Self.reachedCap(response.usage.output.totalTokenCount, cap: answerCap) {
+            throw AskTokenCapReached.answerCap
+        }
         return response.content
+    }
+
+    /// Whether a response that wrote `outputTokens` stopped at `cap`.
+    ///
+    /// **The count is all there is to go on.** The SDK stops a response at its
+    /// cap without throwing, SDK 27 gives no finish reason, and the reply's
+    /// own `GeneratedContent.isComplete` reads true on a stream's last
+    /// snapshot whether or not its JSON closed (measured with a scripted
+    /// provider). At or past the cap, never one token under it: a reply that
+    /// long is a runaway, and the cap is what stopped it. Nil `cap`, as
+    /// Private Cloud Compute's sessions have, is never reached.
+    nonisolated static func reachedCap(_ outputTokens: Int, cap: Int?) -> Bool {
+        guard let cap else { return false }
+        return outputTokens >= cap
     }
 
     /// The tool calls in the session's transcript, across all its turns. One
@@ -374,6 +420,22 @@ nonisolated public final class AppleAskSession: AskSession, Sendable {
         }
         return session.logFeedbackAttachment(sentiment: verdict)
     }
+}
+
+/// A response that stopped at the token cap its request set, where what it
+/// wrote could pass for a finished reply: `AppleAskSession` throws this from
+/// `plan` and `respond` rather than return it. A streamed answer is never
+/// thrown: its last snapshot says it (`AskReplySnapshot.reachedTokenCap`), and
+/// the engine keeps it as a truncated answer.
+///
+/// Its case names are its tags (`AskTriage.tag(for:)`), and a turn it fails
+/// reads as `AskError.model(tag:)`, which offers Try Again.
+nonisolated enum AskTokenCapReached: Error, Equatable {
+    /// An answer, or a refine pass's response, reached the session's answer
+    /// cap.
+    case answerCap
+    /// The grounded retry's plan reached the session's planner cap.
+    case planCap
 }
 
 #endif

@@ -278,7 +278,8 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
 
     /// The scripted generation in the shape asked for. A prose reply has no
     /// kind and no tiles, as `AppleAskSession`'s doesn't, so each snapshot
-    /// goes out without them, whatever the script wrote.
+    /// goes out without them, whatever the script wrote, and with the token
+    /// cap it set.
     func stream(
         prompt: String,
         images: [AskImageAttachment],
@@ -297,7 +298,9 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
         let task = Task {
             do {
                 for try await snapshot in full {
-                    continuation.yield(AskReplySnapshot(answer: snapshot.answer, followUps: snapshot.followUps))
+                    var prose = AskReplySnapshot(answer: snapshot.answer, followUps: snapshot.followUps)
+                    prose.reachedTokenCap = snapshot.reachedTokenCap
+                    continuation.yield(prose)
                 }
                 continuation.finish()
             } catch {
@@ -995,17 +998,22 @@ extension AskTierState {
 }
 
 extension AskReplySnapshot {
+    /// A snapshot with each field as given. `reachedTokenCap` makes it the
+    /// last of a generation the token cap stopped.
     static func answering(
         _ text: String,
         kind: AskQuestionKind? = nil,
         tiles: [String]? = nil,
         showsEveryMatch: Bool? = nil,
-        followUps: [String]? = nil
+        followUps: [String]? = nil,
+        reachedTokenCap: Bool = false
     ) -> AskReplySnapshot {
-        AskReplySnapshot(
+        var snapshot = AskReplySnapshot(
             answer: text, questionKind: kind?.rawValue, showsEveryMatch: showsEveryMatch,
             tiles: tiles, followUps: followUps
         )
+        snapshot.reachedTokenCap = reachedTokenCap
+        return snapshot
     }
 }
 

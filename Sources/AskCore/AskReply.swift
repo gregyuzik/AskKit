@@ -156,6 +156,20 @@ nonisolated public struct AskReplySnapshot: Sendable, Equatable {
     public var tiles: [String]?
     /// `AskReply.followUps`, as far as they have been written.
     public var followUps: [String]?
+    /// The generation stopped at the token cap its request set
+    /// (`GenerationOptions.maximumResponseTokens`): this is as far as the
+    /// reply gets, and a field it hasn't begun it never will.
+    ///
+    /// **The SDK stops a response at its cap without throwing, and SDK 27
+    /// gives no finish reason.** `AppleAskSession` sets this once the
+    /// response's output count, which every snapshot carries, reaches its
+    /// cap. The engine keeps a reply that reached it as a truncated answer
+    /// (`AskAnswer.isTruncated`), as it keeps one the turn's deadline cut.
+    ///
+    /// False unless a session sets it, so a host's own session that never does
+    /// streams as it did before; one whose model can tell sets it on the last
+    /// snapshot, on the value, since the initializer doesn't take it.
+    public var reachedTokenCap = false
 
     /// A snapshot, with nil for each field the model hasn't begun.
     public init(
