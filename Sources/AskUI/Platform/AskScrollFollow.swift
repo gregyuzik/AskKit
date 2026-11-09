@@ -218,6 +218,11 @@ final class AskScrollFollow {
     /// `lastGeometry`'s reason.
     @ObservationIgnored private var arrivedTurn: UUID?
 
+    /// Whether the thread was following a streaming answer, the reader at
+    /// its foot, as it last went out of view (`threadDisappeared()`). Ignored
+    /// by observation for `lastGeometry`'s reason.
+    @ObservationIgnored private var leftFollowingAStream = false
+
     /// When the thread's width last changed, which `resizeWindow` is counted
     /// from. Ignored by observation for `lastGeometry`'s reason.
     @ObservationIgnored private var resizedAt: TimeInterval?
@@ -633,18 +638,31 @@ final class AskScrollFollow {
     /// The thread has appeared with `lastTurn` as its last turn, with
     /// `streaming` saying whether an answer is being written as it does
     /// (`AskScreen`'s `thread`). Whether the screen sends the thread to its
-    /// own end: true for a last turn this follow hasn't seen arrive, and the
-    /// follow then takes the trip as `jumped(at:)`.
+    /// own end: true for a last turn this follow hasn't seen arrive, and for
+    /// a reader it was following down a streaming answer as the thread went
+    /// out of view (`threadDisappeared()`). The follow then takes the trip
+    /// as `jumped(at:)`.
     ///
     /// **A last turn it has seen arrive is the same thread coming back into
     /// view**, from under a pushed item or from another tab, which runs the
     /// screen's task again, and the reader is wherever they left it. Sent to
     /// its end there, a reader who had scrolled up to an earlier answer, and
     /// opened one of its tiles, came back to the foot with the answer they
-    /// were reading gone. So only the streaming flag is brought up to date:
-    /// a stream that started or stopped while the thread was out of view is
-    /// the thread's own move, as `streamingChanged(_:at:)` would have made it,
-    /// and the latch, the pill and the reader's place are left as they were.
+    /// were reading gone, and one who had opened a card in the settled last
+    /// answer came back with it up under the bar: the latch holds there too,
+    /// so it isn't what decides. Such a return only brings the streaming flag
+    /// up to date, a stream that started or stopped unheard being the
+    /// thread's own move, as `streamingChanged(_:at:)` would have made it,
+    /// and leaves the latch, the pill and the reader's place as they were.
+    ///
+    /// **A reader it was following down a stream goes to the end as before.**
+    /// What arrived while they were away, the rest of the answer or the
+    /// growth it ended with, may be laid out only as the thread comes back,
+    /// past `ownGrowthWindow`, and with the latch holding no pill reports it:
+    /// left where they were, the end sat under the composer. Read as the
+    /// thread left rather than as it comes back, since the samples the return
+    /// lays out may arrive before this does, with the foot already moved.
+    ///
     /// A follow that has seen no turn arrive is a new screen's, or one New
     /// Chat replaced, so a thread opened again from the chats goes to its end
     /// as before.
@@ -662,14 +680,23 @@ final class AskScrollFollow {
     func threadAppeared(
         lastTurn: UUID, streaming: Bool, at now: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> Bool {
-        guard lastTurn != arrivedTurn else {
+        if lastTurn == arrivedTurn, !leftFollowingAStream {
             if streaming != isStreaming { streamingChanged(streaming, at: now) }
             return false
         }
         arrivedTurn = lastTurn
+        leftFollowingAStream = false
         isStreaming = streaming
         jumped(at: now)
         return true
+    }
+
+    /// The thread has gone out of view: under a pushed item, behind another
+    /// tab, or with its window. Whether it was following a streaming answer
+    /// as it went is what `threadAppeared(lastTurn:streaming:at:)` reads as
+    /// it comes back.
+    func threadDisappeared() {
+        leftFollowingAStream = isStreaming && isAtFoot
     }
 
     /// The reader tapped the pill, or the thread was sent to its own end.

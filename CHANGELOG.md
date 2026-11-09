@@ -37,9 +37,10 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   thread gliding to its foot, the answer they had been reading gone: the scroll that takes a new
   question into view ran again each time the thread reappeared, and took the reader back down. It now
   runs only for a last turn the screen hasn't seen arrive, the thread's first appearance and a new
-  question, so a restored conversation and a screen built mid-answer still open at the end. Coming
-  back, the thread only learns whether an answer is streaming: a reader at the foot is still followed,
-  and one up the thread keeps their place and the pill.
+  question, so a restored conversation and a screen built mid-answer still open at the end, and for a
+  reader the thread was following down a streaming answer as it went, who comes back to the end of it
+  whether or not it finished meanwhile. Anyone else comes back to where they left the thread, with the
+  pill where it was, a card they had opened in the last answer included.
 
 ## [0.7.1] - 2026-11-09
 

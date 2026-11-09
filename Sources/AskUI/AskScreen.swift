@@ -1503,11 +1503,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // view**, from under a pushed item or from another tab, with
                 // the same last turn, and that is no arrival: the follow sends
                 // the thread to its end only for a last turn it hasn't seen
-                // arrive (`AskScrollFollow.threadAppeared`). Sent there, a
-                // reader who had scrolled up to an earlier answer and opened
-                // one of its tiles came back to the foot, and carrying the
-                // reader back from somewhere they chose to be is the one thing
-                // this screen never does.
+                // arrive, or for a reader it was following down a streaming
+                // answer as the thread went (`AskScrollFollow.threadAppeared`).
+                // Sent there, a reader who had scrolled up to an earlier answer
+                // and opened one of its tiles came back to the foot, and
+                // carrying the reader back from somewhere they chose to be is
+                // the one thing this screen never does.
                 //
                 // **With whatever is streaming as it runs**, since this screen
                 // may be built mid-answer, in a second window or a rebuilt
@@ -1521,11 +1522,12 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 .task(id: store.lastTurnID) {
                     guard let lastTurn = store.lastTurnID,
                           follow.threadAppeared(lastTurn: lastTurn, streaming: store.isThinking) else { return }
-                    // **The end of the thread, whatever brought a new last
-                    // turn.** One target and one anchor: a question the reader
-                    // just sent is at the end, and so is the answer they came
-                    // back to on a restored conversation. Why not the top of
-                    // the screen: ARCHITECTURE.md, Rejected designs.
+                    // **The end of the thread, whatever brought us here.** One
+                    // target and one anchor: a question the reader just sent
+                    // is at the end, and so is the answer they came back to on
+                    // a restored conversation, or followed before they went.
+                    // Why not the top of the screen: ARCHITECTURE.md, Rejected
+                    // designs.
                     guard follow.isScrollable else { return }
                     scrollThreadItself {
                         withAnimation(threadMotion) {
@@ -1533,6 +1535,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                         }
                     }
                 }
+                // Whether the follow was following a stream as the thread
+                // went, which the task above reads as it comes back.
+                .onDisappear { follow.threadDisappeared() }
                 // **The follow.** Keyed on the last turn's measured height
                 // rather than on its text, so it fires once per layout that
                 // actually grew: the reveal repainting the same glyphs can't
