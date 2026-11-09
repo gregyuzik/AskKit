@@ -12,6 +12,28 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Changed
+
+- **`AskProposal.modelReceipt(notYet:)` names the card's button bare.** Its receipt now ends "Nothing
+  changes until the Lend button on the card below is confirmed.", where it put the label in straight
+  double quotes, `"Lend" on the card below`, and a hand-off's receipt changes the same way. The model
+  copies a straight double quote from tool output into its answer, where it ends the answer's string. A
+  label that clamps to nothing still reads "the card below". The new wording wasn't measured: 0.5.0's
+  numbers were taken with the label in quotes.
+
+### Fixed
+
+- **No straight double quote reaches the model from a clamped field or the grounded retry's rows.**
+  Apple's on-device model copies one from tool output into its guided-generation answer, where it ends
+  the answer's string, and the generation runs on to the token cap: in vultyr's eval, 6 of 8 answers
+  that ran to the cap stopped where a quoted title would open ("The incident is titled ").
+  `AskPrompt.clamp` now turns each straight double quote in a field into ″ (U+2033, double prime), as
+  in `Vinyl, 7″, 45 RPM`: one scalar for one, so a limit cuts where it did, and clamping twice still
+  changes nothing. The engine does the same to the rows it fences in the grounded retry, which keep
+  their line breaks. Mention and tile matching read ″ as a straight double quote, so an answer that
+  copies `7″` still names the row titled `7"`. ADOPTING.md's rules for tools say so, and that a clamp
+  of a tool's own misses it.
+
 ## [0.7.0] - 2026-11-09
 
 The answer's language named as Apple's practice names it, in place of a domain's line at the end of

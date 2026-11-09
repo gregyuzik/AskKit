@@ -306,6 +306,25 @@ nonisolated public enum AskPrompt {
         return String(String.UnicodeScalarView(swapped))
     }
 
+    /// Each straight double quote (U+0022) replaced with a double prime
+    /// (U+2033, `″`), so none can end the answer's string; `clamp(_:_:)`
+    /// says why. One scalar for one, so a text keeps its length in
+    /// characters and in scalars, and its line breaks.
+    ///
+    /// Swapped scalar by scalar, as `neuteringTags(_:)` swaps brackets: a
+    /// quote under a combining mark is one Character with it, and still
+    /// U+0022 to the model.
+    ///
+    /// `clamp(_:_:)` runs it on every field, and the engine on the grounded
+    /// retry's rows, beside `neuteringTags(_:)`, which is named for tags and
+    /// leaves quotes alone.
+    static func neuteringQuotes(_ text: String) -> String {
+        let swapped = text.unicodeScalars.map { scalar -> Unicode.Scalar in
+            scalar == "\"" ? "″" : scalar
+        }
+        return String(String.UnicodeScalarView(swapped))
+    }
+
     /// The question as it reaches a prompt: trimmed of whitespace and
     /// newlines, clamped to `maxQuestionLength` characters, and each
     /// character held to its first 16 Unicode scalars, as `clamp(_:_:)`
@@ -436,9 +455,21 @@ nonisolated public enum AskPrompt {
 
     /// Untrusted text as it may appear in a prompt: ASCII angle brackets
     /// replaced with their single-glyph lookalikes so no tag can be spelled
-    /// with them, any of AskKit's fence tags spelled in other brackets
-    /// redacted, newlines collapsed to spaces, and the whole clamped. Text
-    /// longer than `limit` keeps its first `limit` characters, then a "…".
+    /// with them, straight double quotes with double primes (`″`), any of
+    /// AskKit's fence tags spelled in other brackets redacted, newlines
+    /// collapsed to spaces, and the whole clamped. Text longer than `limit`
+    /// keeps its first `limit` characters, then a "…".
+    ///
+    /// **A clamped field can't end the answer's string.** Apple's on-device
+    /// model writes its answer inside a guided-generation JSON string, and
+    /// copies a straight double quote (U+0022) from tool output into it,
+    /// where the quote ends the string: the answer stops mid-sentence ("The
+    /// incident is titled ") and the generation runs on to the token cap.
+    /// So each one becomes a double prime (U+2033), which looks like it and
+    /// ends nothing, as in `Vinyl, 7″, 45 RPM` or `The ″Best″ Album`
+    /// (`neuteringQuotes(_:)`). One scalar for one and one character for one,
+    /// so the limit and the scalar cap fall where they did, and nothing after
+    /// the swap writes a quote for a second clamp to find.
     ///
     /// Each character also keeps at most its first 16 Unicode scalars, so the
     /// result holds no more than `16 × limit + 1` of them. The limit counts
@@ -484,7 +515,7 @@ nonisolated public enum AskPrompt {
     public static func clamp(_ text: String, _ limit: Int) -> String {
         let limit = max(0, limit)
         var kept = settled(
-            neuteringTags(text)
+            neuteringQuotes(neuteringTags(text))
                 .split(whereSeparator: \.isNewline)
                 .joined(separator: " "),
             trimmingItsEnd: true

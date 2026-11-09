@@ -114,7 +114,7 @@ import Testing
     @Test func aReceiptOpensWithTheHostsSentenceAndNamesTheButton() {
         #expect(
             Self.lend.modelReceipt(notYet: "The Peregrine is not lent yet.")
-                == #"The Peregrine is not lent yet. Nothing changes until "Mark as lent" on the card below is confirmed."#
+                == "The Peregrine is not lent yet. Nothing changes until the Mark as lent button on the card below is confirmed."
         )
     }
 
@@ -123,8 +123,25 @@ import Testing
         let handOff = AskProposal(kind: .handOff, title: "Add an item", actionLabel: "Open Add")
         #expect(
             handOff.modelReceipt(notYet: "Nothing is added yet.")
-                == #"Nothing is added yet. Nothing opens until "Open Add" on the card below is confirmed, and confirming it opens a form to finish it."#
+                == "Nothing is added yet. Nothing opens until the Open Add button on the card below is confirmed, and confirming it opens a form to finish it."
         )
+    }
+
+    /// The answer repeats its receipt, so a receipt carries no straight double
+    /// quote: the model copies one into its answer, where it ends the answer's
+    /// string. The button is named bare, and a quote in the host's words is
+    /// clamped to a double prime.
+    @Test func aReceiptCarriesNoStraightDoubleQuote() {
+        let quoted = AskProposal(title: #"Lend the 7" single"#, actionLabel: #"Lend 7""#)
+        let receipt = quoted.modelReceipt(notYet: #"The "Best" single is not lent yet."#)
+        #expect(receipt == "The ″Best″ single is not lent yet. Nothing changes until the Lend 7″ button on the card below is confirmed.")
+        let handOff = AskProposal(kind: .handOff, title: "Add an item", actionLabel: "Open Add")
+        for receipt in [
+            receipt, Self.lend.modelReceipt(notYet: "The Peregrine is not lent yet."),
+            handOff.modelReceipt(notYet: "Nothing is added yet."), AskProposal.modelReceipt, AskProposal.handOffReceipt
+        ] {
+            #expect(!receipt.unicodeScalars.contains("\""), "\(receipt) carries a straight double quote")
+        }
     }
 
     /// A sentence with no closing punctuation would run into the next, so it

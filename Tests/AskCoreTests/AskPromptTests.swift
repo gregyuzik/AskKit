@@ -869,6 +869,58 @@ import Testing
         #expect(clamped.hasSuffix("…"))
     }
 
+    // MARK: - Straight double quotes
+
+    @Test func clampTurnsEveryStraightDoubleQuoteIntoADoublePrime() {
+        // The on-device model copies a straight double quote from tool output
+        // into its guided-generation answer, where the quote ends the JSON
+        // string: the answer stops mid-sentence and the generation runs on to
+        // the token cap. A double prime ends nothing.
+        #expect(AskPrompt.clamp(#"Vinyl, 7", 45 RPM"#, AskPrompt.shortClamp) == "Vinyl, 7″, 45 RPM")
+        #expect(AskPrompt.clamp(#"The "Best" Album"#, AskPrompt.shortClamp) == "The ″Best″ Album")
+        // Read by scalar, as the brackets are: a quote under a combining mark,
+        // or after a Prepend scalar, is one Character with it, and still a
+        // quote to the model. So is one in a tag's attribute.
+        for quoted in ["7\"\u{0301}", "\u{0600}\"Best\"", "\"\u{FE0F}", #"<rows lang="en">"#, #"＜rows lang="en""#] {
+            let clamped = AskPrompt.clamp(quoted, AskPrompt.shortClamp)
+            #expect(!clamped.unicodeScalars.contains("\""), "\(quoted.unicodeScalars.map(\.value)) kept a straight double quote")
+        }
+        // A recap's titles and a photo's label are clamped before they are
+        // fenced, so they carry the double prime too.
+        #expect(AskPrompt.sanitizeForFence(AskPrompt.clamp(#"Vinyl, 7", 45 RPM"#, AskPrompt.shortClamp)) == "Vinyl, 7″, 45 RPM")
+        #expect(AskPrompt.photoLine(label: #"The "Best" Album"#) == Self.photoLinePrefix + "The ″Best″ Album</rows>")
+        // The swap is a step of its own, beside the bracket swap: `neuteringTags`
+        // is public and named for tags, and the grounded retry's rows take
+        // both steps.
+        #expect(AskPrompt.neuteringTags(#"Vinyl, 7", 45 RPM"#) == #"Vinyl, 7", 45 RPM"#)
+    }
+
+    @Test func theDoublePrimeLeavesTheClampsArithmeticAsItWas() {
+        // One scalar for one, and one character for one, so the limit and the
+        // scalar cap fall where they did: a quoted text clamps to what the
+        // same text with its quotes already swapped clamps to, and clamping
+        // it again changes nothing.
+        let stack = "\"" + String(repeating: "\u{0301}", count: 200)
+        let texts = [
+            #"Vinyl, 7", 45 RPM"#, #"The "Best" Album"#, String(repeating: "\"", count: 100),
+            String(repeating: #"12" single, "#, count: 10), String(repeating: stack, count: 80),
+            String(repeating: "x", count: 59) + #""Best""#, "\u{0600}\"" + String(repeating: "x", count: 70)
+        ]
+        for text in texts {
+            let swapped = String(String.UnicodeScalarView(text.unicodeScalars.map { $0 == "\"" ? "″" : $0 }))
+            #expect(swapped.count == text.count && swapped.unicodeScalars.count == text.unicodeScalars.count)
+            for limit in [12, AskPrompt.shortClamp, AskPrompt.longClamp] {
+                let clamped = AskPrompt.clamp(text, limit)
+                let label = "\(text.prefix(20).debugDescription) at \(limit)"
+                #expect(Array(clamped.utf8) == Array(AskPrompt.clamp(swapped, limit).utf8), "\(label) moved the cut")
+                #expect(clamped.count <= limit + 1, "\(label) ran long")
+                #expect(Array(AskPrompt.clamp(clamped, limit).utf8) == Array(clamped.utf8), "\(label) changed when clamped again")
+            }
+        }
+        let quotes = AskPrompt.clamp(String(repeating: "\"", count: 100), AskPrompt.shortClamp)
+        #expect(quotes == String(repeating: "″", count: AskPrompt.shortClamp) + "…")
+    }
+
     @Test func theClampsBoundTheScalarsAStackOfMarksCarries() {
         // The limits count Characters, and one Character can carry any number
         // of combining marks: sixty of them, two hundred marks each, were
