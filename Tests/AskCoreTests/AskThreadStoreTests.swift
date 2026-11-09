@@ -749,6 +749,56 @@ import Testing
         #expect(setAsideFiles(in: folder).count == 1)
     }
 
+    @Test func aThreadSetAsideWhoseFilingReadsOnlyInPartIsFiledBesideIt() async throws {
+        // A chat opened from a filing this build reads in part, asked on,
+        // then set aside by a New Chat whose filing failed. Joined with what
+        // decoded, the filing would lose the turns that didn't, so it was
+        // never filed at all and came back at every launch. Filed beside
+        // that filing instead, which stays as it was.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let archive = archive(in: folder)
+        let first = try #require(await archive.archive([dated("first", 1000), dated("second", 2000)]))
+        let filed = folder.appending(path: "threads/\(first.id.uuidString).json")
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: filed)) as? [[String: Any]])
+        turns[1]["question"] = 12_345
+        let altered = try JSONSerialization.data(withJSONObject: turns)
+        try altered.write(to: filed)
+
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.save([dated("first", 1000), dated("second", 2000), dated("third", 3000)]))
+        #expect(await store.setAside())
+        #expect(await store.recoverSetAside(into: archive) == 1)
+        #expect(setAsideFiles(in: folder).isEmpty)
+        #expect(try Data(contentsOf: filed) == altered)
+        let summaries = await archive.summaries()
+        #expect(summaries.count == 2)
+        let beside = try #require(summaries.first { $0.id != first.id })
+        #expect(await archive.entries(for: beside.id).entries.map(\.question) == ["first", "second", "third"])
+    }
+
+    @Test func anOriginalWhoseFilingReadsOnlyInPartStillWaits() async throws {
+        // An original's turns are on screen in its chat already, as far as
+        // they decode: filed beside a filing that reads in part, the chat
+        // would be listed twice, so the original waits for a build that
+        // reads the filing whole.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let archive = archive(in: folder)
+        let first = try #require(await archive.archive([dated("first", 1000), dated("second", 2000)]))
+        let filed = folder.appending(path: "threads/\(first.id.uuidString).json")
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: filed)) as? [[String: Any]])
+        turns[1]["question"] = 12_345
+        try JSONSerialization.data(withJSONObject: turns).write(to: filed)
+        let original = folder.appending(path: "ask-thread-original-\(UUID().uuidString).json")
+        try JSONEncoder().encode([dated("first", 1000), dated("second", 2000)]).write(to: original)
+
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.recoverSetAside(into: archive) == 0)
+        #expect(originalFiles(in: folder) == [original])
+        #expect(await archive.summaries().map(\.id) == [first.id])
+    }
+
     @Test func aThreadSetAsideStaysUntilTheEarlierChatsHaveIt() async throws {
         // Filed first, removed after: an archive that can't be written to
         // leaves the thread where it was set aside, for the next launch.

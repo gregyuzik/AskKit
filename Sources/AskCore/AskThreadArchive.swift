@@ -110,12 +110,13 @@ nonisolated struct AskThreadIndex: Codable, Sendable, Equatable {
 
 /// What `AskThreadArchive.merge(_:filingIfNew:at:)` did.
 nonisolated enum AskArchiveMerge: Equatable, Sendable {
-    /// Filed, into the chat's earlier filing when it had one.
+    /// Filed, into the chat's earlier filing when it had one that reads
+    /// whole, and beside it when it had one that doesn't.
     case filed(AskThreadSummary)
     /// No filing is this chat, and none was made.
     case noSuchChat
-    /// Not written: the chat's filing can't be read whole, or the write
-    /// failed.
+    /// Not written: the chat's filing can't be read whole and the turns
+    /// weren't to be filed on their own, or the write failed.
     case notFiled
 }
 
@@ -369,7 +370,10 @@ public actor AskThreadArchive<Row: AskRow> {
     /// chat's filing instead, a thread kept aside would cost the turns asked
     /// since, or the filing would cost the turns only it holds. Never into a
     /// filing that doesn't read whole: joined with what decoded, the rest
-    /// would be written over.
+    /// would be written over. Beside it instead, as a chat of their own, when
+    /// `filingIfNew`, as `archive(_:at:sparing:)` files a chat beside such a
+    /// filing: a thread set aside that waited for that filing to read whole
+    /// would wait for good, out of History all the while.
     func merge(_ entries: [AskThreadEntry<Row>], filingIfNew: Bool, at now: Date = .now) -> AskArchiveMerge {
         guard !entries.isEmpty else { return .notFiled }
         let index = readIndex()
@@ -379,15 +383,18 @@ public actor AskThreadArchive<Row: AskRow> {
         }
         guard let url = url(for: earlier.id) else { return .notFiled }
         let merged: [AskThreadEntry<Row>]
+        var id = earlier.id
         switch contents(of: url).read {
         case .thread(let filed, let dropped) where dropped == 0:
             merged = AskThreadEntry.merging(entries, into: filed)
         case .empty:
             merged = entries
-        default:
-            return .notFiled
+        case .thread, .unreadable:
+            guard filingIfNew else { return .notFiled }
+            merged = entries
+            id = UUID()
         }
-        return file(merged, as: earlier.id, in: index, at: now, sparing: nil).map(AskArchiveMerge.filed) ?? .notFiled
+        return file(merged, as: id, in: index, at: now, sparing: nil).map(AskArchiveMerge.filed) ?? .notFiled
     }
 
     /// File turns that are on screen and kept nowhere else yet, under `id`,

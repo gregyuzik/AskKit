@@ -49,6 +49,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   the question's `<user_request>` fence, where every line already ended in a newline. A non-empty
   prefix that doesn't end in one now gets one in the prompt, after it, so what `prewarm` caches is
   still how the prompt opens.
+- **A chat set aside beside a filing this build reads only in part reaches History.** A chat opened
+  from such a filing, asked on, then set aside because New Chat couldn't file it, was put back at the
+  next launch only into its earlier filing, which is never written over while some of its turns don't
+  decode. So it was never filed, stayed out of History, and was tried again at every launch. It is now
+  filed beside that filing, as New Chat files a chat beside one, and the filing stays as it was. An
+  original kept for a build that reads more still waits for its chat's filing to read whole.
 
 ## [0.7.1] - 2026-11-09
 

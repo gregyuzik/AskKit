@@ -661,8 +661,10 @@ public actor AskThreadStore<Row: AskRow> {
     /// - A thread set aside goes to the earlier chats: a newer build may have
     ///   written it, or the device was locked when it was read. Into the
     ///   filing its chat already has, if one does, so neither copy's turns are
-    ///   lost. Read only in part, what reads is filed and the file is kept
-    ///   whole as an original, for a build that reads the rest.
+    ///   lost, or beside that filing where this build can't read it whole, as
+    ///   New Chat files a chat beside one. Read only in part, what reads is
+    ///   filed and the file is kept whole as an original, for a build that
+    ///   reads the rest.
     /// - An original goes back into its own chat: the thread, when the thread
     ///   is that chat, or else the earlier chat that is. When neither is, the
     ///   reader deleted that chat or the cap trimmed it, and the original goes
