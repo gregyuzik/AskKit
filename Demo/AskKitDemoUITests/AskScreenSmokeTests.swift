@@ -473,7 +473,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// The failure it guards: the answer grows while the thread is out of
     /// view, where no follow runs, and by the return its stream has long
     /// stopped, so nothing owns that growth and no pill reports it. With
-    /// `AskScrollFollow.threadDisappeared()` doing nothing, four runs of four
+    /// `AskScrollFollow.threadDisappeared()` doing nothing, six runs of six
     /// came back to the question with its answer under the composer.
     ///
     /// **The model's turn, because only the model streams.** A scripted
