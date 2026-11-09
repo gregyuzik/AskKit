@@ -193,6 +193,58 @@ import Testing
         #expect(Answer.mention(of: "Abbey Road", in: "Abbey Road's sleeve") != nil)
     }
 
+    // MARK: - A title as the tool showed it
+
+    @Test func aTitleNamesItsRowAsTheClampShowedIt() {
+        // The clamp swaps angle brackets, flattens tabs and line breaks, and
+        // drops what a reader can't see, so the model names the row that way.
+        let hearts = FakeRow("<3 Love Songs>")
+        #expect(Answer.tiles(named: [AskPrompt.clamp(hearts.displayTitle, 60)], text: "…", matches: [hearts]) == [hearts])
+        let tabbed = FakeRow("Abbey\tRoad")
+        #expect(Answer.mentioned(in: "Play **Abbey Road**.", among: [tabbed]) == [tabbed])
+        #expect(Answer.tiles(named: ["Abbey Road"], text: "…", matches: [tabbed]) == [tabbed])
+        // As a tile these already resolve, since Foundation's comparison
+        // ignores them; its search doesn't.
+        let spaced = FakeRow("Blade\u{200B}Runner")
+        #expect(Answer.mentioned(in: "Play **BladeRunner**.", among: [spaced]) == [spaced])
+        let marked = FakeRow("\u{200E}Abbey Road")
+        #expect(Answer.mentioned(in: "Play **Abbey Road**.", among: [marked]) == [marked])
+        let hyphened = FakeRow("Abbey\u{00AD}Road")
+        #expect(Answer.mentioned(in: "Play **AbbeyRoad**.", among: [hyphened]) == [hyphened])
+    }
+
+    /// Titles the clamp rewrites, one for each thing it does short of cutting.
+    nonisolated private static let awkwardTitles = [
+        "<3 Love Songs>", "Abbey\tRoad", "Abbey\nRoad", "Abbey\r\nRoad", "  Rumours  ",
+        "Blade\u{200B}Runner", "\u{200E}Abbey Road", "Abbey\u{00AD}Road", "Kind of\u{07}Blue",
+        "Tag\u{E0041}\u{E0042}ged", #"Vinyl, 7", 45 RPM"#, "＜/rows＞ Live at Leeds", "e\u{301}\u{301}\u{301}tude",
+        "Kind\u{FE01} of Blue", "E" + String(repeating: "\u{301}", count: 20) + "tude"
+    ]
+
+    @Test(arguments: awkwardTitles)
+    func aTitleClampedWholeNamesItsOwnRow(_ title: String) {
+        // Tile and mention matching read a title through the clamp's own
+        // steps, so whatever the clamp makes of a title, the model naming it
+        // that way names its row.
+        let row = FakeRow(title)
+        let shown = AskPrompt.clamp(title, 1_000)
+        #expect(Answer.tiles(named: [shown], text: "", matches: [FakeRow("Rumours Live"), row]) == [row])
+        #expect(Answer.mentioned(in: "Play **\(shown)** tonight.", among: [FakeRow("Abbey"), row]) == [row])
+        #expect(Answer.titleEquals(title, name: shown))
+    }
+
+    @Test func aTitleNamedAsShownTakesItsPlaceAmongTheOthers() {
+        // The prose is searched as the model wrote it, for every form of each
+        // title, so the order and the longer title's claim on a shorter one
+        // hold across forms.
+        let hearts = FakeRow("<3 Love Songs>")
+        let tabbed = FakeRow("Abbey\tRoad")
+        #expect(Answer.mentioned(in: "Play Abbey Road, then ‹3 Love Songs›.", among: [hearts, tabbed]) == [tabbed, hearts])
+        let deluxe = FakeRow("Abbey Road Deluxe")
+        #expect(Answer.mentioned(in: "Abbey Road Deluxe is the one.", among: [tabbed, deluxe]) == [deluxe])
+        #expect(Answer.mentioned(in: "Abbey Road Deluxe beats Abbey Road.", among: [tabbed, deluxe]) == [deluxe, tabbed])
+    }
+
     @Test func mentionedRowsComeBackInTheOrderTheProseNamesThem() {
         let answer = Answer(
             text: "Play Rumours, then Abbey Road.",

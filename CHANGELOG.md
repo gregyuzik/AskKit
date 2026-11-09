@@ -25,6 +25,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   turn keeps its question, prose, outcome and other rows, and an answer whose only tile went reads back
   with none. A thread whose rows all encode is written as before, and one that still won't encode fails
   as before.
+- **A title names its row as the clamp showed it to the model.** `AskPrompt.clamp` swaps a title's
+  angle brackets for ‹ ›, makes its tabs and line breaks spaces and drops what a reader can't see, and
+  the model names the row as it read it, but tile and mention matching compared the title as stored: a
+  row titled `<3 Love Songs>`, shown as `‹3 Love Songs›`, got no tile when the model chose it, and one
+  whose title held a tab, a zero-width space, a soft hyphen or a left-to-right mark wasn't found in
+  prose that named it, so a follow-up naming it could fail as ungrounded. Matching now reads each title
+  both as stored and as the clamp shows it, short of a cut, through the clamp's own steps, in prose and
+  in the model's tile titles alike, and `AskEval` counts a title it names that way as named.
 
 ## [0.7.1] - 2026-11-09
 

@@ -573,18 +573,32 @@ nonisolated public enum AskPrompt {
     /// nothing. A negative limit reads as zero.
     public static func clamp(_ text: String, _ limit: Int) -> String {
         let limit = max(0, limit)
-        var kept = settled(
-            neuteringTags(text)
-                .split(whereSeparator: { $0.isNewline || $0 == "\t" })
-                .joined(separator: " "),
-            trimmingItsEnd: true
-        )
+        var kept = shownWhole(text)
         var cut = false
         while kept.count > limit {
             cut = true
             kept = settled(String(kept.prefix(limit)), trimmingItsEnd: false)
         }
         return cut ? boundingScalars(kept, before: "…") + "…" : kept
+    }
+
+    /// `text` as `clamp(_:_:)` shows it to the model before any cut: its
+    /// angle brackets swapped, its tabs and line breaks made spaces, then
+    /// settled (`settled(_:trimmingItsEnd:)`), so sanitized, held to the
+    /// scalar cap and trimmed. A clamp whose limit `text` fits returns this.
+    ///
+    /// What tile and mention matching read a row's title as, beside the
+    /// title as stored (`AskAnswer.titleEquals`), since the model names a row
+    /// as a tool showed it: `<3 Love Songs>` as `‹3 Love Songs›`, and `Abbey`
+    /// and `Road` parted by a tab as `Abbey Road`. The clamp's own first
+    /// step, so the two can't drift.
+    static func shownWhole(_ text: String) -> String {
+        settled(
+            neuteringTags(text)
+                .split(whereSeparator: { $0.isNewline || $0 == "\t" })
+                .joined(separator: " "),
+            trimmingItsEnd: true
+        )
     }
 
     /// `text` sanitized (`sanitizeForFence(_:)`), held to the scalar cap and

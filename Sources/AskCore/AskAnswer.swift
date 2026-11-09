@@ -427,30 +427,24 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         // names a row, against up to `AskCollector.maxThreadRows` rows, so once
         // per row would rework the whole answer two hundred times a snapshot.
         let haystack = plainPunctuation(text)
-        let named = rows.compactMap { row -> (row: Row, needle: String, at: Range<String.Index>)? in
-            let needle = Self.needle(for: row.displayTitle)
-            var places = mentions(of: needle, inPlain: haystack).makeIterator()
-            guard let first = places.next() else { return nil }
-            return (row, needle, first)
+        let named = rows.compactMap { row -> (row: Row, places: [Range<String.Index>])? in
+            let places = needles(for: row.displayTitle).flatMap { mentions(of: $0, inPlain: haystack) }
+            return places.isEmpty ? nil : (row, places.sorted { $0.lowerBound < $1.lowerBound })
         }
         // A title inside a longer one the prose names is that one's mention:
         // "Aliens" does not also name Alien, nor "Dune Messiah" Dune. The
         // shorter title counts only where the prose names it outside every
-        // longer title it names. Only the rows already named are compared, so
-        // the cost is the few titles an answer names, never every row read.
-        let kept = named.compactMap { entry -> (row: Row, at: String.Index)? in
-            let longer = named.filter {
-                $0.needle.count > entry.needle.count
-                    && $0.needle.range(
-                        of: entry.needle, options: [.caseInsensitive, .diacriticInsensitive], locale: .current
-                    ) != nil
+        // longer title it names: at a place no other row's place holds and
+        // outruns. Only the rows already named are compared, so the cost is
+        // the few titles an answer names, never every row read.
+        let kept = named.indices.compactMap { index -> (row: Row, at: String.Index)? in
+            let others = named.indices.lazy.filter { $0 != index }.map { named[$0].places }
+            let own = named[index].places.first { place in
+                !others.contains { theirs in
+                    theirs.contains { $0 != place && $0.lowerBound <= place.lowerBound && place.upperBound <= $0.upperBound }
+                }
             }
-            guard !longer.isEmpty else { return (entry.row, entry.at.lowerBound) }
-            let theirs = longer.flatMap { mentions(of: $0.needle, inPlain: haystack) }
-            let own = mentions(of: entry.needle, inPlain: haystack).first { place in
-                !theirs.contains { $0.lowerBound <= place.lowerBound && place.upperBound <= $0.upperBound }
-            }
-            return own.map { (entry.row, $0.lowerBound) }
+            return own.map { (named[index].row, $0.lowerBound) }
         }
         return kept.sorted { $0.at < $1.at }.map(\.row)
     }
@@ -534,9 +528,9 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             }
             func nearest(in rows: [Row]) -> Row? {
                 var best: (row: Row, overlap: Int)?
-                for row in rows where !seen.contains(row.id) && titleMatches(row.displayTitle, name: name) {
-                    let overlap = min(row.displayTitle.trimmingCharacters(in: .whitespacesAndNewlines).count, name.count)
-                    if overlap > (best?.overlap ?? 0) { best = (row, overlap) }
+                for row in rows where !seen.contains(row.id) {
+                    guard let overlap = nearOverlap(row.displayTitle, name: name), overlap > (best?.overlap ?? 0) else { continue }
+                    best = (row, overlap)
                 }
                 return best?.row
             }
@@ -549,43 +543,51 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     }
 
     /// The same title once both are trimmed and their punctuation is made
-    /// plain (`plainPunctuation`), and blind to case and diacritics. The
-    /// exact half of tile resolution, and what `AskEval` counts as a title the
-    /// turn read.
+    /// plain (`plainPunctuation`), and blind to case and diacritics, with the
+    /// title read as stored or as a tool's clamp showed it (`needles(for:)`).
+    /// The exact half of tile resolution, and what `AskEval` counts as a
+    /// title the turn read.
     static func titleEquals(_ title: String, name: String) -> Bool {
-        let title = needle(for: title)
-        guard !title.isEmpty else { return false }
-        return title.compare(
-            needle(for: name), options: [.caseInsensitive, .diacriticInsensitive], locale: .current
-        ) == .orderedSame
+        let name = needle(for: name)
+        return needles(for: title).contains { equals($0, name) }
     }
 
-    /// Equal by `titleEquals`, or one inside the other when the shorter side
-    /// is long enough not to be a stray word.
-    static func titleMatches(_ title: String, name: String) -> Bool {
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return false }
-        if titleEquals(title, name: name) { return true }
-        guard min(title.count, name.count) >= wholeWordBelow else { return false }
-        return mention(of: title, in: name) != nil || mention(of: name, in: title) != nil
+    /// How much of the model's `name` a row titled `title` shares as a near
+    /// match, or nil for none: equal by `titleEquals`, or one inside the
+    /// other when the shorter side is long enough not to be a stray word, and
+    /// the length of that shorter side. The title is read in each of its
+    /// forms (`needles(for:)`), and the nearest of them counts.
+    static func nearOverlap(_ title: String, name: String) -> Int? {
+        let name = needle(for: name)
+        guard !name.isEmpty else { return nil }
+        let overlaps = needles(for: title).compactMap { title -> Int? in
+            let shorter = min(title.count, name.count)
+            if equals(title, name) { return shorter }
+            guard shorter >= wholeWordBelow else { return nil }
+            let inside = firstMention(of: title, inPlain: name) != nil || firstMention(of: name, inPlain: title) != nil
+            return inside ? shorter : nil
+        }
+        return overlaps.max()
     }
 
     /// Where `title` is named in `text`, if it is: case- and
     /// diacritic-insensitive, over both strings with their typographic
     /// punctuation made plain, so a title stored with three periods or a
     /// straight apostrophe is found in prose the model wrote with an ellipsis
-    /// or a curly one. The range indexes the text with its punctuation made
-    /// plain (`plainPunctuation`), not the original; callers use it only to
-    /// order mentions, never to slice the original.
+    /// or a curly one, and with the title read as stored or as a tool's
+    /// clamp showed it (`needles(for:)`), the first place either is named.
+    /// The range indexes the text with its punctuation made plain
+    /// (`plainPunctuation`), not the original; callers use it only to order
+    /// mentions, never to slice the original.
     static func mention(of title: String, in text: String) -> Range<String.Index>? {
-        mention(of: title, inPlain: plainPunctuation(text))
+        let haystack = plainPunctuation(text)
+        return needles(for: title).compactMap { firstMention(of: $0, inPlain: haystack) }.min { $0.lowerBound < $1.lowerBound }
     }
 
-    /// `mention(of:in:)` over prose whose punctuation the caller has already
-    /// made plain, so a scan of many titles through one text does that work
-    /// once.
-    private static func mention(of title: String, inPlain haystack: String) -> Range<String.Index>? {
-        var places = mentions(of: needle(for: title), inPlain: haystack).makeIterator()
+    /// The first place a needle is named in prose whose punctuation is
+    /// already plain.
+    private static func firstMention(of needle: String, inPlain haystack: String) -> Range<String.Index>? {
+        var places = mentions(of: needle, inPlain: haystack).makeIterator()
         return places.next()
     }
 
@@ -609,10 +611,38 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         }
     }
 
-    /// A title as the mention scan looks for it: trimmed, punctuation made
-    /// plain.
-    private static func needle(for title: String) -> String {
-        plainPunctuation(title.trimmingCharacters(in: .whitespacesAndNewlines))
+    /// The same text to the comparison every match makes: blind to case and
+    /// diacritics.
+    private static func equals(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.compare(rhs, options: [.caseInsensitive, .diacriticInsensitive], locale: .current) == .orderedSame
+    }
+
+    /// The model's name for a row as the matching reads it: trimmed,
+    /// punctuation made plain.
+    private static func needle(for name: String) -> String {
+        plainPunctuation(name.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    /// A row's title in each form the model may name it by, as the matching
+    /// reads them (`needle(for:)`): as a tool's clamp showed it, which is how
+    /// the model saw it in tool output, a recap or a referent
+    /// (`AskPrompt.shownWhole(_:)`: brackets swapped, tabs and line breaks
+    /// made spaces, invisible and control characters dropped, straight
+    /// quotes turned to double primes); and as stored, which the model can
+    /// know from elsewhere in the turn, such as the question. One form where
+    /// the two agree, and none that is empty.
+    ///
+    /// Read once a title, not once a call (`AskTitleForms`): the mention scan
+    /// reads every row the thread has read on every streamed snapshot of a
+    /// follow-up, and the clamp's reading is several passes over each title.
+    private static func needles(for title: String) -> [String] {
+        AskTitleForms.forms(of: title) { title in
+            let stored = needle(for: title)
+            let shown = needle(for: AskPrompt.shownWhole(title))
+            return [shown, stored].reduce(into: []) { forms, form in
+                if !form.isEmpty, !forms.contains(form) { forms.append(form) }
+            }
+        }
     }
 
     /// The typographic variants a model writes and a catalog stores
@@ -666,6 +696,31 @@ nonisolated final class AskDroppedRows: Sendable {
 
     func add(_ rows: Int) {
         count.withLock { $0 += rows }
+    }
+}
+
+/// The forms of the titles read lately, as tile and mention matching read
+/// them (`AskAnswer`'s `needles(for:)`), so each title is read once rather
+/// than on every streamed snapshot that is scanned for it. What a title's
+/// forms are depends on the title alone.
+///
+/// Emptied whole once it holds `capacity` titles: four times
+/// `AskCollector.maxThreadRows`, the most a scan reads at once, so a thread's
+/// rows stay in it while a long-lived process can't grow it without bound.
+nonisolated enum AskTitleForms {
+    static var capacity: Int { 4 * AskCollector<AskNoRow>.maxThreadRows }
+
+    private static let known = Mutex<[String: [String]]>([:])
+
+    /// `title`'s forms, made by `make` the first time it is asked for.
+    static func forms(of title: String, making make: (String) -> [String]) -> [String] {
+        if let forms = known.withLock({ $0[title] }) { return forms }
+        let forms = make(title)
+        known.withLock { known in
+            if known.count >= capacity { known.removeAll(keepingCapacity: true) }
+            known[title] = forms
+        }
+        return forms
     }
 }
 
