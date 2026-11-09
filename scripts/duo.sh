@@ -215,22 +215,24 @@ save_history() {
       abandon_save
     fi
   done
-  if [ -f "$prefs.plist" ] && domain=$(python3 -I -c '
+  # Nothing printed is no domain remembered; a plist that can't be read stops
+  # the run, as a folder that can't be copied does.
+  [ -f "$prefs.plist" ] || return 0
+  domain=$(python3 -I -c '
 import plistlib, sys
 with open(sys.argv[1], "rb") as f:
     value = plistlib.load(f).get(sys.argv[2])
-if not isinstance(value, str):
-    sys.exit(1)
-print(value)' "$prefs.plist" "$domain_key" 2>/dev/null); then
-    if ! { mkdir -p "$keep" && printf '%s\n' "$domain" >"$keep/$domain_key"; }; then
-      abandon_save
-    fi
+if isinstance(value, str):
+    print(value)' "$prefs.plist" "$domain_key" 2>/dev/null) || abandon_save
+  [ -n "$domain" ] || return 0
+  if ! { mkdir -p "$keep" && printf '%s\n' "$domain" >"$keep/$domain_key"; }; then
+    abandon_save
   fi
 }
 
 abandon_save() {
   rm -rf "$keep"
-  echo "duo: couldn't copy the saved chats out, so nothing was deleted" >&2
+  echo "duo: couldn't copy out what -askFreshHistory deletes, so nothing was deleted" >&2
   exit 1
 }
 
@@ -239,8 +241,9 @@ abandon_save() {
 #
 # The domain goes back through `defaults` run in the simulator, not as a file:
 # the demo reads its defaults through the simulator's preferences daemon, which
-# caches them. It is read back the same way, since nothing else shows that the
-# write took.
+# may hold a copy of them and miss a file written underneath it. It is read
+# back the same way, which shows the write took there, not that the demo will
+# read it.
 restore_history() {
   [ -d "$keep" ] || return 0
   xcrun simctl terminate "$duo" "$bundle" 2>/dev/null || true
