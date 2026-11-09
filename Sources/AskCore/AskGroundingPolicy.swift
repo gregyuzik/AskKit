@@ -24,11 +24,11 @@ nonisolated public enum AskGroundingPolicy: String, Sendable, Equatable {
     case retrieval
     /// Exactly `.retrieval` without the grounded retry. Grounding is judged
     /// the same way, a follow-up included, which the thread's rows still
-    /// ground, and prose draws only once the turn is grounded. But a first
-    /// answer that ends ungrounded fails as `AskError.ungrounded` at once,
-    /// with coaching: no planner, no search and no second generation, so
-    /// `SearchArguments`, `search(_:context:)` and `searchPlanInstructions`
-    /// go unused.
+    /// ground, and prose draws only once the turn is grounded. But an answer
+    /// on a fresh session that ends ungrounded fails as `AskError.ungrounded`
+    /// at once, with coaching: no planner, no search and no second
+    /// generation, so `SearchArguments`, `search(_:context:)` and
+    /// `searchPlanInstructions` go unused.
     ///
     /// For a domain whose every question is a lookup or an action, so its
     /// tools ground every answer worth keeping.

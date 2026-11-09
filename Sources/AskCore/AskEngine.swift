@@ -184,9 +184,9 @@ public actor AskEngine<Domain: AskDomain> {
         // And a domain with no search under the grounded retry, which a
         // domain that retrieves has: it plans `SearchArguments` and runs
         // `search`. With `AskNoSearchArguments` there is nothing to plan, so no
-        // planner is asked, and the default search throws, so a first answer
-        // that calls no tool fails all the same, as under `.toolCall`. Under
-        // the other policies there is no retry to reach it.
+        // planner is asked, and the default search throws, so an answer on a
+        // fresh session that calls no tool fails all the same, as under
+        // `.toolCall`. Under the other policies there is no retry to reach it.
         if grounding == .retrieval, Domain.SearchArguments.self == AskNoSearchArguments.self {
             mistake("SearchArguments is AskNoSearchArguments under the grounded retry — a first answer that calls no tool has no search to plan, and the default search(_:context:) fails it as ungrounded")
         }
@@ -1665,8 +1665,8 @@ public actor AskEngine<Domain: AskDomain> {
         // reason, and the session says so on the last snapshot
         // (`AskReplySnapshot.reachedTokenCap`). Logged by its tag, then
         // judged as any answer is: one with no prose fails, and one the policy
-        // doesn't keep is ungrounded, so a first answer still gets the
-        // grounded retry.
+        // doesn't keep is ungrounded, so an answer on a fresh session under
+        // `.retrieval` still gets the grounded retry.
         if outcome.reachedTokenCap {
             log.routing("\(tier.rawValue) stopped at its token cap: \(AskTriage.tag(for: AskTokenCapReached.answerCap))")
         }

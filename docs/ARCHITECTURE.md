@@ -1108,8 +1108,8 @@ Code comments cite these by number ("house rule 4"), so the numbers are fixed.
    - **`.retrieval`**, the default: prose shows only once the turn is grounded. An ungrounded answer on a
      fresh session gets the grounded retry; an ungrounded follow-up on a kept conversation fails, with
      coaching.
-   - **`.toolCall`**: the same without the retry, so an ungrounded first answer fails at once, with
-     coaching.
+   - **`.toolCall`**: the same without the retry, so an ungrounded answer on a fresh session fails at
+     once, with coaching.
    - **`.notRequired`**: prose draws from the first token, and every answer is kept, recording in
      `AskAnswer.grounding` what grounded it, or that nothing did (`AskGrounding.nothing`).
 
