@@ -188,8 +188,9 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    count, a total or a yes-or-no, and otherwise chosen in this order:
    1. when the model says the answer is every match (`showsEveryMatch`), the rows this turn read, never
       for a follow-up that read nothing, which has no set to show whole;
-   2. the rows the model's titles resolve to, in its order: exact before near, this turn's before the
-      thread's, and of near ones the row sharing the most of the title;
+   2. the rows the model's titles resolve to, in its order: exact, then the whole title before a name's
+      ellipsis, then a title the tool cut short, then near, this turn's before the thread's at each, and
+      of near ones the row sharing the most of the title;
    3. when none resolve, the rows its prose names, among this turn's rows (the thread's, when it read
       none).
 
@@ -552,7 +553,8 @@ A domain whose `persistence` is `.thread` (the default) keeps the thread in
   didn't keeps every other copy of what it was writing.
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
   by entry; a row that no longer decodes costs its answer that row, never the turn, and the read logs
-  how many went.
+  how many went. A row that won't encode, such as one holding a NaN, is left out of its answer on disk
+  in the same way, and the rest of the turn is written.
 - **Never written over.** The store writes back only the turns it was handed, so a thread read in part
   is first kept whole beside the thread as `ask-thread-original-<id>.json`, and a launch that reads all
   of it puts the rest back into its chat. If the original can't be kept, the thread is unreadable rather

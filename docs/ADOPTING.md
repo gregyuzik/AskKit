@@ -58,7 +58,7 @@ your data gives all seven:
 
 | Member | What you give it |
 |---|---|
-| `Row` | An `AskRow`: `Codable`, `Sendable`, `Identifiable` and `Equatable`, with a `displayTitle` the model reads in tool output and writes back when it picks tiles. Rows are written into the thread file, so a field you add later needs a default when it decodes. |
+| `Row` | An `AskRow`: `Codable`, `Sendable`, `Identifiable` and `Equatable`, with a `displayTitle` the model reads in tool output and writes back when it picks tiles. Rows are written into the thread file, so a field you add later needs a default when it decodes, and a row that won't encode, such as one holding a NaN `Double`, is left out of its answer on disk while the rest of the turn is written. |
 | `SearchArguments` | A `@Generable` type, your tool's arguments, so that when the model won't call the tool, the app's own search chooses them as the model would have. |
 | `brand` | An `AskBrand`: your copy, the Application Support folder the thread is kept in, and the log subsystem every AskKit logger writes under. `help`, the field's placeholder, is drawn on one line and cut off where it is wider than the field, so keep it to a few words. |
 | `overview()` | What the reader has to ask about: scopes and counts. |
