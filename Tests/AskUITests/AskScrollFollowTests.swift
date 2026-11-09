@@ -337,7 +337,7 @@ import Testing
         // `ownGrowthWindow` and then let the answer write itself below the
         // composer, with no pill, until the turn ended.
         let follow = AskScrollFollow()
-        follow.threadAppeared(streaming: true, at: 100)
+        #expect(follow.threadAppeared(lastTurn: UUID(), streaming: true, at: 100))
         follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
         follow.lastTurnHeightChanged(Self.readable + 400, at: 105)
         #expect(follow.followsGrowth(at: 105))
@@ -355,7 +355,7 @@ import Testing
         // A thread read back from disk or opened from the chats lands through
         // its first measurements, and what grows after that is the reader's.
         let follow = AskScrollFollow()
-        follow.threadAppeared(streaming: false, at: 100)
+        #expect(follow.threadAppeared(lastTurn: UUID(), streaming: false, at: 100))
         follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
         follow.lastTurnHeightChanged(Self.readable + 400, at: 100.3)
         #expect(follow.followsGrowth(at: 100.3))
@@ -367,8 +367,117 @@ import Testing
         // the follow last heard of doesn't outlive the turn it belonged to.
         let follow = onAPhone(at: 100)
         follow.streamingChanged(true, at: 100)
-        follow.threadAppeared(streaming: false, at: 110)
+        #expect(follow.threadAppeared(lastTurn: UUID(), streaming: false, at: 110))
         #expect(!follow.followsGrowth(at: 110 + AskScrollFollow.ownGrowthWindow))
+    }
+
+    // MARK: - The thread coming back into view
+
+    /// A thread with a turn this follow saw arrive, a reader up it at an
+    /// earlier answer, far enough for the pill: as a reader who scrolled up
+    /// and tapped a tile leaves it.
+    private func aReaderUpTheThread(of turn: UUID, streaming: Bool = false, at now: TimeInterval) -> AskScrollFollow {
+        let follow = AskScrollFollow()
+        #expect(follow.threadAppeared(lastTurn: turn, streaming: streaming, at: now))
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: now)
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace + 1500), at: now + 10)
+        #expect(!follow.isAtFoot)
+        #expect(follow.showsJumpPill)
+        return follow
+    }
+
+    @Test func theSameThreadComingBackLeavesTheReaderWhereTheyWere() {
+        // **Back from a pushed item or another tab, with the same last turn.**
+        // The screen's task runs again as the thread reappears, and sent to
+        // its end, the reader who had scrolled up to an earlier answer came
+        // back to the foot, the follow latched there and the pill gone.
+        let turn = UUID()
+        let follow = aReaderUpTheThread(of: turn, at: 100)
+        #expect(!follow.threadAppeared(lastTurn: turn, streaming: false, at: 120))
+        #expect(!follow.isAtFoot)
+        #expect(follow.isFar)
+        #expect(follow.showsJumpPill)
+        #expect(!follow.followsGrowth(at: 120))
+    }
+
+    @Test func aNewLastTurnIsSentToItsEnd() {
+        // A question asked while the thread was out of view, or as it came
+        // back, is an arrival like any other.
+        let follow = aReaderUpTheThread(of: UUID(), at: 100)
+        #expect(follow.threadAppeared(lastTurn: UUID(), streaming: true, at: 120))
+        #expect(follow.isAtFoot)
+        #expect(!follow.isFar)
+        #expect(!follow.showsJumpPill)
+    }
+
+    @Test func aFollowNewChatReplacedSendsTheSameChatToItsEnd() {
+        // New Chat replaces the follow (`AskScreen`), so the same chat
+        // opened again from the chats, its last turn the one the old follow
+        // saw arrive, is an arrival again.
+        let turn = UUID()
+        _ = aReaderUpTheThread(of: turn, at: 100)
+        #expect(AskScrollFollow().threadAppeared(lastTurn: turn, streaming: false, at: 120))
+    }
+
+    @Test func theThreadComingBackIsNoMoveOfItsOwn() {
+        // With nothing streaming either way, the return isn't the thread's
+        // doing: a card the reader at the foot opens just after it grows in
+        // place, and nothing it grows reports a pill to a reader up the
+        // thread.
+        let turn = UUID()
+        let atTheFoot = AskScrollFollow()
+        #expect(atTheFoot.threadAppeared(lastTurn: turn, streaming: false, at: 100))
+        atTheFoot.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
+        #expect(!atTheFoot.threadAppeared(lastTurn: turn, streaming: false, at: 120))
+        atTheFoot.lastTurnHeightChanged(Self.readable + 400, at: 120.2)
+        #expect(atTheFoot.isAtFoot)
+        #expect(!atTheFoot.followsGrowth(at: 120.2))
+
+        let upTheThread = aReaderUpTheThread(of: turn, at: 100)
+        #expect(!upTheThread.threadAppeared(lastTurn: turn, streaming: false, at: 120))
+        upTheThread.lastTurnHeightChanged(Self.readable + 400, at: 120.2)
+        #expect(!upTheThread.hasUnseenGrowth)
+    }
+
+    @Test func aReaderAtTheFootComesBackToAStreamStillFollowed() {
+        // A reader who pushed a row from the foot while an answer streamed is
+        // still followed when they come back, however long they were away.
+        let turn = UUID()
+        let follow = AskScrollFollow()
+        #expect(follow.threadAppeared(lastTurn: turn, streaming: true, at: 100))
+        follow.geometryChanged(Self.sample(distanceFromContentFoot: AskScrollFollow.restingTrailingSpace), at: 100)
+        #expect(!follow.threadAppeared(lastTurn: turn, streaming: true, at: 130))
+        follow.lastTurnHeightChanged(Self.readable + 400, at: 131)
+        #expect(follow.isAtFoot)
+        #expect(follow.followsGrowth(at: 131))
+    }
+
+    @Test func aStreamThatStoppedOutOfViewIsTheThreadsOwnMove() {
+        // **A stream the follow didn't hear stop** ends as `streamingChanged`
+        // would have ended it, had it heard: the growth the turn ended with,
+        // laid out as the thread comes back, is followed for a reader at the
+        // foot, and reported to one in the band above it. Told only that
+        // nothing streams now, that reader's pill would take the settled
+        // rule, and at 250 pt there would be none, with the turn's end under
+        // the composer.
+        let turn = UUID()
+        let room = AskScrollFollow.restingTrailingSpace
+        let atTheFoot = AskScrollFollow()
+        #expect(atTheFoot.threadAppeared(lastTurn: turn, streaming: true, at: 100))
+        atTheFoot.geometryChanged(Self.sample(distanceFromContentFoot: room), at: 100)
+        #expect(!atTheFoot.threadAppeared(lastTurn: turn, streaming: false, at: 130))
+        atTheFoot.lastTurnHeightChanged(Self.readable + 400, at: 130.2)
+        #expect(atTheFoot.followsGrowth(at: 130.2))
+        #expect(!atTheFoot.followsGrowth(at: 130 + AskScrollFollow.ownGrowthWindow))
+
+        let inTheBand = AskScrollFollow()
+        #expect(inTheBand.threadAppeared(lastTurn: turn, streaming: true, at: 100))
+        inTheBand.geometryChanged(Self.sample(distanceFromContentFoot: room), at: 100)
+        inTheBand.geometryChanged(Self.sample(distanceFromContentFoot: room + 250), at: 110)
+        #expect(!inTheBand.threadAppeared(lastTurn: turn, streaming: false, at: 130))
+        inTheBand.lastTurnHeightChanged(Self.readable + 300, at: 130.2)
+        #expect(!inTheBand.isFar)
+        #expect(inTheBand.showsJumpPill)
     }
 
     // MARK: - The way back down

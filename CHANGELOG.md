@@ -32,6 +32,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   `prefill(_:send: false)` or words typed before Apple Intelligence went off, and sending put a failed
   thread where that screen had been. The composer now offers the menu neither Send nor Stop while it is
   disabled, as its circle offers neither.
+- **Coming back to the thread leaves the reader where they were.** A reader who scrolled up to an
+  earlier answer and opened one of its tiles in a pushed row, or went to another tab, came back to the
+  thread gliding to its foot, the answer they had been reading gone: the scroll that takes a new
+  question into view ran again each time the thread reappeared, and took the reader back down. It now
+  runs only for a last turn the screen hasn't seen arrive, the thread's first appearance and a new
+  question, so a restored conversation and a screen built mid-answer still open at the end. Coming
+  back, the thread only learns whether an answer is streaming: a reader at the foot is still followed,
+  and one up the thread keeps their place and the pill.
 
 ## [0.7.1] - 2026-11-09
 

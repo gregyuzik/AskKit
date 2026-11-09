@@ -903,7 +903,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // The thread is gone, and what was measured of it goes too.
                 // Kept, the next chat's first short turn would pass the scroll
                 // guard on the last thread's `isScrollable` and lift itself
-                // under the bar.
+                // under the bar. The last turn the follow saw arrive goes with
+                // it, so the same chat opened again from the chats goes to its
+                // end rather than being taken for the thread coming back.
                 follow = AskScrollFollow()
                 return
             }
@@ -1497,24 +1499,33 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 //
                 // It also runs on the thread's first appearance, which is
                 // right: arriving at a restored conversation should show its
-                // end.
+                // end. **And it runs again each time the thread comes back into
+                // view**, from under a pushed item or from another tab, with
+                // the same last turn, and that is no arrival: the follow sends
+                // the thread to its end only for a last turn it hasn't seen
+                // arrive (`AskScrollFollow.threadAppeared`). Sent there, a
+                // reader who had scrolled up to an earlier answer and opened
+                // one of its tiles came back to the foot, and carrying the
+                // reader back from somewhere they chose to be is the one thing
+                // this screen never does.
                 //
                 // **With whatever is streaming as it runs**, since this screen
                 // may be built mid-answer, in a second window or a rebuilt
                 // split view's detail, where `onChange(of: store.isThinking)`
-                // has nothing to report (`AskScrollFollow.threadAppeared`).
+                // has nothing to report, and a stream may have started or
+                // stopped while the thread was out of view.
                 // Not by giving that closure `initial: true`, which on every
                 // screen built mid-stream would clear VoiceOver's next stop
                 // and put the keyboard away, racing a host's request for the
                 // composer.
                 .task(id: store.lastTurnID) {
-                    guard store.lastTurnID != nil else { return }
-                    follow.threadAppeared(streaming: store.isThinking)
-                    // **The end of the thread, whatever brought us here.** One
-                    // target and one anchor: a question the reader just sent
-                    // is at the end, and so is the answer they came back to on
-                    // a restored conversation. Why not the top of the screen:
-                    // ARCHITECTURE.md, Rejected designs.
+                    guard let lastTurn = store.lastTurnID,
+                          follow.threadAppeared(lastTurn: lastTurn, streaming: store.isThinking) else { return }
+                    // **The end of the thread, whatever brought a new last
+                    // turn.** One target and one anchor: a question the reader
+                    // just sent is at the end, and so is the answer they came
+                    // back to on a restored conversation. Why not the top of
+                    // the screen: ARCHITECTURE.md, Rejected designs.
                     guard follow.isScrollable else { return }
                     scrollThreadItself {
                         withAnimation(threadMotion) {
@@ -1564,6 +1575,10 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 // **And it lets a finished answer's ink finish first**:
                 // `waitForChunksToSettle` has the whole of that, and why it
                 // reaches no other growth.
+                //
+                // It runs again as the thread comes back into view, and its
+                // guard moves only a reader `followsGrowth` still holds at the
+                // foot, never one who had scrolled away from it.
                 .task(id: follow.lastTurnHeight) {
                     guard !Task.isCancelled, follow.lastTurnHeight > 0, follow.followsGrowth else { return }
                     await waitForChunksToSettle()
@@ -1593,8 +1608,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
                 //
                 // Asked again rather than read off the count, because the task
                 // also runs each time the thread appears, with whatever count
-                // the last resize left, beside the glide that brings the newest
-                // question into view.
+                // the last resize left: beside the glide that brings a new last
+                // turn into view, or, back from a pushed item or another tab,
+                // over a reader who may be anywhere in the thread.
                 .task(id: follow.footRequests) {
                     guard follow.keepsFootThroughResize, follow.isScrollable else { return }
                     scrollThreadItself { proxy.scrollTo(askThreadFoot, anchor: .bottom) }
