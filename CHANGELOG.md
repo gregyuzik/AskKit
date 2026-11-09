@@ -12,6 +12,17 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bank of tiles with no column maximum lays out under an unbounded width.** An `AskTileGrid` given
+  `columns: .adaptive(minimum: 76, maximum: .infinity)`, the maximum `GridItem.adaptive` defaults to,
+  put its first tile at an x of NaN and handed its parent a width that wasn't a number wherever it was
+  asked how wide it could be: in a `.fixedSize()`, a horizontal `ScrollView` or a `ViewThatFits`, the
+  non-finite geometry behind `LayoutSubview.place`'s assertion. AskKit's own columns are finite, so only
+  a host's could. Asked with an unbounded width, such a bank now answers with every tile in one row at
+  the minimum, the one finite width its columns name, and lays out that row when placed at it; a bank
+  with a maximum answers at the maximum, as before.
+
 ## [0.7.1] - 2026-11-09
 
 Fenced text that reaches the model loses its straight double quotes and what a reader can't see, and

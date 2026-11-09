@@ -144,6 +144,50 @@ struct AskTileGridTests {
         #expect(unbounded.frames.map(\.minX) == [0, 108, 216])
         #expect(unbounded.width == 316)
         #expect(unbounded.height == 50)
+
+        let none = AskTileArrangement(count: 0, in: .infinity, columns: columns, rowSpacing: 8) { _, _ in 50 }
+        #expect(none.frames.isEmpty)
+        #expect(none.width == 0)
+        #expect(none.height == 0)
+    }
+
+    /// **An unbounded width with no maximum either is every tile in one row
+    /// at the minimum**, the one finite width the columns name. No maximum is
+    /// `GridItem.adaptive`'s default, and a host's `.fixedSize()`, horizontal
+    /// `ScrollView` or `ViewThatFits` asks with an unbounded width. At the
+    /// maximum, the first tile's x was `0 × ∞`, which is NaN, and the bank
+    /// handed its parent a width that wasn't a number: the non-finite geometry
+    /// `AskChipFlow` refuses to hand up.
+    @Test func anUnboundedBankWithNoMaximumIsFinite() {
+        let columns = AskTileColumns.adaptive(minimum: 76, maximum: .infinity)
+        var asked: Set<CGFloat> = []
+        let unbounded = AskTileArrangement(count: 3, in: .infinity, columns: columns, rowSpacing: 8) { _, cellWidth in
+            asked.insert(cellWidth)
+            return 50
+        }
+        #expect(unbounded.frames.allSatisfy { $0.minX.isFinite && $0.width.isFinite } && unbounded.width.isFinite)
+        #expect(asked.allSatisfy { $0.isFinite }, "A tile is measured at its column's width, which is finite too.")
+        #expect(unbounded.frames.map(\.minX) == [0, 84, 168])
+        #expect(unbounded.frames.map(\.width) == [76, 76, 76])
+        #expect(unbounded.width == 244)
+        #expect(unbounded.height == 50)
+
+        // Placed at the width it answered with, the bank is that row again.
+        let placed = AskTileArrangement(count: 3, in: unbounded.width, columns: columns, rowSpacing: 8) { _, _ in 50 }
+        #expect(placed.frames == unbounded.frames)
+
+        let none = AskTileArrangement(count: 0, in: .infinity, columns: columns, rowSpacing: 8) { _, _ in 50 }
+        #expect(none.frames.isEmpty)
+        #expect(none.width == 0)
+        #expect(none.height == 0)
+    }
+
+    /// A width with room in it is shared as before, however wide a column may
+    /// grow.
+    @Test func aBoundedBankWithNoMaximumSharesItsWidth() {
+        let fit = AskTileColumns.adaptive(minimum: 76, maximum: .infinity).fit(in: 366)
+        #expect(fit.count == 4)
+        #expect(fit.width == 85.5)
     }
 
     /// A tile that answers with a height it cannot have is given none, so the

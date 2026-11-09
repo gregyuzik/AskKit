@@ -41,8 +41,15 @@ nonisolated public struct AskTileColumns: Equatable, Sendable {
     /// the minimum gets one column as wide as the width. An unbounded width
     /// holds every tile in one row at the maximum, which is the honest answer
     /// to a probe asking how wide the bank could be.
+    ///
+    /// **With no maximum either, the row is at the minimum**, the one finite
+    /// width the columns name: an unbounded `maximum` is `GridItem.adaptive`'s
+    /// default. At the maximum, the first tile's x would be `0 × ∞`, which is
+    /// NaN, and the bank would hand its parent a width that isn't a number:
+    /// the non-finite geometry `AskChipFlow.sizeThatFits` refuses to hand up.
+    /// Placed at the width that row comes to, the bank lays out the same row.
     public func fit(in width: CGFloat) -> (count: Int, width: CGFloat) {
-        guard width.isFinite else { return (.max, maximum) }
+        guard width.isFinite else { return (.max, maximum.isFinite ? maximum : minimum) }
         let pitch = minimum + spacing
         // A hair of tolerance, so a width that holds its last column exactly is
         // not lost to the division's rounding.
