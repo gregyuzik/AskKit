@@ -7,9 +7,8 @@ import SwiftUI
 /// other two first screens.
 ///
 /// A host's can be a glyph of its own, even one that moves. The demo's is
-/// `askkit.bubbles.fill`, the filled sibling of its Ask tab's `askkit.bubbles`,
-/// custom symbols in its asset catalog drawn from its icon's three bubbles, as
-/// the tab bar swaps the fill in for the selected tab: lit in the tint, and
+/// `askkit.bubbles.fill`, the sibling of its Ask tab's `askkit.bubbles` in its
+/// asset catalog, drawn from its icon's three bubbles: lit in the tint, and
 /// unlit in one tertiary ink.
 struct DemoMark: View {
     let isLit: Bool
