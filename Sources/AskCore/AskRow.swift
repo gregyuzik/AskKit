@@ -8,7 +8,10 @@
 /// against, name in a recap, and persist with a thread.
 ///
 /// `Codable` because a row rides the thread to disk; `Equatable` so the store
-/// and the UI can tell a changed turn from an unchanged one.
+/// and the UI can tell a changed turn from an unchanged one. A row that won't
+/// encode, such as one holding a `Double` that is infinite or NaN, is left out
+/// of its answer on disk, as one that no longer decodes is left out as it is
+/// read: either costs the answer that row, never the turn.
 ///
 /// **A value, not a reference.** Make it a struct or an enum, or a class
 /// whose fields never change: a row recorded into an answer is what the

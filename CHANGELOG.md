@@ -12,6 +12,20 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Fixed
+
+- **A row that won't encode costs its answer that row, not every save of its chat.** A host's row
+  can decode and still not encode, such as one holding a `Double` that is NaN or infinite, which a
+  default `JSONEncoder` refuses, or one whose own `encode(to:)` throws. The thread, a chat's filing and
+  a proposal's outcome were each encoded whole, so from the turn that read such a row on, every save of
+  the thread failed and a relaunch brought back only the turns before it, every yes to a proposal
+  failed with its save, New Chat couldn't file the chat, and no earlier chat opened while it was on
+  screen. Reads already salvaged row by row. Now a write that won't encode whole tries each row alone,
+  writes the turns without the ones that fail, in `matches` and `tiles` alike, and logs how many: the
+  turn keeps its question, prose, outcome and other rows, and an answer whose only tile went reads back
+  with none. A thread whose rows all encode is written as before, and one that still won't encode fails
+  as before.
+
 ## [0.7.1] - 2026-11-09
 
 Fenced text that reaches the model loses its straight double quotes and what a reader can't see, and

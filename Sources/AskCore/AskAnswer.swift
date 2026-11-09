@@ -291,6 +291,23 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         )
     }
 
+    /// This answer with only the rows `isKept` keeps, in `matches` and
+    /// `tiles` alike, and how many went, counted per list as a read counts
+    /// the rows that no longer decode (`salvagedRows`): how a write leaves out
+    /// a row that won't encode (`AskThreadStore.encodeEntries(_:logger:)`).
+    func keepingRows(where isKept: (Row) -> Bool) -> (answer: AskAnswer<Row>, dropped: Int) {
+        let keptMatches = matches.filter(isKept)
+        let keptTiles = tiles.filter(isKept)
+        let dropped = matches.count - keptMatches.count + tiles.count - keptTiles.count
+        guard dropped > 0 else { return (self, 0) }
+        let answer = AskAnswer(
+            text: text, matches: keptMatches, tiles: keptTiles, followUps: followUps,
+            questionKind: questionKind, isTruncated: isTruncated, basis: basis, encodedPayload: payload,
+            proposal: proposal, grounding: grounding
+        )
+        return (answer, dropped)
+    }
+
     /// This answer with no more than `maxTiles` tiles, the first ones kept:
     /// what the engine hands out for every answer, the domain's own included,
     /// since AskUI lays a bank out whole on the strength of that bound.

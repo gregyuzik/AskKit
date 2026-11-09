@@ -285,7 +285,9 @@ public actor AskThreadArchive<Row: AskRow> {
     /// written.
     ///
     /// Capped like the thread, at `AskThreadStore.maxPersistedTurns`, oldest
-    /// turns dropped.
+    /// turns dropped. A row that won't encode is left out of its answer in
+    /// the filing, and costs it nothing else
+    /// (`AskThreadStore.encodeEntries(_:logger:)`).
     ///
     /// **Nil for turns there were means they are not filed**, and a caller
     /// must keep them where they are: not clear the thread they came from,
@@ -428,7 +430,10 @@ public actor AskThreadArchive<Row: AskRow> {
     /// read back says what came of it, and never offers the action again.
     /// Only the chat's file is written, since its title, dates and count are
     /// as they were, and only a filing every turn of which decodes: written
-    /// back from what decoded, it would lose the rest.
+    /// back from what decoded, it would lose the rest. A row in it that
+    /// decodes and won't encode is left out of its answer, as a filing leaves
+    /// one out (`AskThreadStore.encodeEntries(_:logger:)`): kept, it would
+    /// refuse the outcome every write.
     @discardableResult
     package func settleProposal(asked question: String, at askedAt: Date, with outcome: AskProposalOutcome) -> Bool {
         var settledAny = false
@@ -442,7 +447,7 @@ public actor AskThreadArchive<Row: AskRow> {
                   let settled = AskThreadEntry.settlingProposal(asked: question, at: askedAt, with: outcome, in: entries)
             else { continue }
             do {
-                try write(JSONEncoder().encode(settled), to: url)
+                try write(AskThreadStore<Row>.encodeEntries(settled, logger: logger), to: url)
                 settledAny = true
             } catch {
                 logger.error("a proposal's outcome could not be written to its chat: \(AskStoredFile.tag(for: error), privacy: .public)")
@@ -471,7 +476,7 @@ public actor AskThreadArchive<Row: AskRow> {
         guard let url = url(for: id),
               let summary = AskThreadSummary.of(kept, id: id, fallbackDate: now) else { return nil }
         do {
-            try write(JSONEncoder().encode(kept), to: url)
+            try write(AskThreadStore<Row>.encodeEntries(kept, logger: logger), to: url)
         } catch {
             logger.error("an earlier chat could not be written: \(AskStoredFile.tag(for: error), privacy: .public)")
             return nil
