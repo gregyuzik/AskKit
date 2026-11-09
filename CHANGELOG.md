@@ -12,6 +12,43 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Changed
+
+- **`AskProposal.modelReceipt(notYet:)` names the card's button bare.** Its receipt now ends "Nothing
+  changes until the Lend button on the card below is confirmed.", where it put the label in straight
+  double quotes, `"Lend" on the card below`, and a hand-off's receipt changes the same way. The model
+  copies a straight double quote from tool output into its answer, where it ends the answer's string. A
+  label that clamps to nothing still reads "the card below". The new wording wasn't measured: 0.5.0's
+  numbers were taken with the label in quotes.
+
+### Fixed
+
+- **No straight double quote reaches the model through a fence.** Apple's on-device model copies one
+  from tool output into its guided-generation answer, where it ends the answer's string, and the
+  generation runs on to the token cap: in vultyr's eval, 6 of 8 answers that ran to the cap stopped
+  where a quoted title would open ("The incident is titled "). `AskPrompt.sanitizeForFence` now turns
+  each straight double quote into ″ (U+2033, double prime) before it reads for fence tags, as in
+  `Vinyl, 7″, 45 RPM`, and every fenced path runs it: `AskPrompt.clamp`, a tool's output that keeps its
+  lines (`sanitizeForFence`, then `neuteringTags`), the grounded retry's rows, the recaps, a photo's
+  label and the reader's question, which the thread still shows as typed. One scalar for one, so a
+  clamp's limit cuts where it did, and clamping twice still changes nothing. Mention and tile matching
+  read ″ as a straight double quote, so an answer that copies `7″` still names the row titled `7"`.
+  ADOPTING.md's rules for tools say so, and that a clamp of a tool's own misses it.
+
+### Security
+
+- **What a reader can't see no longer reaches the model through a fence.** A review of Kabynyt's move to
+  `AskPrompt.clamp` found that a tool's rows, such as catalog titles and web imports, can carry Unicode
+  tag characters (U+E0020 to U+E007F), which draw nothing and spell ASCII to the model; bidi controls,
+  which draw text in another order than it is sent; and runs of zero-width joiners. Only the question
+  and its follow-ups dropped them. `AskPrompt.sanitizeForFence` now drops them first, as the question
+  path does: every format character, keeping a joiner after anything but a joiner and the tags of the
+  three subdivision flags Unicode recommends, and every variation selector that selects nothing. It
+  drops the C0 and C1 controls too, all but the tab and the line breaks, which it keeps for output laid
+  out in lines and which `AskPrompt.clamp` turns into spaces, a tab now as well as a line break. Every
+  fenced path runs it, as above, and a control inside a fence tag's name no longer hides the tag from
+  the redaction, as an invisible scalar already couldn't.
+
 ## [0.7.0] - 2026-11-09
 
 The answer's language named as Apple's practice names it, in place of a domain's line at the end of

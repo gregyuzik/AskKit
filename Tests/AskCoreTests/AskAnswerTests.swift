@@ -134,6 +134,18 @@ import Testing
         #expect(Answer.mention(of: "Don't Look Back", in: "Try “Don’t Look Back” tonight") != nil)
     }
 
+    @Test func anAnswerThatCopiesADoublePrimeStillNamesTheRow() {
+        // `AskPrompt.clamp` and the grounded retry's rows hand the model each
+        // straight double quote as a double prime, and the model copies what
+        // it read: `7″` names the row titled `7"`, in prose and as a tile.
+        let row = FakeRow(#"Vinyl, 7", 45 RPM"#)
+        #expect(Answer.mention(of: row.displayTitle, in: "Play Vinyl, 7″, 45 RPM tonight") != nil)
+        #expect(Answer.mention(of: "Vinyl, 7″, 45 RPM", in: #"Play Vinyl, 7", 45 RPM tonight"#) != nil)
+        #expect(Answer.mentioned(in: "Your Vinyl, 7″, 45 RPM is on the shelf.", among: [row]) == [row])
+        #expect(Answer.tiles(named: ["Vinyl, 7″, 45 RPM"], text: "", matches: [FakeRow("Vinyl"), row]) == [row])
+        #expect(Answer.tiles(named: ["The ″Best″ Album"], text: "", matches: [FakeRow(#"The "Best" Album"#)]).count == 1)
+    }
+
     @Test func mentionIsCaseAndDiacriticInsensitive() {
         #expect(Answer.mention(of: "Café Bleu", in: "your copy of CAFE BLEU") != nil)
     }

@@ -76,17 +76,23 @@ answer's tiles resolve only against recorded rows.
 **A tool's output is the reader's data, and AskKit fences it.** Put every field through `AskPrompt.clamp`,
 show at most `context.rowLimit` rows, and return the lines bare: no fence of your own, which the grounded
 retry would redact, and none of AskKit's tag names (`user_request`, `rows`, `previous_question`,
-`previous_answer` and `tool_result`). `clamp` swaps angle brackets for lookalikes, flattens newlines,
-holds each character to 16 Unicode scalars and redacts a fence tag in any spelling NFKD maps to it, then
-cuts to the limit, so clamping twice changes nothing; its doc comment has the spellings. For output whose
-line breaks carry its layout, use `AskPrompt.sanitizeForFence`, then `AskPrompt.neuteringTags`, which
-does the bracket swap alone.
+`previous_answer` and `tool_result`). `clamp` drops what the question path drops, the scalars a reader
+can't see (tag characters, bidi controls, a run of joiners), and every C0 and C1 control but the tab and
+the line breaks, which it flattens to spaces; swaps straight double quotes for ″ and angle brackets for
+lookalikes; holds each character to 16 Unicode scalars and redacts a fence tag in any spelling NFKD maps
+to it, then cuts to the limit, so clamping twice changes nothing; its doc comment has the spellings. For
+output whose line breaks carry its layout, use `AskPrompt.sanitizeForFence`, which makes the same drops
+and swaps the quotes but keeps tabs and line breaks, then `AskPrompt.neuteringTags`, which does the
+bracket swap alone.
 
 **No straight double quotes around a title or a name.** The model copies the quote into its answer,
 where it ends the guided-generation string the answer is written in. In vultyr's eval, 6 of 8 answers
 that ran to the token cap stopped right where a quoted title would open ("The incident is titled "), and
 the rest of the generation ran on to the cap. In Japanese the model closed a string with 」 instead, and
-ran away the same way. Leave titles and names bare, as the README's sample does.
+ran away the same way. Leave titles and names bare, as the README's sample does. `AskPrompt.clamp` and
+`AskPrompt.sanitizeForFence` turn a straight double quote inside a field into ″, so data such as a 7"
+record can't end the answer's string. Put every field through one of the two, as the rule above says: a
+clamp of the tool's own misses this.
 
 **A guided string's list of values takes whole values.** A value that begins with a word the model
 reaches for captures the whole phrase: once the model writes the word, the list leaves it one value to

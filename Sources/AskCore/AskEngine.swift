@@ -1285,13 +1285,15 @@ public actor AskEngine<Domain: AskDomain> {
         lines.append(
             "These are the things the app found for this question — answer only from them, "
             + "and do not search again: <tool_result>"
-            // Both, and in this order: `sanitizeForFence` redacts the tags
-            // AskKit knows, and `neuteringTags` neuters any other. Here the
-            // engine, not a tool, puts rows into a prompt, so it does what
-            // house rule 3 asks of a tool's output rather than trust the
-            // domain's search to have done it. Not `clamp`: that collapses
-            // newlines and truncates, flattening the layout the domain built
-            // for the model to read.
+            // Both, and in this order: `sanitizeForFence` drops what a reader
+            // can't see and the controls, turns each straight double quote
+            // into ″ (`AskPrompt.clamp` says why) and redacts the tags AskKit
+            // knows, keeping the line breaks, and `neuteringTags` neuters any
+            // other tag. Here the engine, not a tool, puts rows into a
+            // prompt, so it does what house rule 3 asks of a tool's output
+            // rather than trust the domain's search to have done it. Not
+            // `clamp`: that collapses newlines and truncates, flattening the
+            // layout the domain built for the model to read.
             + AskPrompt.neuteringTags(AskPrompt.sanitizeForFence(rows))
             + "</tool_result>"
         )

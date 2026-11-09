@@ -105,8 +105,8 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// picks the ending, so a hand-off's says confirming opens a form.
     ///
     ///     return proposal.modelReceipt(notYet: "Jaws is not marked as opened yet.")
-    ///     // Jaws is not marked as opened yet. Nothing changes until
-    ///     // "Mark Opened" on the card below is confirmed.
+    ///     // Jaws is not marked as opened yet. Nothing changes until the
+    ///     // Mark Opened button on the card below is confirmed.
     ///
     /// **`notYet` is the claim an answer would make, negated, in the words it
     /// would make it in.** Asked for a change, the on-device model answers by
@@ -136,7 +136,9 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
     /// `AskPrompt.longClamp`, the label to `AskPrompt.shortClamp`, each on one
     /// line. A sentence with no closing punctuation takes a full stop, and
     /// one that clamps to nothing reads `modelReceipt` or `handOffReceipt`
-    /// instead.
+    /// instead. The label goes in bare ("the Mark Opened button"): quotes
+    /// around it would be tool output the model copies into its answer, where
+    /// a straight one ends the answer's string (`AskPrompt.clamp`).
     ///
     /// **Its words are English, as the rest of what a tool returns is, and the
     /// answer repeats them.** Whether an answer in another language translates
@@ -150,7 +152,7 @@ nonisolated public struct AskProposal: Codable, Sendable, Equatable, Identifiabl
         }
         if !".!?…。！？".contains(last) { sentence += "." }
         let label = AskPrompt.clamp(actionLabel, AskPrompt.shortClamp)
-        let button = label.isEmpty ? "the card below" : "\"\(label)\" on the card below"
+        let button = label.isEmpty ? "the card below" : "the \(label) button on the card below"
         switch kind {
         case .perform:
             return "\(sentence) Nothing changes until \(button) is confirmed."

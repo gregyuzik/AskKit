@@ -1513,6 +1513,18 @@ import Testing
         #expect(store.composerFocusRequest == nil)
     }
 
+    /// The engine's fence hands the model a straight double quote as ″, and
+    /// the thread shows the question as typed: the store keeps the reader's
+    /// words, and hands the engine those.
+    @Test func theThreadShowsAQuestionsStraightDoubleQuotesAsTyped() async {
+        let asker = ScriptedAsker(.init(events: [.answer(.of("An answer."))]))
+        let store = makeStore(asker: asker)
+        store.ask(#"Is "Best of" on vinyl?"#)
+        await settle(store)
+        #expect(store.turns.first?.question == #"Is "Best of" on vinyl?"#)
+        #expect(asker.questions.withLock { $0 }.map(\.0) == [#"Is "Best of" on vinyl?"#])
+    }
+
     @Test func anEmptyPrefillChangesNothing() {
         let store = makeStore(asker: ScriptedAsker())
         store.draft = "half a question"

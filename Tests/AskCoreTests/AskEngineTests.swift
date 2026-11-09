@@ -325,6 +325,34 @@ private extension Trait where Self == ConditionTrait {
         #expect(prompts.last?.contains("do not search again") == true)
     }
 
+    @Test func theRetrysRowsReachThePromptWithNoStraightDoubleQuote() async {
+        // The model copies a straight double quote from the rows into its
+        // answer, where it ends the answer's string, so each reaches the
+        // prompt as a double prime, and the rows keep the line breaks the
+        // search laid them out with.
+        var domain = FakeDomain()
+        domain.searchRows = [FakeRow(#"Vinyl, 7", 45 RPM"#), FakeRow(#"The "Best" Album"#)]
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        session.script(FakeSession.Script(snapshots: [.answering("Answer.")], toolCallsAfter: 0))
+        _ = await record(engine.ask("q"))
+        let prompts = session.prompts.withLock { $0 }
+        #expect(prompts.count == 2)
+        #expect(prompts.last?.contains("<tool_result>Vinyl, 7″, 45 RPM\nThe ″Best″ Album</tool_result>") == true)
+    }
+
+    @Test func theQuestionReachesThePromptWithNoStraightDoubleQuote() async {
+        // The reader's words are fenced as a tool's are, so a quote they typed
+        // reaches the model as a double prime. The thread shows the question
+        // as typed: the store keeps its own words (AskConversationStoreTests).
+        let (engine, seam, _) = makeEngine()
+        let session = seam.session(for: .privateCloud)
+        session.script(grounded("Answer."))
+        _ = await record(engine.ask(#"Is "Best of" on vinyl?"#))
+        let prompts = session.prompts.withLock { $0 }
+        #expect(prompts.first?.hasSuffix("<user_request>Is ″Best of″ on vinyl?</user_request>") == true)
+    }
+
     @Test func aGroundedRetryAsksTheDomainForItsLinesOnce() async {
         // The first prompt, the plan and the re-ask are built from one reading
         // of the domain's lines, not one each.
