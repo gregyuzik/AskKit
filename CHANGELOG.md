@@ -12,6 +12,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-09
+
+Eleven fixes, and no change to the API. A chat keeps saving when one of its rows won't encode, a yes
+given twice is carried out once, a title the clamp rewrote or a tool cut short still names its row,
+and a reader comes back to the thread where they left it.
+
 ### Fixed
 
 - **A yes given again after one that failed off screen is carried out once, and its card says so.**
@@ -853,7 +859,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/gregyuzik/AskKit/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/gregyuzik/AskKit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/gregyuzik/AskKit/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/gregyuzik/AskKit/compare/v0.5.0...v0.6.0
