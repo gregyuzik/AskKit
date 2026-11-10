@@ -230,8 +230,8 @@ with the next one.
 ## Imaging the iPhone screen
 
 The README's six iPhone images are an iPhone 18 Pro simulator (iOS 27.2), each shot in light
-(`iphone-<shot>.png`) and dark (`iphone-<shot>-dark.png`), framed with
-[`frames`](https://github.com/viticci/frames-cli) and scaled to 600x1227:
+(`iphone-<shot>.png`) and dark (`iphone-<shot>-dark.png`): the screen alone, with no device around
+it, its corners clear to the display's shape, scaled to 534x1163:
 - `first`: the library's first screen, nothing asked;
 - `answer`: a live answer from the on-device model to a starter, "What records do I own?" in light and
   "What books do I own?" in dark ("What tools do I own?" came back padded in every take);
@@ -275,13 +275,18 @@ simulator for the whole run, so no test or other app comes to the front on it.
    bottom (116 pt). That puts the turn's time under the bar, and the last follow-up runs under the
    composer's glass, as a chat's does. A drag on the thread is less precise, and one on the answer's
    words selects them.
-5. Capture and frame. `frames` matches the 1206x2622 capture to the iPhone 18 Pro frame in Burgundy,
-   its default, at 1350x2760; scale that to 600x1227:
+5. Capture the screen and clear its corners. A plain capture is the whole 1206x2622 rectangle, with
+   the pixels the display's corners hide. One taken with `--mask=alpha` has those corners clear, but
+   paints the Dynamic Island as a black pill between the clock and the status icons. So take both,
+   use ImageMagick (`brew install imagemagick`) to give the plain capture the masked one's alpha,
+   which is opaque across the island, and scale the result to 534x1163:
 
    ```sh
    xcrun simctl io <udid> screenshot iphone-raw.png
-   frames frame iphone-raw.png --output framed/
-   sips -z 1227 600 framed/iphone-raw_framed.png --out iphone-answer.png
+   xcrun simctl io <udid> screenshot --mask=alpha iphone-mask.png
+   magick iphone-raw.png \( iphone-mask.png -alpha extract \) -alpha off \
+     -compose CopyOpacity -composite iphone-cut.png
+   sips -z 1163 534 iphone-cut.png --out iphone-answer.png
    ```
 
 6. Put the simulator back: `xcrun simctl status_bar <udid> clear`, its own appearance, the app's
