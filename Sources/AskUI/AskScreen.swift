@@ -657,6 +657,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         .onAppear {
             writeSlotFaceStyle()
             updateSlotCover { $0.screenAppeared() }
+            // Where this begins the reader's visit, the tips hear of it
+            // (`AskVisits`).
+            AskTips.screenAppeared(screenID)
         }
         // **The tips' gates, from the window the reader is in** (`tipGates`,
         // `readerIsInWindow`), each opening only once it has held
@@ -681,9 +684,11 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
         .onDisappear {
             updateSlotCover { $0.screenDisappeared() }
             // Its surfaces go with it, so no tip waits to point at a screen
-            // nobody is on.
+            // nobody is on. And the visit ends, unless an item pushed over
+            // the screen is what took it (`AskVisits`).
             if windowAppearsActive { AskTipGates.Reading().write() }
             settledTipGates = AskTipGates.Reading()
+            AskTips.screenDisappeared(screenID, underPushedItem: itemIsPushed)
             // Focus goes with the screen, and the task that would put a held-up
             // composer down is cancelled with it. Left up, the composer would
             // come back raised over a slot that forgot it as the tab went

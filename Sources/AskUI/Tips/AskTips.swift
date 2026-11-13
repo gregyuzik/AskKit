@@ -16,11 +16,12 @@ import TipKit
 /// captures, and one that doesn't sees none. Nothing here is public, so a host
 /// has nothing to adopt.
 ///
-/// **One at a time, the first that applies** (`AskTips.group`). Each tip's one
+/// **One at a time, the first that applies** (`AskTips.group`). Each tip's
 /// rule is its surface being on screen with nothing over it, which `AskScreen`
 /// works out and writes to `AskTipGates`, so the group's current tip is always
-/// one a view is drawing. Each goes once its action has been done, from the
-/// menu, the swipe or VoiceOver, or once it's closed with its ×.
+/// one a view is drawing. The starter's waits as well for the reader's second
+/// visit to Ask (`AskVisits`). Each goes once its action has been done, from
+/// the menu, the swipe or VoiceOver, or once it's closed with its ×.
 ///
 /// **No tip moves a frame** (house rule 4): all three are popovers
 /// (`askPopoverTip`), the starter's on the "Try asking" heading, the
@@ -52,6 +53,91 @@ enum AskTips {
     /// By id, since `currentTip` is an existential.
     static func isCurrent(_ tip: some Tip) -> Bool {
         group.currentTip?.id == tip.id
+    }
+
+    /// The screens up and the visit they are (`AskVisits`). Static for the
+    /// group's reason: a screen built again finds the visit the one before
+    /// it began, and a second window's screen the first's.
+    private static var visits = AskVisits()
+
+    /// `screen`, by the identity it holds, has come on screen: where that
+    /// begins a visit, TipKit hears of it (`AskVisits.begun`).
+    static func screenAppeared(_ screen: UUID) {
+        guard visits.screenAppeared(screen, at: .now) else { return }
+        AskVisits.begun.sendDonation()
+    }
+
+    /// `screen` has gone, under an item a host pushed over it or for good.
+    static func screenDisappeared(_ screen: UUID, underPushedItem: Bool) {
+        visits.screenDisappeared(screen, underPushedItem: underPushedItem, at: .now)
+    }
+}
+
+/// The reader's visits to Ask, which the starter's tip waits for the second
+/// of (`AskStarterDeclineTip`). A visit begins as a screen appears with none
+/// up, and goes on until the last one leaves: opening Ask's tab, or the app
+/// on it.
+///
+/// **Not every appearance begins one.** iPhone Duo opening or closing and a
+/// size class changing build the screen again, an item a host pushes over
+/// the screen takes it off until its pop, and a second window puts up a
+/// screen of its own. Counted, any of them would bring the tip up on the
+/// visit it sits out. So a screen appearing while another is up is the same
+/// visit, as is one back from under a pushed item, and one that appears
+/// within `rebuild` of the last one leaving.
+///
+/// **A value, so it can be tested** (`AskVisitsTests`): the screens report
+/// to the one `AskTips` holds, and it never reads the clock itself.
+nonisolated struct AskVisits: Equatable {
+    /// A visit begun, donated once for each (`AskTips.screenAppeared(_:)`).
+    /// TipKit keeps the newest two, which is all the starter tip's rule
+    /// counts to.
+    ///
+    /// **An event, not a count kept in a parameter.** TipKit reads its store
+    /// some time after `Tips.configure` returns. A parameter read in between
+    /// was still its default, and that default plus one was what the store
+    /// then kept: a count of 1 at every launch, for a reader who opens Ask
+    /// first. Donations add to what the store holds, made before `configure`
+    /// or after it, and TipKit works the rule out once it has read them
+    /// (macOS 27.2, 2026-11-13). In a host that never configures TipKit a
+    /// donation keeps nothing, and no tip shows there anyway.
+    static let begun = Tips.Event(id: "AskKit.visitBegun", donationLimit: Tips.DonationLimit(maximumCount: 2))
+
+    /// How long after the last screen left an appearance is still the same
+    /// visit: a screen being built again, whose old one went first.
+    static let rebuild = Duration.seconds(1)
+
+    /// The screens on screen, by the identity each holds.
+    private var screensUp: Set<UUID> = []
+    /// The screens that went under an item a host pushed over them, until
+    /// each comes back.
+    private var screensCovered: Set<UUID> = []
+    /// When the last screen up left, other than under a pushed item.
+    private var lastLeft: ContinuousClock.Instant?
+
+    /// `screen` has come on screen at `now`. True where that begins a visit.
+    mutating func screenAppeared(_ screen: UUID, at now: ContinuousClock.Instant) -> Bool {
+        let wasCovered = screensCovered.remove(screen) != nil
+        let isRebuild = lastLeft.map { now - $0 < Self.rebuild } ?? false
+        let goesOn = !screensUp.isEmpty || wasCovered || isRebuild
+        screensUp.insert(screen)
+        return !goesOn
+    }
+
+    /// `screen` has gone at `now`: `underPushedItem`, which its pop brings
+    /// it back from on the same visit, or because the reader left. One that
+    /// never appeared changes nothing.
+    ///
+    /// **A covered screen isn't counted as up.** A host can drop a screen
+    /// it has pushed over without showing it again, and one counted as up
+    /// for good would make every later appearance the same visit.
+    mutating func screenDisappeared(_ screen: UUID, underPushedItem: Bool, at now: ContinuousClock.Instant) {
+        guard screensUp.remove(screen) != nil else { return }
+        if underPushedItem {
+            screensCovered.insert(screen)
+        } else if screensUp.isEmpty {
+            lastLeft = now
+        }
     }
 }
 
@@ -167,6 +253,10 @@ nonisolated struct AskQuestionMenuTip: Tip {
 /// screen's "Try asking" heading (`AskFirstScreen`), and retired as a starter
 /// or a follow-up is turned down, which is the same item under the same
 /// gesture.
+///
+/// **From the reader's second visit to Ask** (`AskVisits`), and on every one
+/// after it until the tip is done or closed. On the first the reader hasn't
+/// read the screen it would stand over, or met a suggestion to turn down.
 nonisolated struct AskStarterDeclineTip: Tip {
     var title: Text {
         Text("Hide a Suggestion", bundle: #bundle, comment: "Title of a tip that points at the suggested questions on the Ask first screen, any of which the reader can turn down.")
@@ -184,6 +274,7 @@ nonisolated struct AskStarterDeclineTip: Tip {
 
     var rules: [Rule] {
         Tips.Rule(AskTipGates.starterDecline) { $0 }
+        #Rule(AskVisits.begun) { $0.donations.count >= 2 }
     }
 }
 
