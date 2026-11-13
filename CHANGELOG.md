@@ -12,6 +12,17 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+### Changed
+
+- **The "Hide a Suggestion" tip waits for the reader's second visit to Ask.** It came up over the
+  first screen the first time Ask was opened, before the reader had read the screen or met a
+  suggestion to turn down. A visit begins as an Ask screen appears with none up: opening Ask's tab, or
+  the app on it. A screen a host builds again as its layout changes, one coming back from under an
+  item a host pushed over it (`askItemIsPushed`) and a second window's screen are the same visit going
+  on. TipKit counts the visits in the host's store, so they are forgotten with the tips
+  (`Tips.resetDatastore()`), and a reader who has already been to Ask starts from none: their next
+  visit is the first. The other two tips are as they were.
+
 ## [0.7.2] - 2026-11-09
 
 Eleven fixes, and no change to the API. A chat keeps saving when one of its rows won't encode, a yes

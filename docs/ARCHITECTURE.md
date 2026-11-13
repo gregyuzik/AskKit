@@ -972,7 +972,10 @@ on a starter; and deleting one chat. AskKit never calls `Tips.configure`, so a h
 TipKit gets them beside its own, and one that doesn't sees none. One shows at a time, the first that
 applies (`AskTips.group`), and only while its surface is on screen with nothing over it: `AskScreen`
 works that out in the window the reader is in and writes it to `AskTipGates`, a gate opening only once
-it has held for half a second. Each goes once the reader has done what it says, or closed it. All three
+it has held for half a second. The starter's waits as well for the reader's second visit to Ask
+(`AskVisits`): a visit begins as a screen appears with none up, so another tab and back is one and so
+is the next launch, while a screen built again, one back from under a pushed item and a second window's
+are the visit going on. Each goes once the reader has done what it says, or closed it. All three
 are popovers, so no tip moves a frame (house rule 4), on a side named the same way on every platform
 (`AskTipSide`). The doc comments of `AskTips.swift`, `AskScreen.swift`'s tip gates, `AskFirstScreen`,
 `AskQuestionBubble`, `AskThreadHistoryList` and `AskChatsPane` say why each rule, gate and placement is
