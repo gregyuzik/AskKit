@@ -18,6 +18,24 @@ Vision Pro simulators (27.2) and on macOS 27.2. Beside what the comments hold:
 - On visionOS a window resize settles the gates again, and each return counts as a display, which costs
   nothing while no tip has a `MaxDisplayCount`.
 
+## The second visit
+
+The starter's tip waits for the reader's second visit to Ask (`AskVisits`), walked on 2026-11-13 on the
+iPhone 18 Pro and iPhone Duo simulators (27.2) with the demo under `-askTabs`:
+
+- A fresh install shows no starter tip on the first screen. Another tab and back, three seconds apart,
+  brings it; so does the next launch, on its first screen. TipKit's log names the rule:
+  `AskStarterDeclineTip.event.AskKit.visitBegun.count(donationsCount) >= Optional(2)`, `failed` then
+  `passed`.
+- A `TabView` keeps the screen: a tab switch is the same screen disappearing and appearing. Opening and
+  closing iPhone Duo did neither, in the demo.
+- A tile's row pushed over the thread (`-askPush`) took the screen off with `askItemIsPushed` already
+  true, and its pop 16 s later began no visit; New Chat after it showed the first screen with no tip.
+- A screen built again (the demo's root swapped between two branches every four seconds) began no
+  visit, eleven of eleven. `AskVisits.rebuild` has the order and the gaps.
+- To see a visit begin, log `AskVisits.screenAppeared(_:at:)`'s result in `AskTips.screenAppeared(_:)`.
+  A tip walk on a seat starts from an uninstall: the donations are in TipKit's store with the tips.
+
 ## Left as they are
 
 - In a tabletop, the chats sheet's tip rides up over its own row: the system moves a popover clear of

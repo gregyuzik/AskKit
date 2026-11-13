@@ -31,8 +31,8 @@ import Testing
         #expect(builtAgainBegan)
     }
 
-    /// iPhone Duo opening or closing and a size class changing build the
-    /// screen again, and the new one may appear before the old one goes.
+    /// A host whose layout changes builds the screen again, and the new one
+    /// may appear before the old one goes.
     @Test func aScreenBuiltAgainWhileTheOldOneIsUpIsTheSameVisit() {
         var visits = AskVisits()
         let rebuilt = UUID()

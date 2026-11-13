@@ -35,8 +35,9 @@ struct AskKitDemoApp: App {
     /// the UI tests' taps, and a tip in a README image would be in every copy
     /// of it.
     ///
-    /// `.immediate`, because the screen's three tips are met in one sitting
-    /// and each waits for its own surface anyway (`AskTipGates`).
+    /// `.immediate`, because each of the screen's three tips waits for its
+    /// own surface anyway (`AskTipGates`), and the starter's for a second
+    /// visit to Ask as well (`AskVisits`).
     private static func startTips() {
         let arguments = CommandLine.arguments
         if arguments.contains(DemoLaunchArgument.hidesTips) || arguments.contains(DemoLaunchArgument.captureWindow) {

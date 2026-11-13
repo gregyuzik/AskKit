@@ -37,12 +37,15 @@ enum AskTips {
     /// comes first where two apply at once: beside iPhone Duo's fold the
     /// chats are on screen with the thread, and the first screen with them.
     ///
-    /// **Static, so one group outlives every screen.** iPhone Duo opening or
-    /// closing, a size class changing and a tab switch all rebuild the
-    /// screen, and a group held by one would be a new group each time, whose
-    /// `currentTip` the views drawing the tips wouldn't share. A `static let`
-    /// is made on its first read, which is a body's, after a host's
-    /// `Tips.configure` in its `App.init`.
+    /// **Static, so one group outlives every screen.** A host can build the
+    /// screen again, where its layout changes as iPhone Duo opens or closes,
+    /// with a size class or with its tabs, and a group held by one would be
+    /// a new group each time, whose `currentTip` the views drawing the tips
+    /// wouldn't share. The demo's `TabView` keeps the screen through a tab
+    /// switch and a fold (iPhone 18 Pro and iPhone Duo simulators,
+    /// 2026-11-13), which no host has to. A `static let` is made on its
+    /// first read, which is a body's, after a host's `Tips.configure` in its
+    /// `App.init`.
     static let group = TipGroup(.firstAvailable) {
         AskQuestionMenuTip()
         AskStarterDeclineTip()
@@ -78,13 +81,14 @@ enum AskTips {
 /// up, and goes on until the last one leaves: opening Ask's tab, or the app
 /// on it.
 ///
-/// **Not every appearance begins one.** iPhone Duo opening or closing and a
-/// size class changing build the screen again, an item a host pushes over
-/// the screen takes it off until its pop, and a second window puts up a
-/// screen of its own. Counted, any of them would bring the tip up on the
-/// visit it sits out. So a screen appearing while another is up is the same
-/// visit, as is one back from under a pushed item, and one that appears
-/// within `rebuild` of the last one leaving.
+/// **Not every appearance begins one.** A host whose layout changes, as
+/// iPhone Duo opens or a size class does, builds the screen again; an item
+/// it pushes over the screen takes the screen off until its pop
+/// (`askItemIsPushed`); and a second window puts up a screen of its own.
+/// Counted, any of them would bring the tip up on the visit it sits out. So
+/// a screen appearing while another is up is the same visit, as is one back
+/// from under a pushed item, and one that appears within `rebuild` of the
+/// last one leaving.
 ///
 /// **A value, so it can be tested** (`AskVisitsTests`): the screens report
 /// to the one `AskTips` holds, and it never reads the clock itself.
@@ -105,7 +109,15 @@ nonisolated struct AskVisits: Equatable {
 
     /// How long after the last screen left an appearance is still the same
     /// visit: a screen being built again, whose old one went first.
-    static let rebuild = Duration.seconds(1)
+    ///
+    /// **Either may land first.** Built again inside a `TabView`, the old
+    /// screen went 18 to 41 ms before the new one appeared (iPhone 18 Pro
+    /// simulator, 2026-11-13, five of five, at a load average past 100).
+    /// With no tab view around it the new one appeared first, 6 to 11 ms
+    /// before the old one went (iPhone Duo simulator, six of six). Six times
+    /// the longest gap, and well under the 826 ms two scripted taps took to
+    /// leave a tab and come back to it, which is a visit.
+    static let rebuild = Duration.milliseconds(250)
 
     /// The screens on screen, by the identity each holds.
     private var screensUp: Set<UUID> = []
