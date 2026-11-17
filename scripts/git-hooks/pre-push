@@ -6,7 +6,7 @@
 # whose checker CI can't reach.
 #
 # In a clone: `git config core.hooksPath scripts/git-hooks`. It needs the tools
-# scripts/ci.sh lists, and it runs all of ci.sh on every push. Git ignores a
+# scripts/ci.sh lists, and it runs `ci.sh all` on every push. Git ignores a
 # hook that isn't executable, so this file stays mode 100755.
 #
 # It proves the working tree, which the dirty-tree check below makes HEAD's
@@ -23,9 +23,9 @@
 # in the 24 locales beside English, every unit translated and not blank, each
 # argument's specifier, the CLDR plural categories, no stray locale, the demo
 # project's and Info.plist's locale lists, and the bytes Xcode writes. Nothing
-# in this repository provides one; without it the gate runs every step of
-# ci.sh, scripts/check-strings.py among them, and nothing grades the catalogs'
-# translations.
+# in this repository provides one; without it the gate runs `ci.sh all`, the
+# steps CI runs, scripts/check-strings.py among them, and nothing grades the
+# catalogs' translations or runs the iOS steps, which need its seat lock.
 #
 # Order is cheapest-first, so a logic break surfaces in seconds rather than
 # after twelve xcodebuilds:
@@ -41,7 +41,8 @@
 #   6. ci.sh builds          (the package for eight destinations)
 #   7. ci.sh demo            (the demo's three apps and its UI tests, built)
 #   8. ci.sh test-ios        (the package's tests on an iPhone seat, with
-#                             PREPUSH_LIB only: its gate_sim holds the seat)
+#                             PREPUSH_LIB only: its gate_lock_sim holds the
+#                             seat)
 #   9. ci.sh ui-smoke        (the demo's UI tests on that seat, when the push
 #                             changes Sources/AskUI/ or Demo/; PREPUSH_LIB only)
 # A cache may skip 4 to 9, never the checks. A change to THIS file reaches no
@@ -198,7 +199,7 @@ if [ -n "$dirty_relevant$untracked_relevant$ignored_relevant" ]; then
 fi
 
 if [ -z "${PREPUSH_LIB:-}" ]; then
-  echo "pre-push: running scripts/ci.sh, the steps CI runs; with no PREPUSH_LIB there is no cache, so every step runs, and no shared String Catalog checker" >&2
+  echo "pre-push: running scripts/ci.sh all, the steps CI runs; with no PREPUSH_LIB there is no cache, so all of them run, with no shared String Catalog checker and no iOS tests, which need its seat lock" >&2
   exec ./scripts/ci.sh all
 fi
 
@@ -238,15 +239,52 @@ gate_lock_sim "$sim"
 # The seat goes back as the lock found it: xcodebuild boots one that is down,
 # so the gate shuts it down again, and only then lets the lock go, so the next
 # holder never gets it mid-shutdown. This replaces gate_lock_sim's trap, which
-# only lets the lock go.
-case $(xcrun simctl list devices booted) in
-  *"$sim"*) booted_here=0 ;;
-  *) booted_here=1 ;;
-esac
+# only lets the lock go. When simctl can't say what is booted, the gate counts
+# the seat as booted already and leaves it up: a seat left running costs
+# memory, and one shut down under someone costs their run.
+if booted=$(xcrun simctl list devices booted 2>/dev/null); then
+  case $booted in
+    *"$sim"*) booted_here=0 ;;
+    *) booted_here=1 ;;
+  esac
+else
+  booted_here=0
+fi
+
+# Whether a test run is live on the seat, which nothing should start without
+# the lock but Xcode or a hand-run xcodebuild can: its runner's environment
+# names the session. hold-sim.sh asks the same before it shuts a seat down.
+test_run_live() {
+  # shellcheck disable=SC2009 # pgrep can't match a process's environment
+  ps -axwwE -o command= 2>/dev/null | grep -F "/Devices/$1/" |
+    grep -q -E 'XCTestSessionIdentifier=|XCTestConfigurationFilePath='
+}
+
+# Shuts the seat down, waiting at most a minute: the lock stays held until
+# then, and a hung simctl would hold it, and every gate behind it, for good.
+shut_down() {
+  xcrun simctl shutdown "$1" >/dev/null 2>&1 &
+  shut_pid=$!
+  waited=0
+  while kill -0 "$shut_pid" 2>/dev/null; do
+    if [ "$waited" -ge 60 ]; then
+      echo "pre-push: simulator $1 is still shutting down after a minute; letting the lock go" >&2
+      kill "$shut_pid" 2>/dev/null || true
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
 seat_back() {
   if [ "$booted_here" = 1 ]; then
-    echo "pre-push: shutting down simulator $sim, which this gate booted" >&2
-    xcrun simctl shutdown "$sim" >/dev/null 2>&1 || true
+    if test_run_live "$sim"; then
+      echo "pre-push: left simulator $sim booted: a test run is live on it" >&2
+    else
+      echo "pre-push: shutting down simulator $sim, which this gate booted" >&2
+      shut_down "$sim"
+    fi
   fi
   # shellcheck disable=SC2154 # gate_lock_sim sets it
   rm -rf "$gate_sim_lock_"
@@ -261,6 +299,12 @@ ASKKIT_SIM=$sim ./scripts/ci.sh test-ios || exit 1
 # when the push changes the screen: a file under Sources/AskUI/ or Demo/ that
 # differs from where the branch left origin/main. With no origin/main to
 # compare against, it runs.
+#
+# A tree that passes with the suite skipped is still recorded, so a later push
+# of the same tree skips the suite too, even where origin/main has moved and
+# its screen now differs (a revert of a screen change, say). Such a tree's
+# screen is one origin/main shipped, and recording only the runs that ran the
+# suite would rebuild every logic-only tree at every landing.
 base=$(git merge-base HEAD origin/main 2>/dev/null) || base=
 if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- Sources/AskUI Demo; then
   ASKKIT_SIM=$sim ./scripts/ci.sh ui-smoke || exit 1

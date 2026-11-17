@@ -20,8 +20,9 @@
 #   destinations  those eight, one per line: CI's build matrix and
 #                 scripts/soft-deprecation-check.sh read them
 #   demo          the demo's three apps and its UI-test bundle
-#   all           checks, test, api, builds and demo: what the push gate runs,
-#                 and the default. CI runs each of them as a job.
+#   all           checks, test, api, builds and demo: the default, what CI runs
+#                 (one job each), and what the push gate runs with no
+#                 PREPUSH_LIB. With one it adds test-ios and ui-smoke.
 #
 # Needs Xcode 27.2 or later and Python 3, plus
 # `brew install swiftlint shellcheck actionlint zizmor`.

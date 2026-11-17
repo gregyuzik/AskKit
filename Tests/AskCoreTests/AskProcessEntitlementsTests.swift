@@ -6,12 +6,12 @@ import Testing
 /// The entitlement read, such as it is.
 ///
 /// The simulator branch — the sole guard behind "an unentitled request is fatal
-/// in a simulator app" — is compiled by the push gate's simulator builds and
-/// run only by the UI bundle: `swift test` runs on macOS, and the push gate
-/// runs the bundle (`scripts/ci.sh ui-smoke`) only for a push that changes the
-/// screen, CI never. What can be pinned from a
-/// host test is that asking is safe, which is the property a trap would
-/// break.
+/// in a simulator app" — runs only on a simulator: in `scripts/ci.sh test-ios`,
+/// which runs this suite on an iPhone, and in the demo's UI bundle
+/// (`scripts/ci.sh ui-smoke`). `swift test` runs on macOS, CI runs neither, and
+/// the maintainers' push gate runs `test-ios` whenever it builds and
+/// `ui-smoke` only for a push that changes the screen. What can be pinned from
+/// a test is that asking is safe, which is the property a trap would break.
 @Suite(.timeLimit(.minutes(1))) struct AskProcessEntitlementsTests {
 
     @Test func askingForAnEntitlementNothingHoldsReadsItAbsentRatherThanTrapping() {
