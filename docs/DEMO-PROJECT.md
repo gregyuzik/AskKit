@@ -140,7 +140,8 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   written twice, and links AskUI so the suite uses `AskAccessibility`: a renamed identifier breaks the
   build, rather than leaving the tests green against strings nothing sets.
 - **The `AskKitDemoUITests` scheme** is its own, so the three app schemes stay what the push gate
-  builds. The gate builds it and doesn't run it (`scripts/ci.sh ui-smoke` runs it). Its one build
+  builds. The gate builds it, and runs it (`scripts/ci.sh ui-smoke`) only for a push that changes
+  `Sources/AskUI/` or `Demo/`; CI builds it and never runs it. Its one build
   entry, the bundle, is built for Run as well as Test, so a plain `xcodebuild build` on the scheme has
   something to build: with Test alone, xcodebuild refuses the destination ("Supported platforms for
   the buildables in the current scheme is empty"). The app isn't in the scheme: the bundle depends on

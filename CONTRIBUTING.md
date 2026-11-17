@@ -34,9 +34,9 @@ steps:
 | `scripts/ci.sh api` | `swift package diagnose-api-breaking-changes` against the newest `v*` tag in the branch's history, over the macOS build's public and `package` API, in about 30 seconds. It fails on anything removed, renamed or changed, a new enum case included, unless `.github/api-breakage-allowlist.txt` lists it (below). It can't see a public declaration made `package`, or a change of isolation alone. |
 | `scripts/ci.sh builds` | The `AskKit-Package` scheme for eight generic destinations: iOS, macOS, visionOS, tvOS and watchOS on the simulator or the Mac, then the iOS, visionOS and watchOS devices. `scripts/ci.sh build DESTINATION` builds one, and `scripts/ci.sh destinations` lists them for CI's matrix. |
 | `scripts/ci.sh demo` | The demo's three apps and its UI-test bundle. |
-| `scripts/ci.sh all` | `checks`, `test`, `api`, `builds` and `demo`: the default, and what the push gate runs. |
-| `scripts/ci.sh test-ios` | The package's tests on an iPhone 18 Pro simulator, failing under 1,580 passes: lower than `test`'s floor, since some of AskUI's tests compile for the Mac alone and a skipped test doesn't count here. A local run. |
-| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. A local run. |
+| `scripts/ci.sh all` | `checks`, `test`, `api`, `builds` and `demo`: the default, what CI runs, and what the push gate runs without `PREPUSH_LIB`. With it, the gate adds `test-ios` and `ui-smoke`. |
+| `scripts/ci.sh test-ios` | The package's tests on an iPhone 18 Pro simulator, failing under 1,580 passes: lower than `test`'s floor, since some of AskUI's tests compile for the Mac alone and a skipped test doesn't count here. Not in CI; the maintainers' push gate runs it. |
+| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. Not in CI; the maintainers' push gate runs it when a push changes `Sources/AskUI/` or `Demo/`. |
 
 While you work, `swift test` and `swiftlint lint` are the quick ones. No test asks a real model: the
 engine and the store run against scripted sessions. Any warning that names a file under `Sources/`,
@@ -44,9 +44,10 @@ engine and the store run against scripted sessions. Any warning that names a fil
 builds and demo. Logs and DerivedData go under `$ASKKIT_CI_WORK` (`${TMPDIR}askkit-ci` by default), and a
 failing step names its log.
 
-Three runs stay local: `test-ios` after a change to an `os(iOS)` leg (a hosted runner draws views too
-slowly for the suite's deadlines), `ui-smoke` after a change to the screen (CI builds it without running
-it; it takes about 12 minutes), and `scripts/soft-deprecation-check.sh`, which lists the soft-deprecated
+Three runs stay out of CI. Run `test-ios` after a change to an `os(iOS)` leg (a hosted runner draws views
+too slowly for the suite's deadlines) and `ui-smoke` after a change to the screen (CI builds it without
+running it; it takes about 12 minutes); a push gate with `PREPUSH_LIB` runs both for you, `ui-smoke`
+when the push changes `Sources/AskUI/` or `Demo/`. `scripts/soft-deprecation-check.sh` stays local: it lists the soft-deprecated
 SDK APIs AskKit calls, since the compiler never warns about them (its first run extracts about 4 GB of
 symbol graphs).
 

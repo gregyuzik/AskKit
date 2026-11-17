@@ -53,8 +53,8 @@ Deeper notes: `.claude/references/`.
 - **The demo.** `Demo/AskKitDemo.xcodeproj` is committed, its project file in Xcode 27.2's JSON
   format (`project.xcproj`). Edit it in Xcode, with `xcrun xcodeproj` or in `Demo/Signing.xcconfig`;
   how, and why its settings are what they are: `docs/DEMO-PROJECT.md`.
-- **Simulators.** In hand-run `xcodebuild`, pick simulators by UDID: two devices with one name make
-  `name=` ambiguous.
+- **Simulators.** `ci.sh` picks a simulator by UDID, since two devices with one name make `name=`
+  ambiguous, or takes the one in `ASKKIT_SIM`, which the push gate sets to the seat it holds.
 - **Two gates, one set of steps.** CI (`.github/workflows/ci.yml`) runs on every PR and push to main
   (a change only to docs other than `README.md` skips its jobs; `CI passed`, the one check main
   requires, still reports on a pull request), weekly on main and on `gh workflow run ci.yml`; main
@@ -81,9 +81,11 @@ Deeper notes: `.claude/references/`.
     there start with `//`: the digester runs the file through the C preprocessor, and a `#` line
     empties the list, so the step refuses one. The push gate runs it after `test`, and counts the
     allowlist as part of the tree.
-  - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in neither: run them by hand
-    after changing an `os(iOS)` leg or the screen. CI's virtual Mac draws views too slowly for the
-    suite's deadlines.
+  - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in the push gate when it has
+    `PREPUSH_LIB` (the maintainers'), never in CI, whose virtual Mac draws views too slowly for the
+    suites' deadlines. The gate holds an iPhone seat for them and runs `ui-smoke` (about 12 minutes)
+    only when the push changes a file under `Sources/AskUI/` or `Demo/`. Without `PREPUSH_LIB`,
+    CONTRIBUTING.md says when to run them yourself.
   - A test that passes only while work beats a deadline on the wall clock takes `.racesTheClock`
     (`AskEngineTests.swift`). It is skipped while the load average is past two a core, and
     `ci.sh test` says how many were.

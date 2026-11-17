@@ -107,8 +107,8 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// view collapses to, and that moves with the accessibility modifiers on
     /// it. `ask.answer` is one element with its own label and value rather
     /// than a `staticText`, for VoiceOver's sake, and a change like that
-    /// breaks a query by type silently, because the push gate builds this
-    /// bundle and does not run it.
+    /// breaks a query by type silently: CI builds this bundle without running
+    /// it, and the push gate runs it only when a push changes the screen.
     @MainActor
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
