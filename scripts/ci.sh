@@ -29,6 +29,9 @@
 # Logs, the cold builds' scratch and DerivedData go under $ASKKIT_CI_WORK: by
 # default $RUNNER_TEMP/askkit-ci on CI and ${TMPDIR}askkit-ci elsewhere. A step
 # that fails names the log to read.
+#
+# test-ios and ui-smoke test on the simulator whose UDID is in $ASKKIT_SIM, the
+# seat the push gate holds for them, or else on one named iPhone 18 Pro.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -390,10 +393,9 @@ passes_in() { # result-bundle
 }
 
 # The package's tests on the iOS simulator, where every `os(iOS)` leg that
-# `swift test` on the Mac never compiles runs. A local run: not in the push
-# gate, since a simulator holds one test run at a time and the gate builds
-# instead, and not in CI, whose virtual Mac draws views too slowly for the
-# suite's deadlines.
+# `swift test` on the Mac never compiles runs. The push gate runs it on the
+# seat it holds (a simulator holds one test run at a time); CI doesn't, since
+# its virtual Mac draws views too slowly for the suite's deadlines.
 #
 # The minimum is lower than `step_test`'s, and counts tests passed, read from the
 # result bundle, since `-quiet` keeps the per-test lines out of the log. The
@@ -409,7 +411,7 @@ passes_in() { # result-bundle
 # runner that took ten minutes and timed out.
 step_test_ios() {
   local sim log="$logs/test-ios.log" results="$work/test-ios.xcresult" passes
-  sim=$(simulator "iPhone 18 Pro")
+  sim=${ASKKIT_SIM:-$(simulator "iPhone 18 Pro")}
   rm -rf "$results"
   say "AskKit-Package tests on iPhone 18 Pro ($sim)"
   if ! logged "$log" xcodebuild test -scheme AskKit-Package -destination "id=$sim" \
@@ -429,8 +431,9 @@ step_test_ios() {
 }
 
 # The demo's UI smoke suite on the iOS simulator, which scripts/ui-smoke.sh
-# runs. A local run: the push gate and CI build the bundle and don't run it,
-# since a simulator UI test would be the flakiest part of a gate every change
+# runs. CI builds the bundle and doesn't run it, and the push gate runs it only
+# for a push that changes the screen (Sources/AskUI/ or Demo/): a simulator UI
+# test, about 12 minutes, would be the flakiest part of a gate every change
 # passes. `-project` is spelled out because from the repo root xcodebuild
 # otherwise resolves against `Package.swift`, which has no such scheme. Its
 # DerivedData and settings are `demo_build`'s, so it starts from what `demo`
@@ -445,7 +448,7 @@ step_test_ios() {
 # so with TEST that pass is TEST's.
 step_ui_smoke() { # [test]
   local sim log="$logs/ui-smoke.log" results="$work/ui-smoke.xcresult" only=() passes
-  sim=$(simulator "iPhone 18 Pro")
+  sim=${ASKKIT_SIM:-$(simulator "iPhone 18 Pro")}
   [ -z "${1:-}" ] || only=("-only-testing:AskKitDemoUITests/$1")
   # xcodebuild refuses a result bundle path that already exists.
   rm -rf "$results"

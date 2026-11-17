@@ -1,8 +1,9 @@
 # The steps are scripts/ci.sh's, which the push gate runs too: one job per step,
 # so they run side by side, and the package builds as a matrix, so one run
-# reports every platform. Three stay local runs: the soft-deprecation check
-# (scripts/soft-deprecation-check.sh), the UI smoke suite (scripts/ui-smoke.sh),
-# and the package's tests on the iOS simulator (scripts/ci.sh test-ios). A
+# reports every platform. Three don't run here: the soft-deprecation check
+# (scripts/soft-deprecation-check.sh), a local run, and the package's tests on
+# the iOS simulator (scripts/ci.sh test-ios) and the UI smoke suite
+# (scripts/ui-smoke.sh), which the maintainers' push gate runs. A
 # hosted runner is a virtual Mac, and its simulator drew a view in up to a
 # minute, which starved the main actor that half the suite's deadlines run on.
 name: CI

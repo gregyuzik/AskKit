@@ -7,9 +7,9 @@ import Testing
 ///
 /// The simulator branch — the sole guard behind "an unentitled request is fatal
 /// in a simulator app" — is compiled by the push gate's simulator builds and
-/// run by no automated test: `swift test` runs on macOS, and the UI bundle
-/// that would exercise it is built and deliberately never run by the push
-/// gate (`scripts/ui-smoke.sh` runs it by hand). What can be pinned from a
+/// run only by the UI bundle: `swift test` runs on macOS, and the push gate
+/// runs the bundle (`scripts/ci.sh ui-smoke`) only for a push that changes the
+/// screen, CI never. What can be pinned from a
 /// host test is that asking is safe, which is the property a trap would
 /// break.
 @Suite(.timeLimit(.minutes(1))) struct AskProcessEntitlementsTests {

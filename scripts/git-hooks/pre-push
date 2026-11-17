@@ -39,8 +39,12 @@
 #   4. ci.sh test            (`swift test`, cold, with a minimum pass count)
 #   5. ci.sh api             (the public API against the newest release tag)
 #   6. ci.sh builds          (the package for eight destinations)
-#   7. ci.sh demo            (the demo's three apps and its UI tests)
-# A cache may skip 4 to 7, never the checks. A change to THIS file reaches no
+#   7. ci.sh demo            (the demo's three apps and its UI tests, built)
+#   8. ci.sh test-ios        (the package's tests on an iPhone seat, with
+#                             PREPUSH_LIB only: its gate_sim holds the seat)
+#   9. ci.sh ui-smoke        (the demo's UI tests on that seat, when the push
+#                             changes Sources/AskUI/ or Demo/; PREPUSH_LIB only)
+# A cache may skip 4 to 9, never the checks. A change to THIS file reaches no
 # compiler, but it decides what passing means, so a cache has to count it as a
 # change to the tree. The release tag `api` compares with is no part of the
 # tree, so a tree that passed stays passed when a new tag is cut; CI, which has
@@ -222,6 +226,47 @@ fi
 ./scripts/ci.sh api || exit 1
 ./scripts/ci.sh builds || exit 1
 ./scripts/ci.sh demo || exit 1
+
+# The iOS steps CI can't run, since its virtual Mac draws views too slowly for
+# the suites' deadlines, so this gate is where they run. Both test on an iPhone
+# seat, held from here until the gate exits (gate_lock_sim): a simulator runs
+# one test session at a time, and the lock is shared with every repo's gate and
+# with hold-sim.sh.
+sim=$(gate_sim "iPhone 18 Pro") || exit 1
+gate_lock_sim "$sim"
+
+# The seat goes back as the lock found it: xcodebuild boots one that is down,
+# so the gate shuts it down again, and only then lets the lock go, so the next
+# holder never gets it mid-shutdown. This replaces gate_lock_sim's trap, which
+# only lets the lock go.
+case $(xcrun simctl list devices booted) in
+  *"$sim"*) booted_here=0 ;;
+  *) booted_here=1 ;;
+esac
+seat_back() {
+  if [ "$booted_here" = 1 ]; then
+    echo "pre-push: shutting down simulator $sim, which this gate booted" >&2
+    xcrun simctl shutdown "$sim" >/dev/null 2>&1 || true
+  fi
+  # shellcheck disable=SC2154 # gate_lock_sim sets it
+  rm -rf "$gate_sim_lock_"
+}
+trap seat_back EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+ASKKIT_SIM=$sim ./scripts/ci.sh test-ios || exit 1
+
+# The UI smoke suite (about 12 minutes, and the flakiest step there is) only
+# when the push changes the screen: a file under Sources/AskUI/ or Demo/ that
+# differs from where the branch left origin/main. With no origin/main to
+# compare against, it runs.
+base=$(git merge-base HEAD origin/main 2>/dev/null) || base=
+if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- Sources/AskUI Demo; then
+  ASKKIT_SIM=$sim ./scripts/ci.sh ui-smoke || exit 1
+else
+  echo "pre-push: ui-smoke skipped: nothing under Sources/AskUI/ or Demo/ changed since origin/main" >&2
+fi
 
 gate_record
 echo "pre-push: ok" >&2
