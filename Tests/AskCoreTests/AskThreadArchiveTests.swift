@@ -619,28 +619,6 @@ import Testing
         #expect(try Data(contentsOf: filed) == written)
     }
 
-    @Test func turnsPutBackBesideAFilingWithARowThisBuildCannotReadLeaveThatFilingAsItIs() async throws {
-        // Joined with what decoded, the filing would be written without the
-        // row. They go beside it, as beside a filing with a turn that won't
-        // decode.
-        let (archive, directory) = makeArchive()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let entries = chat(["Which records do I own?", "Any on vinyl?"])
-        let summary = try #require(await archive.archive(entries))
-        let filed = file(for: summary.id, in: directory)
-        let written = try withARowANewerBuildWrote(in: filed)
-        let askedOn = entries + chat(["And on tape?"], from: Date(timeIntervalSince1970: 1_000_120))
-
-        #expect(await archive.merge(askedOn, filingIfNew: false) == .notFiled)
-        guard case .filed(let beside) = await archive.merge(askedOn, filingIfNew: true) else {
-            Issue.record("the turns are filed beside the filing")
-            return
-        }
-        #expect(beside.id != summary.id)
-        #expect(await archive.entries(for: beside.id).entries.map(\.question) == askedOn.map(\.question))
-        #expect(try Data(contentsOf: filed) == written)
-    }
-
     // MARK: - A row that won't encode
 
     /// A chat whose second turn read a row that won't encode, `unwritable`,

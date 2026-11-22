@@ -714,12 +714,14 @@ public actor AskThreadStore<Row: AskRow> {
     ///   written it, or the device was locked when it was read. Into the
     ///   filing its chat already has, if one does, so neither copy's turns are
     ///   lost, or beside that filing where this build can't read it whole, as
-    ///   New Chat files a chat beside one. Read only in part, a turn or a row
-    ///   left out, what reads is filed and the file is kept whole as an
-    ///   original, for a build that reads the rest.
-    /// - An original goes back into its own chat, once every turn and row in
-    ///   it reads: the thread, when the thread is that chat, or else the
-    ///   earlier chat that is. When neither is, the
+    ///   New Chat files a chat beside one. Read only in part, what reads is
+    ///   filed and the file is kept whole as an original, for a build that
+    ///   reads the rest. A row left out of an answer costs that row, as the
+    ///   thread's next save costs one (`load()`): kept for it, the file could
+    ///   never give it back, since a join keeps the filing's copy of a turn
+    ///   both hold (`AskThreadEntry.merging`).
+    /// - An original goes back into its own chat: the thread, when the thread
+    ///   is that chat, or else the earlier chat that is. When neither is, the
     ///   reader deleted that chat or the cap trimmed it, and the original goes
     ///   too rather than bring it back. Unless a turn in it has no date, which
     ///   leaves its chat unfindable: then it is filed as a chat of its own.
@@ -738,7 +740,7 @@ public actor AskThreadStore<Row: AskRow> {
         var recovered = 0
         for file in setAsideFiles() {
             guard let data = try? AskStoredFile.contents(of: file),
-                  case let (entries, dropped, droppedRows)? = try? Self.decodeEntries(from: data) else { continue }
+                  case let (entries, dropped, _)? = try? Self.decodeEntries(from: data) else { continue }
             if entries.isEmpty {
                 // Every turn dropped stays for a build that reads them. An
                 // empty array holds nothing to keep.
@@ -747,7 +749,7 @@ public actor AskThreadStore<Row: AskRow> {
             }
             guard case .filed = await archive.merge(entries, filingIfNew: true) else { continue }
             recovered += 1
-            if dropped == 0, droppedRows == 0 {
+            if dropped == 0 {
                 remove(file)
             } else {
                 keepAsOriginal(file)
@@ -755,8 +757,7 @@ public actor AskThreadStore<Row: AskRow> {
         }
         for file in originalFiles() {
             guard let data = try? AskStoredFile.contents(of: file),
-                  case let (entries, dropped, droppedRows)? = try? Self.decodeEntries(from: data),
-                  dropped == 0, droppedRows == 0 else { continue }
+                  case let (entries, dropped, _)? = try? Self.decodeEntries(from: data), dropped == 0 else { continue }
             switch mergeIntoThread(entries) {
             case .merged:
                 recovered += 1

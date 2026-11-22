@@ -233,11 +233,11 @@ public actor AskThreadArchive<Row: AskRow> {
     /// (`dropped` above zero) must keep it filed rather than remove it; the
     /// filing of the chat it becomes then goes beside it, never over it
     /// (`archive(_:at:)`). A filing whose rows alone didn't all decode reads
-    /// as whole here: opened, and filed again, it costs those rows, as the
-    /// thread's next save costs its own (`AskThreadStore.load()`), and as the
-    /// chat on screen shows it. Only the archive's own writes, which the
-    /// reader doesn't make, leave such a filing as it is
-    /// (`settleProposal`, `merge`).
+    /// as whole here. Opened and filed again, or joined with a chat set aside
+    /// (`merge`), it is written without those rows, as the screen shows it
+    /// and as the thread's next save writes its own (`AskThreadStore.load()`).
+    /// Only a proposal's outcome, which costs nothing kept out, leaves such a
+    /// filing as it is (`settleProposal`).
     package func entries(for id: UUID) -> AskThreadRead<Row> {
         guard !pendingDeletions.contains(id), let url = url(for: id) else { return .empty }
         let (read, failure, droppedRows) = contents(of: url)
@@ -374,8 +374,8 @@ public actor AskThreadArchive<Row: AskRow> {
     /// How `AskThreadStore.recoverSetAside` puts a thread back: filed over its
     /// chat's filing instead, a thread kept aside would cost the turns asked
     /// since, or the filing would cost the turns only it holds. Never into a
-    /// filing that doesn't read whole, a turn or a row in it left out: joined
-    /// with what decoded, the rest would be written over. Beside it instead, as a chat of their own, when
+    /// filing that doesn't read whole: joined with what decoded, the rest
+    /// would be written over. Beside it instead, as a chat of their own, when
     /// `filingIfNew`, as `archive(_:at:sparing:)` files a chat beside such a
     /// filing: a thread set aside that waited for that filing to read whole
     /// would wait for good, out of History all the while.
@@ -389,9 +389,11 @@ public actor AskThreadArchive<Row: AskRow> {
         guard let url = url(for: earlier.id) else { return .notFiled }
         let merged: [AskThreadEntry<Row>]
         var id = earlier.id
-        let (read, _, droppedRows) = contents(of: url)
-        switch read {
-        case .thread(let filed, let dropped) where dropped == 0 && droppedRows == 0:
+        // A row left out of the filing's answers costs it that row, as the
+        // thread's next save costs one: guarded like a turn, it would hold
+        // these turns out of History for as long as the row is outgrown.
+        switch contents(of: url).read {
+        case .thread(let filed, let dropped) where dropped == 0:
             merged = AskThreadEntry.merging(entries, into: filed)
         case .empty:
             merged = entries
