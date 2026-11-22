@@ -375,7 +375,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             current: store.currentSummary,
             history: store.history,
             accent: accent,
-            onOpen: { summary in Task { await store.openThread(summary) } },
+            onOpen: { summary, report in Task { await store.openThread(summary, reporting: report) } },
             onDelete: deleteChat,
             // Animated as New Chat is, since the chat on screen ends here too.
             onDeleteAll: { withAnimation(reduceMotion ? .none : .snappy) { store.deleteAllThreads(from: screenID) } }
@@ -614,7 +614,7 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             AskThreadHistorySheet(
                 current: store.currentSummary,
                 history: store.history,
-                onOpen: { summary in Task { await store.openThread(summary) } },
+                onOpen: { summary, report in Task { await store.openThread(summary, reporting: report) } },
                 onDelete: deleteChat,
                 // Animated as New Chat is, since the chat on screen ends here too.
                 onDeleteAll: {

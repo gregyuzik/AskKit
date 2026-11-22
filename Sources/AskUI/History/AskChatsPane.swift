@@ -18,7 +18,9 @@ public import SwiftUI
 /// chat's disabled and heard as selected, and a row is the same row for as
 /// long as it lists the same chat (`AskChatsPaneRows.Identity`). So opening an
 /// earlier chat keeps the element VoiceOver activated where it was, and
-/// VoiceOver hears which chat is opening (`AskChatOpening`).
+/// VoiceOver hears which chat is opening (`AskChatOpening`). One that doesn't
+/// open leaves the mark where it was, and an alert says so
+/// (`AskChatRefusal`).
 ///
 /// **The conversation's own ground.** The list draws no background, so the
 /// two panes are one surface with the hinge's hairline between them. A
@@ -37,11 +39,14 @@ struct AskChatsPane: View {
     let history: [AskThreadSummary]
     /// The screen's accent, which marks the open chat.
     let accent: Color
-    let onOpen: (AskThreadSummary) -> Void
+    /// Opens a chat, and tells the pane what came of it
+    /// (`AskConversationStore.openThread(_:reporting:)`).
+    let onOpen: (AskThreadSummary, @escaping @MainActor (AskChatOpenOutcome) -> Void) -> Void
     let onDelete: (AskThreadSummary) -> Void
     /// Deletes every chat: the earlier ones and the one on screen.
     let onDeleteAll: () -> Void
 
+    @State private var refusal = AskChatRefusal()
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiatesWithoutColor
     @Environment(\.legibilityWeight) private var legibilityWeight
     /// The tips' gates as the screen has settled them (`AskScreen`): the
@@ -66,6 +71,7 @@ struct AskChatsPane: View {
         .accessibilityIdentifier(AskAccessibility.historyPane)
         .overlay { emptyState }
         .safeAreaBar(edge: .top) { header }
+        .askChatRefusalAlert($refusal)
     }
 
     /// The pane's title, and Delete All Chats beside it while there is a chat
@@ -120,7 +126,11 @@ struct AskChatsPane: View {
         let summary = row.summary
         return Button {
             AskChatOpening.announce(summary)
-            onOpen(summary)
+            onOpen(summary) { outcome in
+                // An open chat moves the mark, and what took this one's place
+                // says what came of it.
+                if outcome == .refused { refusal.show(for: summary) }
+            }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 AskChatRowLabel(summary: summary, isOpen: row.isOpen)

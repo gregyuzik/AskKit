@@ -190,12 +190,13 @@ struct AskChatDeleteButton: View {
 /// focus is the screen's to give (`AskVoiceOverTarget`), where nothing asks
 /// for the thread's rows yet. Said here, it is the same line from both: in
 /// the pane the reader's place stays on the row they tapped, and from the
-/// sheet, whose row goes with it, the line is heard as the focus goes back to
-/// the History button.
+/// sheet, whose row goes with it once the chat is on screen, the line is
+/// heard before the focus goes back to the History button.
 ///
-/// **"Opening", not "opened"**, because it is said on the tap. An open can be
-/// declined, when the chat on screen can't be filed or the earlier one won't
-/// read, and the sheet is gone before it would know.
+/// **"Opening", not "opened"**, because it is said on the tap, before the
+/// store knows. An open can be declined, when the chat on screen can't be
+/// filed or the earlier one won't read, and then the list says so in a line
+/// of its own (`refusal(for:)`, `AskChatRefusal`).
 nonisolated enum AskChatOpening {
     /// The line for opening `summary`, its title in the reader's own words.
     static func line(for summary: AskThreadSummary) -> String {
@@ -203,6 +204,16 @@ nonisolated enum AskChatOpening {
             localized: "Opening “\(summary.title)”",
             bundle: #bundle,
             comment: "Spoken by VoiceOver as the reader opens one of their earlier Ask chats from the list of chats. The placeholder is the chat's title: the first question the reader asked in it, in their own words."
+        )
+    }
+
+    /// The line for `summary` chosen and not opened
+    /// (`AskChatOpenOutcome.refused`), its title in the reader's own words.
+    static func refusal(for summary: AskThreadSummary) -> String {
+        String(
+            localized: "Couldn't open “\(summary.title)”",
+            bundle: #bundle,
+            comment: "Shown over the list of the reader's earlier Ask chats, as the title of an alert with only an OK button, and read by VoiceOver, when a chat the reader chose from that list can't be opened: its file won't read or has gone, or the chat on screen couldn't be put away first. The placeholder is the chat's title: the first question the reader asked in it, in their own words."
         )
     }
 
@@ -214,6 +225,30 @@ nonisolated enum AskChatOpening {
         var spoken = AttributedString(line(for: summary))
         spoken.accessibilitySpeechAnnouncementPriority = .high
         AccessibilityNotification.Announcement(spoken).post()
+    }
+}
+
+/// A list of chats saying that the chat chosen from it didn't open
+/// (`AskChatOpenOutcome.refused`), where it would otherwise say nothing: the
+/// sheet stays up, the pane's mark stays where it was, and the reader heard
+/// "Opening" on the tap (house rule 8). An alert with only OK, titled with
+/// the chat, which VoiceOver reads as it comes (`askChatRefusalAlert`).
+///
+/// The line outlives the alert, so its title doesn't empty as it goes.
+nonisolated struct AskChatRefusal {
+    var isShown = false
+    private(set) var line = ""
+
+    mutating func show(for summary: AskThreadSummary) {
+        line = AskChatOpening.refusal(for: summary)
+        isShown = true
+    }
+}
+
+extension View {
+    /// The alert `refusal` shows, with only the system's OK.
+    func askChatRefusalAlert(_ refusal: Binding<AskChatRefusal>) -> some View {
+        alert(Text(refusal.wrappedValue.line), isPresented: refusal.isShown) {}
     }
 }
 

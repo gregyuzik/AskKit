@@ -596,9 +596,10 @@ thread, and the filing goes once that write took and every one of its turns deco
   as the chat's last copy and nothing is written over it until it can be, so an unfiled chat also
   blocks opening an earlier one, and the turns asked meanwhile go into a provisional filing, as beside a
   thread that couldn't be read. A chat it can write nowhere waits in memory to be filed.
-- Opening an earlier chat does nothing if filing the one on screen fails, and the opened chat comes off
-  the list only once it is written as the thread and every one of its turns decoded. A filing again that
-  fails after one took leaves that one, and the chat on screen is in two places until it is filed next.
+- Opening an earlier chat does nothing if filing the one on screen fails, and the list says the chat
+  couldn't open, as it does for one that won't read or has gone. The opened chat comes off the list only
+  once it is written as the thread and every one of its turns decoded. A filing again that fails after
+  one took leaves that one, and the chat on screen is in two places until it is filed next.
 - A save the disk refuses is tried again as protected data comes back and as the screen does.
 - Delete All Chats outranks that rule: what the reader deletes is deleted. What the disk won't delete
   is owed and tried again, and a New Chat deletes it too; a chat whose file won't go stays off the
@@ -1014,8 +1015,10 @@ what it left as it is.
     takes away the prose VoiceOver was on gives it to the returning wait row, which hands it on at the
     new attempt's first word.
   - Opening an earlier chat moves no focus: beside the fold the reader stays on the row they tapped, now
-    the open chat, and from the sheet the focus goes back to the History button. Either way VoiceOver
-    hears "Opening “…”" with the chat's title.
+    the open chat, and from the sheet, which closes once the chat is on screen, the focus goes back to
+    the History button. Either way VoiceOver hears "Opening “…”" with the chat's title as the row is
+    tapped. A chat that doesn't open leaves the sheet up, or the pane's mark where it was, under an
+    alert, which VoiceOver reads: "Couldn't open “…”".
   - Edit & Resend sends it to the field, as does a tap on the face in a host's slot, held until the
     composer comes up over the face, which is then hidden from VoiceOver.
   - After the reader's yes or not now, the card moves it to its outcome line once that line is in the

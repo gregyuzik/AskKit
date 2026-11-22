@@ -6,21 +6,27 @@ public import SwiftUI
 /// The reader's chats in a sheet, from the toolbar's button: the list
 /// (`AskThreadHistoryList`), a search field, and Delete All Chats in the bar.
 ///
-/// An earlier chat opens behind the sheet as it closes, and VoiceOver hears
-/// which (`AskChatOpening`): the row it activated goes with the sheet, and the
-/// focus goes back to the History button, which says nothing of the chat.
-/// Delete All Chats closes the sheet too, since nothing is left in it to look
-/// at.
+/// VoiceOver hears which earlier chat opens as it is tapped
+/// (`AskChatOpening`), and the sheet closes once the chat is on screen behind
+/// it: the row it activated goes with the sheet, and the focus goes back to
+/// the History button, which says nothing of the chat. A chat that doesn't
+/// open keeps the sheet up, and an alert over it says so (`AskChatRefusal`):
+/// closed on the tap, it would leave the reader on the chat they meant to
+/// leave, with nothing said. Delete All Chats closes the sheet too, since
+/// nothing is left in it to look at.
 struct AskThreadHistorySheet: View {
     let current: AskThreadSummary?
     let history: [AskThreadSummary]
-    let onOpen: (AskThreadSummary) -> Void
+    /// Opens a chat, and tells the sheet what came of it
+    /// (`AskConversationStore.openThread(_:reporting:)`).
+    let onOpen: (AskThreadSummary, @escaping @MainActor (AskChatOpenOutcome) -> Void) -> Void
     let onDelete: (AskThreadSummary) -> Void
     /// Deletes every chat: the earlier ones and the one on screen.
     let onDeleteAll: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var refusal = AskChatRefusal()
 
     var body: some View {
         NavigationStack {
@@ -29,12 +35,21 @@ struct AskThreadHistorySheet: View {
                 history: history,
                 query: query,
                 onOpen: { summary in
-                    dismiss()
                     AskChatOpening.announce(summary)
-                    onOpen(summary)
+                    onOpen(summary) { outcome in
+                        switch outcome {
+                        case .opened: dismiss()
+                        // What took its place says what came of it: another
+                        // row, whose own word closes the sheet or says why
+                        // not, or Delete All Chats, which closes it.
+                        case .gaveWay: break
+                        case .refused: refusal.show(for: summary)
+                        }
+                    }
                 },
                 onDelete: onDelete
             )
+            .askChatRefusalAlert($refusal)
             .searchable(text: $query, prompt: Text("Search chats", bundle: #bundle, comment: "Placeholder in the search field of the list of Ask chats."))
             .navigationTitle(AskThreadHistoryList.title)
             #if os(iOS)

@@ -58,6 +58,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   question in the composer unsent, as `send: false` does, ready once something can serve. A domain
   that answers without a model keeps its composer live there, and sends as before. A host's own
   `ask(_:origin:)` is unchanged.
+- **History says when a chat it lists won't open.** The sheet closed on the tap, and VoiceOver heard
+  "Opening" with the chat's title, so a chat that then didn't open, because its file wouldn't read or had
+  gone, the chat on screen couldn't be filed first, or the thread's place held a chat that is nowhere
+  else, left the reader on the chat they meant to leave with nothing said. The sheet now closes once the
+  chat is on screen, and stays up over one that didn't open, under an alert that says so, which
+  VoiceOver reads; the pane beside iPhone Duo's fold shows the same alert. The line is new, in all 25
+  languages.
+
 
 ## [0.7.2] - 2026-11-09
 

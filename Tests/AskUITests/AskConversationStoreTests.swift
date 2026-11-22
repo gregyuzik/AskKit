@@ -2898,6 +2898,23 @@ import Testing
 
     // MARK: - Earlier chats
 
+    /// What an earlier chat's opening told the list it was chosen from, in
+    /// order, and the questions on screen as each was told.
+    @MainActor private final class OpenReports {
+        private let store: AskConversationStore<UIDomain>
+        private(set) var outcomes: [AskChatOpenOutcome] = []
+        private(set) var onScreen: [[String]] = []
+
+        init(_ store: AskConversationStore<UIDomain>) {
+            self.store = store
+        }
+
+        func note(_ outcome: AskChatOpenOutcome) {
+            outcomes.append(outcome)
+            onScreen.append(store.turns.map(\.question))
+        }
+    }
+
     /// A store that keeps its chats, over private files, and an archive over
     /// the same folder to check it against.
     private func keepingStore(
@@ -3634,11 +3651,75 @@ import Testing
         await store.flushPersistence()
         try setMode(0o500, archiveDirectory)
 
-        await store.openThread(earlier)
+        let reports = OpenReports(store)
+        await store.openThread(earlier, reporting: reports.note)
         await store.flushPersistence()
         #expect(store.turns.map(\.question) == ["Anything from 1969?"])
         #expect(await entriesOnDisk(threadURL) == ["Anything from 1969?"])
         #expect(await archive.summaries().map(\.title) == ["Which records do I own?"])
+        // And the list it was chosen from says so.
+        #expect(reports.outcomes == [.refused])
+    }
+
+    @Test func anEarlierChatThatWillNotReadOrHasGoneSaysNothingOpened() async throws {
+        // The list closed on the tap, and the chat on screen stayed with
+        // nothing said: the reader heard the chat opening, and it never did.
+        let threadURL = temporaryLocation("askkit-open-refused").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-refused")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let unreadable = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        let gone = try #require(await archive.archive([earlierEntry("Anything on vinyl?", at: 1_100_000)]))
+        try Data("not a chat".utf8).write(to: archiveDirectory.appending(path: "\(unreadable.id.uuidString).json"))
+        try FileManager.default.removeItem(at: archiveDirectory.appending(path: "\(gone.id.uuidString).json"))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+
+        let reports = OpenReports(store)
+        await store.openThread(unreadable, reporting: reports.note)
+        await store.openThread(gone, reporting: reports.note)
+        #expect(reports.outcomes == [.refused, .refused])
+        #expect(store.turns.map(\.question) == ["Anything from 1969?"])
+        // The one that won't read stays listed, untouched; the one gone goes.
+        #expect(store.history.map(\.id) == [unreadable.id])
+    }
+
+    @Test func anEarlierChatSaysItGaveWayToNewChatOrOpenedOnceItIsOnScreen() async throws {
+        let threadURL = temporaryLocation("askkit-open-reported").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-reported")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+
+        // New Chat, tapped while the chat on screen is filed, takes the
+        // open's place, and says what came of it itself.
+        let filing = Park()
+        filing.parks.withLock { $0 = true }
+        store.whileFilingTheChatOnScreen = { await filing.wait() }
+        let reports = OpenReports(store)
+        let opening = Task { await store.openThread(earlier, reporting: reports.note) }
+        await filing.isParked()
+        store.startOver()
+        filing.release()
+        await opening.value
+        await store.flushPersistence()
+        #expect(reports.outcomes == [.gaveWay])
+        #expect(store.turns.isEmpty)
+
+        // Opened, it says so with the chat on screen.
+        await store.openThread(try #require(store.history.first { $0.id == earlier.id }), reporting: reports.note)
+        #expect(reports.outcomes == [.gaveWay, .opened])
+        #expect(reports.onScreen.last == ["Which records do I own?"])
     }
 
     @Test func aTurnStoppedByAnOpenThatCouldNotFileTheChatIsSaved() async throws {

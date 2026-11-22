@@ -2622,7 +2622,19 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// for while it reads or files, so the reader's last tap wins and two
     /// opens never file the same chat over the one between them.
     public func openThread(_ summary: AskThreadSummary) async {
-        guard offersHistory else { return }
+        await openThread(summary) { _ in }
+    }
+
+    /// `openThread(_:)`, telling the list the chat was chosen from what came
+    /// of it (`AskChatOpenOutcome`) as soon as that is known, once: before the
+    /// engine is handed the chat and before the warm, either of which can
+    /// take as long as a turn's deadline, which a list waiting on the word
+    /// shouldn't.
+    func openThread(_ summary: AskThreadSummary, reporting report: @escaping @MainActor (AskChatOpenOutcome) -> Void) async {
+        guard offersHistory else {
+            report(.refused)
+            return
+        }
         chatRequests &+= 1
         let request = chatRequests
         // The composer as the tap left it, which the open empties only if
@@ -2634,7 +2646,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             // being filed, and the read landing afterwards would replace the
             // chat opened.
             await store.restoration().value
-            await store.open(summary, request: request, composerAtTheTap: composerAtTheTap)
+            await store.open(summary, request: request, composerAtTheTap: composerAtTheTap, reporting: report)
         }.value
         // The reset took the warm. With the composer emptied this warms
         // nothing until the reader types; a question that reached it during
@@ -2646,19 +2658,32 @@ public final class AskConversationStore<Domain: AskDomain> {
 
     /// `openThread`'s change: the chat on screen filed, then the screen, then
     /// the disk, then the engine. `composerAtTheTap` is `composerRevision` as
-    /// the reader chose the chat.
-    private func open(_ summary: AskThreadSummary, request: Int, composerAtTheTap: Int) async {
+    /// the reader chose the chat. Tells `report` what came of it, once, as
+    /// soon as that is known: at each way out, and once the chat is on
+    /// screen, before the engine.
+    private func open(
+        _ summary: AskThreadSummary, request: Int, composerAtTheTap: Int,
+        reporting report: @MainActor (AskChatOpenOutcome) -> Void
+    ) async {
         // Read once the writes before it have run: New Chat's run on the write
         // queue, not this one, and may still be about to hold the place for a
         // chat they couldn't file or move (`endingWrites`).
         await persisting?.value
-        guard heldThread == nil else { return }
+        guard heldThread == nil else {
+            report(.refused)
+            return
+        }
         let read = await archive.entries(for: summary.id)
         // The reader asked for something else while it read.
-        guard request == chatRequests else { return }
+        guard request == chatRequests else {
+            report(.gaveWay)
+            return
+        }
         guard case .thread(let onDisk, let dropped) = read, !onDisk.isEmpty else {
             if case .empty = read { await archive.remove(summary.id) }
+            // Said over a list that no longer has a chat gone from disk.
             await loadHistory()
+            report(.refused)
             return
         }
         // A question waiting to be asked waits on, to be asked on this chat,
@@ -2669,6 +2694,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         let outgoing = turns.filter(\.isComplete).map(\.entry)
         if AskThreadSummary.of(onDisk, id: summary.id, fallbackDate: .distantPast)?.isSameChat(as: outgoing) == true {
             rejoin(onDisk, filed: summary.id, dropped: dropped)
+            report(.opened)
             return
         }
         // Filed before anything leaves the screen, and awaited: unfiled (a
@@ -2711,13 +2737,17 @@ public final class AskConversationStore<Domain: AskDomain> {
                     // The chat stays, with the turn this stopped: saved as Stop
                     // saves one, since its own task returned without a save.
                     if settled { persist() }
+                    report(.refused)
                     return
                 }
                 filedOnce = true
                 // Filed, and still the reader's last request: anything asked
                 // for meanwhile files this chat again, which replaces this
                 // filing.
-                guard request == chatRequests else { return }
+                guard request == chatRequests else {
+                    report(.gaveWay)
+                    return
+                }
                 let onScreen = turns.filter(\.isComplete)
                 let marks = onScreen.map(ReadersMarks.init)
                 if marks == marked { break }
@@ -2772,6 +2802,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             }
             await store.loadHistory()
         }
+        report(.opened)
 
         // The engine after the screen, and a question asked of the chat now
         // showing waits for all of it (`start`): its turn stopped, its session
@@ -3181,6 +3212,24 @@ nonisolated struct AskStoreCensus: Sendable {
         let count = alive[place, default: 0] - 1
         alive[place] = count > 0 ? count : nil
     }
+}
+
+/// What came of the reader's choice of an earlier chat
+/// (`AskConversationStore.openThread(_:reporting:)`), for the list it was
+/// chosen from: the sheet closes on a chat that opened, and says why nothing
+/// opened on one that didn't (house rule 8), rather than close on the tap and
+/// leave the reader on the chat they meant to leave.
+nonisolated enum AskChatOpenOutcome: Equatable, Sendable {
+    /// The chat is on screen: opened, or joined with the chat on screen,
+    /// whose own filing it was.
+    case opened
+    /// A request the reader made after it took its place: New Chat, Delete
+    /// All Chats or another chat, which each say what came of them.
+    case gaveWay
+    /// Nothing opened, and nothing took its place: the chat won't read or
+    /// has gone from disk, the chat on screen couldn't be filed first, or the
+    /// thread's place holds what is nowhere else.
+    case refused
 }
 
 #endif
