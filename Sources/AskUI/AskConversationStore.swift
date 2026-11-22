@@ -1491,7 +1491,9 @@ public final class AskConversationStore<Domain: AskDomain> {
         // Its chat ended while the domain worked (New Chat, or an earlier chat
         // opened in its place), filed with the turn waiting on this. Queued
         // after the writes that filed it. Delete All Chats leaves nothing to
-        // write it into, which is what the reader asked for.
+        // write it into, which is what the reader asked for, but a copy it
+        // couldn't delete yet, which takes it and goes when its owed delete
+        // does (`retryOwedWrites`).
         guard leftTheScreen, keepsThread else { return }
         await queueWrite { await $0.writeLateOutcome(outcome, for: diskTurn) }.value
     }

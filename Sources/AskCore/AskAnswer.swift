@@ -352,11 +352,14 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// close the reply's fields, then a control token from its vocabulary
     /// (`「どの本が一番古いですか？」]}<ctrl46>}`, from the on-device model). So a
     /// chip is cut at its first such token, and then at the first `]` or `}`
-    /// that closes nothing it opened, and loses a quote or separator the cut
-    /// leaves at its end (`withoutReplyResidue(_:)`). Both are read from the
-    /// text's shape alone, so they hold in every script, Thai's questions
-    /// with no mark at their end included (house rule 7): a chip opens what
-    /// it closes. A chip with nothing left is none.
+    /// that closes nothing it opened with only the reply's structure after
+    /// it, and loses the quote and separator that cut leaves at its end
+    /// (`withoutReplyResidue(_:)`). Both are read from the text's shape alone,
+    /// so they hold in every script, Thai's questions with no mark at their
+    /// end included (house rule 7): a chip opens what it closes, and goes on
+    /// past a bracket of its own. Cut from the text as written and again from
+    /// the plain text, as what draws nothing is, since an entity can spell
+    /// either. A chip with nothing left is none.
     ///
     /// The engine cleans every model answer's follow-ups, a domain's `refine`
     /// pass's included. A deterministic answer's are the domain's, and lose
@@ -371,11 +374,12 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             // Made visible before the Markdown is read, so a marker behind
             // an invisible still reads as one, and again after: the parse
             // turns an entity into the character it names, and `&#x202E;`
-            // names an invisible one.
-            // The reply's residue goes before the Markdown is read too, once
-            // what would hide it is gone: none of it is Markdown.
-            let plain = AskPrompt.droppingInvisibles(
-                AskMarkdown.plainText(AskPrompt.tidy(withoutReplyResidue(AskPrompt.droppingInvisibles(candidate))))
+            // names an invisible one. The reply's residue goes at both points
+            // too, for the same reason: none of it is Markdown, and
+            // `&lt;ctrl46&gt;` reads as a token.
+            let written = withoutReplyResidue(AskPrompt.droppingInvisibles(candidate))
+            let plain = withoutReplyResidue(
+                AskPrompt.droppingInvisibles(AskMarkdown.plainText(AskPrompt.tidy(written)))
             )
             .trimmingCharacters(in: .whitespacesAndNewlines)
             // Without a letter or a digit it asks nothing: what is left of a
@@ -397,12 +401,17 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     ///
     /// 1. Cut at its first control token, in either form a model's vocabulary
     ///    writes one: `<ctrl46>`, `<|end|>`. Nothing a reader asks is spelled
-    ///    so, and what follows one is the model's, not the question.
+    ///    so, and what follows one is the model's, not the question. Trimmed
+    ///    of the space before it.
     /// 2. Then cut at the first `]` or `}` that closes no `[` or `{` before it
-    ///    in the chip: the reply's own fields closing.
-    /// 3. Then, where either cut, trimmed of what the cut left at its end:
-    ///    space, a `,` or `:` between the reply's fields, and a `"` that
-    ///    closes no quote the chip opened.
+    ///    in the chip and has nothing after it but more of the reply's
+    ///    structure (`]`, `}`, `"`, `,`, `:` and space): the reply's own
+    ///    fields closing. One the chip goes on past is the chip's, as in
+    ///    `(1969, 1975]?`.
+    /// 3. Then trimmed of what that cut left at its end: the space and the
+    ///    `,` or `:` between the reply's fields, and the one `"` that closed
+    ///    the reply's field there. Only that one: a quote further in, an inch
+    ///    mark say, is the reader's.
     static func withoutReplyResidue(_ chip: String) -> String {
         var kept = Substring(chip)
         if let token = kept.firstRange(of: /<ctrl\d+>|<\|[^|<>\s]*\|>/) {
@@ -410,12 +419,15 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         }
         var squares = 0
         var braces = 0
+        var closedTheReply = false
         scan: for index in kept.indices {
             switch kept[index] {
             case "[": squares += 1
             case "{": braces += 1
             case "]" where squares == 0, "}" where braces == 0:
+                guard kept[index...].allSatisfy(isReplyStructure) else { continue scan }
                 kept = kept[..<index]
+                closedTheReply = true
                 break scan
             case "]": squares -= 1
             case "}": braces -= 1
@@ -423,12 +435,23 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             }
         }
         guard kept.endIndex != chip.endIndex else { return chip }
-        while let last = kept.last {
-            let unpairedQuote = last == "\"" && kept.count(where: { $0 == "\"" }) % 2 == 1
-            guard last.isWhitespace || last == "," || last == ":" || unpairedQuote else { break }
+        func trimSeparators() {
+            while let last = kept.last, last.isWhitespace || (closedTheReply && (last == "," || last == ":")) {
+                kept.removeLast()
+            }
+        }
+        trimSeparators()
+        if closedTheReply, kept.last == "\"" {
             kept.removeLast()
+            trimSeparators()
         }
         return String(kept)
+    }
+
+    /// What the reply's structure writes after a field it closes: brackets,
+    /// braces, the quotes and separators between its fields, and space.
+    private static func isReplyStructure(_ character: Character) -> Bool {
+        "]}\",:".contains(character) || character.isWhitespace
     }
 
     /// A domain's own follow-ups, as given but for the empty and the

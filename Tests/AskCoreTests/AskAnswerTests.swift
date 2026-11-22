@@ -79,6 +79,25 @@ import Testing
         // reply's, and only a token in a vocabulary's own form is a token.
         #expect(Answer.cleanedFollowUps(["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
                 == ["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
+        // Nor is one the chip goes on past: the reply's structure is all that
+        // follows its own.
+        #expect(Answer.cleanedFollowUps(["Which notes mention `}`?", "Which came out in (1969, 1975]?"])
+                == ["Which notes mention }?", "Which came out in (1969, 1975]?"])
+    }
+
+    @Test func onlyTheQuoteTheReplyClosedGoesWithItsStructure() {
+        // The quote just before the reply's brackets closed the reply's field;
+        // an inch mark before it is the reader's.
+        #expect(Answer.cleanedFollowUps(["Do I own any 12\" singles?\"]}"]) == ["Do I own any 12\" singles?"])
+    }
+
+    @Test func aTokenSpelledAsEntitiesGoesAsWellAndCleaningAgainChangesNothing() {
+        // The Markdown read turns entities into what they name, so a token or
+        // a bracket spelled as one is cut from the plain text: left there, it
+        // would be cut by the next clean, as the chat is read back.
+        let cleaned = Answer.cleanedFollowUps(["Which is oldest?&lt;ctrl46&gt;", "Which is newest?&#93;&#125;"])
+        #expect(cleaned == ["Which is oldest?", "Which is newest?"])
+        #expect(Answer.cleanedFollowUps(cleaned) == cleaned)
     }
 
     // MARK: - Follow-ups as plain text

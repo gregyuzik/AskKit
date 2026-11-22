@@ -63,7 +63,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   gone, the chat on screen couldn't be filed first, or the thread's place held a chat that is nowhere
   else, left the reader on the chat they meant to leave with nothing said. The sheet now closes once the
   chat is on screen, and stays up over one that didn't open, under an alert that says so, which
-  VoiceOver reads; the pane beside iPhone Duo's fold shows the same alert. The line is new, in all 25
+  VoiceOver reads, unless something asked for since took the open's place; the pane beside iPhone
+  Duo's fold shows the same alert. The line is new, in all 25
   languages.
 - **What came of a yes reaches a chat New Chat could only set aside or keep in the thread's place.**
   When the archive refused the chat New Chat ended while a perform was still out, its outcome was

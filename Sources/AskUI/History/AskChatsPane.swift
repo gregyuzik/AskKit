@@ -20,7 +20,8 @@ public import SwiftUI
 /// earlier chat keeps the element VoiceOver activated where it was, and
 /// VoiceOver hears which chat is opening (`AskChatOpening`). One that doesn't
 /// open leaves the mark where it was, and an alert says so
-/// (`AskChatRefusal`).
+/// (`AskChatRefusal`), unless a later request took its place, which then says
+/// what came of it.
 ///
 /// **The conversation's own ground.** The list draws no background, so the
 /// two panes are one surface with the hinge's hairline between them. A
