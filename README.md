@@ -172,7 +172,7 @@ nonisolated struct BookQuery: Sendable {
 /// The one lookup: the model's tool, and the grounded retry's search.
 nonisolated struct SearchBooks: Tool {
     let name = "search_books"
-    let description = "Search the reader's books by any words from the question. Call this before answering anything about what they own."
+    let description = "Search the reader's books by a title or an author. Call this before answering anything about what they own."
 
     let context: AskToolContext<Book>
 
@@ -182,7 +182,9 @@ nonisolated struct SearchBooks: Tool {
         await context.withToolCall(.searching(scope: nil)) { collector in
             // A one-letter word, such as "a" or "I", names nothing to look for.
             let asked = Self.words(arguments.words).filter { $0.count > 1 }
-            let matches = Book.shelf.filter { !Self.words("\($0.title) \($0.author)").isDisjoint(with: asked) }
+            // A book needs every word, so a question's "the" or "le" can't narrow it to one title. The
+            // trade: "books by Le Guin" reads the whole shelf, which still names her.
+            let matches = asked.isEmpty ? [] : Book.shelf.filter { asked.isSubset(of: Self.words("\($0.title) \($0.author)")) }
             // Nothing matched, as for "How many books do I own?": the whole shelf, to count or look through.
             let found = matches.isEmpty ? Book.shelf : matches
             let shown = Array(found.prefix(context.rowLimit))
