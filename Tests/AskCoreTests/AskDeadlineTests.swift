@@ -104,11 +104,17 @@ import Testing
         // the test is cancelled, as by the suite's time limit, and the body
         // finishes the stream however it ends, so a body never cancelled
         // fails this rather than holding it.
+        //
+        // **The body waits an hour, so only the cancellation ends it.** One
+        // that could finish first raced the deadline on the wall clock, and
+        // in a run that kept the timer from a thread for five seconds the work
+        // won: no cancellation came, and the continuation it was to resume
+        // was never resumed.
         let (cancellations, cancellation) = AsyncStream<Void>.makeStream()
 
         _ = try await AskDeadline.run(.milliseconds(50)) { () -> String in
             do {
-                try await Task.sleep(for: .seconds(5))
+                try await Task.sleep(for: .seconds(3_600))
             } catch {
                 cancellation.yield()
             }

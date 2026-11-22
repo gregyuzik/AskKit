@@ -25,8 +25,11 @@ nonisolated final class TestPark: Sendable {
 
     private let state = Mutex(State())
 
+    /// How many calls are waiting here.
+    var waiters: Int { state.withLock { $0.waiting.count } }
+
     /// Whether a call is waiting here.
-    var isWaiting: Bool { state.withLock { !$0.waiting.isEmpty } }
+    var isWaiting: Bool { waiters > 0 }
 
     /// Wait here while `shouldWait` says to, read under the park's lock, or
     /// go straight on past a let-go that came before any call waited.
