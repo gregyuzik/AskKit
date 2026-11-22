@@ -40,7 +40,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   the one before. It drew over the last run's card, so each run's icon went over the one before it, and
   their edges showed through. It also converts the icon from `ictool`'s Display P3 to the card's sRGB
   before drawing it, so the card's plates have the README icon's colors: they were P3 values read as
-  sRGB, duller where the plates are most saturated.
+  sRGB, duller where the plates are most saturated. It draws the card's platform line too, from
+  `SOCIAL_PLATFORMS`, set as the card's other words are, so naming another platform is one edit. The
+  line names iPadOS now, as README.md's features do.
 
 ## [0.7.2] - 2026-11-09
 

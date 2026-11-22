@@ -20,13 +20,15 @@ scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`.
   parallax, scaled to sit inside the round mask.
 - `docs/images/icon.png` and `icon-dark.png` — the icon atop the README, rendered by Icon Composer's
   `ictool` in light and dark.
-- `docs/images/social-preview.png` — GitHub's card for the repository: the icon, rendered by
-  `ictool` and converted from Display P3 to the card's sRGB, laid at `SOCIAL_TILE` over
-  `docs/images/social-preview-card.png`, the card without it, so every run draws on the same card
-  rather than on the last run's icon. That card holds the field, the tile's shadow, the badge and
-  the words. Their source is lost, so a change to them is an edit to that image; where the icon goes
-  it holds a smooth fill of the field and shadow around it, which shows only through the icon's edge
-  and corners. GitHub shows a new card only once it's uploaded in the repository's settings.
+- `docs/images/social-preview.png` — GitHub's card for the repository: the platform line under
+  "Foundation Models", drawn from `SOCIAL_PLATFORMS` as the card's words were set, and the icon,
+  rendered by `ictool` and converted from Display P3 to the card's sRGB, laid at `SOCIAL_TILE`, both
+  over `docs/images/social-preview-card.png`, the card without them, so every run draws on the same
+  card rather than on the last run's. That card holds the field, the tile's shadow, the badge and the
+  other words. Their source is lost, so a change to them is an edit to that image; where the line
+  goes it holds a smooth fill of the field, and where the icon goes a fill of the field and shadow
+  around it, which shows only through the icon's edge and corners. GitHub shows a new card only once
+  it's uploaded in the repository's settings.
 
 The three PNGs under `docs/images/` then go through `oxipng -o max --strip safe` when oxipng is
 installed (`brew install oxipng`), which is lossless and keeps their color profile; without it they
@@ -35,7 +37,8 @@ time: a few hundred inside the plates can come out a level or two apart, so a ru
 nothing can still leave those PNGs modified.
 
 Needs macOS with Xcode (`swift` runs make-demo-symbol.swift, and `ictool` renders the images) and
-numpy, shapely and Pillow:
+numpy, shapely and Pillow with libraqm, which PyPI's Pillow wheels bundle and which lays out the
+card's platform line:
 
     python3 -m venv tmp/venv && tmp/venv/bin/pip install numpy shapely pillow
     tmp/venv/bin/python scripts/make-demo-icon.py
@@ -52,7 +55,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageCms, ImageDraw
+from PIL import Image, ImageCms, ImageDraw, ImageFont, features
 from shapely import affinity
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
@@ -93,6 +96,20 @@ STACK_BACK = 2
 SOCIAL_TILE = (153, 150, 340)
 SOCIAL_CARD = IMAGES / "social-preview-card.png"
 SOCIAL_PREVIEW = IMAGES / "social-preview.png"
+
+# The card's platform line, under "Foundation Models": the names, and what parts them, a dot with two
+# spaces either side.
+SOCIAL_PLATFORMS = ("iOS", "iPadOS", "macOS", "visionOS")
+SOCIAL_SEPARATOR = "  ·  "
+
+# How the card's words are set, measured off them: SF Pro, the system's own font file, at 24 px,
+# weight 500 and optical size 24, tracked 0.01 em, in #5b4969, the line's first pen at x 780 and its
+# baseline at y 496.5. Set so, "iOS · macOS · visionOS" matched the line the card had to within 0.4 of
+# a level, RMS.
+SOCIAL_FONT = Path("/System/Library/Fonts/SFNS.ttf")
+SOCIAL_TYPE = {"size": 24, "weight": 500, "optical size": 24, "tracking": 0.01}
+SOCIAL_INK = "#5b4969"
+SOCIAL_LINE = (780, 496.5)
 
 
 # MARK: - The plates
@@ -300,10 +317,43 @@ def write_stack(shapes: list[Polygon]) -> None:
     field("light").save(STACK / "Back.solidimagestacklayer/Content.imageset/back.png", optimize=True)
 
 
+# MARK: - The social card
+
+
+def platform_line(size: tuple[int, int]) -> np.ndarray:
+    """The platform line's coverage on a card of `size`, set as the card's words were: each glyph drawn
+    on a layer twice the card's size, at its pen rounded to that layer's pixels, the pen moved by the
+    glyph's kerned advance and the tracking, then the layer halved with Lanczos. The halving's lobes
+    are kept, so the line has the faint light edge the card's other words have."""
+    if not features.check("raqm"):
+        raise SystemExit("Pillow lacks libraqm, which lays out the card's platform line: reinstall Pillow from PyPI")
+    font = ImageFont.truetype(str(SOCIAL_FONT), SOCIAL_TYPE["size"] * 2, layout_engine=ImageFont.Layout.RAQM)
+    # The font's other axes, width and grade, stay at their defaults.
+    settings = {"Weight": SOCIAL_TYPE["weight"], "Optical Size": SOCIAL_TYPE["optical size"]}
+    axes = font.get_variation_axes()
+    names = [axis["name"].decode() if isinstance(axis["name"], bytes) else axis["name"] for axis in axes]
+    if missing := set(settings) - set(names):
+        raise SystemExit(f"{SOCIAL_FONT} has no {', '.join(sorted(missing))} axis")
+    font.set_variation_by_axes([settings.get(name, axis["default"]) for name, axis in zip(names, axes)])
+    text = SOCIAL_SEPARATOR.join(SOCIAL_PLATFORMS)
+    width, height = size
+    layer = Image.new("L", (width * 2, height * 2), 0)
+    draw = ImageDraw.Draw(layer)
+    left, baseline = SOCIAL_LINE
+    pen = left * 2
+    for i, char in enumerate(text):
+        draw.text((round(pen), baseline * 2), char, font=font, fill=255, anchor="ls")
+        after = text[i + 1:i + 2]
+        pen += font.getlength(char + after) - font.getlength(after) + SOCIAL_TYPE["tracking"] * SOCIAL_TYPE["size"] * 2
+    halved = Image.fromarray(np.asarray(layer, dtype=np.float32) / 255, "F").resize(size, Image.LANCZOS)
+    return np.asarray(halved)
+
+
 def render_social_preview() -> None:
-    """The icon laid over the card without it, at `SOCIAL_TILE`, written as GitHub's card. `ictool`
-    renders in Display P3 and the card is sRGB, so the icon's colors are converted to the card's
-    profile first, relative colorimetric: a plate color outside sRGB is clipped to its edge."""
+    """The platform line and the icon laid over the card without them, the icon at `SOCIAL_TILE`,
+    written as GitHub's card. `ictool` renders in Display P3 and the card is sRGB, so the icon's colors
+    are converted to the card's profile first, relative colorimetric: a plate color outside sRGB is
+    clipped to its edge."""
     with tempfile.TemporaryDirectory() as scratch:
         tile = Path(scratch) / "tile.png"
         subprocess.run([str(ictool()), str(ICON), "--export-image", "--output-file", str(tile),
@@ -318,7 +368,10 @@ def render_social_preview() -> None:
                                               ImageCms.ImageCmsProfile(io.BytesIO(base.info["icc_profile"])),
                                               renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC)
         converted.putalpha(icon.getchannel("A"))
-        card = base.convert("RGBA")
+        line = platform_line(base.size)[..., None]
+        ink = np.array(hex_rgb(SOCIAL_INK)) * 255
+        words = np.asarray(base.convert("RGB"), dtype=np.float64) * (1 - line) + ink * line
+        card = Image.fromarray(np.clip(np.round(words), 0, 255).astype(np.uint8), "RGB").convert("RGBA")
         card.alpha_composite(converted.resize((side, side), Image.LANCZOS), (left, top))
         card.convert("RGB").save(SOCIAL_PREVIEW, optimize=True, icc_profile=base.info["icc_profile"])
 
