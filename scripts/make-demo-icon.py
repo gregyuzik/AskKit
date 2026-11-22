@@ -30,7 +30,9 @@ scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`.
 
 The three PNGs under `docs/images/` then go through `oxipng -o max --strip safe` when oxipng is
 installed (`brew install oxipng`), which is lossless and keeps their color profile; without it they
-stay as written, and the script says it skipped them.
+stay as written, and the script says it skipped them. `ictool` doesn't render the same pixels every
+time: a few hundred inside the plates can come out a level apart, so a run that changes nothing can
+still leave those PNGs modified.
 
 Needs macOS with Xcode (`swift` runs make-demo-symbol.swift, and `ictool` renders the images) and
 numpy, shapely and Pillow:
