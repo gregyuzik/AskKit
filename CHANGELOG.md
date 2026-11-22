@@ -35,6 +35,10 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   any words from the question. A search copied from the sample takes the same change: a book matches
   when `asked.isSubset(of:)` its words, in place of `!isDisjoint(with: asked)`, and an empty `asked`
   matches none.
+- **Scripts.** `scripts/make-demo-icon.py` draws the icon on `docs/images/social-preview-card.png`, the
+  card without it, and writes `docs/images/social-preview.png` from that, so a run no longer depends on
+  the one before. It drew over the last run's card, so each run's icon went over the one before it, and
+  their edges showed through.
 
 ## [0.7.2] - 2026-11-09
 
