@@ -21,8 +21,12 @@ scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`.
 - `docs/images/icon.png` and `icon-dark.png` — the icon atop the README, rendered by Icon Composer's
   `ictool` in light and dark.
 - `docs/images/social-preview.png` — GitHub's card for the repository: the icon, rendered by
-  `ictool`, laid over the tile the card holds, its field and its words left as they are. GitHub
-  shows a new card only once it's uploaded in the repository's settings.
+  `ictool`, laid at `SOCIAL_TILE` over `docs/images/social-preview-card.png`, the card without it,
+  so every run draws on the same card rather than on the last run's icon. That card holds the
+  field, the tile's shadow, the badge and the words. Their source is lost, so a change to them is an
+  edit to that image; where the icon goes it holds a smooth fill of the field and shadow around it,
+  which shows only through the icon's edge and corners. GitHub shows a new card only once it's
+  uploaded in the repository's settings.
 
 The three PNGs under `docs/images/` then go through `oxipng -o max --strip safe` when oxipng is
 installed (`brew install oxipng`), which is lossless and keeps their color profile; without it they
@@ -81,8 +85,11 @@ FIELD = {
 STACK_SCALE = 0.86
 STACK_BACK = 2
 
-# Where the icon's tile sits on GitHub's 1280 x 640 card: its left edge, top edge and side.
+# Where the icon's tile sits on GitHub's 1280 x 640 card: its left edge, top edge and side. The card
+# without the icon, which the script reads and never writes, and the card it writes from it.
 SOCIAL_TILE = (153, 150, 340)
+SOCIAL_CARD = IMAGES / "social-preview-card.png"
+SOCIAL_PREVIEW = IMAGES / "social-preview.png"
 
 
 # MARK: - The plates
@@ -291,16 +298,17 @@ def write_stack(shapes: list[Polygon]) -> None:
 
 
 def render_social_preview() -> None:
-    """The icon laid over the tile on GitHub's card, at `SOCIAL_TILE`."""
+    """The icon laid over the card without it, at `SOCIAL_TILE`, written as GitHub's card."""
     with tempfile.TemporaryDirectory() as scratch:
         tile = Path(scratch) / "tile.png"
         subprocess.run([str(ictool()), str(ICON), "--export-image", "--output-file", str(tile),
                         "--platform", "iOS", "--rendition", "Default", "--width", "1024", "--height", "1024",
                         "--scale", "1", "--design-generation", "27"], check=True, capture_output=True)
         left, top, side = SOCIAL_TILE
-        card = Image.open(IMAGES / "social-preview.png").convert("RGBA")
+        base = Image.open(SOCIAL_CARD)
+        card = base.convert("RGBA")
         card.alpha_composite(Image.open(tile).convert("RGBA").resize((side, side), Image.LANCZOS), (left, top))
-        card.convert("RGB").save(IMAGES / "social-preview.png", optimize=True)
+        card.convert("RGB").save(SOCIAL_PREVIEW, optimize=True, icc_profile=base.info["icc_profile"])
 
 
 def recompress(paths: list[Path]) -> None:
@@ -324,8 +332,8 @@ def main() -> None:
     print(f"wrote {ICON.relative_to(ROOT)} (icon.json and {len(list((ICON / 'Assets').iterdir()))} assets)")
     print(f"wrote {STACK.relative_to(ROOT)} (back, middle, front)")
     print(f"wrote {(IMAGES / 'icon.png').relative_to(ROOT)} and {(IMAGES / 'icon-dark.png').relative_to(ROOT)}")
-    print(f"wrote {(IMAGES / 'social-preview.png').relative_to(ROOT)}")
-    recompress([IMAGES / "icon.png", IMAGES / "icon-dark.png", IMAGES / "social-preview.png"])
+    print(f"wrote {SOCIAL_PREVIEW.relative_to(ROOT)} from {SOCIAL_CARD.relative_to(ROOT)}")
+    recompress([IMAGES / "icon.png", IMAGES / "icon-dark.png", SOCIAL_PREVIEW])
 
 
 if __name__ == "__main__":
