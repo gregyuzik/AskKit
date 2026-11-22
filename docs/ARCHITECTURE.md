@@ -209,16 +209,18 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    recorded rides along. A payload, the domain's own `Encodable` value, is encoded as JSON by AskKit and
    decoded by `payload(as:)`; a value JSON can't hold, or a `Data`, throws as it is recorded. A domain's
    refine pass then runs on the same session, the stream reporting `.refining` when it first asks the
-   model and the store recording that as the turn's activity (`AskActivity.refiningKey`). A failure or a
-   timeout keeps the first answer; a refined one is cleaned and cut the same way and keeps the first
-   answer's payload, proposal and grounding where it brings none. The stream ends with `.answer`; the
-   mirror's refresh runs beside the turn, so nothing follows.
+   model and the store recording that as the turn's activity (`AskActivity.refiningKey`), which the
+   tools that model calls leave as it is: they report nothing. A failure or a timeout keeps the first
+   answer; a refined one is cleaned and cut the same way and keeps the first answer's payload, proposal
+   and grounding where it brings none. The stream ends with `.answer`; the mirror's refresh runs beside
+   the turn, so nothing follows.
 10. **Failures.** Any failure is triaged into an `AskError`, never shown as the SDK's text
     ([Triage](#triage)), and a Private Cloud Compute outage is handed down once ([The
     hand-down](#the-hand-down)). If the deadline passes with prose the policy keeps on screen, that prose
     becomes the answer, flagged as truncated, with the model's tiles and basis line only if the model had
     begun its follow-ups, its last field; a reply that stopped at its token cap is kept the same way
-    (step 9). Otherwise the turn fails.
+    (step 9). Otherwise the turn fails. A stop from below once prose is drawn, as a tool's own
+    cancellation is, ends the turn as a stop, which keeps that prose as its answer.
 11. **Reveal and persistence.** The store applies each event to its `AskTurn`; the screen draws the prose
     in as it arrives (the reveal), then the answer's other pieces in waves. On `AskTurnEvent.restarted`
     the store clears what the thrown-away attempt left (house rule 5): a Stop before the new attempt's
@@ -262,12 +264,13 @@ unavailable (its assets downloading, say), which is asked again. The locale prob
 read are each shared by overlapping callers, kept once answered and bounded at 3 s, so a stalled network
 can't hold the turn.
 
-A transport failure cools Private Cloud Compute for 60 s, a rate limit naming its reset cools it until
-then, and a spent quota holds it until the day's reset; no hold is ever shortened or runs past a day,
-whatever date the tier gave. The holds and the availability cache run on the monotonic clock, so
-changing the device's clock moves none of them. Sessions are built off the main actor, with on-device
-replies capped at 1,024 tokens and the grounded retry's plan at 256. `AskSession.usage()` is the newest
-response's usage, not the session's running total
+A transport failure cools Private Cloud Compute for 60 s, as does a generation there the turn's deadline
+gave up on having heard nothing from it ([the hand-down](#the-hand-down)), a rate limit naming its reset
+cools it until then, and a spent quota holds it until the day's reset; no hold is ever shortened or
+runs past a day, whatever date the tier gave. The holds and the availability cache run on the monotonic
+clock, so changing the device's clock moves none of them. Sessions are built off the main actor, with
+on-device replies capped at 1,024 tokens and the grounded retry's plan at 256. `AskSession.usage()` is
+the newest response's usage, not the session's running total
 ([rollover](#continuation-tail-referent-recap-rollover)), and tool calls are counted off the transcript.
 
 **The reply's shape.** Every generation streams through `AskSession`'s shaped stream in the domain's
@@ -338,11 +341,16 @@ Compute despite it.
 A failure is a tier outage (`askIsTierOutage`) when it triages to `.privateCloudUnreachable` (a network
 failure, the service unavailable, a rate limit, a timeout, being offline or the context gate) or
 `.quotaReached`. An outage on Private Cloud Compute hands the turn down once, to the next servable tier:
-- **Only an unreachable tier cools.** A spent quota is no network fault and already holds the tier until
-  its reset. The cooldown and the mirror's refresh run beside the turn, in one task so the cooldown
-  lands first: both can wait on the tier that just went out, and a turn waiting on them would hold back
-  the answer the hand-down is for. The tier caption names the fallback from the stream's `.tier` event,
-  not the mirror.
+- **Only an unreachable tier cools, or one that said nothing.** A spent quota is no network fault and
+  already holds the tier until its reset. A Private Cloud Compute generation that was asked and sent no
+  snapshot and no tool call before the turn's deadline abandoned it, as on a connection half open that
+  never throws a timeout of its own, cools the tier, though the turn fails as the deadline does
+  (`AskError.couldNotAnswer`), with no time left to hand down. A slow host tool that uses up the deadline
+  was called, so it cools nothing, and nor does a grounded retry's re-ask, whose tier answered the turn's
+  first ask moments before. The cooldown and the mirror's refresh run beside the turn, in one task so
+  the cooldown lands first: both can wait on the tier that just went out, and a turn waiting on them
+  would hold back the answer the hand-down is for. The tier caption names the fallback from the
+  stream's `.tier` event, not the mirror.
 - **The question starts a new conversation.** A session is bound to its model, so the question goes to
   the fallback with the thread's tail: a handed-down follow-up or "Another pick" still has the last
   exchanges.
@@ -366,8 +374,8 @@ from the host. Nor is a failure of the host's own search (`AskDomain.search`), w
 
 **Tail and referent.** A kept conversation remembers its **tail**: the last three exchanges, each a
 question, its answer and the titles of the rows it showed. An exchange enters it once a model answered
-and the reader saw prose, which the thread keeps as the answer: finished, cut by the deadline, or
-stopped by the reader after its first words, with the rows it had read. An answer the domain gave
+and the reader saw prose, which the thread keeps as the answer: finished, cut by the deadline, or stopped
+after its first words, by the reader or from below, with the rows it had read. An answer the domain gave
 without a model doesn't, nor a turn that failed or was stopped before it drew anything. The engine and
 the store share the rule (`AskContinuation.entersTail(tier:prose:)`), so a follow-up after a Stop gets
 the same recap whether or not the app relaunched. After each answer, `referent(from:)` names the rows it
@@ -442,7 +450,7 @@ asked for where no session was built yet:
 | Error | `AskError` |
 |---|---|
 | An `AskError`, bare or inside a tool's `ToolCallError` | itself |
-| A cancellation, bare or inside a `ToolCallError` | `.stopped` |
+| A cancellation, bare or inside a `ToolCallError` | `.stopped`, for a turn stopped before its first words: one stopped after them ends as a stop, keeping them |
 | Private Cloud Compute's quota limit | `.quotaReached(resetDate:)` |
 | On Private Cloud Compute: a network failure, the service unavailable, a rate limit, a timeout, a lost connection, or the context gate | `.privateCloudUnreachable` |
 | A missing on-device model asset | `.modelUnavailable(.modelNotReady)` |

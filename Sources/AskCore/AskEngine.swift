@@ -402,8 +402,10 @@ public actor AskEngine<Domain: AskDomain> {
     /// that fails finishes it by throwing an `AskError`. A turn stopped before
     /// its answer finishes it by throwing `CancellationError`, whether by
     /// `stop()`, by `reset()`, or by a newer question, which stops the turn in
-    /// flight before it starts. So a caller that catches only `AskError`
-    /// misses a stop. A reader that lets the stream go stops the turn too, and
+    /// flight before it starts, and so does a stop from below once prose is
+    /// drawn, such as a tool's own cancellation: before any, that fails as
+    /// `AskError.stopped`. So a caller that catches only `AskError` misses a
+    /// stop. A reader that lets the stream go stops the turn too, and
     /// hears nothing more.
     ///
     /// **The question is asked as the reader saw it**: what a reader can't
@@ -686,34 +688,8 @@ public actor AskEngine<Domain: AskDomain> {
                 chat: chat, started: started, deadline: deadline, drawn: drawn, continuation: continuation
             )
         } catch let stop as CancellationError {
-            logIfCancelledFromBelow(stop, on: tier)
-            // A generation cut off mid-stream leaves a transcript the next turn
-            // can't build on, so the session goes. What the thread said stays,
-            // for the fresh session the next question starts, and so does what
-            // the reader saw of this turn, which they keep as its answer. A
-            // standalone turn's generation was on a session of its own, and a
-            // turn from a chat that has ended leaves the next chat alone.
-            if mode.joinsThread, isCurrent(chat) {
-                dropSession(adding: stoppedExchange(question, on: tier, drawn: drawn))
-            }
-            throw CancellationError()
+            throw stopped(stop, question, on: tier, mode: mode, chat: chat, drawn: drawn)
         } catch let raw {
-            // Everything that is not already an `AskError` is triaged here, not
-            // thrown on: session construction reaches this catch raw, and an
-            // untriaged error would skip the hand-down below and put an SDK
-            // string on the screen. By the tier asked for, since there is no
-            // session yet to say which tier it would have run on.
-            //
-            // What a session's own generations throw is triaged a layer down,
-            // by the tier that session runs on (`AskSessionBox.tier`): the
-            // stream's in `stream`, because a follow-up's overflow has to be a
-            // typed `.contextTooLarge` before `attempt` can roll it over, and
-            // the grounded retry's planner in `plannedPrompt`. A router's
-            // on-device session answering for Private Cloud Compute fails as
-            // the on-device model, and cools nothing. The domain's search
-            // fails as an `AskError` of its own.
-            let error = triaged(raw, on: tier)
-
             // An announced outage hands the turn down once. The caption the
             // reader is looking at names the fallback from its `.tier` event,
             // so the cooldown and the mirror's refresh go beside the turn,
@@ -724,16 +700,11 @@ public actor AskEngine<Domain: AskDomain> {
             // Anything the tier BELOW would fail at too (a refusal, an
             // overflow, an ungrounded answer) fails where it stands: another
             // model reaches the same verdict, and the reader would just be
-            // told it slower.
-            //
-            // Only a tier that couldn't be reached is noted as a transport
-            // failure, handed down or not. A spent quota is no network fault:
-            // the tier's state says it is spent (`AskTierState.quotaReached`)
-            // until its reset, and a cooldown on top would log a failure there
-            // wasn't.
-            let unreachable = tier == .privateCloud && error == .privateCloudUnreachable
+            // told it slower. A tier the deadline found silent fails where
+            // it stands too, with no time left to hand down, and cools.
+            let (error, cools) = failure(raw, on: tier)
             guard let fallback, askIsTierOutage(error) else {
-                refreshStatusAside(notingTransportFailureOn: unreachable ? tier : nil)
+                refreshStatusAside(notingTransportFailureOn: cools)
                 throw error
             }
             // House rule 5's one exception takes the prose back only for an
@@ -743,7 +714,7 @@ public actor AskEngine<Domain: AskDomain> {
             // as it does with no tier to hand down to.
             if !drawn.prose.isEmpty, deadline - ContinuousClock().now < Self.restartFloor {
                 log.routing("\(tier.rawValue) went out with too little time left to hand down — keeping what it drew")
-                refreshStatusAside(notingTransportFailureOn: unreachable ? tier : nil)
+                refreshStatusAside(notingTransportFailureOn: cools)
                 throw error
             }
             // A session is bound to its model, so the conversation cannot move
@@ -757,7 +728,7 @@ public actor AskEngine<Domain: AskDomain> {
                 restoredTail = threadTail
                 conversation = nil
             }
-            refreshStatusAside(notingTransportFailureOn: unreachable ? tier : nil)
+            refreshStatusAside(notingTransportFailureOn: cools)
             let outage = if case .quotaReached = error { "is out of quota" } else { "went out" }
             log.routing("\(tier.rawValue) \(outage) — handing down to \(fallback.rawValue)")
             drawn.restart()
@@ -769,24 +740,73 @@ public actor AskEngine<Domain: AskDomain> {
                     chat: chat, started: started, deadline: deadline, drawn: drawn, continuation: continuation
                 )
             } catch let stop as CancellationError {
-                logIfCancelledFromBelow(stop, on: fallback)
-                if mode.joinsThread, isCurrent(chat) {
-                    dropSession(adding: stoppedExchange(question, on: fallback, drawn: drawn))
-                }
-                throw CancellationError()
+                throw stopped(stop, question, on: fallback, mode: mode, chat: chat, drawn: drawn)
             } catch let raw {
-                // Triaged like the first tier's failures: the fallback builds a
+                // Read like the first tier's failures: the fallback builds a
                 // session and plans the same way, and a raw error from either
                 // would otherwise reach a caller such as `answerOnce` as the
                 // SDK's own. Nothing is handed down twice.
-                let error = triaged(raw, on: fallback)
-                refreshStatusAside()
+                let (error, cools) = failure(raw, on: fallback)
+                refreshStatusAside(notingTransportFailureOn: cools)
                 throw error
             }
         }
         // The mirror refreshed beside the turn: the turn is over when its
         // answer lands.
         refreshStatusAside()
+    }
+
+    /// The stop path, for a turn's attempt on `tier` that ended in a stop:
+    /// the reader's, the chat's end, a newer question's, or one from below
+    /// (`logIfCancelledFromBelow`). What the caller throws.
+    ///
+    /// A generation cut off mid-stream leaves a transcript the next turn
+    /// can't build on, so the session goes. What the thread said stays, for
+    /// the fresh session the next question starts, and so does what the
+    /// reader saw of this turn, which they keep as its answer. A standalone
+    /// turn's generation was on a session of its own, and a turn from a chat
+    /// that has ended leaves the next chat alone.
+    private func stopped(
+        _ stop: CancellationError,
+        _ question: String,
+        on tier: AskTier,
+        mode: AskTurnMode,
+        chat: Int,
+        drawn: AskDrawn<Row>
+    ) -> CancellationError {
+        logIfCancelledFromBelow(stop, on: tier)
+        if mode.joinsThread, isCurrent(chat) {
+            dropSession(adding: stoppedExchange(question, on: tier, drawn: drawn))
+        }
+        return CancellationError()
+    }
+
+    /// What a failed attempt on `tier` ends the turn with, and the tier it
+    /// cools, if any.
+    ///
+    /// Everything that is not already an `AskError` is triaged here, not
+    /// thrown on: session construction reaches `turn` raw, and an untriaged
+    /// error would skip the hand-down and put an SDK string on the screen. By
+    /// the tier asked for, since there is no session yet to say which tier it
+    /// would have run on. What a session's own generations throw is triaged a
+    /// layer down, by the tier that session runs on (`AskSessionBox.tier`):
+    /// the stream's in `stream`, because a follow-up's overflow has to be a
+    /// typed `.contextTooLarge` before `attempt` can roll it over, and the
+    /// grounded retry's planner in `plannedPrompt`. A router's on-device
+    /// session answering for Private Cloud Compute fails as the on-device
+    /// model, and cools nothing. The domain's search fails as an `AskError`
+    /// of its own.
+    ///
+    /// **Two failures cool, handed down or not:** a Private Cloud Compute
+    /// that couldn't be reached, and one the deadline found silent
+    /// (`AskSilentGeneration`), which fails as the deadline does. A spent
+    /// quota is no network fault: the tier's state says it is spent
+    /// (`AskTierState.quotaReached`) until its reset, and a cooldown on top
+    /// would log a failure there wasn't.
+    private func failure(_ raw: any Error, on tier: AskTier) -> (error: AskError, cools: AskTier?) {
+        if let silent = raw as? AskSilentGeneration { return (.couldNotAnswer, silent.tier) }
+        let error = triaged(raw, on: tier)
+        return (error, tier == .privateCloud && error == .privateCloudUnreachable ? tier : nil)
     }
 
     /// Note a transport failure and refresh the mirror beside the turn
@@ -1033,11 +1053,15 @@ public actor AskEngine<Domain: AskDomain> {
                 deadline: deadline
             ) else {
                 // The seam reported this tier servable and then handed back no
-                // session. That is a bug in the seam, not a condition of the
-                // reader's — and it is indistinguishable from an ordinary
-                // outage by the time it reaches the screen.
+                // session. `AppleModelSeam` reads the on-device model's
+                // availability again as it builds, and a host's hold on
+                // inference can begin between the two, so a condition that
+                // has already passed reads this way as often as a seam's bug
+                // does. Retryable, as the reason no tier can serve isn't: the
+                // mirror is read again beside the turn, and Try Again finds a
+                // tier that serves, or the reason none does.
                 log.routing("\(tier.rawValue) reported servable and made no session")
-                throw AskError.modelUnavailable(.unknown)
+                throw AskError.couldNotAnswer
             }
             (box, collector, relay) = (made, fresh, freshRelay)
         }
@@ -1365,9 +1389,12 @@ public actor AskEngine<Domain: AskDomain> {
         // Everything this generation tells the reader goes out through here,
         // and nothing after its answer. The deadline abandons the snapshot
         // loop rather than waiting for it, and a loop caught between two hops
-        // wakes after the truncated answer with a snapshot still to send; the
+        // wakes with a snapshot still to send, and goes on to the ones its
+        // session had buffered, which a cancelled reader is still handed; the
         // tools' observer is cleared only as this returns. The lock that lets
-        // the answer out shuts the rest, as `refine` shuts its announcement.
+        // the answer out shuts the rest, as `refine` shuts its announcement,
+        // and on the ceiling the outlet is shut before the answer's text is
+        // taken.
         let outlet = AskAnswerOutlet(continuation, drawn: drawn)
 
         // The tools report straight into this turn's stream, by both routes. They
@@ -1415,6 +1442,10 @@ public actor AskEngine<Domain: AskDomain> {
         // leaves no time to read it again, and a truncated answer only the
         // transcript grounds is still grounded.
         let transcribed = Mutex<Int?>(nil)
+        // Whether the generation was asked for at all: the race starts
+        // nothing once the deadline has passed, and a tier asked nothing has
+        // said nothing for a reason of the turn's own.
+        let asked = Mutex(false)
         let shape = replyShape
         let isPCC = tier == .privateCloud
         // Where the latch below starts: grounded already when the app
@@ -1478,6 +1509,7 @@ public actor AskEngine<Domain: AskDomain> {
                         // so the schema it saw is the one it answers in.
                         shape: shape
                     )
+                    asked.withLock { $0 = true }
                     for try await snapshot in stream {
                         latest = snapshot
                         streamed.withLock { $0 = snapshot }
@@ -1540,9 +1572,21 @@ public actor AskEngine<Domain: AskDomain> {
             // it fails the turn. Logged by its tag here, once: `turn` logs only
             // what reaches it raw.
             if error is CancellationError { throw error }
-            if let ask = error as? AskError { throw ask }
-            let ask = AskTriage.askError(from: error, tier: tier)
-            log.routing("\(tier.rawValue) failed: \(AskTriage.tag(for: error))")
+            let ask: AskError
+            if let chosen = error as? AskError {
+                ask = chosen
+            } else {
+                ask = AskTriage.askError(from: error, tier: tier)
+                log.routing("\(tier.rawValue) failed: \(AskTriage.tag(for: error))")
+            }
+            // **A stop from below once prose is drawn is a stop**, as a bare
+            // `CancellationError` from below is: `AskError.stopped` is a turn
+            // stopped before its first words, and one stopped after them
+            // keeps them as its answer, which `turn`'s stop path puts in the
+            // tail. A tool's own cancellation, such as its own timeout's,
+            // arrives inside the session's `ToolCallError` and is triaged as
+            // `.stopped`.
+            if ask == .stopped, !drawn.prose.isEmpty { throw CancellationError() }
             throw ask
         }
 
@@ -1644,11 +1688,33 @@ public actor AskEngine<Domain: AskDomain> {
 
         // The ceiling: the deadline cut the stream where `streamed` got to.
         guard let outcome else {
+            // **Shut before the snapshot is taken.** The loop the deadline let
+            // go of may still be running, and sets `streamed` before it sends
+            // what it read: shut first, every partial that got out is of a
+            // snapshot this read reaches, so the truncated answer holds all
+            // the reader saw, and none drawn after it can outrun it (house
+            // rule 5).
+            outlet.shut()
             let snapshot = streamed.withLock { $0 }
             let partial = AskPrompt.partialText(snapshot.answer ?? "")
             guard isKept, !partial.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 log.discard(AskDiscard(tier: tier, reason: .deadlineWithNothingToKeep, text: partial))
                 logTurn(stats)
+                // **A Private Cloud Compute that said nothing cools.** A
+                // connection half open, that never throws a timeout of its
+                // own, holds every question after it the whole deadline too,
+                // Try Again's included, so it cools as an outage does, though
+                // the turn still fails as the deadline does: no time is left
+                // to hand it down. Told apart from the host using up the
+                // deadline by what the tier did: it was asked, and sent no
+                // snapshot and no tool call, a slow host tool sending the
+                // call. Not a grounded retry's re-ask, which the tier answered
+                // the turn's first ask before, with the app's search between.
+                if isPCC, !retried, asked.withLock({ $0 }), measured.snapshots == 0, calls == 0,
+                   firstTool.withLock({ $0 }) == nil {
+                    log.routing("\(tier.rawValue) said nothing before the deadline — noting a transport failure")
+                    throw AskSilentGeneration(tier: tier)
+                }
                 throw AskError.couldNotAnswer
             }
             stats.characters = partial.count
@@ -1725,6 +1791,12 @@ public actor AskEngine<Domain: AskDomain> {
         // transcript can't be trusted. A failure is logged, and a stop is
         // rethrown, so the stopped turn keeps no session.
         var abandoned = false
+        // **The pass's tools say nothing.** Its model calls them on this
+        // session, and they report to this turn's collector: passed on, a
+        // tool's idle would clear `.refining` for the rest of the pass, and
+        // its narration finds the relay already ended. `.refining` is what
+        // the turn is doing until its answer.
+        collector.setObserver(nil)
         do {
             switch try await refine(
                 answer, question: question, tier: tier, box: box, deadline: deadline, continuation: continuation
@@ -2023,7 +2095,8 @@ public actor AskEngine<Domain: AskDomain> {
 /// One generation's way out to the reader's stream, shut by its answer: what
 /// is sent after the answer is dropped, so no `.partial`, `.rowsRead` or
 /// `.activity` ever follows `.answer`. The answer goes out under the same
-/// lock that shuts it, so nothing sent from another task can land between.
+/// lock that shuts it, so nothing sent from another task can land between,
+/// and it goes out once the outlet is already shut (`shut()`).
 ///
 /// What it lets out of the prose and the rows read, it notes in `drawn`: what
 /// the reader has on screen.
@@ -2050,6 +2123,12 @@ nonisolated private final class AskAnswerOutlet<Row: AskRow>: Sendable {
         }
     }
 
+    /// Shut the outlet to everything but the answer, before the answer is
+    /// built from what was streamed: whatever is sent from here is dropped.
+    func shut() {
+        isOpen.withLock { $0 = false }
+    }
+
     /// Send the answer, and shut the outlet.
     func answer(_ answer: AskAnswer<Row>) {
         isOpen.withLock { open in
@@ -2057,6 +2136,14 @@ nonisolated private final class AskAnswerOutlet<Row: AskRow>: Sendable {
             continuation.yield(.answer(answer))
         }
     }
+}
+
+/// A generation the deadline gave up on having heard nothing from its tier:
+/// asked, it sent no snapshot and no tool call (`AskEngine.stream`). Only
+/// `AskEngine.turn` sees it, which fails the turn as `AskError.couldNotAnswer`,
+/// the deadline's error, and notes a transport failure on `tier`.
+nonisolated private struct AskSilentGeneration: Error {
+    let tier: AskTier
 }
 
 /// What one turn has on the reader's screen: the prose of the last `.partial`

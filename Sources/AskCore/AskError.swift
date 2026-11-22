@@ -79,7 +79,11 @@ nonisolated public enum AskError: LocalizedError, Equatable, Sendable, Codable {
     /// A tier was available and tried, but returned nothing usable or ran
     /// out of time: the turn's deadline passed, or the on-device model timed
     /// out. On Private Cloud Compute a timeout is an outage,
-    /// `privateCloudUnreachable`. A question with nothing left in it once
+    /// `privateCloudUnreachable`, and a generation there the deadline gave
+    /// up on having sent nothing, no snapshot and no tool call, fails with
+    /// this and cools the tier as an outage does
+    /// (`AskModelSeam.noteTransportFailure(on:)`), with no time left to hand
+    /// the turn down. A question with nothing left in it once
     /// what the reader can't see is dropped and it is trimmed fails with this
     /// too, before any tier is asked.
     case couldNotAnswer

@@ -69,7 +69,9 @@ nonisolated public enum AskTurnEvent<Row: AskRow>: Sendable, Equatable {
     /// already has, such as a look at photos of the rows it chose
     /// (`AskDomain.refine`). Sent when the pass first asks, and never after
     /// the answer: a pass that only reorders what it has asks nothing and
-    /// isn't announced. The prose on screen stays; a failure, or a pass the
+    /// isn't announced. The tools the pass's model calls send no `.activity`
+    /// or `.activityEnded`, so this stays the turn's activity until the
+    /// answer. The prose on screen stays; a failure, or a pass the
     /// turn's deadline ends, keeps the first answer.
     ///
     /// The store records it as the turn's `activity`, under

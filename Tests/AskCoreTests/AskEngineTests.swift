@@ -4273,7 +4273,7 @@ private extension Trait where Self == ConditionTrait {
     /// handed them (above). The hook holds the turn in the domain's basis
     /// line, after the answer's text was taken and before the answer is out,
     /// and lets the loop go there (#107).
-    @Test func aTruncatedAnswerTakesBackNothingTheReaderSaw() async throws {
+    @Test(.racesTheClock) func aTruncatedAnswerTakesBackNothingTheReaderSaw() async throws {
         var domain = FakeDomain()
         domain.deadline = .milliseconds(300)
         domain.basisText = "Because."

@@ -22,6 +22,45 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   on. TipKit counts the visits in the host's store, so they are forgotten with the tips
   (`Tips.resetDatastore()`), and a reader who has already been to Ask starts from none: their next
   visit is the first. The other two tips are as they were.
+- **`AppleModelSeam.withGeneration(onDevice:_:)` runs its body on no actor.** It ran on the seam's, so
+  an engine's work on each snapshot of a generation held every other caller of the seam through it:
+  other engines' reads of the tiers, the mirror's refreshes and the failures its sessions note. The
+  protocol's signature is as it was, and the API check can't see the change: a body that read
+  `#isolation` found the seam there, and finds nil now.
+
+### Fixed
+
+- **A Private Cloud Compute that says nothing until the deadline cools the tier.** A generation there
+  that the turn's deadline gave up on having sent no snapshot and no tool call, as on a connection half
+  open that never throws a timeout of its own, failed the turn as `AskError.couldNotAnswer` and cooled
+  nothing, so the next question, Try Again's included, went back to it and could wait the whole deadline
+  again. It now cools the tier as a transport failure does (`AskModelSeam.noteTransportFailure(on:)`),
+  and the turn still fails as the deadline does, with no time left to hand it down. A slow host tool
+  that uses up the deadline was called, so it cools nothing, and nor does a grounded retry's re-ask.
+  Whether Foundation Models ever leaves a stream silent that long isn't known; this is a defence.
+- **A tool that cancels itself after the first words stops the turn rather than failing it.** A tool
+  that threw a `CancellationError` of its own, from a timeout of its own or a task it cancelled, reached
+  the engine inside the session's `ToolCallError` and failed the turn as `AskError.stopped`, so the
+  prose already drawn stood with no answer, under "Couldn't answer that just now", and was left out of
+  the next question's recap. It now ends as a stop from below does: the stream throws
+  `CancellationError`, `AskConversationStore` keeps the prose as a truncated answer, and the exchange
+  joins the conversation's tail. With nothing drawn it fails as `.stopped`, as before.
+- **A truncated answer keeps every word the reader saw.** At the deadline, the snapshot loop the
+  deadline had let go of could still send a partial while the truncated answer was being built, longer
+  than the answer that followed it, since a cancelled reader of an `AsyncThrowingStream` is still handed
+  what it buffered: words appeared and then went. The turn now lets nothing more out before it takes the
+  answer's text.
+- **A tool the refine pass calls leaves the turn refining.** Its call and its finish reached the turn's
+  stream, and the finish set `AskTurn.activity` to nil for the rest of the pass, which only a host that
+  draws the activity after the prose would see. The pass's tools now report nothing.
+- **A session the seam couldn't build for a tier it called servable fails retryably.** It failed as
+  `AskError.modelUnavailable(.unknown)`, with no Try Again, though `AppleModelSeam` reads the on-device
+  model's availability again as it builds, so a change between its two reads, which passes, failed the
+  same way. It now fails as `AskError.couldNotAnswer`, and the mirror is read again beside the turn.
+- **A quota or a cooldown noted while Private Cloud Compute's locale probe runs is in the tier's
+  state.** `AppleModelSeam` read the spent quota before the probe, which can take 3 s on its first
+  read, and the cooldown after it, so a quota failure another turn noted in between was missed: the turn
+  reading the state spent a request learning it again, and was handed down.
 
 ## [0.7.2] - 2026-11-09
 
