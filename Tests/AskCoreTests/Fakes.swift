@@ -232,7 +232,7 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
     /// Generations let go before they finished: the turn that asked for one
     /// was stopped.
     let generationsCancelled = Mutex(0)
-    private let heldGeneration = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let heldGeneration = TestPark()
     /// Where a scripted tool call records its rows.
     let bridge: CollectorBridge
     /// The transcript's tool-call count, which grows when a generation runs —
@@ -359,9 +359,7 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
                     await Task.yield()
                 }
                 if script.holdsAfterSnapshots {
-                    await withCheckedContinuation { held in
-                        self.heldGeneration.withLock { $0 = held }
-                    }
+                    await self.heldGeneration.wait()
                 }
                 if script.hangsAfterSnapshots {
                     try? await Task.sleep(for: .seconds(600))
@@ -384,15 +382,12 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
     /// Returns once a held generation is waiting, or once `yieldUntil` gives
     /// up.
     func generationIsHeld() async {
-        await yieldUntil { heldGeneration.withLock { $0 != nil } }
+        await yieldUntil { heldGeneration.isWaiting }
     }
 
-    /// Let a held generation finish.
+    /// Let a held generation finish, or the next one go on unheld.
     func releaseGeneration() {
-        heldGeneration.withLock { held in
-            held?.resume()
-            held = nil
-        }
+        heldGeneration.letGo()
     }
 
     /// What the refinement pass was shown, so a test can assert it reached
@@ -458,26 +453,22 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
     /// Holds `prewarm` until `releasePrewarm()`, so a test can ask a question
     /// while a warm is still being made.
     let holdsPrewarm = Mutex(false)
-    private let heldPrewarm = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let heldPrewarm = TestPark()
 
     func prewarm(promptPrefix: String) async {
         prewarmCalls.withLock { $0.append(promptPrefix) }
         guard holdsPrewarm.withLock({ $0 }) else { return }
-        await withCheckedContinuation { continuation in
-            heldPrewarm.withLock { $0 = continuation }
-        }
+        await heldPrewarm.wait()
     }
 
     /// Returns once a held prewarm is waiting, or once `yieldUntil` gives up.
     func prewarmIsHeld() async {
-        await yieldUntil { heldPrewarm.withLock { $0 != nil } }
+        await yieldUntil { heldPrewarm.isWaiting }
     }
 
+    /// Let a held prewarm finish, or the next one go on unheld.
     func releasePrewarm() {
-        heldPrewarm.withLock { held in
-            held?.resume()
-            held = nil
-        }
+        heldPrewarm.letGo()
     }
 
     func feedbackAttachment(sentiment: AskFeedback.Sentiment) async -> Data? {

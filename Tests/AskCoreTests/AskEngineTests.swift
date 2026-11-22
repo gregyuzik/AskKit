@@ -20,7 +20,9 @@ nonisolated private func theMacIsUnderLoad() -> Bool {
     return load > 2 * Double(ProcessInfo.processInfo.activeProcessorCount)
 }
 
-private extension Trait where Self == ConditionTrait {
+/// Not private: AskSharedReadTests, beside AppleModelSeamTests, has a test
+/// that races the clock too.
+extension Trait where Self == ConditionTrait {
     /// For a test that passes only while scripted work beats the turn's
     /// deadline on the wall clock: the snapshot has to arrive inside the 120 ms
     /// the test gave the turn, or the first generation inside 900.
@@ -1437,7 +1439,7 @@ private extension Trait where Self == ConditionTrait {
 
     // MARK: - Follow-ups
 
-    @Test func aSecondQuestionRidesTheKeptSession() async {
+    @Test func aSecondQuestionRidesTheKeptSession() async throws {
         let (engine, seam, _) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(grounded("First.", tiles: ["Rumours"]))
@@ -1445,7 +1447,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Second."))
         _ = await record(engine.ask("second"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 2)
+        try #require(prompts.count == 2)
         // The follow-up names its referent and does NOT re-send the prefix.
         #expect(prompts[1].contains("<rows>Rumours</rows>"))
         #expect(!prompts[1].hasPrefix("PREFIX"))
@@ -2697,7 +2699,7 @@ private extension Trait where Self == ConditionTrait {
 
     // MARK: - Siri
 
-    @Test func aStandaloneTurnSharesNothing() async {
+    @Test func aStandaloneTurnSharesNothing() async throws {
         let (engine, seam, _) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(grounded("First."))
@@ -2710,7 +2712,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Second."))
         _ = await record(engine.ask("second"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 3)
+        try #require(prompts.count == 3)
         #expect(!prompts[2].hasPrefix("PREFIX"))
     }
 
@@ -3339,7 +3341,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Abbey Road."))
         _ = await record(engine.ask("And after that?"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 2)
+        try #require(prompts.count == 2)
         #expect(prompts[0].contains(Self.recordsLine))
         #expect(!prompts[1].contains(Self.recordsLine))
     }
@@ -3769,17 +3771,27 @@ private extension Trait where Self == ConditionTrait {
     }
 
     // MARK: - The turn ends when its answer lands
+    //
+    // No bound of the test's own: a stream held open behind the refresh is
+    // caught by the suite's time limit, and the turn's deadline is an hour,
+    // so it can't end one first. A five-second bound was a guess at how long
+    // a turn takes, and a loaded run outlasted it.
+
+    /// A turn deadline no test outlives.
+    private static let deadlinePastTheTimeLimit: Duration = .seconds(3_600)
 
     @Test func theStreamEndsWithItsAnswerWhileTheMirrorStillRefreshes() async throws {
         // The mirror's refresh can wait on Private Cloud Compute's locale
         // probe, a network call. The reader's turn is over when its answer
         // lands: a stream held open behind the refresh keeps the store
         // thinking, the follow-ups hidden and Stop on the circle.
-        let (engine, seam, _) = makeEngine()
+        var domain = FakeDomain()
+        domain.deadline = Self.deadlinePastTheTimeLimit
+        let (engine, seam, _) = makeEngine(domain: domain)
         seam.session(for: .privateCloud).script(grounded("Answer.", followUps: ["What else?"]))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
+        let recording = await record(engine.ask("q"))
         #expect(recording.answer?.text == "Answer.")
         #expect(recording.error == nil)
         // What the chips wait on is settled before the stream ends.
@@ -3790,7 +3802,9 @@ private extension Trait where Self == ConditionTrait {
     }
 
     @Test func aFailedTurnEndsWhileTheMirrorStillRefreshes() async throws {
-        let (engine, seam, _) = makeEngine(states: [
+        var domain = FakeDomain()
+        domain.deadline = Self.deadlinePastTheTimeLimit
+        let (engine, seam, _) = makeEngine(domain: domain, states: [
             .serving(.privateCloud), .down(.onDevice, .deviceNotEligible)
         ])
         seam.session(for: .privateCloud).script(FakeSession.Script(
@@ -3798,7 +3812,7 @@ private extension Trait where Self == ConditionTrait {
         ))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
+        let recording = await record(engine.ask("q"))
         #expect(recording.askError == .privateCloudUnreachable)
         await eventually { seam.transportFailures.withLock { $0 } == [.privateCloud] }
         #expect(seam.transportFailures.withLock { $0 } == [.privateCloud])
@@ -3808,14 +3822,16 @@ private extension Trait where Self == ConditionTrait {
         // A hand-down is for a tier that went out, and on a stalled network
         // the refresh can hang on the tier that went out. The device's answer
         // must not wait for it.
-        let (engine, seam, _) = makeEngine()
+        var domain = FakeDomain()
+        domain.deadline = Self.deadlinePastTheTimeLimit
+        let (engine, seam, _) = makeEngine(domain: domain)
         seam.session(for: .privateCloud).script(FakeSession.Script(
             error: AskError.privateCloudUnreachable, toolCallsAfter: 1
         ))
         seam.session(for: .onDevice).script(grounded("From the device."))
         seam.refreshHold.arm()
         defer { seam.refreshHold.release() }
-        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
+        let recording = await record(engine.ask("q"))
         #expect(recording.restarts == [.onDevice])
         #expect(recording.answer?.text == "From the device.")
     }
@@ -3829,7 +3845,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .privateCloud).script(grounded("Answer."))
         seam.languageHold.arm()
         defer { seam.languageHold.release() }
-        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
+        let recording = await record(engine.ask("q"))
         #expect(recording.askError == .couldNotAnswer)
     }
 
@@ -3840,7 +3856,7 @@ private extension Trait where Self == ConditionTrait {
         seam.session(for: .privateCloud).script(grounded("Answer."))
         seam.tierStatesHold.arm()
         defer { seam.tierStatesHold.release() }
-        let recording = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) })
+        let recording = await record(engine.ask("q"))
         #expect(recording.askError == .couldNotAnswer)
     }
 
@@ -3848,7 +3864,7 @@ private extension Trait where Self == ConditionTrait {
     /// turn's deadline too. A host session that never answers how many
     /// tools its transcript holds fails the turn at its deadline, and the
     /// next question is answered.
-    @Test func aSessionThatNeverCountsItsToolCallsEndsTheTurnAtItsDeadline() async throws {
+    @Test(.racesTheClock) func aSessionThatNeverCountsItsToolCallsEndsTheTurnAtItsDeadline() async throws {
         let domain = FakeDomain()
         domain.deadlineOverride.set(.milliseconds(200))
         let (engine, seam, log) = makeEngine(domain: domain)
@@ -3856,22 +3872,19 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Answer."))
         session.countRead.arm()
         defer { session.countRead.release() }
-        let hung = try #require(
-            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("first")) },
-            "the turn waited on a count that never came"
-        )
+        let hung = await record(engine.ask("first"))
         #expect(hung.askError == .couldNotAnswer)
         #expect(log.routings.withLock { $0 }.contains("ran out of time reading privateCloud's tool calls"))
 
         session.countRead.release()
         domain.deadlineOverride.set(nil)
-        let next = try #require(try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) })
+        let next = await record(engine.ask("second"))
         #expect(next.answer?.text == "Answer.")
     }
 
     /// A session that never reports its usage costs the turn its `[usage]`
     /// line, not its answer: the answer goes out by the deadline.
-    @Test func aSessionThatNeverReportsItsUsageStillAnswersByTheDeadline() async throws {
+    @Test(.racesTheClock) func aSessionThatNeverReportsItsUsageStillAnswersByTheDeadline() async throws {
         let domain = FakeDomain()
         domain.deadlineOverride.set(.milliseconds(200))
         let (engine, seam, log) = makeEngine(domain: domain)
@@ -3881,10 +3894,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(script)
         session.usageHold.arm()
         defer { session.usageHold.release() }
-        let recording = try #require(
-            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("q")) },
-            "the turn waited on usage that never came"
-        )
+        let recording = await record(engine.ask("q"))
         #expect(recording.answer?.text == "Answer.")
         #expect(log.turns.withLock { $0 }.last?.inputTokens == nil)
     }
@@ -3913,7 +3923,10 @@ private extension Trait where Self == ConditionTrait {
     /// A domain hook that waits on `hold` and never returns, nor notices it
     /// was stopped, past the turn's short deadline: the turn fails then, as
     /// it does on a hanging tier read, and the next question, with the whole
-    /// of its own deadline, is answered.
+    /// of its own deadline, is answered. A turn held for good is caught by
+    /// the suite's time limit. The callers race the clock: the turn has to
+    /// reach the hook inside its 200 ms, or an earlier step logs instead and
+    /// the hook, armed once, holds the next question.
     private func aHangingHookEndsTheTurnAtItsDeadline(
         _ hold: (FakeDomain) -> TestHold,
         logs line: String,
@@ -3926,28 +3939,25 @@ private extension Trait where Self == ConditionTrait {
         let hook = hold(domain)
         hook.arm(once: true)
         defer { hook.release() }
-        let hung = try #require(
-            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("first")) },
-            "the turn outlived its deadline", sourceLocation: sourceLocation
-        )
+        let hung = await record(engine.ask("first"))
         #expect(hung.askError == .couldNotAnswer, sourceLocation: sourceLocation)
         #expect(log.routings.withLock { $0 }.contains(line), sourceLocation: sourceLocation)
         domain.deadlineOverride.set(nil)
-        let next = try #require(
-            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) },
-            "the next question waited", sourceLocation: sourceLocation
-        )
+        let next = await record(engine.ask("second"))
         #expect(next.answer?.text == "Answer.", sourceLocation: sourceLocation)
     }
 
     /// The same hook hanging, with the turn's whole deadline ahead of it: a
     /// newer question stops the turn and is answered at once, rather than
-    /// waiting for a turn that would end only when the hook did.
+    /// waiting for a turn that would end only when the hook did. The deadline
+    /// is an hour, so a newer question that waited is caught by the suite's
+    /// time limit, not let through when the turn's deadline ended it.
     private func aNewerQuestionIsAnsweredPastAHangingHook(
         _ hold: (FakeDomain) -> TestHold,
         sourceLocation: SourceLocation = #_sourceLocation
     ) async throws {
         let domain = FakeDomain()
+        domain.deadlineOverride.set(Self.deadlinePastTheTimeLimit)
         let (engine, seam, _) = makeEngine(domain: domain)
         seam.session(for: .privateCloud).script(grounded("Answer."))
         let hook = hold(domain)
@@ -3955,27 +3965,24 @@ private extension Trait where Self == ConditionTrait {
         defer { hook.release() }
         let first = Task { await record(engine.ask("first")) }
         await hook.isReached()
-        let next = try #require(
-            try await AskDeadline.run(.seconds(5)) { await record(engine.ask("second")) },
-            "the newer question waited on the turn it stopped", sourceLocation: sourceLocation
-        )
+        let next = await record(engine.ask("second"))
         #expect(next.answer?.text == "Answer.", sourceLocation: sourceLocation)
         #expect(await first.value.error is CancellationError, sourceLocation: sourceLocation)
     }
 
-    @Test func aHangingAnswerWithoutAModelEndsTheTurnAtItsDeadline() async throws {
+    @Test(.racesTheClock) func aHangingAnswerWithoutAModelEndsTheTurnAtItsDeadline() async throws {
         try await aHangingHookEndsTheTurnAtItsDeadline(
             \.deterministicHold, logs: "ran out of time waiting for the domain's answer without a model"
         )
     }
 
-    @Test func aHangingOverviewEndsTheTurnAtItsDeadline() async throws {
+    @Test(.racesTheClock) func aHangingOverviewEndsTheTurnAtItsDeadline() async throws {
         try await aHangingHookEndsTheTurnAtItsDeadline(
             \.overviewHold, logs: "ran out of time reading the domain's overview"
         )
     }
 
-    @Test func hangingPromptLinesEndTheTurnAtItsDeadline() async throws {
+    @Test(.racesTheClock) func hangingPromptLinesEndTheTurnAtItsDeadline() async throws {
         try await aHangingHookEndsTheTurnAtItsDeadline(
             \.promptLinesHold, logs: "ran out of time reading the domain's prompt lines"
         )

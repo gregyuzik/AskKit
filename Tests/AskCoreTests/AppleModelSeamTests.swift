@@ -697,18 +697,28 @@ import Synchronization
         AskSharedRead(label: "test read", bound: bound, failureMemory: memory, now: { clock.now })
     }
 
-    /// Spin until `condition` holds, or give up. Bounded, and it yields.
+    /// Spin until `condition` holds, polling a millisecond apart so a wait
+    /// holds no core. No count of rounds: a loaded run used one up while the
+    /// work it waited on was still coming, and the suite's time limit is the
+    /// safety net, ending the poll's sleep and with it the wait.
     private func spin(_ what: String, until condition: @Sendable () async -> Bool) async throws {
-        for _ in 0..<4_000 {
-            if await condition() { return }
+        while !(await condition()) {
             await Task.yield()
-            try await Task.sleep(for: .milliseconds(1))
+            do {
+                try await Task.sleep(for: .milliseconds(1))
+            } catch {
+                Issue.record("stopped waiting for \(what)")
+                throw error
+            }
         }
-        Issue.record("timed out waiting for \(what)")
     }
 
+    /// A read bound no test outlives, for a test of sharing rather than of
+    /// the bound, which a loaded run's steps could otherwise outlast.
+    private static let boundPastTheTimeLimit: Duration = .seconds(3_600)
+
     @Test func overlappingReadsShareOneRun() async throws {
-        let reads = reads()
+        let reads = reads(bound: Self.boundPastTheTimeLimit)
         let probe = Probe()
         let first = Task { await reads.value(for: "he") { await probe.held(true) } }
         try await spin("the first run") { probe.count == 1 }
@@ -764,7 +774,7 @@ import Synchronization
         #expect(runs.withLock { $0 } == 2)
     }
 
-    @Test func aStalledReadIsAbandonedAtItsBound() async {
+    @Test(.racesTheClock) func aStalledReadIsAbandonedAtItsBound() async {
         // A stalled network can't hold the turn that asked: the read gives up
         // at its bound, reads as no answer, and is remembered like a throw.
         let reads = reads(bound: .milliseconds(50))
@@ -784,7 +794,7 @@ import Synchronization
     @Test func aCancelledCallerStopsWaitingAndTheReadGoesOn() async throws {
         // A view torn down mid-refresh cancels its caller, not the read the
         // next caller is waiting on.
-        let reads = reads()
+        let reads = reads(bound: Self.boundPastTheTimeLimit)
         let probe = Probe()
         let cancelled = Task { await reads.value(for: "he") { await probe.held(true) } }
         try await spin("the first caller waiting") { await reads.waiting(for: "he") == 1 }
