@@ -612,7 +612,7 @@ func temporaryLocation(_ prefix: String) -> URL {
 @MainActor
 func makeStore(
     domain: UIDomain = UIDomain(),
-    asker: ScriptedAsker,
+    asker: some AskAnswering<UIRow>,
     threadURL: URL? = nil,
     archiveDirectory: URL? = nil,
     attachmentsDirectory: URL? = nil,

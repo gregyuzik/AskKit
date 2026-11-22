@@ -465,6 +465,20 @@ import Synchronization
         #expect(device.availabilityReads == 0)
     }
 
+    // MARK: - Where a generation runs
+
+    /// A generation's body runs on no actor, the seam's included, on either
+    /// tier. An engine's snapshot loop runs inside it, and on the seam's actor
+    /// every engine's and the mirror's reads of the tiers, refreshes and
+    /// noted failures would queue behind each snapshot's work (#107).
+    @Test func aGenerationRunsOffTheSeamsActor() async throws {
+        let seam = seam(ScriptedOnDevice(.available, writes: true))
+        for onDevice in [false, true] {
+            let isolation = try await seam.withGeneration(onDevice: onDevice) { #isolation }
+            #expect(isolation == nil, "onDevice \(onDevice) ran on \(String(describing: isolation))")
+        }
+    }
+
     /// The hold is the host's to lift: the same seam reads the model again
     /// once it is off.
     @Test func anUnheldSeamReadsTheModelAsItIs() async throws {

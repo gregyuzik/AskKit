@@ -1057,6 +1057,82 @@ private extension Trait where Self == ConditionTrait {
         #expect(log.discards.withLock { $0 }.contains { $0.reason == .deadlineWithNothingToKeep })
     }
 
+    // MARK: - A tier that says nothing until the deadline
+
+    /// A Private Cloud Compute generation the deadline gives up on having
+    /// heard nothing from it, no snapshot and no tool, fails the turn as the
+    /// deadline does, and cools the tier as an outage does: a connection that
+    /// is half open, and never throws a timeout of its own, would otherwise
+    /// hold every question after it the whole deadline, Try Again's
+    /// included (#100).
+    ///
+    /// A second's deadline, so the generation has begun well inside it: what
+    /// this pins is a deadline expiring on a stream that was asked.
+    @Test func aPrivateCloudStreamThatSaysNothingUntilTheDeadlineCoolsTheTier() async {
+        var domain = FakeDomain()
+        domain.deadline = .seconds(1)
+        let (engine, seam, log) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        session.script(FakeSession.Script(hangs: true))
+        let recording = await record(engine.ask("q"))
+        #expect(recording.askError == .couldNotAnswer)
+        #expect(recording.restarts.isEmpty)
+        #expect(session.prompts.withLock { $0 }.count == 1)
+        await eventually { seam.transportFailures.withLock { $0 } == [.privateCloud] }
+        #expect(seam.transportFailures.withLock { $0 } == [.privateCloud])
+        #expect(log.routings.withLock { $0 }.contains(
+            "privateCloud said nothing before the deadline — noting a transport failure"
+        ))
+    }
+
+    /// A slow host tool that uses up the deadline cools nothing: the tier
+    /// called it, and the time went to the host.
+    @Test func aSlowHostToolThatUsesUpTheDeadlineDoesNotCoolTheTier() async {
+        var domain = FakeDomain()
+        domain.deadline = .seconds(1)
+        let (engine, seam, _) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).script(FakeSession.Script(toolNeverReturns: true))
+        let recording = await record(engine.ask("q"))
+        #expect(recording.askError == .couldNotAnswer)
+        #expect(recording.activities == [.searching(scope: "records")])
+        // The cooldown is noted ahead of the refresh, in the one task beside
+        // the turn, so once the refresh is in, any cooldown is too.
+        await eventually { seam.refreshes.withLock { $0 } >= 1 }
+        #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+    }
+
+    /// Nor does a grounded retry's re-ask the deadline gives up on: the tier
+    /// answered the turn's first ask moments before, and the app's search
+    /// between the two, the host's, may have taken the time.
+    @Test func aGroundedRetryTheDeadlineGivesUpOnDoesNotCoolTheTier() async {
+        var domain = FakeDomain()
+        domain.deadline = .seconds(1)
+        let (engine, seam, _) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).scripts([
+            FakeSession.Script(snapshots: [.answering("Unread.")]),
+            FakeSession.Script(hangs: true)
+        ])
+        let recording = await record(engine.ask("q"))
+        #expect(recording.restarts == [.privateCloud], "only the grounded retry")
+        #expect(recording.askError == .couldNotAnswer)
+        await eventually { seam.refreshes.withLock { $0 } >= 1 }
+        #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+    }
+
+    /// Nor does the on-device model, which has no transport to cool.
+    @Test func anOnDeviceStreamThatSaysNothingUntilTheDeadlineCoolsNothing() async {
+        var domain = FakeDomain()
+        domain.deadline = .seconds(1)
+        let (engine, seam, _) = makeEngine(domain: domain, states: [
+            .down(.privateCloud, .notEntitled), .serving(.onDevice)
+        ])
+        seam.session(for: .onDevice).script(FakeSession.Script(hangs: true))
+        let recording = await record(engine.ask("q"))
+        #expect(recording.askError == .couldNotAnswer)
+        await eventually { seam.refreshes.withLock { $0 } >= 1 }
+        #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+    }
+
     // MARK: - The token cap
 
     /// An engine whose turns run on device, the tier whose sessions are
@@ -2211,6 +2287,46 @@ private extension Trait where Self == ConditionTrait {
         #expect(await !engine.hasKeptConversation)
     }
 
+    /// A tool that stops itself, as one with a timeout of its own or one
+    /// awaiting a task it cancelled does, once the turn has drawn prose, stops
+    /// the turn as a stop from below does: `AskError.stopped` is a turn
+    /// stopped before its first words, and one stopped after them keeps them
+    /// as its answer, which joins the tail (#101).
+    @Test func aToolThatCancelsItselfAfterProseIsDrawnStopsTheTurn() async {
+        let (engine, seam, _) = makeEngine()
+        let session = seam.session(for: .privateCloud)
+        session.script(FakeSession.Script(
+            snapshots: [.answering("Partly")],
+            error: LanguageModelSession.ToolCallError(tool: TriageShelfTool(), underlyingError: CancellationError()),
+            toolCallsAfter: 1
+        ))
+        let stopped = await record(engine.ask("q"))
+        #expect(stopped.partials == ["Partly"])
+        #expect(stopped.error is CancellationError)
+        #expect(await engine.hasKeptConversation)
+
+        session.script(grounded("Next."))
+        _ = await record(engine.ask("and then?"))
+        #expect(session.prompts.withLock { $0 }.last?.contains(
+            "<previous_question>q</previous_question><previous_answer>Partly</previous_answer>"
+        ) == true)
+    }
+
+    /// With nothing drawn, it fails as `AskError.stopped`, which Try Again
+    /// retries, and leaves the thread as it was.
+    @Test func aToolThatCancelsItselfBeforeAnyProseFailsAsStopped() async {
+        let (engine, seam, _) = makeEngine()
+        seam.session(for: .privateCloud).script(FakeSession.Script(
+            error: LanguageModelSession.ToolCallError(tool: TriageShelfTool(), underlyingError: CancellationError()),
+            toolCallsAfter: 1
+        ))
+        let failed = await record(engine.ask("q"))
+        #expect(failed.partials.isEmpty)
+        #expect(failed.askError == .stopped)
+        #expect(failed.askError?.isRetryable == true)
+        #expect(await !engine.hasKeptConversation)
+    }
+
     @Test func aFreshSessionThatFailsLeavesTheThreadsRecapForTryAgain() async {
         // A thread at its turn ceiling gives up its session to start a fresh
         // one. When the fresh one can't be built, Try Again still starts from
@@ -2223,7 +2339,7 @@ private extension Trait where Self == ConditionTrait {
         _ = await record(engine.ask("first"))
         seam.refusesSession.withLock { $0 = [.privateCloud] }
         let failed = await record(engine.ask("second"))
-        #expect(failed.askError != nil)
+        #expect(failed.askError?.isRetryable == true)
         // No model saw the recap, so the turn draws no hairline saying so.
         #expect(failed.summarizedCount == 0)
 
@@ -2232,6 +2348,24 @@ private extension Trait where Self == ConditionTrait {
         let retried = await record(engine.ask("second"))
         #expect(retried.summarizedCount == 1)
         #expect(session.prompts.withLock { $0 }.last?.contains("<rows>Rumours</rows>") == true)
+    }
+
+    /// A tier the read of the tiers called servable that then builds no
+    /// session fails the turn retryably, and the mirror is read again beside
+    /// it. `AppleModelSeam` reads the on-device model's availability again
+    /// as it builds, so a model that went out between the two reads hands
+    /// back none: a condition that passes, which Try Again gets past, or one
+    /// the mirror's next reading names (#107).
+    @Test func aSessionTheSeamCouldNotBuildFailsRetryably() async {
+        let (engine, seam, _) = makeEngine(states: [.down(.privateCloud, .notEntitled), .serving(.onDevice)])
+        seam.refusesSession.withLock { $0 = [.onDevice] }
+        let failed = await record(engine.ask("q"))
+        #expect(failed.tiers == [.onDevice])
+        #expect(failed.askError == .couldNotAnswer)
+        #expect(failed.askError?.isRetryable == true)
+        await eventually { seam.refreshes.withLock { $0 } >= 1 }
+        #expect(seam.refreshes.withLock { $0 } >= 1)
+        #expect(seam.transportFailures.withLock { $0 }.isEmpty)
     }
 
     @Test func aRecapHandedDownBeforeItWasSentIsReportedOnce() async {
@@ -2606,6 +2740,34 @@ private extension Trait where Self == ConditionTrait {
             if case .answer = $0 { return true } else { return false }
         })
         #expect(refining < answered)
+    }
+
+    /// A tool the refine pass's model calls leaves the turn refining. Its
+    /// events reach the collector the first pass's tools report to, and
+    /// passed on, its idle would clear `.refining` for the rest of the pass
+    /// (#107).
+    @Test func aToolTheRefinePassCallsLeavesTheTurnRefining() async throws {
+        var domain = FakeDomain()
+        domain.refinement = AskAnswer(text: "Refined.")
+        domain.refineAsksTheModel = true
+        domain.refineCallsATool = true
+        let (engine, seam, _) = makeEngine(domain: domain)
+        seam.session(for: .privateCloud).script(grounded("First draft."))
+        let recording = await record(engine.ask("q"))
+        #expect(recording.answer?.text == "Refined.")
+        let refining = try #require(recording.events.firstIndex {
+            if case .refining = $0 { return true } else { return false }
+        })
+        let answered = try #require(recording.events.firstIndex {
+            if case .answer = $0 { return true } else { return false }
+        })
+        let duringThePass = recording.events[refining..<answered].filter {
+            switch $0 {
+            case .activity, .activityEnded: return true
+            default: return false
+            }
+        }
+        #expect(duringThePass.isEmpty, "the pass's tool spoke over .refining: \(duringThePass)")
     }
 
     @Test func aRefinementsFollowUpsAreCleanedLikeTheFirstPasss() async {
@@ -4074,6 +4236,67 @@ private extension Trait where Self == ConditionTrait {
         let recording = await record(engine.ask("q"))
         #expect(recording.answer?.isTruncated == true)
         #expect(recording.afterAnswer.isEmpty, "the stream spoke after its answer: \(recording.afterAnswer)")
+    }
+
+    /// What the outlet below has to allow for: a reader cancelled while the
+    /// stream it reads holds elements is still handed them, though the stream
+    /// has heard of the cancellation. So a snapshot loop the deadline let go
+    /// of goes on to the snapshots its session buffered.
+    @Test func aCancelledReaderIsStillHandedWhatTheStreamHadBuffered() async {
+        let (stream, continuation) = AsyncThrowingStream<Int, any Error>.makeStream()
+        let cancelled = Mutex(false)
+        continuation.onTermination = { termination in
+            if case .cancelled = termination { cancelled.withLock { $0 = true } }
+        }
+        continuation.yield(1)
+        continuation.yield(2)
+        let hold = TestHold()
+        hold.arm()
+        let reader = Task { () -> [Int?] in
+            await hold.pass()
+            var elements = stream.makeAsyncIterator()
+            let first = (try? await elements.next()) ?? nil
+            let second = (try? await elements.next()) ?? nil
+            return [first, second]
+        }
+        await hold.isReached()
+        reader.cancel()
+        hold.release()
+        let read = await reader.value
+        #expect(cancelled.withLock { $0 })
+        #expect(read == [1, 2])
+    }
+
+    /// A truncated answer takes back nothing the reader saw. The deadline
+    /// lets go of a snapshot loop caught between two hops, which then wakes
+    /// to the snapshots its session buffered, as a cancelled reader is still
+    /// handed them (above). The hook holds the turn in the domain's basis
+    /// line, after the answer's text was taken and before the answer is out,
+    /// and lets the loop go there (#107).
+    @Test func aTruncatedAnswerTakesBackNothingTheReaderSaw() async throws {
+        var domain = FakeDomain()
+        domain.deadline = .milliseconds(300)
+        domain.basisText = "Because."
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        session.script(FakeSession.Script(
+            snapshots: [
+                .answering("Rumours is", tiles: ["Rumours"], followUps: []),
+                .answering("Rumours is the one you play most", tiles: ["Rumours"], followUps: [])
+            ],
+            hangsAfterSnapshots: true, toolCallsAfter: 1, holdsCountReadMidStream: true
+        ))
+        let countRead = session.countRead
+        domain.basisHook.set {
+            countRead.release()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        let recording = await record(engine.ask("q"))
+        let answer = try #require(recording.answer)
+        #expect(answer.isTruncated)
+        for partial in recording.partials {
+            #expect(answer.text.hasPrefix(partial), "drawn, then taken back: \(partial)")
+        }
     }
 
     // MARK: - A follow-up that outgrew its window

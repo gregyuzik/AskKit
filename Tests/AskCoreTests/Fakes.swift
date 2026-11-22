@@ -64,6 +64,14 @@ nonisolated final class CollectorBridge: @unchecked Sendable {
         await collector.noteToolFinished()
     }
 
+    /// A tool call that begins and never returns: the host's tool, slow
+    /// enough to use up the turn's deadline. Only its start is reported.
+    func openAToolCallThatNeverReturns(reporting activity: AskActivity = .searching(scope: "records")) async {
+        guard let collector = collector.withLock({ $0 }) else { return }
+        await collector.noteToolCall(activity)
+        try? await Task.sleep(for: .seconds(600))
+    }
+
     /// What a tool also knew this turn, recorded where a real tool records it.
     func recordPayload(_ payload: Data) async {
         guard let collector = collector.withLock({ $0 }) else { return }
@@ -191,6 +199,9 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
         /// notice cancellation, which is the kind a turn has to stop from its
         /// own side.
         var holdsAfterSnapshots = false
+        /// Opens a tool call at the generation's start that never returns,
+        /// and sends nothing: a slow host tool using up the deadline.
+        var toolNeverReturns = false
         /// Tool calls the transcript will report after this generation.
         var toolCallsAfter = 0
         /// What the scripted tool call tells the collector it is doing. Not
@@ -343,6 +354,11 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
                     }
                 }
                 for activity in script.relayReports { await bridge.reportThroughRelay(activity) }
+                if script.toolNeverReturns {
+                    await bridge.openAToolCallThatNeverReturns(reporting: script.toolActivity)
+                    continuation.finish()
+                    return
+                }
                 if let delay = script.delay { try? await Task.sleep(for: delay) }
                 // Before the first snapshot is out, so the read it holds is
                 // the one the engine makes as it judges that snapshot.
@@ -804,6 +820,9 @@ nonisolated struct FakeDomain: AskDomain {
     /// the way a pass that looks at photos of the rows it named does, rather
     /// than only reordering what it has.
     var refineAsksTheModel = false
+    /// Whether the model the refine pass asks calls a tool, which reports
+    /// to the collector the turn's tools report to.
+    var refineCallsATool = false
     /// Identity of every session `refine` was handed — so a test can say
     /// it got the one the turn streamed on and not a fresh one. A class,
     /// because `Mutex` is non-Copyable and this domain is a struct.
@@ -864,6 +883,9 @@ nonisolated struct FakeDomain: AskDomain {
     /// Run inside `referent(from:)`, which the engine calls on its own actor
     /// once a turn's answer is out.
     let referentHook = TestHook()
+    /// Run inside `basis(for:)`, which the engine calls on its own actor as
+    /// it builds an answer with tiles, before the answer is out.
+    let basisHook = TestHook()
 
     func overview() async -> AskOverview {
         overviewReads.record()
@@ -931,7 +953,10 @@ nonisolated struct FakeDomain: AskDomain {
         return deterministic
     }
 
-    func basis(for answer: AskAnswer<FakeRow>) -> String? { basisText }
+    func basis(for answer: AskAnswer<FakeRow>) -> String? {
+        basisHook.run()
+        return basisText
+    }
 
     var rerollableKinds: Set<AskQuestionKind> { rerollKinds }
 
@@ -948,6 +973,7 @@ nonisolated struct FakeDomain: AskDomain {
             _ = try? await session.session.respond(
                 AskReply.self, images: [], prompt: "Revise.", temperature: 0.4, reasoningLevel: nil
             )
+            if refineCallsATool { await bridge.recordAToolCall() }
         }
         if let refinementDelay { try await Task.sleep(for: refinementDelay) }
         if refinementThrows { throw AskError.couldNotAnswer }
