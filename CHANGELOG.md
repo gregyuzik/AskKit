@@ -45,6 +45,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   itself. The failed turn's prose kept drawing through the reveal's renderer, rebuilt on each redraw of
   its row, rather than as plain text, and after a question the turn wasn't saved until the next one
   ended, so an app quit meanwhile lost it.
+- **A thumb, a hand-off or an answer to a card given while an earlier chat opens is kept with the
+  chat it ends.** The open files the chat on screen before it leaves, and the chat stays there while
+  the archive writes it. A verdict, a hand-off, a Not now or a yes given then, or a perform's outcome
+  landing then, was saved only once the chat had ended, which saves nothing, so the filed chat read
+  back without it: no thumb, or a card offering its action again. A yes given then was refused as its
+  chat ended and never carried out, and its card, opened again, asked as though nothing had been said.
+  The open now files the chat again until the filing holds what the reader marked on it.
 - **A prefill sent on the first screen of a device that can't serve waits in the composer.**
   `prefill(_:scope:send: true)` asked the question at once, though that screen's composer is disabled,
   and the turn failed for the reason the screen gave, in the screen's place. It now leaves the

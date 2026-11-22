@@ -441,32 +441,29 @@ nonisolated struct UIDomain: AskDomain {
     }
 }
 
-/// What a domain's `overview()` does besides answering. A class, for the
-/// reason `PerformLog` is one.
-nonisolated final class OverviewHook: Sendable {
-    /// The domain's turn deadline (`UIDomain.turnDeadline`).
-    let deadline = Mutex<Duration>(.seconds(45))
-    /// Whether each read ran on the main thread, in order.
-    let ranOnTheMainThread = Mutex<[Bool]>([])
-    /// Whether a read waits until `release()`: a host's overview that counts
-    /// its library over the network, or never returns.
+/// Holds whatever waits in it, while `parks` is set, until `release()`: a
+/// host's hook, or one of the store's writes, held still for a test to act
+/// while it is out. A class, because `Mutex` is non-Copyable and a domain is
+/// a struct; open, so a hook that records what entered it builds on it.
+nonisolated class Park: @unchecked Sendable {
+    /// Whether a wait lasts until `release()`.
     let parks = Mutex(false)
     private let parked = Mutex<[CheckedContinuation<Void, Never>]>([])
 
-    func enter() async {
-        ranOnTheMainThread.withLock { $0.append(pthread_main_np() != 0) }
+    /// Wait here while `parks` is set, until `release()`.
+    func wait() async {
         guard parks.withLock({ $0 }) else { return }
         await withCheckedContinuation { continuation in
             parked.withLock { $0.append(continuation) }
         }
     }
 
-    /// Returns once a read is parked, or once `yieldUntil` gives up.
+    /// Returns once a wait is parked, or once `yieldUntil` gives up.
     func isParked() async {
         await yieldUntil { parked.withLock { !$0.isEmpty } }
     }
 
-    /// Let every parked read finish, and park no more.
+    /// Let every parked wait finish, and park no more.
     func release() {
         parks.withLock { $0 = false }
         let waiting = parked.withLock { parked in
@@ -477,15 +474,27 @@ nonisolated final class OverviewHook: Sendable {
     }
 }
 
-/// The proposals a domain was asked to carry out. A class, because `Mutex` is
-/// non-Copyable and the domain is a struct.
-nonisolated final class PerformLog: Sendable {
+/// What a domain's `overview()` does besides answering. Parked, a read waits
+/// until `release()`: a host's overview that counts its library over the
+/// network, or never returns.
+nonisolated final class OverviewHook: Park, @unchecked Sendable {
+    /// The domain's turn deadline (`UIDomain.turnDeadline`).
+    let deadline = Mutex<Duration>(.seconds(45))
+    /// Whether each read ran on the main thread, in order.
+    let ranOnTheMainThread = Mutex<[Bool]>([])
+
+    func enter() async {
+        ranOnTheMainThread.withLock { $0.append(pthread_main_np() != 0) }
+        await wait()
+    }
+}
+
+/// The proposals a domain was asked to carry out. Parked, `perform` waits,
+/// once it has recorded the proposal, until `release()`: a host's perform
+/// that takes its time, such as a network call, for a test to change the
+/// chat while it runs.
+nonisolated final class PerformLog: Park, @unchecked Sendable {
     private let log = Mutex<[AskProposal]>([])
-    /// Whether `perform` waits, once it has recorded the proposal, until
-    /// `release()`: a host's perform that takes its time, such as a network
-    /// call, for a test to change the chat while it runs.
-    let parks = Mutex(false)
-    private let parked = Mutex<[CheckedContinuation<Void, Never>]>([])
     /// Whether each perform ran on the main thread, in order.
     let ranOnTheMainThread = Mutex<[Bool]>([])
     /// The thread file to read as each perform begins, or nil for none.
@@ -501,28 +510,10 @@ nonisolated final class PerformLog: Sendable {
             outcomesOnDiskAtEntry.withLock { $0.append(onDisk) }
         }
         log.withLock { $0.append(proposal) }
-        guard parks.withLock({ $0 }) else { return }
-        await withCheckedContinuation { continuation in
-            parked.withLock { $0.append(continuation) }
-        }
+        await wait()
     }
 
     var proposals: [AskProposal] { log.withLock { $0 } }
-
-    /// Returns once a perform is parked, or once `yieldUntil` gives up.
-    func isParked() async {
-        await yieldUntil { parked.withLock { !$0.isEmpty } }
-    }
-
-    /// Let every parked perform finish, and park no more.
-    func release() {
-        parks.withLock { $0 = false }
-        let waiting = parked.withLock { parked in
-            defer { parked = [] }
-            return parked
-        }
-        for continuation in waiting { continuation.resume() }
-    }
 }
 
 @Generable

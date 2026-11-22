@@ -4150,6 +4150,94 @@ import Testing
         #expect(store.draft == "And the oldest?")
     }
 
+    @Test func aThumbAndAHandOffTappedWhileAnEarlierChatOpensAreFiledWithTheChatItEnds() async throws {
+        // The open took the chat's turns before it filed them, and the tap's
+        // save, queued behind the filing, ran once the chat had ended and
+        // wrote nothing. Opened again, the chat showed no thumb, and offered
+        // the hand-off again.
+        let folder = try privateFolder()
+        defer { try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive) = keepingStore(
+            asker: ScriptedAsker(.init(events: [
+                .tier(.privateCloud),
+                .answer(AskAnswer(text: "Kind of Blue isn't on your shelf.", proposal: Self.addRecord))
+            ])),
+            threadURL: folder.thread, archiveDirectory: folder.archive
+        )
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        await store.restoreIfNeeded()
+        store.ask("Do I own Kind of Blue?")
+        await settle(store)
+        await store.flushPersistence()
+        let answered = try #require(store.turns.last)
+
+        let filing = Park()
+        filing.parks.withLock { $0 = true }
+        store.whileFilingTheChatOnScreen = { await filing.wait() }
+        let opening = Task { await store.openThread(earlier) }
+        await filing.isParked()
+        store.rate(answered, .positive)
+        store.handOffProposal(answered, line: "Opened in Add")
+        filing.release()
+        await opening.value
+        await store.flushPersistence()
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+
+        let ended = try #require(store.history.first { $0.title == "Do I own Kind of Blue?" })
+        let filed = await archive.entries(for: ended.id).entries
+        #expect(filed.map(\.feedback) == [.positive], "the thumb is lost from the chat filed")
+        #expect(filed.map(\.proposalOutcome) == [.handedOff("Opened in Add")], "the hand-off is lost from the chat filed")
+        await store.openThread(ended)
+        let reopened = try #require(store.turns.last)
+        #expect(reopened.feedback == .positive)
+        #expect(store.proposalPhase(for: reopened) == .handedOff("Opened in Add"))
+    }
+
+    @Test func aYesGivenWhileAnEarlierChatOpensIsCarriedOutOnceAndFiledWithWhatCameOfIt() async throws {
+        // The filing took the turn before the yes, and the yes's save ran
+        // once the chat had ended: refused, it was never carried out, and the
+        // filing held no `.performing` for what came of it to settle. Opened
+        // again, the card asked as though nothing had been said. Whether the
+        // perform returns before the open lands or after, the filing ends
+        // holding what came of it.
+        let folder = try privateFolder()
+        defer { try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive) = keepingStore(
+            asker: ScriptedAsker(.init(events: [
+                .tier(.privateCloud),
+                .answer(AskAnswer(text: "The Peregrine is on your shelf.", proposal: Self.lendBook))
+            ])),
+            threadURL: folder.thread, archiveDirectory: folder.archive
+        )
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        await store.restoreIfNeeded()
+        store.ask("Can I lend The Peregrine to Sam?")
+        await settle(store)
+        await store.flushPersistence()
+        let answered = try #require(store.turns.last)
+
+        let filing = Park()
+        filing.parks.withLock { $0 = true }
+        store.whileFilingTheChatOnScreen = { await filing.wait() }
+        let opening = Task { await store.openThread(earlier) }
+        await filing.isParked()
+        store.confirmProposal(answered)
+        filing.release()
+        await opening.value
+        await store.flushProposal()
+        await store.flushPersistence()
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+        #expect(store.domain.performed.proposals.count == 1, "the yes was never carried out")
+
+        let line = "Marked The Peregrine as lent."
+        let ended = try #require(store.history.first { $0.title == "Can I lend The Peregrine to Sam?" })
+        #expect(await archive.entries(for: ended.id).entries.map(\.proposalOutcome) == [.confirmed(line)])
+        await store.openThread(ended)
+        let reopened = try #require(store.turns.last)
+        #expect(store.proposalPhase(for: reopened) == .done(line))
+        #expect(store.domain.performed.proposals.count == 1)
+    }
+
     /// A New Chat over a turn still streaming, whose filing took and whose
     /// delete didn't, and an app quit before the delete was tried again: the
     /// thread holds the chat as last saved, without the turn New Chat

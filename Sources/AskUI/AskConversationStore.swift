@@ -2559,6 +2559,12 @@ public final class AskConversationStore<Domain: AskDomain> {
         await persisting?.value
     }
 
+    /// Awaited as an earlier chat opening files the chat on screen, before
+    /// the archive writes it (`open`). For tests: a slow disk leaves the
+    /// reader that window to tap in, and nothing else holds the archive
+    /// still. Nil, and skipped, everywhere else.
+    @ObservationIgnored var whileFilingTheChatOnScreen: (@MainActor () async -> Void)?
+
     // MARK: - Earlier chats
 
     /// Whether this domain keeps chats to go back to. A per-launch domain
@@ -2664,23 +2670,49 @@ public final class AskConversationStore<Domain: AskDomain> {
         // Filed before anything leaves the screen, and awaited: unfiled (a
         // locked device, a full disk), the chat on screen stays there, since
         // opening the other would write over its last copy.
+        //
+        // **Filed again while it changes under the filing.** The chat stays on
+        // screen while the archive writes it, and a thumb, a hand-off, a
+        // decline or a yes tapped then, or a perform's outcome landing, changes
+        // a turn the filing has already taken. That change's own save is
+        // queued behind the filing and runs once the chat has ended, so it
+        // writes nothing (`persist()`): lost from the filing, the chat would
+        // read back with no thumb, or offer its card again. So the chat is
+        // filed until what the reader marked on it is as filed, each filing
+        // replacing the one before it as the same chat's. No turn can join or
+        // leave meanwhile: a question asked waits for this change, and Try
+        // Again waits for it too (`retry`). Compared by those marks alone, not
+        // as whole entries, which compare the host's rows: one holding a NaN
+        // is unequal to itself, so whether two readings agreed, and the loop
+        // ended, would rest on their sharing the arrays' storage.
         if !outgoing.isEmpty {
-            // Turns filed beside a thread that couldn't be read, and read since,
-            // are in this filing, which takes their filing's place.
-            let filed = await queueWrite { [archive] _ in
-                await archive.fileTheChatOnScreen(outgoing, at: .now, sparing: summary.id) != nil
-            }.value
-            guard filed else {
-                Logger(subsystem: brand.logSubsystem, category: "ask")
-                    .error("the chat on screen could not be filed, so an earlier chat did not open")
-                // The chat stays, with the turn this stopped: saved as Stop
-                // saves one, since its own task returned without a save.
-                if settled { persist() }
-                return
+            var filing = outgoing
+            var marked = turns.filter(\.isComplete).map(ReadersMarks.init)
+            while true {
+                // Turns filed beside a thread that couldn't be read, and read
+                // since, are in this filing, which takes their filing's place.
+                let filed = await queueWrite { [archive, filing] store in
+                    await store.whileFilingTheChatOnScreen?()
+                    return await archive.fileTheChatOnScreen(filing, at: .now, sparing: summary.id) != nil
+                }.value
+                guard filed else {
+                    Logger(subsystem: brand.logSubsystem, category: "ask")
+                        .error("the chat on screen could not be filed, so an earlier chat did not open")
+                    // The chat stays, with the turn this stopped: saved as Stop
+                    // saves one, since its own task returned without a save.
+                    if settled { persist() }
+                    return
+                }
+                // Filed, and still the reader's last request: anything asked
+                // for meanwhile files this chat again, which replaces this
+                // filing.
+                guard request == chatRequests else { return }
+                let onScreen = turns.filter(\.isComplete)
+                let marks = onScreen.map(ReadersMarks.init)
+                if marks == marked { break }
+                filing = onScreen.map(\.entry)
+                marked = marks
             }
-            // Filed, and still the reader's last request: anything asked for
-            // meanwhile files this chat again, which replaces this filing.
-            guard request == chatRequests else { return }
         }
 
         // With what came of a proposal whose perform returned after the chat
@@ -2691,8 +2723,10 @@ public final class AskConversationStore<Domain: AskDomain> {
         turns = entries.map(readBack)
         threadEnds &+= 1
         // Filed with the chat just now, if any: that filing is the reader's.
-        // With nothing on screen to file, it is an ordinary one from here on,
-        // as its turns are on screen no more (`endProvisional`, below).
+        // A backstop for one still provisional with nothing on screen to file,
+        // which nothing reaches now that Try Again waits for the open: it is
+        // an ordinary one from here on, as its turns are on screen no more
+        // (`endProvisional`, below).
         heldTurnsFiling = nil
         // Emptied as New Chat empties it, but here, after the reads, rather
         // than at the tap: an open that gives way or gives up leaves the
@@ -2736,6 +2770,21 @@ public final class AskConversationStore<Domain: AskDomain> {
         let tail = Self.recapTail(from: entries, domain: domain)
         if !tail.isEmpty { await engine.resume(from: tail) }
         await readKeptConversation()
+    }
+
+    /// What the reader can still change on a chat that an earlier chat
+    /// opening is filing (`open`): each ended turn's verdict, and what its
+    /// card says came of its proposal.
+    private struct ReadersMarks: Equatable {
+        let turn: UUID
+        let feedback: AskFeedback.Sentiment?
+        let proposalOutcome: AskProposalOutcome?
+
+        init(_ turn: Turn) {
+            self.turn = turn.id
+            feedback = turn.feedback
+            proposalOutcome = turn.proposalOutcome
+        }
     }
 
     /// A filing read back: its turns, and how many didn't decode.
