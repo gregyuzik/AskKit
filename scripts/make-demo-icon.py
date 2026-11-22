@@ -104,8 +104,8 @@ SOCIAL_SEPARATOR = "  ·  "
 
 # How the card's words are set, measured off them: SF Pro, the system's own font file, at 24 px,
 # weight 500 and optical size 24, tracked 0.01 em, in #5b4969, the line's first pen at x 780 and its
-# baseline at y 496.5. Set so, "iOS · macOS · visionOS" matched the line the card had to within 0.4 of
-# a level, RMS.
+# baseline at y 496.5. Set so, "iOS · macOS · visionOS" matched the line the card had, and "Foundation
+# Models" at a baseline 34 px higher the one above it, each to within half a level, RMS.
 SOCIAL_FONT = Path("/System/Library/Fonts/SFNS.ttf")
 SOCIAL_TYPE = {"size": 24, "weight": 500, "optical size": 24, "tracking": 0.01}
 SOCIAL_INK = "#5b4969"
@@ -322,9 +322,11 @@ def write_stack(shapes: list[Polygon]) -> None:
 
 def platform_line(size: tuple[int, int]) -> np.ndarray:
     """The platform line's coverage on a card of `size`, set as the card's words were: each glyph drawn
-    on a layer twice the card's size, at its pen rounded to that layer's pixels, the pen moved by the
-    glyph's kerned advance and the tracking, then the layer halved with Lanczos. The halving's lobes
-    are kept, so the line has the faint light edge the card's other words have."""
+    on a layer twice the card's size, its pen the laid-out width of the text before it plus the
+    tracking, rounded to that layer's pixels, then the layer halved with Lanczos. So a kerned pair's
+    second glyph stands where it would unkerned, and the kern moves the glyphs after it, as in the
+    card's "Fo". The halving's lobes are kept, so the line has the faint light edge the card's other
+    words have."""
     if not features.check("raqm"):
         raise SystemExit("Pillow lacks libraqm, which lays out the card's platform line: reinstall Pillow from PyPI")
     font = ImageFont.truetype(str(SOCIAL_FONT), SOCIAL_TYPE["size"] * 2, layout_engine=ImageFont.Layout.RAQM)
@@ -340,11 +342,10 @@ def platform_line(size: tuple[int, int]) -> np.ndarray:
     layer = Image.new("L", (width * 2, height * 2), 0)
     draw = ImageDraw.Draw(layer)
     left, baseline = SOCIAL_LINE
-    pen = left * 2
+    tracking = SOCIAL_TYPE["tracking"] * SOCIAL_TYPE["size"] * 2
     for i, char in enumerate(text):
+        pen = left * 2 + font.getlength(text[:i]) + i * tracking
         draw.text((round(pen), baseline * 2), char, font=font, fill=255, anchor="ls")
-        after = text[i + 1:i + 2]
-        pen += font.getlength(char + after) - font.getlength(after) + SOCIAL_TYPE["tracking"] * SOCIAL_TYPE["size"] * 2
     halved = Image.fromarray(np.asarray(layer, dtype=np.float32) / 255, "F").resize(size, Image.LANCZOS)
     return np.asarray(halved)
 
