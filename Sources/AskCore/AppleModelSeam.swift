@@ -46,9 +46,9 @@ public actor AppleModelSeam: AskModelSeam {
     /// long.
     nonisolated public static let reprobeInterval: Duration = .seconds(60)
     /// How long Private Cloud Compute sits out after a transport failure that
-    /// did not say when to come back, or a generation the turn's deadline gave
-    /// up on having heard nothing from it, so a burst of questions on a bad
-    /// connection does not wait on it every time. A rate limit that names its
+    /// did not say when to come back, or a generation that said nothing
+    /// through the half or more of the turn's deadline it was given, so a
+    /// burst of questions on a bad connection does not wait on it every time. A rate limit that names its
     /// reset is held until then instead.
     nonisolated public static let transportCooldown: Duration = .seconds(60)
 

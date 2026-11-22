@@ -1066,9 +1066,10 @@ private extension Trait where Self == ConditionTrait {
     /// hold every question after it the whole deadline, Try Again's
     /// included (#100).
     ///
-    /// A second's deadline, so the generation has begun well inside it: what
-    /// this pins is a deadline expiring on a stream that was asked.
-    @Test func aPrivateCloudStreamThatSaysNothingUntilTheDeadlineCoolsTheTier() async {
+    /// A second's deadline, so the generation has begun well inside its
+    /// first half: what this pins is a deadline expiring on a stream that was
+    /// asked with most of it left.
+    @Test(.racesTheClock) func aPrivateCloudStreamThatSaysNothingUntilTheDeadlineCoolsTheTier() async {
         var domain = FakeDomain()
         domain.deadline = .seconds(1)
         let (engine, seam, log) = makeEngine(domain: domain)
@@ -1087,7 +1088,7 @@ private extension Trait where Self == ConditionTrait {
 
     /// A slow host tool that uses up the deadline cools nothing: the tier
     /// called it, and the time went to the host.
-    @Test func aSlowHostToolThatUsesUpTheDeadlineDoesNotCoolTheTier() async {
+    @Test(.racesTheClock) func aSlowHostToolThatUsesUpTheDeadlineDoesNotCoolTheTier() async {
         var domain = FakeDomain()
         domain.deadline = .seconds(1)
         let (engine, seam, _) = makeEngine(domain: domain)
@@ -1104,7 +1105,7 @@ private extension Trait where Self == ConditionTrait {
     /// Nor does a grounded retry's re-ask the deadline gives up on: the tier
     /// answered the turn's first ask moments before, and the app's search
     /// between the two, the host's, may have taken the time.
-    @Test func aGroundedRetryTheDeadlineGivesUpOnDoesNotCoolTheTier() async {
+    @Test(.racesTheClock) func aGroundedRetryTheDeadlineGivesUpOnDoesNotCoolTheTier() async {
         var domain = FakeDomain()
         domain.deadline = .seconds(1)
         let (engine, seam, _) = makeEngine(domain: domain)
@@ -1115,6 +1116,31 @@ private extension Trait where Self == ConditionTrait {
         let recording = await record(engine.ask("q"))
         #expect(recording.restarts == [.privateCloud], "only the grounded retry")
         #expect(recording.askError == .couldNotAnswer)
+        await eventually { seam.refreshes.withLock { $0 } >= 1 }
+        #expect(seam.transportFailures.withLock { $0 }.isEmpty)
+    }
+
+    /// Nor does a tier asked with less than half the deadline left: a host's
+    /// hook ahead of the ask took the rest, and a tier given that little may
+    /// be slow to its first word rather than gone. The overview is let go of
+    /// 650 ms into a second's deadline, so the ask, which this checks was
+    /// made, leaves the tier at most 350 ms.
+    @Test(.racesTheClock) func aTierAskedWithLittleOfTheDeadlineLeftDoesNotCool() async {
+        var domain = FakeDomain()
+        domain.deadline = .seconds(1)
+        domain.overviewHold.arm()
+        let hold = domain.overviewHold
+        let (engine, seam, _) = makeEngine(domain: domain)
+        let session = seam.session(for: .privateCloud)
+        session.script(FakeSession.Script(hangs: true))
+        let release = Task {
+            try? await Task.sleep(for: .milliseconds(650))
+            hold.release()
+        }
+        let recording = await record(engine.ask("q"))
+        await release.value
+        #expect(recording.askError == .couldNotAnswer)
+        #expect(session.prompts.withLock { $0 }.count == 1, "the tier was asked")
         await eventually { seam.refreshes.withLock { $0 } >= 1 }
         #expect(seam.transportFailures.withLock { $0 }.isEmpty)
     }

@@ -33,10 +33,11 @@ nonisolated public protocol AskModelSeam: Sendable {
         instructions: String
     ) async throws -> AskSessionBox?
 
-    /// A network or service failure, or a generation the turn's deadline gave
-    /// up on having heard nothing from the tier: sit the tier out for a while
-    /// and let the one below answer. The mirror learns of it now, and again when the
-    /// cooldown lifts, so the tier caption comes and goes with it.
+    /// A network or service failure, or a generation that said nothing
+    /// through the half or more of the turn's deadline it was given: sit the
+    /// tier out for a while and let the one below answer. The mirror learns
+    /// of it now, and again when the cooldown lifts, so the tier caption comes
+    /// and goes with it.
     func noteTransportFailure(on tier: AskTier) async
 
     /// Run `body` at the generation gate when `onDevice` is true, so on-device

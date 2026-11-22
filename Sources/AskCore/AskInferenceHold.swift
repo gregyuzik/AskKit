@@ -20,8 +20,9 @@ import Synchronization
 ///   screen shows what a reader with a working model sees rather than "Apple
 ///   Intelligence is off" or "language not supported".
 /// - `AppleModelSeam.makeSession` builds nothing, so the engine's `prewarm`
-///   warms nothing and a question asked anyway fails as a turn whose tier
-///   could not serve.
+///   warms nothing and a question asked anyway fails as
+///   `AskError.couldNotAnswer`, as does its Try Again, until the host lets
+///   go.
 /// - `AppleModelSeam.withGeneration` and `AskGenerationGate.run` throw
 ///   `HeldError` without running their body, on either tier, and say so in
 ///   the log: a host's own generations stop at the same gate as Ask's.

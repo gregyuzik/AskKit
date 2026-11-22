@@ -402,10 +402,10 @@ public actor AskEngine<Domain: AskDomain> {
     /// that fails finishes it by throwing an `AskError`. A turn stopped before
     /// its answer finishes it by throwing `CancellationError`, whether by
     /// `stop()`, by `reset()`, or by a newer question, which stops the turn in
-    /// flight before it starts, and so does a stop from below once prose is
-    /// drawn, such as a tool's own cancellation: before any, that fails as
-    /// `AskError.stopped`. So a caller that catches only `AskError` misses a
-    /// stop. A reader that lets the stream go stops the turn too, and
+    /// flight before it starts. A cancellation from below, the session's or
+    /// the seam's, ends it the same way, and so does a tool's own once prose
+    /// is drawn; a tool's own before any fails as `AskError.stopped`. So a
+    /// caller that catches only `AskError` misses a stop. A reader that lets the stream go stops the turn too, and
     /// hears nothing more.
     ///
     /// **The question is asked as the reader saw it**: what a reader can't
@@ -1054,12 +1054,15 @@ public actor AskEngine<Domain: AskDomain> {
             ) else {
                 // The seam reported this tier servable and then handed back no
                 // session. `AppleModelSeam` reads the on-device model's
-                // availability again as it builds, and a host's hold on
-                // inference can begin between the two, so a condition that
-                // has already passed reads this way as often as a seam's bug
-                // does. Retryable, as the reason no tier can serve isn't: the
-                // mirror is read again beside the turn, and Try Again finds a
-                // tier that serves, or the reason none does.
+                // availability again as it builds, so a change between the two
+                // reads, which passes, reads this way as a seam's bug does.
+                // Retryable, as the reason no tier can serve isn't: the mirror
+                // is read again beside the turn, and Try Again finds a tier
+                // that serves, or the reason none does. Under a host's hold on
+                // inference (`AskInferenceHold`) the seam reports the
+                // on-device model servable and builds nothing, so a question
+                // asked then fails this way, and so does its Try Again, until
+                // the host lets go.
                 log.routing("\(tier.rawValue) reported servable and made no session")
                 throw AskError.couldNotAnswer
             }
@@ -1391,7 +1394,8 @@ public actor AskEngine<Domain: AskDomain> {
         // loop rather than waiting for it, and a loop caught between two hops
         // wakes with a snapshot still to send, and goes on to the ones its
         // session had buffered, which a cancelled reader is still handed; the
-        // tools' observer is cleared only as this returns. The lock that lets
+        // tools' observer is cleared before the refine pass and as this
+        // returns, so on the ceiling it stays to the end. The lock that lets
         // the answer out shuts the rest, as `refine` shuts its announcement,
         // and on the ceiling the outlet is shut before the answer's text is
         // taken.
@@ -1442,10 +1446,11 @@ public actor AskEngine<Domain: AskDomain> {
         // leaves no time to read it again, and a truncated answer only the
         // transcript grounds is still grounded.
         let transcribed = Mutex<Int?>(nil)
-        // Whether the generation was asked for at all: the race starts
-        // nothing once the deadline has passed, and a tier asked nothing has
-        // said nothing for a reason of the turn's own.
-        let asked = Mutex(false)
+        // When the generation was asked, if it was: the race starts nothing
+        // once the deadline has passed, and a tier asked nothing, or asked
+        // with too little of the deadline left, has said nothing for a reason
+        // of the turn's own.
+        let askedAt = Mutex<ContinuousClock.Instant?>(nil)
         let shape = replyShape
         let isPCC = tier == .privateCloud
         // Where the latch below starts: grounded already when the app
@@ -1509,7 +1514,7 @@ public actor AskEngine<Domain: AskDomain> {
                         // so the schema it saw is the one it answers in.
                         shape: shape
                     )
-                    asked.withLock { $0 = true }
+                    askedAt.withLock { $0 = ContinuousClock().now }
                     for try await snapshot in stream {
                         latest = snapshot
                         streamed.withLock { $0 = snapshot }
@@ -1706,12 +1711,22 @@ public actor AskEngine<Domain: AskDomain> {
                 // Try Again's included, so it cools as an outage does, though
                 // the turn still fails as the deadline does: no time is left
                 // to hand it down. Told apart from the host using up the
-                // deadline by what the tier did: it was asked, and sent no
-                // snapshot and no tool call, a slow host tool sending the
-                // call. Not a grounded retry's re-ask, which the tier answered
-                // the turn's first ask before, with the app's search between.
-                if isPCC, !retried, asked.withLock({ $0 }), measured.snapshots == 0, calls == 0,
-                   firstTool.withLock({ $0 }) == nil {
+                // deadline by what the tier did and what it was given: it was
+                // asked with at least half the turn's deadline left, past the
+                // 20 s its first word was measured at under the default 45 s,
+                // and sent no snapshot and no tool call, a slow host tool
+                // reporting its call (`withToolCall`, or the relay). The
+                // snapshots are counted again here, after the shut: the loop
+                // the deadline let go of may have had one since. Not a grounded
+                // retry's re-ask, which the tier answered the turn's first ask
+                // before, with the app's search between. A rollover's re-ask
+                // is judged as any ask: asked with little left it is not
+                // cooled, and silent through most of the deadline it is the
+                // half-open connection this is for.
+                let given = askedAt.withLock { $0 }.map { deadline - $0 }
+                let heard = measuring.withLock { $0.snapshots } > 0 || calls > 0
+                    || firstTool.withLock { $0 } != nil
+                if isPCC, !retried, !heard, let given, given >= (deadline - started) / 2 {
                     log.routing("\(tier.rawValue) said nothing before the deadline — noting a transport failure")
                     throw AskSilentGeneration(tier: tier)
                 }
@@ -2139,7 +2154,8 @@ nonisolated private final class AskAnswerOutlet<Row: AskRow>: Sendable {
 }
 
 /// A generation the deadline gave up on having heard nothing from its tier:
-/// asked, it sent no snapshot and no tool call (`AskEngine.stream`). Only
+/// asked with at least half the turn's deadline left, it sent no snapshot and
+/// no tool call (`AskEngine.stream`). Only
 /// `AskEngine.turn` sees it, which fails the turn as `AskError.couldNotAnswer`,
 /// the deadline's error, and notes a transport failure on `tier`.
 nonisolated private struct AskSilentGeneration: Error {

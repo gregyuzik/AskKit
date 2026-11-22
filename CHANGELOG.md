@@ -34,10 +34,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   that the turn's deadline gave up on having sent no snapshot and no tool call, as on a connection half
   open that never throws a timeout of its own, failed the turn as `AskError.couldNotAnswer` and cooled
   nothing, so the next question, Try Again's included, went back to it and could wait the whole deadline
-  again. It now cools the tier as a transport failure does (`AskModelSeam.noteTransportFailure(on:)`),
-  and the turn still fails as the deadline does, with no time left to hand it down. A slow host tool
-  that uses up the deadline was called, so it cools nothing, and nor does a grounded retry's re-ask.
-  Whether Foundation Models ever leaves a stream silent that long isn't known; this is a defence.
+  again. One asked with half the deadline or more left now cools the tier as a transport failure does
+  (`AskModelSeam.noteTransportFailure(on:)`), and the turn still fails as the deadline does, with no
+  time left to hand it down. One asked with less, after a slow `AskDomain` hook or a rollover, cools
+  nothing; nor does a slow host tool that uses up the deadline, which reported its call through
+  `withToolCall` or the relay, nor a grounded retry's re-ask. Whether Foundation Models ever leaves a
+  stream silent that long isn't known; this is a defence.
 - **A tool that cancels itself after the first words stops the turn rather than failing it.** A tool
   that threw a `CancellationError` of its own, from a timeout of its own or a task it cancelled, reached
   the engine inside the session's `ToolCallError` and failed the turn as `AskError.stopped`, so the

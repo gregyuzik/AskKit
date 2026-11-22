@@ -264,13 +264,13 @@ unavailable (its assets downloading, say), which is asked again. The locale prob
 read are each shared by overlapping callers, kept once answered and bounded at 3 s, so a stalled network
 can't hold the turn.
 
-A transport failure cools Private Cloud Compute for 60 s, as does a generation there the turn's deadline
-gave up on having heard nothing from it ([the hand-down](#the-hand-down)), a rate limit naming its reset
-cools it until then, and a spent quota holds it until the day's reset; no hold is ever shortened or
-runs past a day, whatever date the tier gave. The holds and the availability cache run on the monotonic
-clock, so changing the device's clock moves none of them. Sessions are built off the main actor, with
-on-device replies capped at 1,024 tokens and the grounded retry's plan at 256. `AskSession.usage()` is
-the newest response's usage, not the session's running total
+A transport failure cools Private Cloud Compute for 60 s, as does a generation there that said nothing
+through the half or more of the turn's deadline it was given ([the hand-down](#the-hand-down)), a rate
+limit naming its reset cools it until then, and a spent quota holds it until the day's reset; no hold is
+ever shortened or runs past a day, whatever date the tier gave. The holds and the availability cache run
+on the monotonic clock, so changing the device's clock moves none of them. Sessions are built off the
+main actor, with on-device replies capped at 1,024 tokens and the grounded retry's plan at 256.
+`AskSession.usage()` is the newest response's usage, not the session's running total
 ([rollover](#continuation-tail-referent-recap-rollover)), and tool calls are counted off the transcript.
 
 **The reply's shape.** Every generation streams through `AskSession`'s shaped stream in the domain's
@@ -342,11 +342,14 @@ A failure is a tier outage (`askIsTierOutage`) when it triages to `.privateCloud
 failure, the service unavailable, a rate limit, a timeout, being offline or the context gate) or
 `.quotaReached`. An outage on Private Cloud Compute hands the turn down once, to the next servable tier:
 - **Only an unreachable tier cools, or one that said nothing.** A spent quota is no network fault and
-  already holds the tier until its reset. A Private Cloud Compute generation that was asked and sent no
-  snapshot and no tool call before the turn's deadline abandoned it, as on a connection half open that
-  never throws a timeout of its own, cools the tier, though the turn fails as the deadline does
-  (`AskError.couldNotAnswer`), with no time left to hand down. A slow host tool that uses up the deadline
-  was called, so it cools nothing, and nor does a grounded retry's re-ask, whose tier answered the turn's
+  already holds the tier until its reset. A Private Cloud Compute generation asked with half the turn's
+  deadline or more left that sent no snapshot and no tool call before the deadline abandoned it, as on a
+  connection half open that never throws a timeout of its own, cools the tier, though the turn fails as
+  the deadline does (`AskError.couldNotAnswer`), with no time left to hand down. Half the default 45 s
+  is past the 20 s its first word was measured at, and one asked with less, after a host's hook or a
+  rollover took the rest, cools nothing. A slow host tool that uses up the deadline was called and said
+  so, through `withToolCall` or the relay, so it cools nothing (one that reports neither, which no tool
+  should be, reads as silence), and nor does a grounded retry's re-ask, whose tier answered the turn's
   first ask moments before. The cooldown and the mirror's refresh run beside the turn, in one task so
   the cooldown lands first: both can wait on the tier that just went out, and a turn waiting on them
   would hold back the answer the hand-down is for. The tier caption names the fallback from the
@@ -450,7 +453,7 @@ asked for where no session was built yet:
 | Error | `AskError` |
 |---|---|
 | An `AskError`, bare or inside a tool's `ToolCallError` | itself |
-| A cancellation, bare or inside a `ToolCallError` | `.stopped`, for a turn stopped before its first words: one stopped after them ends as a stop, keeping them |
+| A cancellation, bare or inside a `ToolCallError` | `.stopped`, which the engine fails a turn with only for a tool's before the turn's first words: a bare one, or a tool's after them, ends the turn as a stop, keeping what it drew |
 | Private Cloud Compute's quota limit | `.quotaReached(resetDate:)` |
 | On Private Cloud Compute: a network failure, the service unavailable, a rate limit, a timeout, a lost connection, or the context gate | `.privateCloudUnreachable` |
 | A missing on-device model asset | `.modelUnavailable(.modelNotReady)` |
