@@ -58,14 +58,14 @@ import Testing
 
     /// A run let go before its answer ends its stream with neither an answer
     /// nor an error, and that is no answer: never "ok", and never good.
-    @Test func aRunLetGoBeforeItsAnswerIsNoAnswer() async {
+    @Test func aRunLetGoBeforeItsAnswerIsNoAnswer() async throws {
         let (eval, seam) = makeEval()
         let session = seam.session(for: .privateCloud)
         var script = grounded("Rumours.")
         script.holdsAfterSnapshots = true
         session.script(script)
         let run = Task { await eval.run(AskScenario(id: "let go", question: "q")) }
-        await session.generationIsHeld()
+        try await session.generationIsHeld()
         run.cancel()
         let outcome = await run.value
         session.releaseGeneration()

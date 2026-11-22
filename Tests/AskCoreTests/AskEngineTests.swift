@@ -2072,7 +2072,7 @@ extension Trait where Self == ConditionTrait {
 
     // MARK: - Stopping a turn
 
-    @Test func aReaderLettingTheStreamGoStopsTheTurn() async {
+    @Test func aReaderLettingTheStreamGoStopsTheTurn() async throws {
         // The store ends a turn by cancelling the task that reads its stream,
         // and Siri's caller does the same. The generation has to stop with it:
         // left running, it finishes unseen and spends its request.
@@ -2082,15 +2082,17 @@ extension Trait where Self == ConditionTrait {
             snapshots: [.answering("Partly")], hangsAfterSnapshots: true, toolCallsAfter: 1
         ))
         let reading = Task { await record(engine.ask("q")) }
-        await yieldUntil { !session.prompts.withLock { $0.isEmpty } }
+        // Both waits are spins: a wait that gave up under load cancelled the
+        // turn before its generation began, and nothing could let one go.
+        try await spin("the generation to start") { !session.prompts.withLock { $0.isEmpty } }
         reading.cancel()
         _ = await reading.value
-        await eventually { session.generationsCancelled.withLock { $0 } == 1 }
+        try await spin("the generation to be let go") { session.generationsCancelled.withLock { $0 } >= 1 }
         #expect(session.generationsCancelled.withLock { $0 } == 1)
         await engine.stop()
     }
 
-    @Test func aTurnFromAChatThatEndedLeavesTheNextChatNothing() async {
+    @Test func aTurnFromAChatThatEndedLeavesTheNextChatNothing() async throws {
         // New Chat while an answer is still being written. The turn has to
         // stop, and nothing it was doing may reach the next chat: not its
         // session, which the next question would carry on with the ended
@@ -2104,12 +2106,12 @@ extension Trait where Self == ConditionTrait {
             snapshots: [.answering("Second, as far as it got.")], holdsAfterSnapshots: true, toolCallsAfter: 1
         ))
         let second = Task { await record(engine.ask("second")) }
-        await session.generationIsHeld()
+        try await session.generationIsHeld()
         await engine.reset()
         // The stopped turn lets the stream go at its next read, which can come
         // after `reset()` returns. A generation released before then ends the
         // stream itself, and there is nothing left to cancel.
-        await eventually { session.generationsCancelled.withLock { $0 } == 1 }
+        try await spin("the generation to be let go") { session.generationsCancelled.withLock { $0 } >= 1 }
         #expect(session.generationsCancelled.withLock { $0 } == 1)
         session.releaseGeneration()
         #expect(await second.value.error is CancellationError)
@@ -2123,7 +2125,7 @@ extension Trait where Self == ConditionTrait {
         #expect(fresh.summarizedCount == 0)
     }
 
-    @Test func aStoppedTurnLeavesTheThreadsRecapForTheNextQuestion() async {
+    @Test func aStoppedTurnLeavesTheThreadsRecapForTheNextQuestion() async throws {
         // Stop drops the session, whose transcript now ends partway through a
         // generation. What the thread said stays: the screen still shows it,
         // and "which of those is on vinyl?" asked next has to know what those
@@ -2136,7 +2138,7 @@ extension Trait where Self == ConditionTrait {
             snapshots: [.answering("Partly")], hangsAfterSnapshots: true, toolCallsAfter: 1
         ))
         let second = Task { await record(engine.ask("second")) }
-        await yieldUntil { session.prompts.withLock { $0.count >= 2 } }
+        try await spin("the second generation to start") { session.prompts.withLock { $0.count >= 2 } }
         await engine.stop()
         #expect(await second.value.error is CancellationError)
 
@@ -2202,12 +2204,12 @@ extension Trait where Self == ConditionTrait {
     }
 
     /// A turn stopped before it drew anything leaves the thread as it was.
-    @Test func aTurnStoppedBeforeItsFirstWordsLeavesNoExchange() async {
+    @Test func aTurnStoppedBeforeItsFirstWordsLeavesNoExchange() async throws {
         let (engine, seam, _) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(FakeSession.Script(hangs: true))
         let first = Task { await record(engine.ask("first")) }
-        await yieldUntil { session.prompts.withLock { !$0.isEmpty } }
+        try await spin("the generation to start") { session.prompts.withLock { !$0.isEmpty } }
         await engine.stop()
         _ = await first.value
         #expect(await !engine.hasKeptConversation)
@@ -2274,7 +2276,7 @@ extension Trait where Self == ConditionTrait {
         #expect(summarized < firstPartial)
     }
 
-    @Test func aStandaloneAnswerStopsWhenItsCallerDoes() async {
+    @Test func aStandaloneAnswerStopsWhenItsCallerDoes() async throws {
         // Siri's task is the only handle on a standalone turn: it is never the
         // turn in flight, so `stop()` doesn't reach it. Cancelling the caller
         // stops the generation, and says so rather than that the question
@@ -2283,11 +2285,11 @@ extension Trait where Self == ConditionTrait {
         let session = seam.session(for: .privateCloud)
         session.script(FakeSession.Script(hangs: true))
         let siri = Task { try await engine.answerOnce("q") }
-        await yieldUntil { !session.prompts.withLock { $0.isEmpty } }
+        try await spin("the generation to start") { !session.prompts.withLock { $0.isEmpty } }
         siri.cancel()
         let result = await siri.result
         #expect(throws: CancellationError.self) { try result.get() }
-        await eventually { session.generationsCancelled.withLock { $0 } == 1 }
+        try await spin("the generation to be let go") { session.generationsCancelled.withLock { $0 } >= 1 }
         #expect(session.generationsCancelled.withLock { $0 } == 1)
 
         // And the thread goes on as if it had never been asked.
@@ -2310,7 +2312,7 @@ extension Trait where Self == ConditionTrait {
             snapshots: [.answering("Partly")], holdsAfterSnapshots: true, toolCallsAfter: 1
         ))
         let turn = Task { await record(engine.ask("q")) }
-        await session.generationIsHeld()
+        try await session.generationIsHeld()
         defer { session.releaseGeneration() }
 
         // Another generation queues behind the turn's, so the turn holds it.
@@ -2342,7 +2344,7 @@ extension Trait where Self == ConditionTrait {
         session.script(script)
         let siri = Task { try await engine.answerOnce("q") }
         defer { siri.cancel() }
-        await session.generationIsHeld()
+        try await session.generationIsHeld()
         await engine.stop()
         session.releaseGeneration()
         let answer = try await AskDeadline.run(.seconds(5)) { try await siri.value }
@@ -2786,7 +2788,7 @@ extension Trait where Self == ConditionTrait {
         #expect(seam.session(for: .privateCloud).prewarmCalls.withLock { $0 }.isEmpty)
     }
 
-    @Test func aWarmFinishedWhileAQuestionRunsIsNotKept() async {
+    @Test func aWarmFinishedWhileAQuestionRunsIsNotKept() async throws {
         // A warm starts with a question's first keystroke, and a short
         // question can be sent before the warm is built. The question finds
         // no warm yet and builds its own session; the warm finishing after it
@@ -2798,7 +2800,7 @@ extension Trait where Self == ConditionTrait {
         await session.prewarmIsHeld()
         session.script(FakeSession.Script(hangs: true, toolCallsAfter: 1))
         let asking = Task { await record(engine.ask("q")) }
-        await yieldUntil { !session.prompts.withLock { $0.isEmpty } }
+        try await spin("the question's generation to start") { !session.prompts.withLock { $0.isEmpty } }
         session.releasePrewarm()
         await warming.value
         #expect(await !engine.hasWarm)
@@ -4287,14 +4289,14 @@ extension Trait where Self == ConditionTrait {
         #expect(log.routings.withLock { $0 }.contains { $0.hasPrefix("privateCloud was cancelled from below") })
     }
 
-    @Test func aReadersStopIsNotLoggedAsACancellationFromBelow() async {
+    @Test func aReadersStopIsNotLoggedAsACancellationFromBelow() async throws {
         let (engine, seam, log) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(FakeSession.Script(
             snapshots: [.answering("Partly")], hangsAfterSnapshots: true, toolCallsAfter: 1
         ))
         let turn = Task { await record(engine.ask("q")) }
-        await yieldUntil { !session.prompts.withLock { $0.isEmpty } }
+        try await spin("the generation to start") { !session.prompts.withLock { $0.isEmpty } }
         await engine.stop()
         #expect(await turn.value.error is CancellationError)
         #expect(!log.routings.withLock { $0 }.contains { $0.contains("cancelled from below") })

@@ -344,15 +344,6 @@ struct AppleAskSessionTests {
         )
     }
 
-    private func spin(_ what: String, until condition: @Sendable () async -> Bool) async throws {
-        for _ in 0..<4_000 {
-            if await condition() { return }
-            await Task.yield()
-            try await Task.sleep(for: .microseconds(500))
-        }
-        Issue.record("timed out waiting for \(what)")
-    }
-
     /// A turn stopped mid-stream: the engine's loop ends the moment its task
     /// is cancelled, and the task running `streamResponse` goes on. The next
     /// on-device generation waits for that task, not for the loop.
