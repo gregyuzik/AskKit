@@ -581,11 +581,12 @@ import Testing
         #expect(store.turns.count == 2)
     }
 
-    @Test func askAgainAddsATurnRatherThanReplacingOne() async {
+    @Test func askAgainAddsATurnRatherThanReplacingOne() async throws {
         let asker = ScriptedAsker(.init(events: [.answer(.of("An answer."))]))
         let store = makeStore(asker: asker)
         store.ask("q")
         await settle(store)
+        try #require(store.turns.count == 1)
         store.askAgain(store.turns[0])
         await settle(store)
 
@@ -4921,7 +4922,7 @@ import Testing
 
     // MARK: - Try Again, Edit & Resend, and an earlier chat opening
 
-    @Test func tryAgainLeavesTheDraftAlone() async {
+    @Test func tryAgainLeavesTheDraftAlone() async throws {
         // Try Again asks the failed turn's question, not the composer's. Sent
         // back through the composer's path, a typed turn, which is every turn
         // read back from disk, would take a half-typed question with it.
@@ -4935,6 +4936,7 @@ import Testing
         await settle(store)
         store.draft = "half typed"
 
+        try #require(store.turns.count == 1)
         store.retry(store.turns[0])
         await settle(store)
 
@@ -4943,7 +4945,7 @@ import Testing
         #expect(store.draft == "half typed")
     }
 
-    @Test func tryAgainActsOnlyOnTheNewestTurn() async {
+    @Test func tryAgainActsOnlyOnTheNewestTurn() async throws {
         // On an older failure it would pull that turn out of the middle of the
         // thread and stop whatever is streaming below it.
         let asker = ScriptedAsker()
@@ -4957,10 +4959,12 @@ import Testing
         store.ask("second")
         await settle(store)
 
+        try #require(store.turns.count == 2)
         store.retry(store.turns[0])
         await settle(store)
 
         #expect(store.turns.map(\.question) == ["first", "second"])
+        try #require(store.turns.count == 2)
         #expect(store.turns[0].failure != nil)
         #expect(store.turns[1].answer?.text == "Second.")
         #expect(asker.questions.withLock { $0 }.count == 2)
