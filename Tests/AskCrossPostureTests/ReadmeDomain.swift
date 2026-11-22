@@ -36,7 +36,7 @@ nonisolated struct BookQuery: Sendable {
 /// The one lookup: the model's tool, and the grounded retry's search.
 nonisolated struct SearchBooks: Tool {
     let name = "search_books"
-    let description = "Search the reader's books by any words from the question. Call this before answering anything about what they own."
+    let description = "Search the reader's books by a title or an author. Call this before answering anything about what they own."
 
     let context: AskToolContext<Book>
 
@@ -46,7 +46,9 @@ nonisolated struct SearchBooks: Tool {
         await context.withToolCall(.searching(scope: nil)) { collector in
             // A one-letter word, such as "a" or "I", names nothing to look for.
             let asked = Self.words(arguments.words).filter { $0.count > 1 }
-            let matches = Book.shelf.filter { !Self.words("\($0.title) \($0.author)").isDisjoint(with: asked) }
+            // A book needs every word, so a question's "the" or "le" can't narrow it to one title. The
+            // trade: "books by Le Guin" reads the whole shelf, which still names her.
+            let matches = asked.isEmpty ? [] : Book.shelf.filter { asked.isSubset(of: Self.words("\($0.title) \($0.author)")) }
             // Nothing matched, as for "How many books do I own?": the whole shelf, to count or look through.
             let found = matches.isEmpty ? Book.shelf : matches
             let shown = Array(found.prefix(context.rowLimit))
@@ -193,27 +195,20 @@ import Testing
         #expect(await collector.rows == [Book.shelf[2]])
         #expect(await collector.toolCallCount == 1)
 
-        // A limit under the matches says so, and records only what it shows.
-        let capped = AskCollector<Book>()
-        let cappedContext = AskToolContext(
-            collector: capped, relay: AskActivityRelay(),
-            rowLimit: 1, tier: .onDevice, isConversation: true
-        )
-        let some = try await domain.search(BookQuery(words: "the language ursula"), context: cappedContext)
-        #expect(some == "The Dispossessed | Ursula K. Le Guin\n(+1 more not shown)")
-        #expect(await capped.rows == [Book.shelf[0]])
-
         // The words match whatever their case and accents.
-        #expect(try await domain.search(BookQuery(words: "GUÍN"), context: cappedContext) == "The Dispossessed | Ursula K. Le Guin")
+        #expect(try await domain.search(BookQuery(words: "GUÍN"), context: context) == "The Dispossessed | Ursula K. Le Guin")
     }
 
-    /// The search an adopter copies, asked what its starters ask. A question
-    /// no word of narrows, such as "How many books do I own?", reads the whole
-    /// shelf and says so, so the answer can count it rather than call the
-    /// shelf empty. A word matches only a whole word of a title or an author,
-    /// so neither "K" nor "Le" is found inside "Housekeeping" or "Alexander";
-    /// a one-letter word, such as the "A" of "A Pattern Language", matches
-    /// nothing; and digits make a word, so "1984" finds it.
+    /// The search an adopter copies, asked what its starters ask. A book
+    /// matches only when its title and author hold every word of two letters
+    /// or more, so a question's "the" or "le" doesn't narrow it to The
+    /// Dispossessed or Le Guin, in English or in French. A question no book
+    /// holds every word of, such as "How many books do I own?", reads the
+    /// whole shelf and says so, so the answer can count it rather than call
+    /// the shelf empty. A word matches only a whole word of a title or an
+    /// author, so neither "K" nor "Le" is found inside "Housekeeping" or
+    /// "Alexander"; a one-letter word, such as the "A" of "A Pattern
+    /// Language", matches nothing; and digits make a word, so "1984" finds it.
     @MainActor
     @Test func theReadmesSearchListsTheShelfWhenNoWordNarrowsIt() async throws {
         let domain = LibraryDomain()
@@ -234,6 +229,12 @@ import Testing
         #expect(try await domain.search(BookQuery(words: ""), context: context) == shelf)
         #expect(try await domain.search(BookQuery(words: "xyzzy"), context: context) == shelf)
         #expect(try await domain.search(BookQuery(words: "a"), context: context) == shelf)
+        #expect(try await domain.search(BookQuery(words: "How many of the books do I own?"), context: context) == shelf)
+        #expect(try await domain.search(BookQuery(words: "What's the oldest book?"), context: context) == shelf)
+        #expect(try await domain.search(BookQuery(words: "Quel est le livre le plus ancien ?"), context: context) == shelf)
+        // The trade: words beside an author's name read the whole shelf too,
+        // which still names the author.
+        #expect(try await domain.search(BookQuery(words: "books by Le Guin"), context: context) == shelf)
 
         let author = AskCollector<Book>()
         let authorContext = AskToolContext(
@@ -242,6 +243,10 @@ import Testing
         )
         #expect(try await domain.search(BookQuery(words: "Ursula K. Le Guin"), context: authorContext) == "The Dispossessed | Ursula K. Le Guin")
         #expect(await author.rows == [Book.shelf[0]])
+        // A title or an author still narrows, a title's own "The" included.
+        for words in ["Le Guin", "Dispossessed", "the dispossessed"] {
+            #expect(try await domain.search(BookQuery(words: words), context: context) == "The Dispossessed | Ursula K. Le Guin")
+        }
         #expect(try await domain.search(BookQuery(words: "1984"), context: context) == "1984 | George Orwell")
 
         // The whole shelf under a limit shows the limit's worth, says how
