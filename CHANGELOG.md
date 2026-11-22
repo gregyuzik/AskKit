@@ -72,7 +72,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   copy kept the yes as it was saved, so the chat read back on a later launch with what came of it
   unknown, its card drawn with no action. It is written there too now, where that copy reads whole and
   the disk takes the write.
-
+- **A model's follow-ups saved before 0.1.0 read back plain.** Builds from before 0.1.0 saved a model's
+  follow-ups as the model wrote them, so the chips under such a chat's last turn could show Markdown,
+  asterisks and all, and send it back as the question. A model's follow-ups are now cleaned as they are
+  read back, as the engine cleans them as it answers. A domain's own answer, which has no tier, keeps
+  its follow-ups as the domain gave them.
 
 ## [0.7.2] - 2026-11-09
 

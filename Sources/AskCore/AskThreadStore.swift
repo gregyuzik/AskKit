@@ -108,7 +108,6 @@ nonisolated public struct AskThreadEntry<Row: AskRow>: Codable, Sendable, Equata
         let container = try decoder.container(keyedBy: CodingKeys.self)
         question = try container.decode(String.self, forKey: .question)
         text = try container.decodeIfPresent(String.self, forKey: .text) ?? ""
-        answer = try container.decodeIfPresent(AskAnswer<Row>.self, forKey: .answer)
         failureMessage = try container.decodeIfPresent(String.self, forKey: .failureMessage)
         // `try?` and not `try`: a case written by a newer build is a stale
         // line, which `failureMessage` still holds, never a lost turn.
@@ -118,6 +117,16 @@ nonisolated public struct AskThreadEntry<Row: AskRow>: Codable, Sendable, Equata
         // `try?`, as for `failure`: a tier a newer build answered on costs the
         // caption and the turn's place in a recap, never the turn.
         tier = try? container.decodeIfPresent(AskTier.self, forKey: .tier)
+        // A model's follow-ups made plain, as the engine makes them as it
+        // answers (`AskAnswer.cleanedFollowUps(_:)`): builds from before 0.1.0
+        // saved them as the model wrote them, and the chips under a chat's
+        // last turn would show their Markdown and send it back. Only a
+        // model's, which has a tier: a domain's own answer keeps its
+        // follow-ups as the domain gave them (`dedupedFollowUps`).
+        let answer = try container.decodeIfPresent(AskAnswer<Row>.self, forKey: .answer)
+        self.answer = tier == nil ? answer : answer.map {
+            $0.replacing(followUps: AskAnswer<Row>.cleanedFollowUps($0.followUps))
+        }
         askedAt = try container.decodeIfPresent(Date.self, forKey: .askedAt)
         summarizedBefore = try container.decodeIfPresent(Bool.self, forKey: .summarizedBefore) ?? false
         // `try?`, as for `failure`: a verdict a newer build wrote is a lost

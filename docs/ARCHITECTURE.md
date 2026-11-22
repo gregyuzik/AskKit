@@ -554,7 +554,9 @@ A domain whose `persistence` is `.thread` (the default) keeps the thread in
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
   by entry; a row that no longer decodes costs its answer that row, never the turn, and the read logs
   how many went. A row that won't encode, such as one holding a NaN, is left out of its answer on disk
-  in the same way, and the rest of the turn is written.
+  in the same way, and the rest of the turn is written. A model's follow-ups are made plain again as
+  they are read, as the engine makes them as it answers, since builds from before 0.1.0 saved them as
+  the model wrote them; a domain's own answer, which has no tier, keeps its follow-ups as given.
 - **Never written over.** The store writes back only the turns it was handed, so a thread read in part
   is first kept whole beside the thread as `ask-thread-original-<id>.json`, and a launch that reads all
   of it puts the rest back into its chat. If the original can't be kept, the thread is unreadable rather

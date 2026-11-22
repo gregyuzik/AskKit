@@ -228,6 +228,33 @@ nonisolated enum AskOnDiskFormatFixtures {
     ]
     """#
 
+    /// Two turns a build wrote before it made a model's follow-ups plain: a
+    /// model's answer, its follow-ups as the model wrote them, Markdown and a
+    /// repeat included, and a domain's own answer, with no tier, whose
+    /// follow-up keeps what the domain gave it.
+    static let markedUpFollowUps = #"""
+    [
+      {
+        "answer": {
+          "followUps": ["**Which** is on vinyl?", "Which is on *vinyl*?", "And from `1970`?"],
+          "matches": [{"displayTitle": "Abbey Road", "id": "abbey-road"}],
+          "text": "Abbey Road."
+        },
+        "question": "Which of my records are from 1969?",
+        "text": "Abbey Road.",
+        "tier": "onDevice"
+      },
+      {
+        "answer": {
+          "followUps": ["Show **all** records"],
+          "text": "You own 12 records."
+        },
+        "question": "How many records do I own?",
+        "text": "You own 12 records."
+      }
+    ]
+    """#
+
     /// Every `AskGrounding`, as an answer's `grounding` holds it.
     static let groundings = #"""
     ["tool call", "app retrieved", "follow-up", "none"]

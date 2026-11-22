@@ -382,6 +382,20 @@ import Testing
         #expect(Set(groundings) == Set(AskGrounding.allCases))
     }
 
+    /// A model's follow-ups a build saved before it made them plain read back
+    /// plain, as the engine makes them now, so the chips under a chat's last
+    /// turn don't offer its asterisks or send them back. A domain's own
+    /// answer has no tier, and its follow-up reads back as the domain gave it.
+    @Test func aModelsFollowUpsSavedWithTheirMarkdownReadBackPlain() throws {
+        let data = Data(AskOnDiskFormatFixtures.markedUpFollowUps.utf8)
+        let (entries, dropped, _) = try AskThreadStore<Row>.decodeEntries(from: data)
+        #expect(dropped == 0)
+        #expect(entries.map { $0.answer?.followUps } == [["Which is on vinyl?", "And from 1970?"], ["Show **all** records"]])
+        // Plain already, they read back as they were written.
+        let (current, _, _) = try AskThreadStore<Row>.decodeEntries(from: Data(AskOnDiskFormatFixtures.thread.utf8))
+        #expect(current == (try thread()))
+    }
+
     /// An answer written before answers recorded what grounded them reads as
     /// recording nothing, and so does one written with none: the field is
     /// left out, never written as null.
