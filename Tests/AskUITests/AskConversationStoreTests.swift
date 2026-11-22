@@ -413,7 +413,7 @@ import Testing
         #expect(store.threadGeneration == before + 2)
     }
 
-    @Test func aSecondQuestionSettlesTheFirstRatherThanRunningBeside() async {
+    @Test func aSecondQuestionSettlesTheFirstRatherThanRunningBeside() async throws {
         let asker = ScriptedAsker()
         asker.scripts([
             .init(events: [.partial("First, partly")], hangs: true),
@@ -425,7 +425,7 @@ import Testing
         store.ask("second")
         await settle(store)
 
-        #expect(store.turns.count == 2)
+        try #require(store.turns.count == 2)
         // The first kept what it had said.
         #expect(store.turns[0].answer?.text == "First, partly")
         #expect(store.turns[0].stopped)
@@ -520,7 +520,7 @@ import Testing
         store.stop()
     }
 
-    @Test func retryReplacesTheFailedTurnRatherThanStackingOnIt() async {
+    @Test func retryReplacesTheFailedTurnRatherThanStackingOnIt() async throws {
         let asker = ScriptedAsker()
         asker.scripts([
             .init(events: [.tier(.onDevice)], error: AskError.couldNotAnswer),
@@ -529,13 +529,13 @@ import Testing
         let store = makeStore(asker: asker)
         store.ask("q", origin: .starter)
         await settle(store)
-        #expect(store.turns.count == 1)
+        try #require(store.turns.count == 1)
         #expect(store.turns[0].failure != nil)
 
         store.retry(store.turns[0])
         await settle(store)
 
-        #expect(store.turns.count == 1)
+        try #require(store.turns.count == 1)
         #expect(store.turns[0].answer?.text == "Worked this time.")
         // Re-asked the way it was first asked.
         #expect(store.turns.map(\.origin) == [.starter])
@@ -796,15 +796,15 @@ import Testing
 
     // MARK: - Chips
 
-    @Test func aDeclinedChipDoesNotComeBackInThisThread() async {
+    @Test func aDeclinedChipDoesNotComeBackInThisThread() async throws {
         let asker = ScriptedAsker(.init(events: [.answer(.of("An answer."))]))
         let store = makeStore(asker: asker)
         await store.refresh()
-        #expect(store.availableStarters.count == 3)
+        try #require(store.availableStarters.count == 3)
 
         let first = store.availableStarters[0]
         store.decline(first)
-        #expect(store.availableStarters.count == 2)
+        try #require(store.availableStarters.count == 2)
         #expect(!store.availableStarters.contains { $0.id == first.id })
 
         // Asking one also takes it off the board.
@@ -1002,7 +1002,7 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: directory.path(percentEncoded: false)))
     }
 
-    @Test func aPersistedThreadComesBackWithoutItsFadesOrItsFailures() async {
+    @Test func aPersistedThreadComesBackWithoutItsFadesOrItsFailures() async throws {
         let directory = temporaryLocation("askkit-thread").appendingPathExtension("json")
         var domain = UIDomain()
         domain.persistenceMode = .thread
@@ -1022,7 +1022,7 @@ import Testing
         )
         await reopened.restoreIfNeeded()
 
-        #expect(reopened.turns.count == 1)
+        try #require(reopened.turns.count == 1)
         #expect(reopened.turns[0].question == "what do I own")
         #expect(reopened.turns[0].answer?.text == "You own three.")
         // No stamps, so no clock can hold a restored answer faint.
@@ -5231,10 +5231,10 @@ import Testing
         return store
     }
 
-    @Test func eachTurnIsPairedWithTheOneBeforeIt() async {
+    @Test func eachTurnIsPairedWithTheOneBeforeIt() async throws {
         let store = await store(["one", "two", "three"])
         let paired = store.pairedTurns
-        #expect(paired.count == 3)
+        try #require(paired.count == 3)
         #expect(paired[0].previous == nil)
         #expect(paired[1].previous?.question == "one")
         #expect(paired[2].previous?.question == "two")
@@ -5242,7 +5242,7 @@ import Testing
 
     /// The crash, as a value test: a pairing taken before the thread is emptied
     /// is still readable afterwards, because it holds turns rather than indices.
-    @Test func aPairingSurvivesTheThreadBeingEmptied() async {
+    @Test func aPairingSurvivesTheThreadBeingEmptied() async throws {
         let store = await store(["one", "two"])
         let paired = store.pairedTurns
         store.startOver()
@@ -5250,7 +5250,7 @@ import Testing
         #expect(store.pairedTurns.isEmpty)
         // The captured pairing is untouched — no index reaches back into the
         // emptied array.
-        #expect(paired.count == 2)
+        try #require(paired.count == 2)
         #expect(paired[1].previous?.question == "one")
     }
 

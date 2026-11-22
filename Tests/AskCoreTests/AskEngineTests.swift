@@ -1437,7 +1437,7 @@ private extension Trait where Self == ConditionTrait {
 
     // MARK: - Follow-ups
 
-    @Test func aSecondQuestionRidesTheKeptSession() async {
+    @Test func aSecondQuestionRidesTheKeptSession() async throws {
         let (engine, seam, _) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(grounded("First.", tiles: ["Rumours"]))
@@ -1445,7 +1445,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Second."))
         _ = await record(engine.ask("second"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 2)
+        try #require(prompts.count == 2)
         // The follow-up names its referent and does NOT re-send the prefix.
         #expect(prompts[1].contains("<rows>Rumours</rows>"))
         #expect(!prompts[1].hasPrefix("PREFIX"))
@@ -2697,7 +2697,7 @@ private extension Trait where Self == ConditionTrait {
 
     // MARK: - Siri
 
-    @Test func aStandaloneTurnSharesNothing() async {
+    @Test func aStandaloneTurnSharesNothing() async throws {
         let (engine, seam, _) = makeEngine()
         let session = seam.session(for: .privateCloud)
         session.script(grounded("First."))
@@ -2710,7 +2710,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Second."))
         _ = await record(engine.ask("second"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 3)
+        try #require(prompts.count == 3)
         #expect(!prompts[2].hasPrefix("PREFIX"))
     }
 
@@ -3339,7 +3339,7 @@ private extension Trait where Self == ConditionTrait {
         session.script(grounded("Abbey Road."))
         _ = await record(engine.ask("And after that?"))
         let prompts = session.prompts.withLock { $0 }
-        #expect(prompts.count == 2)
+        try #require(prompts.count == 2)
         #expect(prompts[0].contains(Self.recordsLine))
         #expect(!prompts[1].contains(Self.recordsLine))
     }

@@ -40,14 +40,14 @@ import Testing
         #expect(next == [AskRevealChunk(length: closed.characters.count, arrival: 2)])
     }
 
-    @Test func aTailOnlyRewriteKeepsTheSharedPrefixesStamps() {
+    @Test func aTailOnlyRewriteKeepsTheSharedPrefixesStamps() throws {
         let before = parsed("Try the navy blazer with")
         let one = AskArrivals.chunks([], from: AttributedString(), to: before, at: 1)
         let after = parsed("Try the navy blazer and the grey trousers")
         let two = AskArrivals.chunks(one, from: before, to: after, at: 1.2)
 
         let common = "Try the navy blazer ".count
-        #expect(two.count == 2)
+        try #require(two.count == 2)
         #expect(two[0] == AskRevealChunk(length: common, arrival: 1))
         #expect(two[1] == AskRevealChunk(length: after.characters.count - common, arrival: 1.2))
     }

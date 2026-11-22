@@ -94,32 +94,33 @@ import Testing
         // The expiry ABANDONS: it cancels and returns without waiting. What is
         // pinned here is that the cancellation is delivered at all.
         //
-        // Awaited through a continuation the abandoned body resumes, rather
-        // than slept past: a fixed margin is a guess about how long a
-        // cancellation takes to be delivered, and a busy machine, such as one
-        // running the push gate's builds, outlasts the guess.
-        let cancelled = Mutex(false)
-        let delivered = Mutex<CheckedContinuation<Void, Never>?>(nil)
-        async let signal: Void = withCheckedContinuation { continuation in
-            delivered.withLock { $0 = continuation }
-        }
+        // Heard through a stream the abandoned body writes to, rather than
+        // slept past: a fixed margin is a guess about how long a cancellation
+        // takes to be delivered, and a busy machine, such as one running the
+        // push gate's builds, outlasts the guess. The stream buffers, so a
+        // body that hears its cancellation before this test waits is still
+        // heard: a continuation stored by a child task the body could outrun
+        // was resumed by nobody, and held the run for good. The wait ends if
+        // the test is cancelled, as by the suite's time limit, and the body
+        // finishes the stream however it ends, so a body never cancelled
+        // fails this rather than holding it.
+        let (cancellations, cancellation) = AsyncStream<Void>.makeStream()
 
         _ = try await AskDeadline.run(.milliseconds(50)) { () -> String in
             do {
                 try await Task.sleep(for: .seconds(5))
             } catch {
-                cancelled.withLock { $0 = true }
-                // Resume exactly once: the body is abandoned, not awaited, so
-                // nothing else will.
-                delivered.withLock { taken in
-                    taken?.resume()
-                    taken = nil
-                }
+                cancellation.yield()
             }
+            cancellation.finish()
             return "x"
         }
-        await signal
-        #expect(cancelled.withLock { $0 })
+        var heard = false
+        for await _ in cancellations {
+            heard = true
+            break
+        }
+        #expect(heard, "the abandoned body never heard its cancellation")
     }
 
     // MARK: - What makes this a race and not a task group

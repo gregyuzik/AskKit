@@ -189,9 +189,7 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
     func stop() async {
         await hopToTheEngine()
         if parksStop.withLock({ $0 }) {
-            await withCheckedContinuation { parked in
-                parkedStop.withLock { $0 = parked }
-            }
+            await parkedStop.wait(if: { parksStop.withLock { $0 } })
         }
         stops.withLock { $0 += 1 }
         lifecycle.withLock { $0.append("stop") }
@@ -203,9 +201,7 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
         resets.withLock { $0 += 1 }
         lifecycle.withLock { $0.append("reset") }
         if parksReset.withLock({ $0 }) {
-            await withCheckedContinuation { parked in
-                parkedReset.withLock { $0 = parked }
-            }
+            await parkedReset.wait()
         }
         // After the park, as `AskEngine.reset()` cancels whatever is in
         // flight when it runs, not when it was called.
@@ -224,9 +220,7 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
         get async {
             // Once: the read as the parked turn's stream ends.
             if parksKeptConversationRead.withLock({ parks in defer { parks = false }; return parks }) {
-                await withCheckedContinuation { parked in
-                    parkedKeptConversationRead.withLock { $0 = parked }
-                }
+                await parkedKeptConversationRead.wait()
             }
             return keepsConversation.withLock { $0 }
         }
@@ -236,56 +230,46 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
     /// `releaseKeptConversationRead()`: the hop to the engine a turn makes as
     /// its stream ends, for a test to act in.
     let parksKeptConversationRead = Mutex(false)
-    private let parkedKeptConversationRead = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let parkedKeptConversationRead = TestPark()
 
     /// Returns once a read is parked, or once `yieldUntil` gives up.
     func keptConversationReadIsParked() async {
-        await yieldUntil { parkedKeptConversationRead.withLock { $0 != nil } }
+        await yieldUntil { parkedKeptConversationRead.isWaiting }
     }
 
-    /// Let a parked read finish.
+    /// Let a parked read finish, or the next one go on unparked.
     func releaseKeptConversationRead() {
-        parkedKeptConversationRead.withLock { parked in
-            parked?.resume()
-            parked = nil
-        }
+        parkedKeptConversationRead.letGo()
     }
 
     /// Holds `stop()` until `releaseStop()`: Stop's word still on its way to
     /// the engine, for a test to act in.
     let parksStop = Mutex(false)
-    private let parkedStop = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let parkedStop = TestPark()
 
     /// Returns once a stop is parked, or once `yieldUntil` gives up.
     func stopIsParked() async {
-        await yieldUntil { parkedStop.withLock { $0 != nil } }
+        await yieldUntil { parkedStop.isWaiting }
     }
 
     /// Let a parked stop finish, and park no more.
     func releaseStop() {
-        parksStop.withLock { $0 = false }
-        parkedStop.withLock { parked in
-            parked?.resume()
-            parked = nil
-        }
+        parkedStop.letGo(disarming: { parksStop.withLock { $0 = false } })
     }
 
     /// Holds `reset()` until `releaseReset()`: the store mid-way through
     /// swapping one chat for another, for a test to act in.
     let parksReset = Mutex(false)
-    private let parkedReset = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let parkedReset = TestPark()
 
     /// Returns once a parked reset is waiting, or once `yieldUntil` gives up.
     func resetIsParked() async {
-        await yieldUntil { parkedReset.withLock { $0 != nil } }
+        await yieldUntil { parkedReset.isWaiting }
     }
 
-    /// Let a parked reset finish.
+    /// Let a parked reset finish, or the next one go on unparked.
     func releaseReset() {
-        parkedReset.withLock { parked in
-            parked?.resume()
-            parked = nil
-        }
+        parkedReset.letGo()
     }
 
     func prewarm() async {
@@ -304,9 +288,7 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
     func refreshStatus() async {
         refreshes.withLock { $0 += 1 }
         if parksRefresh.withLock({ $0 }) {
-            await withCheckedContinuation { parked in
-                parkedRefresh.withLock { $0 = parked }
-            }
+            await parkedRefresh.wait()
         }
         if let snapshot = refreshSnapshot.withLock({ $0 }) {
             await MainActor.run { status.apply(snapshot) }
@@ -320,19 +302,16 @@ nonisolated final class ScriptedAsker: AskAnswering, @unchecked Sendable {
     /// Compute probe that takes its time, for a test to look at the screen
     /// meanwhile.
     let parksRefresh = Mutex(false)
-    private let parkedRefresh = Mutex<CheckedContinuation<Void, Never>?>(nil)
+    private let parkedRefresh = TestPark()
 
     /// Returns once a parked refresh is waiting, or once `yieldUntil` gives up.
     func refreshIsParked() async {
-        await yieldUntil { parkedRefresh.withLock { $0 != nil } }
+        await yieldUntil { parkedRefresh.isWaiting }
     }
 
-    /// Let a parked refresh finish.
+    /// Let a parked refresh finish, or the next one go on unparked.
     func releaseRefresh() {
-        parkedRefresh.withLock { parked in
-            parked?.resume()
-            parked = nil
-        }
+        parkedRefresh.letGo()
     }
 
     func resume(from tail: [AskThreadTail]) async {
@@ -451,29 +430,22 @@ nonisolated final class OverviewHook: Sendable {
     /// Whether a read waits until `release()`: a host's overview that counts
     /// its library over the network, or never returns.
     let parks = Mutex(false)
-    private let parked = Mutex<[CheckedContinuation<Void, Never>]>([])
+    private let parked = TestPark()
 
     func enter() async {
         ranOnTheMainThread.withLock { $0.append(pthread_main_np() != 0) }
         guard parks.withLock({ $0 }) else { return }
-        await withCheckedContinuation { continuation in
-            parked.withLock { $0.append(continuation) }
-        }
+        await parked.wait(if: { parks.withLock { $0 } })
     }
 
     /// Returns once a read is parked, or once `yieldUntil` gives up.
     func isParked() async {
-        await yieldUntil { parked.withLock { !$0.isEmpty } }
+        await yieldUntil { parked.isWaiting }
     }
 
     /// Let every parked read finish, and park no more.
     func release() {
-        parks.withLock { $0 = false }
-        let waiting = parked.withLock { parked in
-            defer { parked = [] }
-            return parked
-        }
-        for continuation in waiting { continuation.resume() }
+        parked.letGo(disarming: { parks.withLock { $0 = false } })
     }
 }
 
@@ -485,7 +457,7 @@ nonisolated final class PerformLog: Sendable {
     /// `release()`: a host's perform that takes its time, such as a network
     /// call, for a test to change the chat while it runs.
     let parks = Mutex(false)
-    private let parked = Mutex<[CheckedContinuation<Void, Never>]>([])
+    private let parked = TestPark()
     /// Whether each perform ran on the main thread, in order.
     let ranOnTheMainThread = Mutex<[Bool]>([])
     /// The thread file to read as each perform begins, or nil for none.
@@ -502,26 +474,19 @@ nonisolated final class PerformLog: Sendable {
         }
         log.withLock { $0.append(proposal) }
         guard parks.withLock({ $0 }) else { return }
-        await withCheckedContinuation { continuation in
-            parked.withLock { $0.append(continuation) }
-        }
+        await parked.wait(if: { parks.withLock { $0 } })
     }
 
     var proposals: [AskProposal] { log.withLock { $0 } }
 
     /// Returns once a perform is parked, or once `yieldUntil` gives up.
     func isParked() async {
-        await yieldUntil { parked.withLock { !$0.isEmpty } }
+        await yieldUntil { parked.isWaiting }
     }
 
     /// Let every parked perform finish, and park no more.
     func release() {
-        parks.withLock { $0 = false }
-        let waiting = parked.withLock { parked in
-            defer { parked = [] }
-            return parked
-        }
-        for continuation in waiting { continuation.resume() }
+        parked.letGo(disarming: { parks.withLock { $0 = false } })
     }
 }
 
