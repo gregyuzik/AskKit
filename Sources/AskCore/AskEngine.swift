@@ -1722,7 +1722,10 @@ public actor AskEngine<Domain: AskDomain> {
                 // before, with the app's search between. A rollover's re-ask
                 // is judged as any ask: asked with little left it is not
                 // cooled, and silent through most of the deadline it is the
-                // half-open connection this is for.
+                // half-open connection this is for. The deadline and the ask
+                // are both read on `ContinuousClock`, which counts on while
+                // the app is suspended, so a turn that outlived a suspension
+                // after its ask reads as silent, and can cool the tier once.
                 let given = askedAt.withLock { $0 }.map { deadline - $0 }
                 let heard = measuring.withLock { $0.snapshots } > 0 || calls > 0
                     || firstTool.withLock { $0 } != nil
