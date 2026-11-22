@@ -2673,8 +2673,19 @@ public final class AskConversationStore<Domain: AskDomain> {
         // queue, not this one, and may still be about to hold the place for a
         // chat they couldn't file or move (`endingWrites`).
         await persisting?.value
+        // Refused, unless the reader has asked for something else since,
+        // which then says what came of it: two lines over one list, or one
+        // over a sheet New Chat or another chat closed.
+        func refusal() -> AskChatOpenOutcome { request == chatRequests ? .refused : .gaveWay }
+        // Chosen again once it is on screen: a second tap on its row, landing
+        // after the first opened it. Its filing goes once it is written as
+        // the thread, so read now it would look gone.
+        if summary.id == openedChatID {
+            report(request == chatRequests ? .opened : .gaveWay)
+            return
+        }
         guard heldThread == nil else {
-            report(.refused)
+            report(refusal())
             return
         }
         let read = await archive.entries(for: summary.id)
@@ -2687,7 +2698,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             if case .empty = read { await archive.remove(summary.id) }
             // Said over a list that no longer has a chat gone from disk.
             await loadHistory()
-            report(.refused)
+            report(refusal())
             return
         }
         // A question waiting to be asked waits on, to be asked on this chat,
@@ -2741,7 +2752,7 @@ public final class AskConversationStore<Domain: AskDomain> {
                     // The chat stays, with the turn this stopped: saved as Stop
                     // saves one, since its own task returned without a save.
                     if settled { persist() }
-                    report(.refused)
+                    report(refusal())
                     return
                 }
                 filedOnce = true

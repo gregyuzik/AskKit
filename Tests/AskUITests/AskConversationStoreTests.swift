@@ -3784,6 +3784,63 @@ import Testing
         #expect(reports.onScreen.last == ["Which records do I own?"])
     }
 
+    @Test func aChatChosenAgainOnceItIsOnScreenSaysItOpened() async throws {
+        // The sheet stays up until the chat it opens is on screen, so a second
+        // tap on its row can land after the first opened it. Its filing was
+        // gone by then, written as the thread, and the open said it couldn't
+        // open over the chat it had just opened.
+        let threadURL = temporaryLocation("askkit-open-twice").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-twice")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+
+        let reports = OpenReports(store)
+        await store.openThread(earlier, reporting: reports.note)
+        await store.openThread(earlier, reporting: reports.note)
+        await store.flushPersistence()
+        #expect(reports.outcomes == [.opened, .opened])
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+        #expect(await entriesOnDisk(threadURL) == ["Which records do I own?"])
+    }
+
+    @Test func anOpenRefusedAfterTheReaderAskedForSomethingElseGivesWayToIt() async throws {
+        // Refused once New Chat was tapped, the open said so too, and its
+        // alert would stand over the one New Chat's own outcome brings, or
+        // over a sheet it closed.
+        let threadURL = temporaryLocation("askkit-open-refused-late").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-refused-late")
+        defer {
+            makeWritable(archiveDirectory)
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+        try setMode(0o500, archiveDirectory)
+
+        let filing = Park()
+        filing.parks.withLock { $0 = true }
+        store.whileFilingTheChatOnScreen = { await filing.wait() }
+        let reports = OpenReports(store)
+        let opening = Task { await store.openThread(earlier, reporting: reports.note) }
+        await filing.isParked()
+        store.startOver()
+        filing.release()
+        await opening.value
+        await store.flushPersistence()
+        #expect(reports.outcomes == [.gaveWay])
+    }
+
     @Test func aTurnStoppedByAnOpenThatCouldNotFileTheChatIsSaved() async throws {
         // The open stops the turn in flight and then finds the chat on screen
         // can't be filed, so the chat stays; its stopped turn is saved as
