@@ -33,8 +33,9 @@ nonisolated public protocol AskModelSeam: Sendable {
         instructions: String
     ) async throws -> AskSessionBox?
 
-    /// A network or service failure: sit the tier out for a while and let the
-    /// one below answer. The mirror learns of it now, and again when the
+    /// A network or service failure, or a generation the turn's deadline gave
+    /// up on having heard nothing from the tier: sit the tier out for a while
+    /// and let the one below answer. The mirror learns of it now, and again when the
     /// cooldown lifts, so the tier caption comes and goes with it.
     func noteTransportFailure(on tier: AskTier) async
 
@@ -42,8 +43,12 @@ nonisolated public protocol AskModelSeam: Sendable {
     /// generations run one at a time. Private Cloud Compute passes straight
     /// through, since it contends for none of the on-device runtime.
     ///
-    /// `body` runs on its caller's actor, as `nonisolated(nonsending)` says.
-    /// That is spelled out rather than left to `NonisolatedNonsendingByDefault`,
+    /// `body` runs in the isolation of the code that calls it, as
+    /// `nonisolated(nonsending)` says: a seam that is an actor and calls it
+    /// from its own isolation holds every other caller through each
+    /// synchronous stretch of the generation, an engine's per-snapshot work
+    /// among them, so `AppleModelSeam` calls it on no actor. That is spelled
+    /// out rather than left to `NonisolatedNonsendingByDefault`,
     /// which AskKit builds with and a host may not: a conformance copied from
     /// this line conforms under either posture. Under the feature, a plain
     /// `@Sendable () async throws -> T` is the same type.

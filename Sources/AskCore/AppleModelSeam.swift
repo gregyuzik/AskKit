@@ -46,7 +46,8 @@ public actor AppleModelSeam: AskModelSeam {
     /// long.
     nonisolated public static let reprobeInterval: Duration = .seconds(60)
     /// How long Private Cloud Compute sits out after a transport failure that
-    /// did not say when to come back, so a burst of questions on a bad
+    /// did not say when to come back, or a generation the turn's deadline gave
+    /// up on having heard nothing from it, so a burst of questions on a bad
     /// connection does not wait on it every time. A rate limit that names its
     /// reset is held until then instead.
     nonisolated public static let transportCooldown: Duration = .seconds(60)
@@ -249,13 +250,18 @@ public actor AppleModelSeam: AskModelSeam {
             return AskTierState(tier: .privateCloud, speaksLanguage: true, unavailability: .offline)
         }
         let available = probeAvailability()
+        // The locale probe first, the one await: it can take up to
+        // `privateCloudReadBound`, and the holds read after it, in one
+        // stretch, so a quota or a cooldown noted while it ran is in the
+        // state rather than missed, and the turn isn't spent learning it.
+        let speaksLanguage = available ? Self.speaksLanguage(probed: await speaksAppLanguage(.privateCloud)) : true
         var quotaReached = isQuotaHeld
         if available, let model = model() {
             quotaReached = quotaReached || model.quotaUsage.isLimitReached
         }
         return AskTierState(
             tier: .privateCloud,
-            speaksLanguage: available ? Self.speaksLanguage(probed: await speaksAppLanguage(.privateCloud)) : true,
+            speaksLanguage: speaksLanguage,
             quotaReached: quotaReached,
             isCooled: isHeld(cooledUntil),
             unavailability: available ? nil : (probe?.reason ?? .unknown)
@@ -841,14 +847,34 @@ public actor AppleModelSeam: AskModelSeam {
     ///
     /// While the host holds inference, neither tier's runs: this throws
     /// `AskInferenceHold.HeldError`.
+    ///
+    /// **`body` runs on no actor**, the seam's included. An engine's snapshot
+    /// loop runs inside it, and on the seam's actor every engine's reads of
+    /// the tiers, the mirror's refreshes and the failures its sessions note
+    /// would queue behind each snapshot's work.
     public func withGeneration<T: Sendable>(
         onDevice: Bool,
         _ body: nonisolated(nonsending) @Sendable () async throws -> T
     ) async throws -> T {
-        let held = isHeld()
+        try await Self.generate(
+            onDevice: onDevice, held: isHeld(), gate: gate, deadline: holderDeadline,
+            logSubsystem: logSubsystem, body
+        )
+    }
+
+    /// `withGeneration`'s body, at the generation gate when `onDevice` or
+    /// `held` says so, run off the seam's actor.
+    @concurrent nonisolated private static func generate<T: Sendable>(
+        onDevice: Bool,
+        held: Bool,
+        gate: AskGenerationGate,
+        deadline: Duration,
+        logSubsystem: String,
+        _ body: nonisolated(nonsending) @Sendable () async throws -> T
+    ) async throws -> T {
         guard onDevice || held else { return try await body() }
         return try await AskGenerationGate.run(
-            gate: gate, deadline: holderDeadline, logSubsystem: logSubsystem, held: held
+            gate: gate, deadline: deadline, logSubsystem: logSubsystem, held: held
         ) { try await body() }
     }
 
