@@ -101,9 +101,9 @@ import Testing
         // body that hears its cancellation before this test waits is still
         // heard: a continuation stored by a child task the body could outrun
         // was resumed by nobody, and held the run for good. The wait ends if
-        // the test is cancelled, as by the suite's time limit, and the body
-        // finishes the stream however it ends, so a body never cancelled
-        // fails this rather than holding it.
+        // the test is cancelled, so a body never cancelled fails this at the
+        // suite's time limit rather than holding the run; the body finishes
+        // the stream however its sleep ends, for one that ends some other way.
         //
         // **The body waits an hour, so only the cancellation ends it.** One
         // that could finish first raced the deadline on the wall clock, and

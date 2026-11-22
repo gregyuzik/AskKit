@@ -12,8 +12,13 @@ import Synchronization
 /// its flag was read in another can miss a let-go that falls between the
 /// two, or that comes before the call arrives, as one does when the test's
 /// wait for the park gives up under load; nothing resumes it then, and the
-/// run it is in never ends. Here the flag is read and the waiter stored under
-/// the park's own lock, and a let-go is taken under it too.
+/// run it is in never ends. Here a waiter is stored, and a let-go taken, under
+/// the park's own lock, by one of two means. A park whose let-go clears its
+/// flag reads that flag in `wait(if:)` and clears it in `letGo(disarming:)`,
+/// both under the park's lock, so a call that read it set is already waiting
+/// when the let-go comes. A park whose flag stays set reads it outside and
+/// waits in `wait()`, and its `letGo()` keeps a let-go that found nobody
+/// waiting, so the call that arrives late goes straight on.
 ///
 /// Compiled into AskCoreTests and, through a link, AskUITests: edit this
 /// file, never the link.

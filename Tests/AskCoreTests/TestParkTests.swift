@@ -1,3 +1,6 @@
+// Behind the fakes' own gate: `yieldUntil` lives in Fakes.swift.
+#if canImport(FoundationModels) && !os(tvOS)
+
 import Synchronization
 import Testing
 
@@ -89,3 +92,5 @@ import Testing
         for waiter in waiters { await waiter.value }
     }
 }
+
+#endif
