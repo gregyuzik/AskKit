@@ -38,7 +38,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 - **Scripts.** `scripts/make-demo-icon.py` draws the icon on `docs/images/social-preview-card.png`, the
   card without it, and writes `docs/images/social-preview.png` from that, so a run no longer depends on
   the one before. It drew over the last run's card, so each run's icon went over the one before it, and
-  their edges showed through.
+  their edges showed through. It also converts the icon from `ictool`'s Display P3 to the card's sRGB
+  before drawing it, so the card's plates have the README icon's colors: they were P3 values read as
+  sRGB, duller where the plates are most saturated.
 
 ## [0.7.2] - 2026-11-09
 

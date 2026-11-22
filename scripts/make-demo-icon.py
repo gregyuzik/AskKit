@@ -21,12 +21,12 @@ scaled together to `STACK_WIDTH` of the 1024 grid and centred on `STACK_CENTRE`.
 - `docs/images/icon.png` and `icon-dark.png` — the icon atop the README, rendered by Icon Composer's
   `ictool` in light and dark.
 - `docs/images/social-preview.png` — GitHub's card for the repository: the icon, rendered by
-  `ictool`, laid at `SOCIAL_TILE` over `docs/images/social-preview-card.png`, the card without it,
-  so every run draws on the same card rather than on the last run's icon. That card holds the
-  field, the tile's shadow, the badge and the words. Their source is lost, so a change to them is an
-  edit to that image; where the icon goes it holds a smooth fill of the field and shadow around it,
-  which shows only through the icon's edge and corners. GitHub shows a new card only once it's
-  uploaded in the repository's settings.
+  `ictool` and converted from Display P3 to the card's sRGB, laid at `SOCIAL_TILE` over
+  `docs/images/social-preview-card.png`, the card without it, so every run draws on the same card
+  rather than on the last run's icon. That card holds the field, the tile's shadow, the badge and
+  the words. Their source is lost, so a change to them is an edit to that image; where the icon goes
+  it holds a smooth fill of the field and shadow around it, which shows only through the icon's edge
+  and corners. GitHub shows a new card only once it's uploaded in the repository's settings.
 
 The three PNGs under `docs/images/` then go through `oxipng -o max --strip safe` when oxipng is
 installed (`brew install oxipng`), which is lossless and keeps their color profile; without it they
@@ -43,6 +43,7 @@ numpy, shapely and Pillow:
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import shutil
@@ -51,7 +52,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageCms, ImageDraw
 from shapely import affinity
 from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
@@ -300,7 +301,9 @@ def write_stack(shapes: list[Polygon]) -> None:
 
 
 def render_social_preview() -> None:
-    """The icon laid over the card without it, at `SOCIAL_TILE`, written as GitHub's card."""
+    """The icon laid over the card without it, at `SOCIAL_TILE`, written as GitHub's card. `ictool`
+    renders in Display P3 and the card is sRGB, so the icon's colors are converted to the card's
+    profile first, relative colorimetric: a plate color outside sRGB is clipped to its edge."""
     with tempfile.TemporaryDirectory() as scratch:
         tile = Path(scratch) / "tile.png"
         subprocess.run([str(ictool()), str(ICON), "--export-image", "--output-file", str(tile),
@@ -308,8 +311,15 @@ def render_social_preview() -> None:
                         "--scale", "1", "--design-generation", "27"], check=True, capture_output=True)
         left, top, side = SOCIAL_TILE
         base = Image.open(SOCIAL_CARD)
+        render = Image.open(tile)
+        source = io.BytesIO(render.info.get("icc_profile") or DISPLAY_P3.read_bytes())
+        icon = render.convert("RGBA")
+        converted = ImageCms.profileToProfile(icon.convert("RGB"), ImageCms.ImageCmsProfile(source),
+                                              ImageCms.ImageCmsProfile(io.BytesIO(base.info["icc_profile"])),
+                                              renderingIntent=ImageCms.Intent.RELATIVE_COLORIMETRIC)
+        converted.putalpha(icon.getchannel("A"))
         card = base.convert("RGBA")
-        card.alpha_composite(Image.open(tile).convert("RGBA").resize((side, side), Image.LANCZOS), (left, top))
+        card.alpha_composite(converted.resize((side, side), Image.LANCZOS), (left, top))
         card.convert("RGB").save(SOCIAL_PREVIEW, optimize=True, icc_profile=base.info["icc_profile"])
 
 
