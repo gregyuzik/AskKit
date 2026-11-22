@@ -736,6 +736,34 @@ import Testing
         #expect(setAsideFiles(in: folder).isEmpty)
     }
 
+    @Test func aThreadSetAsideWithARowThisBuildCannotReadIsFiledAndKeptWhole() async throws {
+        // A newer build wrote the row under another key. What decodes is
+        // filed, as for a turn that won't decode, and the file is kept whole
+        // as an original: removed, it took the row with it. A later launch of
+        // this build, which still reads it in part, leaves the original be.
+        let (folder, url) = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data("{not a thread".utf8).write(to: url)
+        let store = AskThreadStore<FakeRow>(appDirectory: "unused", url: url)
+        #expect(await store.setAsideIfNotAThread())
+        let aside = try #require(setAsideFiles(in: folder).first)
+        let bytes = Data(#"""
+            [{"question":"What do I own?","text":"Rumours and Go.","tier":"privateCloud","askedAt":800000000,
+              "answer":{"text":"Rumours and Go.","matches":[{"id":"r","displayTitle":"Rumours"},{"id":"g","title":"Go"}]}}]
+            """#.utf8)
+        try bytes.write(to: aside)
+
+        let archive = archive(in: folder)
+        #expect(await store.recoverSetAside(into: archive) == 1)
+        #expect(await archive.summaries().map(\.title) == ["What do I own?"])
+        #expect(setAsideFiles(in: folder).isEmpty)
+        #expect(try originalFiles(in: folder).map { try Data(contentsOf: $0) } == [bytes])
+
+        #expect(await store.recoverSetAside(into: archive) == 0)
+        #expect(try originalFiles(in: folder).map { try Data(contentsOf: $0) } == [bytes])
+        #expect(await archive.summaries().count == 1)
+    }
+
     @Test func aThreadSetAsideThatStillWillNotReadStaysSetAside() async throws {
         let (folder, url) = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

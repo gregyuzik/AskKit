@@ -232,7 +232,12 @@ public actor AskThreadArchive<Row: AskRow> {
     /// the only copy of the turns that didn't decode. A caller that opens one
     /// (`dropped` above zero) must keep it filed rather than remove it; the
     /// filing of the chat it becomes then goes beside it, never over it
-    /// (`archive(_:at:)`).
+    /// (`archive(_:at:)`). A filing whose rows alone didn't all decode reads
+    /// as whole here: opened, and filed again, it costs those rows, as the
+    /// thread's next save costs its own (`AskThreadStore.load()`), and as the
+    /// chat on screen shows it. Only the archive's own writes, which the
+    /// reader doesn't make, leave such a filing as it is
+    /// (`settleProposal`, `merge`).
     package func entries(for id: UUID) -> AskThreadRead<Row> {
         guard !pendingDeletions.contains(id), let url = url(for: id) else { return .empty }
         let (read, failure, droppedRows) = contents(of: url)
@@ -369,8 +374,8 @@ public actor AskThreadArchive<Row: AskRow> {
     /// How `AskThreadStore.recoverSetAside` puts a thread back: filed over its
     /// chat's filing instead, a thread kept aside would cost the turns asked
     /// since, or the filing would cost the turns only it holds. Never into a
-    /// filing that doesn't read whole: joined with what decoded, the rest
-    /// would be written over. Beside it instead, as a chat of their own, when
+    /// filing that doesn't read whole, a turn or a row in it left out: joined
+    /// with what decoded, the rest would be written over. Beside it instead, as a chat of their own, when
     /// `filingIfNew`, as `archive(_:at:sparing:)` files a chat beside such a
     /// filing: a thread set aside that waited for that filing to read whole
     /// would wait for good, out of History all the while.
@@ -384,8 +389,9 @@ public actor AskThreadArchive<Row: AskRow> {
         guard let url = url(for: earlier.id) else { return .notFiled }
         let merged: [AskThreadEntry<Row>]
         var id = earlier.id
-        switch contents(of: url).read {
-        case .thread(let filed, let dropped) where dropped == 0:
+        let (read, _, droppedRows) = contents(of: url)
+        switch read {
+        case .thread(let filed, let dropped) where dropped == 0 && droppedRows == 0:
             merged = AskThreadEntry.merging(entries, into: filed)
         case .empty:
             merged = entries
@@ -436,8 +442,10 @@ public actor AskThreadArchive<Row: AskRow> {
     /// an earlier chat opened in its place, still reaches the card: the chat
     /// read back says what came of it, and never offers the action again.
     /// Only the chat's file is written, since its title, dates and count are
-    /// as they were, and only a filing every turn of which decodes: written
-    /// back from what decoded, it would lose the rest. A row in it that
+    /// as they were, and only a filing every turn and row of which decodes:
+    /// written back from what decoded, it would lose the rest for good, which
+    /// a newer build may have written. That card reads back with what came of
+    /// the yes unknown, and takes no tap. A row in it that
     /// decodes and won't encode is left out of its answer, as a filing leaves
     /// one out (`AskThreadStore.encodeEntries(_:logger:)`): kept, it would
     /// refuse the outcome every write.
@@ -450,7 +458,8 @@ public actor AskThreadArchive<Row: AskRow> {
         // holds the turn, but for a chat filed beside one that didn't read
         // whole.
         for summary in readIndex().threads where !pendingDeletions.contains(summary.id) {
-            guard let url = url(for: summary.id), case .thread(let entries, dropped: 0) = contents(of: url).read,
+            guard let url = url(for: summary.id), case let read = contents(of: url), read.droppedRows == 0,
+                  case .thread(let entries, dropped: 0) = read.read,
                   let settled = AskThreadEntry.settlingProposal(asked: question, at: askedAt, with: outcome, in: entries)
             else { continue }
             do {

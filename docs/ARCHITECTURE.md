@@ -554,7 +554,10 @@ A domain whose `persistence` is `.thread` (the default) keeps the thread in
   didn't keeps every other copy of what it was writing.
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
   by entry; a row that no longer decodes costs its answer that row, never the turn, and the read logs
-  how many went. A row that won't encode, such as one holding a NaN, is left out of its answer on disk
+  how many went. The thread's next save, and a chat opened and filed again, write that answer without
+  the row, as the screen shows it; the writes the reader doesn't make, a late outcome into a filing and a
+  chat set aside put back with its chat, leave a file holding such a row as it is, the set-aside one kept
+  as an original. A row that won't encode, such as one holding a NaN, is left out of its answer on disk
   in the same way, and the rest of the turn is written. A model's follow-ups are made plain again as
   they are read, as the engine makes them as it answers, since builds from before 0.1.0 saved them as
   the model wrote them; a domain's own answer, which has no tier, keeps its follow-ups as given.
@@ -582,7 +585,8 @@ New Chat files the finished turns into `AskThreadArchive`:
   open files it again, each filing replacing the last, while the reader marks it meanwhile (a verdict,
   a card's answer).
 
-The History button lists these chats, opens one, and deletes one or all.
+The History button lists these chats, opens one, and deletes one or all. A chat deleted while it opens
+opens nothing, and the chat on screen stays as it was.
 
 **One chat in two places is joined.** A New Chat whose clear failed, or an open cut short, leaves the
 chat in both the thread and a filing. A thread read at launch or again is joined with a filing of the

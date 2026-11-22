@@ -579,6 +579,68 @@ import Testing
         directory.appending(path: "\(id.uuidString).json")
     }
 
+    // MARK: - A row this build can't decode
+
+    /// The filing at `url` with the first match of its last turn as a newer
+    /// build writes it, its title under another key, which this build's `Row`
+    /// can't decode: it reads back without that row. Returns the bytes
+    /// written.
+    private func withARowANewerBuildWrote(in url: URL) throws -> Data {
+        var turns = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        var answer = try #require(turns[turns.count - 1]["answer"] as? [String: Any])
+        var matches = try #require(answer["matches"] as? [[String: Any]])
+        matches[0]["title"] = matches[0].removeValue(forKey: "displayTitle")
+        answer["matches"] = matches
+        turns[turns.count - 1]["answer"] = answer
+        let data = try JSONSerialization.data(withJSONObject: turns)
+        try data.write(to: url)
+        return data
+    }
+
+    @Test func whatCameOfAProposalLeavesAFilingWithARowThisBuildCannotReadAsItIs() async throws {
+        // Written back from what decoded, the filing would lose the row for
+        // good. Left as it is, the card reads back with what came of the yes
+        // unknown, and takes no tap.
+        let (archive, directory) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let asked = Date(timeIntervalSince1970: 1_000_060)
+        let entries = chat(["Which records?"]) + [
+            AskThreadEntry(
+                question: "Can I lend Two?", text: "Two.",
+                answer: AskAnswer(text: "Two.", matches: [Row("Two"), Row("Three")], tiles: []),
+                tier: .privateCloud, askedAt: asked, proposalOutcome: .performing
+            )
+        ]
+        let summary = try #require(await archive.archive(entries))
+        let filed = file(for: summary.id, in: directory)
+        let written = try withARowANewerBuildWrote(in: filed)
+
+        #expect(await archive.settleProposal(asked: "Can I lend Two?", at: asked, with: .confirmed("Lent.")) == false)
+        #expect(try Data(contentsOf: filed) == written)
+    }
+
+    @Test func turnsPutBackBesideAFilingWithARowThisBuildCannotReadLeaveThatFilingAsItIs() async throws {
+        // Joined with what decoded, the filing would be written without the
+        // row. They go beside it, as beside a filing with a turn that won't
+        // decode.
+        let (archive, directory) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let entries = chat(["Which records do I own?", "Any on vinyl?"])
+        let summary = try #require(await archive.archive(entries))
+        let filed = file(for: summary.id, in: directory)
+        let written = try withARowANewerBuildWrote(in: filed)
+        let askedOn = entries + chat(["And on tape?"], from: Date(timeIntervalSince1970: 1_000_120))
+
+        #expect(await archive.merge(askedOn, filingIfNew: false) == .notFiled)
+        guard case .filed(let beside) = await archive.merge(askedOn, filingIfNew: true) else {
+            Issue.record("the turns are filed beside the filing")
+            return
+        }
+        #expect(beside.id != summary.id)
+        #expect(await archive.entries(for: beside.id).entries.map(\.question) == askedOn.map(\.question))
+        #expect(try Data(contentsOf: filed) == written)
+    }
+
     // MARK: - A row that won't encode
 
     /// A chat whose second turn read a row that won't encode, `unwritable`,
