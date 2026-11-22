@@ -270,6 +270,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// (`prewarm()`); a prefill alone warms nothing.
     public var draft: String = "" {
         didSet {
+            composerRevision &+= 1
             // A draft emptied is a new question, whatever the reader goes on to
             // type: the scope a host left with it goes too.
             if draft.isEmpty { draftScope = nil }
@@ -298,6 +299,14 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// The scope `prefill(_:scope:send:)` left with the draft, for the question
     /// the reader sends from it, edited or not, but not once emptied.
     @ObservationIgnored private var draftScope: String?
+    /// Bumped by every write to the draft or the photo waiting with it, so an
+    /// earlier chat opening can tell whether anything has reached the
+    /// composer since the reader's tap, and empty it only if nothing has
+    /// (`open`): a question Stop gave back meanwhile, or one typed or
+    /// prefilled, is newer than the chat they chose. A count, not the
+    /// composer's contents at the tap, since the question Stop gives back
+    /// can be the very words the composer held then.
+    @ObservationIgnored private var composerRevision = 0
     /// Bumped every time the thread is emptied, by New Chat or Delete All, so
     /// the composer can take focus the instant a new chat opens: the composer
     /// of the screen that emptied it, or every screen's where the host did. A
@@ -726,7 +735,9 @@ public final class AskConversationStore<Domain: AskDomain> {
     // MARK: - Asking
 
     /// The photo waiting in the composer for the reader's next question.
-    public private(set) var pendingPhoto: AskPendingPhoto?
+    public private(set) var pendingPhoto: AskPendingPhoto? {
+        didSet { composerRevision &+= 1 }
+    }
 
     /// Ask a question, as a new turn at the foot of the thread. Everything the
     /// turn does arrives as events; the store only writes them onto the turn.
@@ -2565,10 +2576,12 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// filed first, so nothing the reader leaves is discarded to open another:
     /// a chat that can't be filed stays on screen, and nothing opens. The
     /// chosen chat becomes the thread and comes off the list, the composer
-    /// empties, and the engine is handed the chat's tail the way a relaunch
-    /// hands one, so the next question starts its session with a recap. A
-    /// filing of the chat on screen itself, which an interrupted write can
-    /// leave, joins the screen's turns instead, and the chat goes on.
+    /// empties unless anything has reached it since the tap (a question Stop
+    /// gave back, one typed or prefilled while the chat opened), and the
+    /// engine is handed the chat's tail the way a relaunch hands one, so the
+    /// next question starts its session with a recap. A filing of the chat on
+    /// screen itself, which an interrupted write can leave, joins the
+    /// screen's turns instead, and the chat goes on.
     ///
     /// A chat gone from disk leaves the list. One that won't read stays on it
     /// untouched, and nothing opens. Nothing opens either while the thread's
@@ -2583,24 +2596,29 @@ public final class AskConversationStore<Domain: AskDomain> {
         guard offersHistory else { return }
         chatRequests &+= 1
         let request = chatRequests
+        // The composer as the tap left it, which the open empties only if
+        // nothing has written to it by the time the chat lands.
+        let composerAtTheTap = composerRevision
         await queueChatChange { store in
             // After the saved thread is read. Before it, the chat on screen is
             // still empty, so the thread on disk would be written over without
             // being filed, and the read landing afterwards would replace the
             // chat opened.
             await store.restoration().value
-            await store.open(summary, request: request)
+            await store.open(summary, request: request, composerAtTheTap: composerAtTheTap)
         }.value
-        // The reset took the warm, and the composer is empty, so this warms
-        // nothing until the reader types; a chat that rejoined its own filing
-        // kept both, and warms as a return to the app would. Last, so the chat
-        // is on screen before anything could wait on a session being built.
+        // The reset took the warm. With the composer emptied this warms
+        // nothing until the reader types; a question that reached it during
+        // the open, or a chat that rejoined its own filing and kept both,
+        // warms as a return to the app would. Last, so the chat is on screen
+        // before anything could wait on a session being built.
         await rewarm()
     }
 
     /// `openThread`'s change: the chat on screen filed, then the screen, then
-    /// the disk, then the engine.
-    private func open(_ summary: AskThreadSummary, request: Int) async {
+    /// the disk, then the engine. `composerAtTheTap` is `composerRevision` as
+    /// the reader chose the chat.
+    private func open(_ summary: AskThreadSummary, request: Int, composerAtTheTap: Int) async {
         // Read once the writes before it have run: New Chat's run on the write
         // queue, not this one, and may still be about to hold the place for a
         // chat they couldn't file or move (`endingWrites`).
@@ -2657,8 +2675,16 @@ public final class AskConversationStore<Domain: AskDomain> {
         // With nothing on screen to file, it is an ordinary one from here on,
         // as its turns are on screen no more (`endProvisional`, below).
         heldTurnsFiling = nil
-        draft = ""
-        pendingPhoto = nil
+        // Emptied as New Chat empties it, but here, after the reads, rather
+        // than at the tap: an open that gives way or gives up leaves the
+        // draft. So only what the tap left goes. Anything written since is
+        // newer than the chat chosen: a question asked meanwhile, which waits
+        // for the open and which Stop gives back with its scope and photo, or
+        // words typed or prefilled while the chat opened.
+        if composerRevision == composerAtTheTap {
+            draft = ""
+            pendingPhoto = nil
+        }
         declinedStarters = []
         declinedFollowUps = []
         lastTerminalTurn = nil

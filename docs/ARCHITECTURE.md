@@ -711,7 +711,10 @@ and persists, restores and archives the thread.
 - **Order.** New Chat, Delete All Chats, an earlier chat opening and Stop's word to the engine go through
   one queue; a question asked meanwhile waits for the last of them, since asked at once it could land
   before the engine's `stop()` or `reset()`, or on the chat being replaced. One still waiting when an
-  earlier chat opens is asked on that chat.
+  earlier chat opens is asked on that chat. New Chat empties the composer at the tap; an earlier chat
+  opening empties it as the chat lands, after its reads, and only if nothing has written to the draft
+  or the photo since the tap: a question Stop gave back meanwhile, or one typed or prefilled, is newer
+  than the chat chosen, and stays.
 - **The warm session.** The store warms the engine only once the reader's own question begins, on the
   draft's empty-to-non-empty edge: typed, or put back by Edit & Resend or by a Stop before it was asked.
   A prefill isn't that edge, since a link can come from anywhere, but the reader's first edit of it is.

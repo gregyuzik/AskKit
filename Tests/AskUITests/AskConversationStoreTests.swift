@@ -4840,6 +4840,88 @@ import Testing
         #expect(asker.imageLabels.withLock { $0 }.last == ["A shelf"])
     }
 
+    @Test func aQuestionStoppedWhileAnEarlierChatOpensComesBackWithItsScopeAndPhoto() async throws {
+        // The open emptied the composer as it landed, after its reads, so it
+        // took what Stop had just given back.
+        let folder = try privateFolder()
+        defer { try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive, asker) = await cancellingStoreOverASavedThread(folder)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        await store.restoreIfNeeded()
+        asker.parksReset.withLock { $0 = true }
+        store.startOver()
+        await asker.resetIsParked()
+        asker.parksReset.withLock { $0 = false }
+        let opening = Task { await store.openThread(earlier) }
+        for _ in 0..<20 { await Task.yield() }
+
+        store.prefill("Which are on vinyl?", scope: "records")
+        store.attachPhoto(onePixel(), label: "A shelf")
+        store.ask(store.draft)
+        #expect(store.isThinking)
+        store.stop(byReader: true)
+        #expect(store.draft == "Which are on vinyl?")
+        #expect(store.pendingPhoto?.photo.label == "A shelf")
+
+        asker.releaseReset()
+        await opening.value
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+        #expect(store.draft == "Which are on vinyl?")
+        #expect(store.pendingPhoto?.photo.label == "A shelf")
+
+        store.ask(store.draft)
+        await settle(store)
+        #expect(asker.scopes.withLock { $0 }.last == "records")
+        #expect(asker.imageLabels.withLock { $0 }.last == ["A shelf"])
+    }
+
+    @Test func whatIsTypedWhileAnEarlierChatOpensSurvivesIt() async throws {
+        // The open empties the composer only if nothing has written to it
+        // since the tap: what the reader typed after it is newer than the
+        // chat they chose.
+        let folder = try privateFolder()
+        defer { try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive, asker) = await cancellingStoreOverASavedThread(folder)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        await store.restoreIfNeeded()
+        asker.parksReset.withLock { $0 = true }
+        store.startOver()
+        await asker.resetIsParked()
+        asker.parksReset.withLock { $0 = false }
+        store.draft = "Anything"
+        let opening = Task { await store.openThread(earlier) }
+        for _ in 0..<20 { await Task.yield() }
+
+        store.draft = "Anything from 1969?"
+        asker.releaseReset()
+        await opening.value
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+        #expect(store.draft == "Anything from 1969?")
+    }
+
+    @Test func whatTheComposerHeldAtTheTapGoesWithAnEarlierChatOpening() async throws {
+        // Nothing written since the tap, the open empties it, as New Chat does.
+        let folder = try privateFolder()
+        defer { try? FileManager.default.removeItem(at: folder.folder) }
+        let (store, archive, asker) = await cancellingStoreOverASavedThread(folder)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        await store.restoreIfNeeded()
+        asker.parksReset.withLock { $0 = true }
+        store.startOver()
+        await asker.resetIsParked()
+        asker.parksReset.withLock { $0 = false }
+        store.prefill("Which are on vinyl?", scope: "records")
+        store.attachPhoto(onePixel(), label: "A shelf")
+        let opening = Task { await store.openThread(earlier) }
+        for _ in 0..<20 { await Task.yield() }
+
+        asker.releaseReset()
+        await opening.value
+        #expect(store.turns.map(\.question) == ["Which records do I own?"])
+        #expect(store.draft.isEmpty)
+        #expect(store.pendingPhoto == nil)
+    }
+
     @Test func aQuestionAskedRightAfterNewChatBeforeTheThreadIsReadIsAnsweredOnTheNewChat() async throws {
         // Before the read, New Chat and the question must run in the order
         // they were asked: woken in either order by the read, the question

@@ -32,6 +32,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   put the question back nowhere. `AskConversationStore.retry(_:)` now does nothing until the change is
   done, and the thread hides Try Again meanwhile, so after a Stop before the first word it appears a
   moment after the line that says the reader stopped the answer.
+- **Opening an earlier chat keeps what reached the composer while it opened.** The open emptied the
+  draft and the photo as the chat landed, after reading the chat and filing the one on screen. A
+  question asked meanwhile waits for the open, and Stop gives it back to the composer with its scope
+  and photo, so the open then erased it, and anything typed or prefilled while the chat opened went the
+  same way. The open now empties the composer only if nothing has written to the draft or the photo
+  since the reader chose the chat.
 
 ## [0.7.2] - 2026-11-09
 
