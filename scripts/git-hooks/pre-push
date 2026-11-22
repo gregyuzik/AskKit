@@ -236,62 +236,10 @@ fi
 sim=$(gate_sim "iPhone 18 Pro") || exit 1
 gate_lock_sim "$sim"
 
-# The seat goes back as the lock found it: xcodebuild boots one that is down,
-# so the gate shuts it down again, and only then lets the lock go, so the next
-# holder never gets it mid-shutdown. This replaces gate_lock_sim's trap, which
-# only lets the lock go. When simctl can't say what is booted, the gate counts
-# the seat as booted already and leaves it up: a seat left running costs
-# memory, and one shut down under someone costs their run.
-if booted=$(xcrun simctl list devices booted 2>/dev/null); then
-  case $booted in
-    *"$sim"*) booted_here=0 ;;
-    *) booted_here=1 ;;
-  esac
-else
-  booted_here=0
-fi
-
-# Whether a test run is live on the seat, which nothing should start without
-# the lock but Xcode or a hand-run xcodebuild can: its runner's environment
-# names the session. hold-sim.sh asks the same before it shuts a seat down.
-test_run_live() {
-  # shellcheck disable=SC2009 # pgrep can't match a process's environment
-  ps -axwwE -o command= 2>/dev/null | grep -F "/Devices/$1/" |
-    grep -q -E 'XCTestSessionIdentifier=|XCTestConfigurationFilePath='
-}
-
-# Shuts the seat down, waiting at most a minute: the lock stays held until
-# then, and a hung simctl would hold it, and every gate behind it, for good.
-shut_down() {
-  xcrun simctl shutdown "$1" >/dev/null 2>&1 &
-  shut_pid=$!
-  waited=0
-  while kill -0 "$shut_pid" 2>/dev/null; do
-    if [ "$waited" -ge 60 ]; then
-      echo "pre-push: simulator $1 is still shutting down after a minute; letting the lock go" >&2
-      kill "$shut_pid" 2>/dev/null || true
-      return 0
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-}
-
-seat_back() {
-  if [ "$booted_here" = 1 ]; then
-    if test_run_live "$sim"; then
-      echo "pre-push: left simulator $sim booted: a test run is live on it" >&2
-    else
-      echo "pre-push: shutting down simulator $sim, which this gate booted" >&2
-      shut_down "$sim"
-    fi
-  fi
-  # shellcheck disable=SC2154 # gate_lock_sim sets it
-  rm -rf "$gate_sim_lock_"
-}
-trap seat_back EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
+# The seat goes back as the lock found it when the gate exits: gate_lock_sim's
+# trap shuts it down again if simctl listed it Shutdown when the lock was
+# taken and no test run is live on it, and only then lets the lock go.
+# INT and TERM exit into the trap.
 
 ASKKIT_SIM=$sim ./scripts/ci.sh test-ios || exit 1
 
