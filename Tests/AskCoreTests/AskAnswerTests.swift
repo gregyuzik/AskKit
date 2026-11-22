@@ -55,6 +55,32 @@ import Testing
         #expect(Answer.cleanedFollowUps(["", "   ", "ok?"]) == ["ok?"])
     }
 
+    // MARK: - Follow-ups the reply's structure ran into
+
+    @Test func aChipLosesTheReplysStructureAndTheTokenWrittenAfterItsQuestion() {
+        // From the on-device model, as the chip showed it: the reply's
+        // closing brackets and a control token from its vocabulary after the
+        // question, which the chip drew and a tap would have sent.
+        #expect(Answer.cleanedFollowUps(["「どの本が一番古いですか？」]}<ctrl46>}"]) == ["「どの本が一番古いですか？」"])
+        // The same in Russian, after a quote the reply left open, and in Thai,
+        // whose question ends with no mark to cut after.
+        #expect(Answer.cleanedFollowUps(["Какая книга самая старая?\"]}<ctrl46>", "เล่มไหนเก่าที่สุด\"]}"])
+                == ["Какая книга самая старая?", "เล่มไหนเก่าที่สุด"])
+        // And a token in the other form a model's vocabulary writes them.
+        #expect(Answer.cleanedFollowUps(["Which is oldest?<|end|>\"}"]) == ["Which is oldest?"])
+    }
+
+    @Test func aChipOfNothingButTheReplysStructureIsNone() {
+        #expect(Answer.cleanedFollowUps(["]}<ctrl46>}", "\"]}", "<ctrl12>Which?", "ok?"]) == ["ok?"])
+    }
+
+    @Test func bracketsAChipOpensItKeeps() {
+        // Only a bracket or a brace that closes nothing the chip opened is the
+        // reply's, and only a token in a vocabulary's own form is a token.
+        #expect(Answer.cleanedFollowUps(["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
+                == ["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
+    }
+
     // MARK: - Follow-ups as plain text
 
     @Test func followUpsLoseTheBoldTheModelWritesIntoThem() {

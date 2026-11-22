@@ -181,10 +181,11 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    The answer records what grounded it: a tool call, the app's search, the thread's rows on a follow-up,
    or nothing (`AskAnswer.grounding`).
 9. **The answer.** The reply becomes an `AskAnswer`. Its prose loses headings and bullets, its question
-   kind is normalized to the domain's vocabulary, and its follow-ups are cleaned: made plain text (their
-   Markdown read as the prose's, what draws nothing dropped as from a link's question), since a chip
-   shows its text as it is and a tap asks it, then kept only as one line of at most 80 characters,
-   without repeats, two at most. Its tiles are rows the turn or the thread read: at most 24, none for a
+   kind is normalized to the domain's vocabulary, and its follow-ups are cleaned: cut where the reply's
+   structure ran into them (a control token such as `<ctrl46>`, or a `]` or `}` the chip never opened),
+   made plain text (their Markdown read as the prose's, what draws nothing dropped as from a link's
+   question), since a chip shows its text as it is and a tap asks it, then kept only as one line of at
+   most 80 characters, without repeats, two at most. Its tiles are rows the turn or the thread read: at most 24, none for a
    count, a total or a yes-or-no, and otherwise chosen in this order:
    1. when the model says the answer is every match (`showsEveryMatch`), the rows this turn read, never
       for a follow-up that read nothing, which has no set to show whole;

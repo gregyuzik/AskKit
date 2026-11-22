@@ -77,6 +77,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   asterisks and all, and send it back as the question. A model's follow-ups are now cleaned as they are
   read back, as the engine cleans them as it answers. A domain's own answer, which has no tier, keeps
   its follow-ups as the domain gave them.
+- **A follow-up loses what the reply's structure left after its question.** A model that lost its place
+  in the reply wrote on past a follow-up, as the on-device model did with
+  `「どの本が一番古いですか？」]}<ctrl46>}`, and the chip drew the brackets and the control token, and a tap
+  sent them. `AskAnswer.cleanedFollowUps(_:)` now cuts a chip at its first control token (`<ctrl46>`,
+  `<|end|>`), then at the first `]` or `}` that closes nothing the chip opened, trims the quote or
+  separator the cut leaves, and drops a chip with nothing left. It reads the text's shape alone, so it
+  holds in every script, and it cleans the follow-ups read back from disk as well.
 
 ## [0.7.2] - 2026-11-09
 

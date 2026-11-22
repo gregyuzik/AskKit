@@ -347,6 +347,17 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// flags), from the text as written and again from the plain text, since
     /// an entity such as `&#x202E;` reads as the invisible it names.
     ///
+    /// **Without what the reply's structure left in it.** A model that loses
+    /// its place in the reply writes on past the question: the brackets that
+    /// close the reply's fields, then a control token from its vocabulary
+    /// (`「どの本が一番古いですか？」]}<ctrl46>}`, from the on-device model). So a
+    /// chip is cut at its first such token, and then at the first `]` or `}`
+    /// that closes nothing it opened, and loses a quote or separator the cut
+    /// leaves at its end (`withoutReplyResidue(_:)`). Both are read from the
+    /// text's shape alone, so they hold in every script, Thai's questions
+    /// with no mark at their end included (house rule 7): a chip opens what
+    /// it closes. A chip with nothing left is none.
+    ///
     /// The engine cleans every model answer's follow-ups, a domain's `refine`
     /// pass's included. A deterministic answer's are the domain's, and lose
     /// only their duplicates. A domain that builds an
@@ -361,8 +372,10 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             // an invisible still reads as one, and again after: the parse
             // turns an entity into the character it names, and `&#x202E;`
             // names an invisible one.
+            // The reply's residue goes before the Markdown is read too, once
+            // what would hide it is gone: none of it is Markdown.
             let plain = AskPrompt.droppingInvisibles(
-                AskMarkdown.plainText(AskPrompt.tidy(AskPrompt.droppingInvisibles(candidate)))
+                AskMarkdown.plainText(AskPrompt.tidy(withoutReplyResidue(AskPrompt.droppingInvisibles(candidate))))
             )
             .trimmingCharacters(in: .whitespacesAndNewlines)
             // Without a letter or a digit it asks nothing: what is left of a
@@ -377,6 +390,45 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
             if picked.count == maxFollowUps { break }
         }
         return picked
+    }
+
+    /// `chip` without what followed its question once the model lost its place
+    /// in the reply (`cleanedFollowUps(_:)`), or as it is where nothing did:
+    ///
+    /// 1. Cut at its first control token, in either form a model's vocabulary
+    ///    writes one: `<ctrl46>`, `<|end|>`. Nothing a reader asks is spelled
+    ///    so, and what follows one is the model's, not the question.
+    /// 2. Then cut at the first `]` or `}` that closes no `[` or `{` before it
+    ///    in the chip: the reply's own fields closing.
+    /// 3. Then, where either cut, trimmed of what the cut left at its end:
+    ///    space, a `,` or `:` between the reply's fields, and a `"` that
+    ///    closes no quote the chip opened.
+    static func withoutReplyResidue(_ chip: String) -> String {
+        var kept = Substring(chip)
+        if let token = kept.firstRange(of: /<ctrl\d+>|<\|[^|<>\s]*\|>/) {
+            kept = kept[..<token.lowerBound]
+        }
+        var squares = 0
+        var braces = 0
+        scan: for index in kept.indices {
+            switch kept[index] {
+            case "[": squares += 1
+            case "{": braces += 1
+            case "]" where squares == 0, "}" where braces == 0:
+                kept = kept[..<index]
+                break scan
+            case "]": squares -= 1
+            case "}": braces -= 1
+            default: break
+            }
+        }
+        guard kept.endIndex != chip.endIndex else { return chip }
+        while let last = kept.last {
+            let unpairedQuote = last == "\"" && kept.count(where: { $0 == "\"" }) % 2 == 1
+            guard last.isWhitespace || last == "," || last == ":" || unpairedQuote else { break }
+            kept.removeLast()
+        }
+        return String(kept)
     }
 
     /// A domain's own follow-ups, as given but for the empty and the
