@@ -1096,6 +1096,14 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// tap already was the reader choosing to ask, and never for a link, which
     /// can come from anywhere.
     ///
+    /// **Sent only where the composer would send it.** On the first screen of
+    /// a device that can't serve, whose composer is disabled
+    /// (`AskStage.Phase.cannotServe`, for a domain that can't answer without
+    /// a model), `send: true` leaves the question in the composer unsent, as
+    /// without it: asked, it would fail as that screen's reason, in that
+    /// screen's place, and left there it is ready once something can serve.
+    /// A host's own `ask(_:origin:)` is its call, and goes on to the engine.
+    ///
     /// Clamped like any question, and an empty one does nothing. A draft the
     /// reader was halfway through is replaced: the entry point is the newer
     /// intent. A question left in the composer warms no session until the
@@ -1112,7 +1120,7 @@ public final class AskConversationStore<Domain: AskDomain> {
     public func prefill(_ question: String, scope: String? = nil, send: Bool = false) {
         let clamped = AskPrompt.clampQuestion(question)
         guard !clamped.isEmpty else { return }
-        if send {
+        if send, !composerIsDisabled {
             ask(clamped, origin: .prefilled, scope: scope)
         } else {
             isPrefilling = true
@@ -2917,7 +2925,8 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// without a model. A domain that can keeps it live, since its own data
     /// can still route a typed question. A thread with turns never disables
     /// it, a turn in flight included. The composer and its face in the slot
-    /// both read this.
+    /// both read this, and so does `prefill(_:scope:send:)`, which sends only
+    /// where the composer would.
     var composerIsDisabled: Bool {
         if case .cannotServe = stage.phase {
             return !domain.answersWithoutModel

@@ -1096,6 +1096,54 @@ import Testing
         #expect(store.stage.phase == .thread)
     }
 
+    @Test func aPrefillSentOnTheCannotServeScreenWaitsInTheComposer() async {
+        // Sent, it would be a turn the disabled composer wouldn't send, failed
+        // in place of the screen that says why. It waits there unsent, as a
+        // prefill that doesn't send does, for once something can serve.
+        let asker = ScriptedAsker(.init(events: [.answer(.of("An answer."))]))
+        let store = makeStore(asker: asker)
+        await store.refresh()
+        store.status.apply(.init(nextTier: nil, unavailability: .deviceNotEligible))
+        #expect(store.composerIsDisabled)
+
+        store.prefill("Which are on vinyl?", scope: "records", send: true)
+        #expect(store.turns.isEmpty)
+        #expect(!store.isThinking)
+        #expect(store.draft == "Which are on vinyl?")
+        #expect(store.stage.phase == .cannotServe(.deviceNotEligible))
+        await settle(store)
+        #expect(asker.questions.withLock { $0 }.isEmpty)
+
+        store.status.apply(.init(nextTier: .onDevice))
+        store.ask(store.draft)
+        await settle(store)
+        #expect(asker.questions.withLock { $0 }.map(\.0) == ["Which are on vinyl?"])
+        #expect(asker.scopes.withLock { $0 } == ["records"])
+    }
+
+    @Test func aPrefillSentOnTheCannotServeScreenBeforeTheThreadIsReadWaitsThereToo() async throws {
+        // Before the read the screen holds no turns though the disk may, so it
+        // is the first screen that can't serve, and the question waits in the
+        // composer. Read, the thread outranks that screen, and the question is
+        // there for the reader to send.
+        let url = temporaryLocation("askkit-cannot-serve-before-read").appendingPathExtension("json")
+        await AskThreadStore<UIRow>(appDirectory: "unused", url: url).save([earlierEntry("On screen last time")])
+        var domain = UIDomain()
+        domain.persistenceMode = .thread
+        let asker = ScriptedAsker(.init(events: [.answer(.of("An answer."))]))
+        let store = makeStore(domain: domain, asker: asker, threadURL: url)
+        store.status.apply(.init(nextTier: nil, unavailability: .deviceNotEligible))
+        await store.refresh()
+        #expect(store.composerIsDisabled)
+
+        store.prefill("Which are on vinyl?", send: true)
+        #expect(!store.isThinking)
+        await store.restoreIfNeeded()
+        #expect(store.turns.map(\.question) == ["On screen last time"])
+        #expect(store.draft == "Which are on vinyl?")
+        #expect(asker.questions.withLock { $0 }.isEmpty)
+    }
+
     // MARK: - Disk
     //
     // Through `makeStore`, so the archive and the feedback folder are

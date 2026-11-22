@@ -45,6 +45,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   itself. The failed turn's prose kept drawing through the reveal's renderer, rebuilt on each redraw of
   its row, rather than as plain text, and after a question the turn wasn't saved until the next one
   ended, so an app quit meanwhile lost it.
+- **A prefill sent on the first screen of a device that can't serve waits in the composer.**
+  `prefill(_:scope:send: true)` asked the question at once, though that screen's composer is disabled,
+  and the turn failed for the reason the screen gave, in the screen's place. It now leaves the
+  question in the composer unsent, as `send: false` does, ready once something can serve. A domain
+  that answers without a model keeps its composer live there, and sends as before. A host's own
+  `ask(_:origin:)` is unchanged.
 
 ## [0.7.2] - 2026-11-09
 
