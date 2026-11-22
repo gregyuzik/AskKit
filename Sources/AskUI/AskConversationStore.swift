@@ -1320,9 +1320,11 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// once that write has landed, so a chat that ends, or an app that quits,
     /// while it works never offers the action again. A yes the disk refused
     /// is never carried out, and nor is one whose chat ended before it was
-    /// saved (New Chat, Delete All Chats or an earlier chat opening in the
-    /// same moment): the card says it couldn't be done (`.failed(nil)`), as
-    /// a perform that failed does. The task holds the store until the domain
+    /// saved (New Chat or Delete All Chats in the same moment): the card says
+    /// it couldn't be done (`.failed(nil)`), as a perform that failed does.
+    /// An earlier chat opening refuses none: it files the chat on screen
+    /// again until its filing holds the yes, so the yes's save runs before
+    /// the chat leaves the screen. The task holds the store until the domain
     /// returns, and what came of it is written onto the turn wherever it is
     /// by then: on screen, read back in a chat opened again, or in the filing
     /// of a chat that has ended. Nothing waits for the domain: New Chat and
@@ -1382,10 +1384,12 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// the write has returned: only then is the domain asked.
     ///
     /// **A chat that ended before the write ran, or while it ran, is a
-    /// refusal.** The chat's own writes (New Chat's, Delete All Chats', an
-    /// earlier chat opening's) file or delete it from then on, and an
-    /// earlier chat opening may have filed it before the yes was given, so
-    /// nothing here can say the yes is on disk.
+    /// refusal.** New Chat's or Delete All Chats' own writes file or delete
+    /// it from then on, so nothing here can say the yes is on disk. An
+    /// earlier chat opening ends the chat only once its filing holds what the
+    /// reader marked, this yes included, and a save queued behind a filing
+    /// runs before the next one (`open`), so for an open the check is a
+    /// backstop.
     private func saveTheYes() -> Task<Bool, Never> {
         let ends = threadEnds
         return queueWrite { store in
@@ -2688,6 +2692,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         if !outgoing.isEmpty {
             var filing = outgoing
             var marked = turns.filter(\.isComplete).map(ReadersMarks.init)
+            var filedOnce = false
             while true {
                 // Turns filed beside a thread that couldn't be read, and read
                 // since, are in this filing, which takes their filing's place.
@@ -2696,13 +2701,19 @@ public final class AskConversationStore<Domain: AskDomain> {
                     return await archive.fileTheChatOnScreen(filing, at: .now, sparing: summary.id) != nil
                 }.value
                 guard filed else {
-                    Logger(subsystem: brand.logSubsystem, category: "ask")
-                        .error("the chat on screen could not be filed, so an earlier chat did not open")
+                    // Refused again after a filing that took, the chat is in
+                    // two places, on screen and in that filing, until it is
+                    // filed next, which replaces that filing.
+                    Logger(subsystem: brand.logSubsystem, category: "ask").error("""
+                        the chat on screen could not be filed\(filedOnce ? " again" : "", privacy: .public), \
+                        so an earlier chat did not open
+                        """)
                     // The chat stays, with the turn this stopped: saved as Stop
                     // saves one, since its own task returned without a save.
                     if settled { persist() }
                     return
                 }
+                filedOnce = true
                 // Filed, and still the reader's last request: anything asked
                 // for meanwhile files this chat again, which replaces this
                 // filing.

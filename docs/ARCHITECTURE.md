@@ -575,7 +575,9 @@ New Chat files the finished turns into `AskThreadArchive`:
 - at most 50 chats, the oldest going first, never the chat just filed;
 - the chat files are the record, and every read of the index adds any chat file it doesn't name;
 - a filing it can't read whole is never replaced: the chat is filed beside it;
-- New Chat and an open file the chat on screen in one write, which takes a provisional filing's place.
+- New Chat and an open file the chat on screen in one write, which takes a provisional filing's place; an
+  open files it again, each filing replacing the last, while the reader marks it meanwhile (a verdict,
+  a card's answer).
 
 The History button lists these chats, opens one, and deletes one or all.
 
@@ -595,7 +597,8 @@ thread, and the filing goes once that write took and every one of its turns deco
   blocks opening an earlier one, and the turns asked meanwhile go into a provisional filing, as beside a
   thread that couldn't be read. A chat it can write nowhere waits in memory to be filed.
 - Opening an earlier chat does nothing if filing the one on screen fails, and the opened chat comes off
-  the list only once it is written as the thread and every one of its turns decoded.
+  the list only once it is written as the thread and every one of its turns decoded. A filing again that
+  fails after one took leaves that one, and the chat on screen is in two places until it is filed next.
 - A save the disk refuses is tried again as protected data comes back and as the screen does.
 - Delete All Chats outranks that rule: what the reader deletes is deleted. What the disk won't delete
   is owed and tried again, and a New Chat deletes it too; a chat whose file won't go stays off the
@@ -643,8 +646,9 @@ tiers.) A standalone turn has no card to confirm on, so a domain leaves proposin
 
 A proposal is carried out at most once for each yes. The yes is saved with the turn
 (`AskProposalOutcome.performing`), and `perform` is called only once that write lands. A yes the disk
-refuses, or whose chat ends before it is saved (New Chat, Delete All Chats or an earlier chat opening at
-that moment), isn't carried out: the card says it couldn't be done, as for a failed perform, and on the
+refuses, or whose chat ends before it is saved (New Chat or Delete All Chats at that moment), isn't
+carried out (an earlier chat opening files the chat on screen again until its filing holds the yes, so it
+refuses none): the card says it couldn't be done, as for a failed perform, and on the
 newest turn offers the action again. Under `.perLaunch` nothing is saved first, since no relaunch reads
 the thread back. `perform` runs off the main actor and nothing waits for it, so New Chat and an earlier
 chat opening go ahead while it runs, even if it never returns. Its outcome is written onto the turn
