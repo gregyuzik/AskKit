@@ -2701,6 +2701,45 @@ import Testing
         #expect(relaunched.proposalPhase(for: restored) == .done("Marked The Peregrine as lent."))
     }
 
+    @Test func whatCameOfAYesReachesTheThreadsPlaceThoughNewChatIsTappedAgainAsItIsWritten() async throws {
+        // New Chat lets go of what holds the thread's place at the tap, and
+        // its writes move it aside after the write before them. Asked then
+        // whether the place held a chat New Chat couldn't move, the write of
+        // what came of the yes heard no, missed it, and the chat set aside
+        // next read back on a later launch with what came of it unknown.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        try FileManager.default.createDirectory(at: folder.archive, withIntermediateDirectories: true)
+        let (domain, store, turn) = try await slowOfferingStore(threadURL: folder.thread, archiveDirectory: folder.archive)
+        store.confirmProposal(turn)
+        await domain.performed.isParked()
+        await store.flushPersistence()
+        try setMode(0o500, folder.archive)
+        try setMode(0o500, folder.folder)
+        store.startOver()
+        await store.flushPersistence()
+        try setMode(0o755, folder.folder)
+
+        let writing = Park()
+        writing.parks.withLock { $0 = true }
+        store.whileWritingALateOutcome = { await writing.wait() }
+        domain.performed.release()
+        await writing.isParked()
+        store.startOver()
+        writing.release()
+        await store.flushProposal()
+        await store.flushPersistence()
+        #expect(setAsideFiles(in: folder.folder).count == 1)
+
+        try setMode(0o755, folder.archive)
+        let relaunched = makeStore(domain: domain, asker: ScriptedAsker(), threadURL: folder.thread, archiveDirectory: folder.archive)
+        await relaunched.restoreIfNeeded()
+        await relaunched.openThread(try #require(relaunched.history.first))
+        let reopened = try #require(relaunched.turns.last)
+        #expect(reopened.question == "Can I lend The Peregrine to Sam?")
+        #expect(relaunched.proposalPhase(for: reopened) == .done("Marked The Peregrine as lent."))
+    }
+
     @Test func whatCameOfAProposalItsFilingRefusedStillReadsBackWithTheChat() async throws {
         // The perform returned after New Chat filed its chat, and the filing
         // wouldn't take what came of it. Opened as filed, the card would say

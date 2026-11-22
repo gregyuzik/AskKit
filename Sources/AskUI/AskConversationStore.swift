@@ -1500,16 +1500,17 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// screen: its filing, a chat waiting in memory to be filed
     /// (`filingsOwed`), and a chat New Chat could only set aside beside the
     /// thread or hold in its place (`HeldThread.unfiled`) when the archive
-    /// refused it, which a later launch reads back. In the write queue, so
-    /// what holds the thread's place is what it is when the write runs.
+    /// refused it, which a later launch reads back. The thread's place is
+    /// read whatever `heldThread` says: a New Chat tapped while this waits in
+    /// the write queue clears it at the tap, and moves what it held only
+    /// once this has run (`AskThreadStore.settleProposal`).
     private func writeLateOutcome(_ outcome: AskProposalOutcome, for diskTurn: DiskTurn) async {
+        await whileWritingALateOutcome?()
         filingsOwed = filingsOwed.map { chat in
             AskThreadEntry.settlingProposal(asked: diskTurn.question, at: diskTurn.askedAt, with: outcome, in: chat) ?? chat
         }
         await archive.settleProposal(asked: diskTurn.question, at: diskTurn.askedAt, with: outcome)
-        await thread.settleProposal(
-            asked: diskTurn.question, at: diskTurn.askedAt, with: outcome, inTheThreadsPlace: heldThread == .unfiled
-        )
+        await thread.settleProposal(asked: diskTurn.question, at: diskTurn.askedAt, with: outcome)
     }
 
     private func recordProposalOutcome(_ id: UUID, _ outcome: AskProposalOutcome) {
@@ -2573,6 +2574,13 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// still. Nil, and skipped, everywhere else.
     @ObservationIgnored var whileFilingTheChatOnScreen: (@MainActor () async -> Void)?
 
+    /// Awaited as what came of a proposal is written into the copies of its
+    /// chat kept off screen, before any of them is (`writeLateOutcome`). For
+    /// tests, as `whileFilingTheChatOnScreen` is: a New Chat tapped in that
+    /// window changes what holds the thread's place before its own writes
+    /// move it. Nil, and skipped, everywhere else.
+    @ObservationIgnored var whileWritingALateOutcome: (@MainActor () async -> Void)?
+
     // MARK: - Earlier chats
 
     /// Whether this domain keeps chats to go back to. A per-launch domain
@@ -3238,8 +3246,10 @@ nonisolated enum AskChatOpenOutcome: Equatable, Sendable {
     /// The chat is on screen: opened, or joined with the chat on screen,
     /// whose own filing it was.
     case opened
-    /// A request the reader made after it took its place: New Chat, Delete
-    /// All Chats or another chat, which each say what came of them.
+    /// A request made after it took its place: New Chat, Delete All Chats or
+    /// another chat, from the same list, the menu, another window or the
+    /// host. The list says nothing of this one: a later request from it says
+    /// what came of that.
     case gaveWay
     /// Nothing opened, and nothing took its place: the chat won't read or
     /// has gone from disk, the chat on screen couldn't be filed first, or the

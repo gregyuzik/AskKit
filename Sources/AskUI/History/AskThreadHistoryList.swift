@@ -12,9 +12,10 @@ public import SwiftUI
 /// question, with when it was last asked beneath. The chat on screen leads and
 /// has no delete of its own: New Chat is how a chat on screen ends. An earlier
 /// chat opens on a tap, and goes on a swipe, from its context menu or by
-/// VoiceOver's action. VoiceOver hears which chat is opening
-/// (`AskChatOpening`), since the sheet closes on the tap and takes the row
-/// with it.
+/// VoiceOver's action. VoiceOver hears which chat is opening as it is tapped
+/// (`AskChatOpening`), since the sheet closes once the chat is on screen and
+/// takes the row with it, or stays up under an alert when it doesn't open
+/// (`AskChatRefusal`).
 ///
 /// Content, not chrome: the rows are the list's own, and the only glass is
 /// what the system puts on the bar above it.

@@ -39,9 +39,12 @@ struct AskThreadHistorySheet: View {
                     onOpen(summary) { outcome in
                         switch outcome {
                         case .opened: dismiss()
-                        // What took its place says what came of it: another
-                        // row, whose own word closes the sheet or says why
-                        // not, or Delete All Chats, which closes it.
+                        // What took its place says what came of it here when
+                        // it came from here: another row, whose own word
+                        // closes the sheet or says why not, or Delete All
+                        // Chats, which closes it. New Chat from the menu, a
+                        // host's own request or another window's leaves the
+                        // sheet up, listing the chats as they are now.
                         case .gaveWay: break
                         case .refused: refusal.show(for: summary)
                         }

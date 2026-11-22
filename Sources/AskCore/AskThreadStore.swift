@@ -668,8 +668,15 @@ public actor AskThreadStore<Row: AskRow> {
     /// `question` at `askedAt` (`AskThreadEntry.settlingProposal`), in the
     /// chats New Chat could only keep here when the archive refused them:
     /// those set aside beside the thread for a later launch to file, and the
-    /// thread itself when `inTheThreadsPlace`, while it holds a chat New Chat
-    /// could neither file nor move. Says whether one took it.
+    /// thread itself, which holds such a chat while New Chat can't move it,
+    /// and until its writes have. Says whether one took it.
+    ///
+    /// The thread is read whatever the caller holds of it, since New Chat
+    /// lets go of what holds the place at the tap and moves it only once the
+    /// writes before its own have run. A chat on screen holds the turn only
+    /// where it was read back in it, and then shows this same outcome; and
+    /// only that turn, asked then and still waiting, takes it, so nothing
+    /// else is written.
     ///
     /// Missed there, the chat a later launch files from that copy reads back
     /// with what came of the yes unknown (`AskProposalPhase.outcomeUnknown`),
@@ -678,11 +685,9 @@ public actor AskThreadStore<Row: AskRow> {
     /// decoded, it would lose the rest, which it keeps for a build that reads
     /// them.
     @discardableResult
-    package func settleProposal(
-        asked question: String, at askedAt: Date, with outcome: AskProposalOutcome, inTheThreadsPlace: Bool
-    ) -> Bool {
+    package func settleProposal(asked question: String, at askedAt: Date, with outcome: AskProposalOutcome) -> Bool {
         var files = setAsideFiles()
-        if inTheThreadsPlace, let url { files.append(url) }
+        if let url { files.append(url) }
         var settledAny = false
         for file in files {
             guard let data = try? AskStoredFile.contents(of: file),
