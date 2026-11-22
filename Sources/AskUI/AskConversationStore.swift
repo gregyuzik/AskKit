@@ -954,7 +954,8 @@ public final class AskConversationStore<Domain: AskDomain> {
             // with a question asked after it waiting for its turn. That
             // question has no turn yet, so this is still the last one, and
             // going on would stop the store thinking for it and drop the task
-            // Stop cancels it by.
+            // Stop cancels it by. Whatever let it go has saved this turn and
+            // forgotten its reveal (`settleTurnInFlight`).
             guard !Task.isCancelled else { return }
             // Only if this is still the thread's last turn. A backstop: what
             // replaces the last turn cancels this task first, and the checks
@@ -973,11 +974,15 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// sleep until every chunk has settled
     /// (`AskArrivals.timeUntilSettled(_:at:)`), then 0.05 s more, and clear.
     ///
-    /// **A view can't do this for itself.** `AskStreamingText` runs a
-    /// `TimelineView` while a turn has chunks, and a timeline re-evaluates its
-    /// own body rather than the view that built it, so nothing would ever tell
-    /// the view to stop. Left alone, every finished turn on the thread costs a
-    /// frame's work per frame for the life of the screen.
+    /// **What clearing them buys.** While a turn has chunks, `AskStreamingText`
+    /// draws its prose the reveal's way: the stamped text, a slice and a
+    /// `Text` for each chunk, built again on every evaluation of the row's
+    /// body, painted through `AskRevealRenderer` in a `TimelineView`. The
+    /// timeline pauses itself once every chunk has settled, so the cost isn't
+    /// per frame, but only clearing the chunks gives the row back a plain
+    /// `Text`, with no renderer and no clock, as a turn read back from disk
+    /// has. Left alone, every finished turn on the thread draws the long way
+    /// for the life of the screen.
     ///
     /// **The wait is read from the chunks, not a constant.** Clearing the stamps
     /// paints every run opaque, and a chunk sweeps for as long as it is long
@@ -1934,22 +1939,28 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// which is then a turn to save.
     @discardableResult
     private func settleTurnInFlight(byReader: Bool) -> Bool {
+        // A task still out while the store has stopped thinking is a turn that
+        // failed and is reading what the engine keeps before it saves itself
+        // and forgets its reveal (`begin`): a failure stops the store thinking
+        // in the update that writes it, so Try Again shows at once. Let go in
+        // that hop, the task does neither, so this does both, as for a turn
+        // whose answer landed before its stream ended.
+        let failedInTheHop = task != nil && !isThinking
         task?.cancel()
         task = nil
         waitingQuestion = nil
-        guard isThinking else { return false }
+        guard isThinking || failedInTheHop else { return false }
         isThinking = false
         guard let last = turns.last else { return false }
         // The overtaken turn's reveal chunks have to be forgotten by whoever
-        // settles it, an answered one included: its own task returns on
-        // cancellation, and the answer can land a moment before the stream
-        // ends. Left behind, the settled turn keeps rendering
-        // `TimelineView(.animation(paused: false))` for the life of the screen,
-        // its renderer drawing every run of an answer long since drawn, frame
-        // after frame, which is the cost this mechanism exists to prevent.
+        // settles it, an answered or a failed one included: its own task
+        // returns on cancellation, and the answer or the failure can land a
+        // moment before the stream ends. Left behind, the settled turn draws
+        // through the reveal's renderer for the life of the screen
+        // (`forgetChunksOnceSettled`).
         defer { forgetChunksOnceSettled(last.id) }
-        // A turn to save either way, one whose answer landed before its stream
-        // ended included: the task that would have saved it returns on the
+        // A turn to save either way, one that ended before its stream did
+        // included: the task that would have saved it returns on the
         // cancellation.
         if !last.isComplete { markStopped(last.id, byReader: byReader) }
         return true

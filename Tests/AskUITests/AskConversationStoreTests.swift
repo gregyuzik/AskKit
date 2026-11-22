@@ -667,6 +667,60 @@ import Testing
         #expect(asker.questions.withLock { $0 }.map(\.0) == ["Which is the oldest?"])
     }
 
+    /// A turn that failed after drawing prose, its task parked in the hop as
+    /// its stream ends: the failure has stopped the store thinking, and the
+    /// task hasn't yet saved the turn or forgotten its reveal.
+    private func storeWithAFailureInTheHopAfterIt(
+        threadURL: URL? = nil
+    ) async throws -> (AskConversationStore<UIDomain>, ScriptedAsker, AskTurn<UIRow>) {
+        var domain = UIDomain()
+        if threadURL != nil { domain.persistenceMode = .thread }
+        let asker = ScriptedAsker()
+        asker.scripts([
+            .init(events: [.tier(.privateCloud), .partial("You own three")], error: AskError.privateCloudUnreachable),
+            .init(events: [.tier(.privateCloud)], hangs: true)
+        ])
+        let store = makeStore(domain: domain, asker: asker, threadURL: threadURL)
+        await store.restoreIfNeeded()
+        asker.parksKeptConversationRead.withLock { $0 = true }
+        store.ask("What do I own?")
+        await asker.keptConversationReadIsParked()
+        let failed = try #require(store.turns.last)
+        #expect(failed.failure != nil)
+        #expect(!failed.chunks.isEmpty)
+        #expect(!store.isThinking)
+        return (store, asker, failed)
+    }
+
+    @Test func aFailedTurnAQuestionOvertakesAsItsStreamEndsIsSavedAndStopsRevealing() async throws {
+        // Let go in that hop, the task returned before its save and before it
+        // forgot the turn's reveal, and the question that let it go did
+        // neither, since the store had stopped thinking: the turn kept drawing
+        // through the reveal's renderer, and stayed off disk until the next
+        // turn ended.
+        let url = temporaryLocation("askkit-failed-hop").appendingPathExtension("json")
+        let (store, asker, failed) = try await storeWithAFailureInTheHopAfterIt(threadURL: url)
+
+        store.ask("And the newest?")
+        asker.releaseKeptConversationRead()
+        await store.flushPersistence()
+        #expect(await entriesOnDisk(url) == ["What do I own?"], "the failed turn wasn't saved")
+        await eventually { store.turns.first?.chunks.isEmpty == true }
+        #expect(store.turns.first?.id == failed.id)
+        #expect(store.turns.first?.chunks.isEmpty == true, "the failed turn is still revealing")
+        store.stop()
+    }
+
+    @Test func aFailedTurnStoppedAsItsStreamEndsStopsRevealing() async throws {
+        let (store, asker, failed) = try await storeWithAFailureInTheHopAfterIt()
+
+        store.stop(byReader: true)
+        asker.releaseKeptConversationRead()
+        await eventually { store.turns.last?.chunks.isEmpty == true }
+        #expect(store.turns.map(\.id) == [failed.id])
+        #expect(store.turns.last?.chunks.isEmpty == true, "the failed turn is still revealing")
+    }
+
     @Test func tryAgainLeavesAQuestionWaitingToBeAsked() async throws {
         // Try Again shows under the newest failed turn, and a question waiting
         // for Stop's word to reach the engine has no turn yet. Taken, it would

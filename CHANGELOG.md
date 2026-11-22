@@ -38,6 +38,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   and photo, so the open then erased it, and anything typed or prefilled while the chat opened went the
   same way. The open now empties the composer only if nothing has written to the draft or the photo
   since the reader chose the chat.
+- **A failed turn that a question or Stop overtakes as its stream ends is saved, and drawn as plain
+  text once its reveal has settled.** A failure stops the store thinking at once, so Try Again shows
+  with it, and the turn then reads what the engine keeps before it saves itself and drops its reveal
+  stamps. A question asked or Stop tapped in that hop let the turn go before either, and did neither
+  itself. The failed turn's prose kept drawing through the reveal's renderer, rebuilt on each redraw of
+  its row, rather than as plain text, and after a question the turn wasn't saved until the next one
+  ended, so an app quit meanwhile lost it.
 
 ## [0.7.2] - 2026-11-09
 
