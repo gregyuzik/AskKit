@@ -183,7 +183,7 @@ nonisolated struct SearchBooks: Tool {
             // A one-letter word, such as "a" or "I", names nothing to look for.
             let asked = Self.words(arguments.words).filter { $0.count > 1 }
             // A book needs every word, so a question's "the" or "le" can't narrow it to one title. The
-            // trade: "books by Le Guin" reads the whole shelf, which still names her.
+            // trade: "books by Le Guin" reads the whole shelf, which still names the author.
             let matches = asked.isEmpty ? [] : Book.shelf.filter { asked.isSubset(of: Self.words("\($0.title) \($0.author)")) }
             // Nothing matched, as for "How many books do I own?": the whole shelf, to count or look through.
             let found = matches.isEmpty ? Book.shelf : matches

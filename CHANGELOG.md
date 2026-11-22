@@ -30,8 +30,8 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   title: "How many of the books do I own?" read *The Dispossessed* alone, and the answer counted one
   book, and "Quel est le livre le plus ancien ?" read Le Guin. A book now matches only when its title
   and author hold every such word, so a question that names neither reads the whole shelf under the
-  "No book matched" note. The trade: "books by Le Guin" reads the whole shelf too, which still names
-  her. The tool's description asks for a title or an author, as its `@Guide` already did, rather than
+  "No book matched" note. The trade: "books by Le Guin" reads the whole shelf too, which still lists
+  the author. The tool's description asks for a title or an author, as its `@Guide` already did, rather than
   any words from the question. A search copied from the sample takes the same change: a book matches
   when `asked.isSubset(of:)` its words, in place of `!isDisjoint(with: asked)`, and an empty `asked`
   matches none.
