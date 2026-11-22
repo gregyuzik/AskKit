@@ -4,6 +4,7 @@ import CoreGraphics
 import Foundation
 import FoundationModels
 import Synchronization
+import Testing
 
 @_spi(AskKitInternal) @testable import AskCore
 
@@ -379,10 +380,10 @@ nonisolated final class FakeSession: AskSession, @unchecked Sendable {
         }
     }
 
-    /// Returns once a held generation is waiting, or once `yieldUntil` gives
-    /// up.
-    func generationIsHeld() async {
-        await yieldUntil { heldGeneration.isWaiting }
+    /// Returns once a held generation is waiting, however long a loaded run
+    /// takes to start it (`spin`).
+    func generationIsHeld() async throws {
+        try await spin("the generation to be held") { [heldGeneration] in heldGeneration.isWaiting }
     }
 
     /// Let a held generation finish, or the next one go on unheld.
@@ -1074,7 +1075,8 @@ func record(_ stream: AsyncThrowingStream<AskTurnEvent<FakeRow>, any Error>) asy
 // MARK: - Waiting
 
 /// How long `yieldUntil` waits before it gives up. Long, because only a failing
-/// test ever waits it out.
+/// test is meant to wait it out; a wait a loaded run can outlast while the work
+/// is still coming is a `spin`.
 nonisolated let testWaitDeadline: Duration = .seconds(15)
 
 /// A clock a test moves by hand: the engine ages its warm session by it.
@@ -1088,8 +1090,8 @@ nonisolated final class TestClock: Sendable {
     }
 }
 
-/// Yield until `condition` holds — a generation has started, a warm is
-/// being held — or give up. The caller still asserts: this only stops waiting.
+/// Yield until `condition` holds — a warm is being held, a park has its
+/// waiter — or give up. The caller still asserts: this only stops waiting.
 ///
 /// **Yielding, not sleeping,** because the test acts the moment the condition
 /// holds. **Bounded and cancellable,** because a bare
@@ -1100,6 +1102,30 @@ nonisolated func yieldUntil(_ condition: () -> Bool) async {
     let deadline = ContinuousClock().now + testWaitDeadline
     while !condition(), !Task.isCancelled, ContinuousClock().now < deadline {
         await Task.yield()
+    }
+}
+
+/// Wait until `condition` holds, polling a millisecond apart so a wait holds
+/// no core: a generation has started, a stopped one has been let go.
+///
+/// **No bound of its own.** A count of rounds or a deadline is a guess at how
+/// long the work takes, and a loaded run outlasts it while the work is still
+/// coming. A test that goes on past a wait that gave up tests something else:
+/// `aReaderLettingTheStreamGoStopsTheTurn`, on a gate at a load average in the
+/// hundreds, cancelled a turn whose generation hadn't started, then waited out
+/// a second bound for a count that could no longer come, and ran past its
+/// suite's time limit. That limit is the safety net: it cancels the test,
+/// which ends the poll's sleep, and the throw stops the test there, under the
+/// name of what it waited for.
+nonisolated func spin(_ what: String, until condition: @Sendable () async -> Bool) async throws {
+    while !(await condition()) {
+        await Task.yield()
+        do {
+            try await Task.sleep(for: .milliseconds(1))
+        } catch {
+            Issue.record("stopped waiting for \(what)")
+            throw error
+        }
     }
 }
 

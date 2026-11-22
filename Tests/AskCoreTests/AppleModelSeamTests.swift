@@ -697,22 +697,6 @@ import Synchronization
         AskSharedRead(label: "test read", bound: bound, failureMemory: memory, now: { clock.now })
     }
 
-    /// Spin until `condition` holds, polling a millisecond apart so a wait
-    /// holds no core. No count of rounds: a loaded run used one up while the
-    /// work it waited on was still coming, and the suite's time limit is the
-    /// safety net, ending the poll's sleep and with it the wait.
-    private func spin(_ what: String, until condition: @Sendable () async -> Bool) async throws {
-        while !(await condition()) {
-            await Task.yield()
-            do {
-                try await Task.sleep(for: .milliseconds(1))
-            } catch {
-                Issue.record("stopped waiting for \(what)")
-                throw error
-            }
-        }
-    }
-
     /// A read bound no test outlives, for a test of sharing rather than of
     /// the bound, which a loaded run's steps could otherwise outlast.
     private static let boundPastTheTimeLimit: Duration = .seconds(3_600)

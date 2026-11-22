@@ -152,7 +152,7 @@ extension AskContradictionFreeStatesTests {
 
     /// The table's verdict for each way a run fails, pinned as text, so the
     /// reading a developer compares across runs stays the same words.
-    @Test func theTablesVerdictReadsAsItDidForEveryFailure() async {
+    @Test func theTablesVerdictReadsAsItDidForEveryFailure() async throws {
         let (down, _) = makeEval(states: [
             .down(.privateCloud, .notEntitled), .down(.onDevice, .appleIntelligenceOff)
         ])
@@ -169,7 +169,7 @@ extension AskContradictionFreeStatesTests {
         script.holdsAfterSnapshots = true
         session.script(script)
         let run = Task { await eval.run(AskScenario(id: "let go", question: "q")) }
-        await session.generationIsHeld()
+        try await session.generationIsHeld()
         run.cancel()
         let letGo = await run.value
         session.releaseGeneration()
