@@ -15,7 +15,8 @@ public import SwiftUI
 /// VoiceOver's action. VoiceOver hears which chat is opening as it is tapped
 /// (`AskChatOpening`), since the sheet closes once the chat is on screen and
 /// takes the row with it, or stays up under an alert when it doesn't open and
-/// nothing asked for since took its place (`AskChatRefusal`).
+/// nothing asked for since took its place (`AskChatRefusal`). A chat deleted
+/// as it opens opens nothing, and its row is gone.
 ///
 /// Content, not chrome: the rows are the list's own, and the only glass is
 /// what the system puts on the bar above it.

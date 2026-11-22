@@ -353,8 +353,8 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// (`「どの本が一番古いですか？」]}<ctrl46>}`, from the on-device model). So a
     /// chip is cut at its first such token, and then at the first `]` or `}`
     /// that closes nothing it opened with only the reply's structure after
-    /// it, and loses the quote and separator that cut leaves at its end
-    /// (`withoutReplyResidue(_:)`). Both are read from the text's shape alone,
+    /// it, and loses the separators and the quote the reply closed its field
+    /// with, where either cut (`withoutReplyResidue(_:)`). Both are read from the text's shape alone,
     /// so they hold in every script, Thai's questions with no mark at their
     /// end included (house rule 7): a chip opens what it closes, and goes on
     /// past a bracket of its own. Cut from the text as written and again from
@@ -401,17 +401,16 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     ///
     /// 1. Cut at its first control token, in either form a model's vocabulary
     ///    writes one: `<ctrl46>`, `<|end|>`. Nothing a reader asks is spelled
-    ///    so, and what follows one is the model's, not the question. Trimmed
-    ///    of the space before it.
+    ///    so, and what follows one is the model's, not the question.
     /// 2. Then cut at the first `]` or `}` that closes no `[` or `{` before it
     ///    in the chip and has nothing after it but more of the reply's
-    ///    structure (`]`, `}`, `"`, `,`, `:` and space): the reply's own
-    ///    fields closing. One the chip goes on past is the chip's, as in
-    ///    `(1969, 1975]?`.
-    /// 3. Then trimmed of what that cut left at its end: the space and the
-    ///    `,` or `:` between the reply's fields, and the one `"` that closed
-    ///    the reply's field there. Only that one: a quote further in, an inch
-    ///    mark say, is the reader's.
+    ///    structure: `]`, `}`, `"`, `,`, `:`, space, and a run in angle
+    ///    brackets, a token in a form step 1 doesn't know (`<end_of_turn>`).
+    ///    That is the reply's own fields closing. One the chip goes on past is
+    ///    the chip's, as in `(1969, 1975]?`.
+    /// 3. Then, where either cut, trimmed of what the cut left at its end: the
+    ///    space and the `,` or `:` between the reply's fields, and the `"`
+    ///    that closed the reply's field (`closesTheRepliesField(_:)`).
     static func withoutReplyResidue(_ chip: String) -> String {
         var kept = Substring(chip)
         if let token = kept.firstRange(of: /<ctrl\d+>|<\|[^|<>\s]*\|>/) {
@@ -419,15 +418,13 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         }
         var squares = 0
         var braces = 0
-        var closedTheReply = false
         scan: for index in kept.indices {
             switch kept[index] {
             case "[": squares += 1
             case "{": braces += 1
             case "]" where squares == 0, "}" where braces == 0:
-                guard kept[index...].allSatisfy(isReplyStructure) else { continue scan }
+                guard kept[index...].replacing(/<[^<>\s]*>/, with: "").allSatisfy(isReplyStructure) else { continue scan }
                 kept = kept[..<index]
-                closedTheReply = true
                 break scan
             case "]": squares -= 1
             case "}": braces -= 1
@@ -436,12 +433,12 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
         }
         guard kept.endIndex != chip.endIndex else { return chip }
         func trimSeparators() {
-            while let last = kept.last, last.isWhitespace || (closedTheReply && (last == "," || last == ":")) {
+            while let last = kept.last, last.isWhitespace || last == "," || last == ":" {
                 kept.removeLast()
             }
         }
         trimSeparators()
-        if closedTheReply, kept.last == "\"" {
+        if closesTheRepliesField(kept) {
             kept.removeLast()
             trimSeparators()
         }
@@ -452,6 +449,25 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// braces, the quotes and separators between its fields, and space.
     private static func isReplyStructure(_ character: Character) -> Bool {
         "]}\",:".contains(character) || character.isWhitespace
+    }
+
+    /// Whether the `"` that `chip`, cut where the reply's structure began,
+    /// ends with is the one that closed the reply's field: a quote the chip
+    /// left unpaired, or one straight after the mark that ends its question
+    /// in any script (`?`, `？`, `。`, `؟`: Unicode's sentence terminals).
+    /// One paired with an earlier quote and after a letter is the chip's own,
+    /// as in `Tell me about "Rumours"`, and an inch mark further in is never
+    /// the last character, as in `12" singles?"`.
+    ///
+    /// Given up: a chip whose own quoted title ends it with that title's
+    /// question mark, `Have you read "Is It Dune?"`, loses its closing quote
+    /// when the reply's structure followed it, since nothing in the text
+    /// tells that quote from the reply's.
+    private static func closesTheRepliesField(_ chip: Substring) -> Bool {
+        guard chip.last == "\"" else { return false }
+        let before = chip.dropLast().last
+        let endsAQuestion = before?.unicodeScalars.last?.properties.isSentenceTerminal == true
+        return endsAQuestion || chip.count(where: { $0 == "\"" }) % 2 == 1
     }
 
     /// A domain's own follow-ups, as given but for the empty and the

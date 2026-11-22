@@ -57,38 +57,42 @@ import Testing
 
     // MARK: - Follow-ups the reply's structure ran into
 
-    @Test func aChipLosesTheReplysStructureAndTheTokenWrittenAfterItsQuestion() {
-        // From the on-device model, as the chip showed it: the reply's
-        // closing brackets and a control token from its vocabulary after the
-        // question, which the chip drew and a tap would have sent.
-        #expect(Answer.cleanedFollowUps(["「どの本が一番古いですか？」]}<ctrl46>}"]) == ["「どの本が一番古いですか？」"])
-        // The same in Russian, after a quote the reply left open, and in Thai,
-        // whose question ends with no mark to cut after.
-        #expect(Answer.cleanedFollowUps(["Какая книга самая старая?\"]}<ctrl46>", "เล่มไหนเก่าที่สุด\"]}"])
-                == ["Какая книга самая старая?", "เล่มไหนเก่าที่สุด"])
-        // And a token in the other form a model's vocabulary writes them.
-        #expect(Answer.cleanedFollowUps(["Which is oldest?<|end|>\"}"]) == ["Which is oldest?"])
-    }
+    /// Chips the reply's structure ran into, and what the chip keeps of each,
+    /// or nil for none. The first is from the on-device model, as the chip
+    /// showed it and a tap would have sent it.
+    nonisolated static let residue: [(chip: String, kept: String?)] = [
+        // The reply's closing brackets and a control token after the
+        // question, in Japanese; in Russian after the quote that closed the
+        // reply's field; in Thai, whose question ends with no mark.
+        ("「どの本が一番古いですか？」]}<ctrl46>}", "「どの本が一番古いですか？」"),
+        ("Какая книга самая старая?\"]}<ctrl46>", "Какая книга самая старая?"),
+        ("เล่มไหนเก่าที่สุด\"]}", "เล่มไหนเก่าที่สุด"),
+        // A token in the other form a vocabulary writes, before and after
+        // the reply's quote and separator, and one in neither form after the
+        // reply's brackets.
+        ("Which is oldest?<|end|>\"}", "Which is oldest?"),
+        ("Which is oldest?\"<|end|>", "Which is oldest?"),
+        ("Which is oldest?\",<ctrl46>", "Which is oldest?"),
+        ("Which is oldest?\"]}<end_of_turn>", "Which is oldest?"),
+        // The quote the reply closed its field with goes, the chip's own
+        // stays: an inch mark, and a title the chip quotes.
+        ("Do I own any 12\" singles?\"]}", "Do I own any 12\" singles?"),
+        ("Tell me about \"Rumours\"]}<ctrl46>}", "Tell me about \"Rumours\""),
+        // Nothing but the reply's structure is no chip.
+        ("]}<ctrl46>}", nil),
+        ("\"]}", nil),
+        ("<ctrl12>Which?", nil),
+        // Brackets a chip opens and closes, one it goes on past, and a `<`
+        // that starts no token, stay.
+        ("Which of [Rumours] is {signed}?", "Which of [Rumours] is {signed}?"),
+        ("Is 5 < 6 > 4?", "Is 5 < 6 > 4?"),
+        ("Which notes mention `}`?", "Which notes mention }?"),
+        ("Which came out in (1969, 1975]?", "Which came out in (1969, 1975]?")
+    ]
 
-    @Test func aChipOfNothingButTheReplysStructureIsNone() {
-        #expect(Answer.cleanedFollowUps(["]}<ctrl46>}", "\"]}", "<ctrl12>Which?", "ok?"]) == ["ok?"])
-    }
-
-    @Test func bracketsAChipOpensItKeeps() {
-        // Only a bracket or a brace that closes nothing the chip opened is the
-        // reply's, and only a token in a vocabulary's own form is a token.
-        #expect(Answer.cleanedFollowUps(["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
-                == ["Which of [Rumours] is {signed}?", "Is 5 < 6 > 4?"])
-        // Nor is one the chip goes on past: the reply's structure is all that
-        // follows its own.
-        #expect(Answer.cleanedFollowUps(["Which notes mention `}`?", "Which came out in (1969, 1975]?"])
-                == ["Which notes mention }?", "Which came out in (1969, 1975]?"])
-    }
-
-    @Test func onlyTheQuoteTheReplyClosedGoesWithItsStructure() {
-        // The quote just before the reply's brackets closed the reply's field;
-        // an inch mark before it is the reader's.
-        #expect(Answer.cleanedFollowUps(["Do I own any 12\" singles?\"]}"]) == ["Do I own any 12\" singles?"])
+    @Test(arguments: residue)
+    func aChipLosesWhatTheReplysStructureLeftAfterIt(chip: String, kept: String?) {
+        #expect(Answer.cleanedFollowUps([chip]) == (kept.map { [$0] } ?? []))
     }
 
     @Test func aTokenSpelledAsEntitiesGoesAsWellAndCleaningAgainChangesNothing() {

@@ -182,11 +182,12 @@ The store runs step 1, the engine (`AskEngine`, an actor) steps 2 to 10, the sto
    or nothing (`AskAnswer.grounding`).
 9. **The answer.** The reply becomes an `AskAnswer`. Its prose loses headings and bullets, its question
    kind is normalized to the domain's vocabulary, and its follow-ups are cleaned: cut where the reply's
-   structure ran into them (a control token such as `<ctrl46>`, or a `]` or `}` the chip never opened),
-   made plain text (their Markdown read as the prose's, what draws nothing dropped as from a link's
-   question), since a chip shows its text as it is and a tap asks it, then kept only as one line of at
-   most 80 characters, without repeats, two at most. Its tiles are rows the turn or the thread read: at most 24, none for a
-   count, a total or a yes-or-no, and otherwise chosen in this order:
+   structure ran into them (a control token such as `<ctrl46>`, or a `]` or `}` the chip never opened
+   with only that structure after it), made plain text (their Markdown read as the prose's, what draws
+   nothing dropped as from a link's question), since a chip shows its text as it is and a tap asks it,
+   then kept only as one line of at most 80 characters, without repeats, two at most. Its tiles are rows
+   the turn or the thread read: at most 24, none for a count, a total or a yes-or-no, and otherwise
+   chosen in this order:
    1. when the model says the answer is every match (`showsEveryMatch`), the rows this turn read, never
       for a follow-up that read nothing, which has no set to show whole;
    2. the rows the model's titles resolve to, in its order: exact, then the whole title before a name's
@@ -554,10 +555,10 @@ A domain whose `persistence` is `.thread` (the default) keeps the thread in
   didn't keeps every other copy of what it was writing.
 - **Decoding.** Every entry decodes field by field with defaults, and a load salvages what it can entry
   by entry; a row that no longer decodes costs its answer that row, never the turn, and the read logs
-  how many went. The thread's next save, and a chat opened and filed again, write that answer without
-  the row, as the screen shows it; the writes the reader doesn't make, a late outcome into a filing and a
-  chat set aside put back with its chat, leave a file holding such a row as it is, the set-aside one kept
-  as an original. A row that won't encode, such as one holding a NaN, is left out of its answer on disk
+  how many went. The thread's next save, a chat opened and filed again, and a chat set aside put back
+  with its filing write that answer without the row, as the screen shows it; only a proposal's late
+  outcome leaves a filing holding such a row as it is, and the card reads back with the outcome unknown.
+  A row that won't encode, such as one holding a NaN, is left out of its answer on disk
   in the same way, and the rest of the turn is written. A model's follow-ups are made plain again as
   they are read, as the engine makes them as it answers, since builds from before 0.1.0 saved them as
   the model wrote them; a domain's own answer, which has no tier, keeps its follow-ups as given.

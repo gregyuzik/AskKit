@@ -11,9 +11,10 @@ public import SwiftUI
 /// it: the row it activated goes with the sheet, and the focus goes back to
 /// the History button, which says nothing of the chat. A chat that doesn't
 /// open keeps the sheet up, and an alert over it says so (`AskChatRefusal`),
-/// unless a later request took its place, which then says what came of it:
-/// closed on the tap, the sheet would leave the reader on the chat they meant
-/// to leave, with nothing said. Delete All Chats closes the sheet too, since
+/// unless a later request took its place, which then says what came of it,
+/// or the chat was deleted as it opened, whose row is gone: closed on the
+/// tap, the sheet would leave the reader on the chat they meant to leave,
+/// with nothing said. Delete All Chats closes the sheet too, since
 /// nothing is left in it to look at.
 struct AskThreadHistorySheet: View {
     let current: AskThreadSummary?

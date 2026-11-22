@@ -21,7 +21,7 @@ public import SwiftUI
 /// VoiceOver hears which chat is opening (`AskChatOpening`). One that doesn't
 /// open leaves the mark where it was, and an alert says so
 /// (`AskChatRefusal`), unless a later request took its place, which then says
-/// what came of it.
+/// what came of it, or the chat was deleted as it opened, whose row is gone.
 ///
 /// **The conversation's own ground.** The list draws no background, so the
 /// two panes are one surface with the hinge's hairline between them. A
