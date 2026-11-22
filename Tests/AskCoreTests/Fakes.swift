@@ -1075,8 +1075,9 @@ func record(_ stream: AsyncThrowingStream<AskTurnEvent<FakeRow>, any Error>) asy
 // MARK: - Waiting
 
 /// How long `yieldUntil` waits before it gives up. Long, because only a failing
-/// test is meant to wait it out; a wait a loaded run can outlast while the work
-/// is still coming is a `spin`.
+/// test is meant to wait it out. A loaded run outlasted it while a generation
+/// was still starting, so the waits for a generation to start or be let go
+/// are `spin`s instead.
 nonisolated let testWaitDeadline: Duration = .seconds(15)
 
 /// A clock a test moves by hand: the engine ages its warm session by it.
