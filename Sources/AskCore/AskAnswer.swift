@@ -459,10 +459,11 @@ nonisolated public struct AskAnswer<Row: AskRow>: Sendable, Equatable, Codable {
     /// as in `Tell me about "Rumours"`, and an inch mark further in is never
     /// the last character, as in `12" singles?"`.
     ///
-    /// Given up: a chip whose own quoted title ends it with that title's
-    /// question mark, `Have you read "Is It Dune?"`, loses its closing quote
-    /// when the reply's structure followed it, since nothing in the text
-    /// tells that quote from the reply's.
+    /// Given up: a chip that ends with its own quoted text, closed by a
+    /// sentence mark inside the quote (`Have you read "Is It Dune?"`, `Tell me
+    /// about "U.S."`), loses its closing quote when the reply's structure
+    /// followed it, since nothing in the text tells that quote from the
+    /// reply's.
     private static func closesTheRepliesField(_ chip: Substring) -> Bool {
         guard chip.last == "\"" else { return false }
         let before = chip.dropLast().last

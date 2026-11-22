@@ -78,6 +78,10 @@ import Testing
         // stays: an inch mark, and a title the chip quotes.
         ("Do I own any 12\" singles?\"]}", "Do I own any 12\" singles?"),
         ("Tell me about \"Rumours\"]}<ctrl46>}", "Tell me about \"Rumours\""),
+        // A sentence terminal in another script before the reply's quote,
+        // with the chip's own inch mark before it.
+        ("12\"のレコードはありますか？\"]}", "12\"のレコードはありますか？"),
+        ("هل لدي أسطوانات 12\" ؟\"]}", "هل لدي أسطوانات 12\" ؟"),
         // Nothing but the reply's structure is no chip.
         ("]}<ctrl46>}", nil),
         ("\"]}", nil),
@@ -92,7 +96,10 @@ import Testing
 
     @Test(arguments: residue)
     func aChipLosesWhatTheReplysStructureLeftAfterIt(chip: String, kept: String?) {
-        #expect(Answer.cleanedFollowUps([chip]) == (kept.map { [$0] } ?? []))
+        let cleaned = Answer.cleanedFollowUps([chip])
+        #expect(cleaned == (kept.map { [$0] } ?? []))
+        // Cleaned again as its chat is read back, it is as it was.
+        #expect(Answer.cleanedFollowUps(cleaned) == cleaned)
     }
 
     @Test func aTokenSpelledAsEntitiesGoesAsWellAndCleaningAgainChangesNothing() {
