@@ -59,6 +59,9 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   `AskError.modelUnavailable(.unknown)`, with no Try Again, though `AppleModelSeam` reads the on-device
   model's availability again as it builds, so a change between its two reads, which passes, failed the
   same way. It now fails as `AskError.couldNotAnswer`, and the mirror is read again beside the turn.
+  Under a host's `AskInferenceHold`, which reads the on-device model as servable and builds nothing, a
+  question asked anyway now fails this way too, with a Try Again that fails the same way until the host
+  lets go.
 - **A quota or a cooldown noted while Private Cloud Compute's locale probe runs is in the tier's
   state.** `AppleModelSeam` read the spent quota before the probe, which can take 3 s on its first
   read, and the cooldown after it, so a quota failure another turn noted in between was missed: the turn

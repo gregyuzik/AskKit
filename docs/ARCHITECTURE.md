@@ -319,10 +319,11 @@ environment, the launch argument `-ASK_LIVE_PCC YES`, read from the argument dom
 ### The inference hold
 
 A host can hold every model call in the process for a run that must not depend on a model, such as a
-store-screenshot capture, by passing `AskInferenceHold.setHeld(_:)` a closure, asked on every read.
-While it holds, `AppleModelSeam` reads the tiers from nothing (Private Cloud Compute `.notEntitled`, the
-on-device model available and speaking the app's language: no availability, locale or quota read),
-builds no session and logs the hold once, and `withGeneration` and `AskGenerationGate.run` throw
+store-screenshot capture, by passing `AskInferenceHold.setHeld(_:)` a closure, asked on every read. While
+it holds, `AppleModelSeam` reads the tiers from nothing (Private Cloud Compute `.notEntitled`, the
+on-device model available and speaking the app's language: no availability, locale or quota read), builds
+no session, so a question asked anyway fails as `AskError.couldNotAnswer` and so does its Try Again until
+the host lets go, logs the hold once, and `withGeneration` and `AskGenerationGate.run` throw
 `AskInferenceHold.HeldError` before the queue, without running their body. AskKit never decides it: the
 host does, from a flag of its own.
 
