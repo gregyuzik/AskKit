@@ -654,7 +654,8 @@ newest turn offers the action again. Under `.perLaunch` nothing is saved first, 
 the thread back. `perform` runs off the main actor and nothing waits for it, so New Chat and an earlier
 chat opening go ahead while it runs, even if it never returns. Its outcome is written onto the turn
 wherever that is when it returns: on screen, in its chat opened again (whose card shows it under way
-until then), or in an ended chat's filing. A turn is known there by its question and when it was asked,
+until then), in an ended chat's filing, or in the copy New Chat kept of a chat the archive refused, set
+aside beside the thread or held in its place. A turn is known there by its question and when it was asked,
 as a join knows one, since one read back gets a new identity. A card read back with its yes still out and
 nothing in the process carrying it out, as after an app quit, takes no tap and draws the proposal alone,
 since its outcome is unknown and confirmed again it could be done twice. So does one whose outcome this

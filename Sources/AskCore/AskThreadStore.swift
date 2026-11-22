@@ -655,6 +655,44 @@ public actor AskThreadStore<Row: AskRow> {
         return moveAside(url, unread: false)
     }
 
+    /// Write what came of a proposal into the turn waiting on it, asked
+    /// `question` at `askedAt` (`AskThreadEntry.settlingProposal`), in the
+    /// chats New Chat could only keep here when the archive refused them:
+    /// those set aside beside the thread for a later launch to file, and the
+    /// thread itself when `inTheThreadsPlace`, while it holds a chat New Chat
+    /// could neither file nor move. Says whether one took it.
+    ///
+    /// Missed there, the chat a later launch files from that copy reads back
+    /// with what came of the yes unknown (`AskProposalPhase.outcomeUnknown`),
+    /// as one still does whose write the disk refuses here. Only a file every
+    /// turn and row of which decodes is written: written back from what
+    /// decoded, it would lose the rest, which it keeps for a build that reads
+    /// them.
+    @discardableResult
+    package func settleProposal(
+        asked question: String, at askedAt: Date, with outcome: AskProposalOutcome, inTheThreadsPlace: Bool
+    ) -> Bool {
+        var files = setAsideFiles()
+        if inTheThreadsPlace, let url { files.append(url) }
+        var settledAny = false
+        for file in files {
+            guard let data = try? AskStoredFile.contents(of: file),
+                  case let (entries, 0, 0)? = try? Self.decodeEntries(from: data),
+                  let settled = AskThreadEntry.settlingProposal(asked: question, at: askedAt, with: outcome, in: entries)
+            else { continue }
+            do {
+                try write(Self.encodeEntries(settled, logger: logger), to: file)
+                settledAny = true
+            } catch {
+                logger.error("""
+                    a proposal's outcome could not be written to a chat kept beside the thread: \
+                    \(AskStoredFile.tag(for: error), privacy: .public)
+                    """)
+            }
+        }
+        return settledAny
+    }
+
     /// Put every file waiting beside the thread that now reads whole where it
     /// belongs, and say how many were.
     ///

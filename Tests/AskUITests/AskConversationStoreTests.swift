@@ -2639,6 +2639,68 @@ import Testing
         #expect(relaunched.proposalPhase(for: try #require(relaunched.turns.last)) == .done("Marked The Peregrine as lent."))
     }
 
+    @Test func whatCameOfAYesReachesAChatNewChatCouldOnlySetAside() async throws {
+        // The archive refused the chat, so New Chat set it aside for the next
+        // launch to file, its yes still out. Written only into the filings
+        // and the chats waiting in memory, what came of it missed the copy set
+        // aside, and the chat filed from it said nobody knew what came of it.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        try FileManager.default.createDirectory(at: folder.archive, withIntermediateDirectories: true)
+        let (domain, store, turn) = try await slowOfferingStore(threadURL: folder.thread, archiveDirectory: folder.archive)
+        store.confirmProposal(turn)
+        await domain.performed.isParked()
+        await store.flushPersistence()
+        try setMode(0o500, folder.archive)
+
+        store.startOver()
+        await store.flushPersistence()
+        #expect(setAsideFiles(in: folder.folder).count == 1)
+        domain.performed.release()
+        await store.flushProposal()
+        await store.flushPersistence()
+
+        try setMode(0o755, folder.archive)
+        let relaunched = makeStore(domain: domain, asker: ScriptedAsker(), threadURL: folder.thread, archiveDirectory: folder.archive)
+        await relaunched.restoreIfNeeded()
+        await relaunched.openThread(try #require(relaunched.history.first))
+        let reopened = try #require(relaunched.turns.last)
+        #expect(reopened.question == "Can I lend The Peregrine to Sam?")
+        #expect(relaunched.proposalPhase(for: reopened) == .done("Marked The Peregrine as lent."))
+    }
+
+    @Test func whatCameOfAYesReachesAChatNewChatCouldOnlyHoldInTheThreadsPlace() async throws {
+        // Neither filed nor written, the chat waits in memory, and the
+        // thread's place, which holds its last save with the yes in it, is
+        // held. What came of the yes, landing once the disk takes writes
+        // again, is written there too: a relaunch reads that place as the
+        // chat on screen.
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        try FileManager.default.createDirectory(at: folder.archive, withIntermediateDirectories: true)
+        let (domain, store, turn) = try await slowOfferingStore(threadURL: folder.thread, archiveDirectory: folder.archive)
+        store.confirmProposal(turn)
+        await domain.performed.isParked()
+        await store.flushPersistence()
+        try setMode(0o500, folder.archive)
+        try setMode(0o500, folder.folder)
+
+        store.startOver()
+        await store.flushPersistence()
+        #expect(setAsideFiles(in: folder.folder).isEmpty)
+        try setMode(0o755, folder.folder)
+        domain.performed.release()
+        await store.flushProposal()
+        await store.flushPersistence()
+
+        try setMode(0o755, folder.archive)
+        let relaunched = makeStore(domain: domain, asker: ScriptedAsker(), threadURL: folder.thread, archiveDirectory: folder.archive)
+        await relaunched.restoreIfNeeded()
+        let restored = try #require(relaunched.turns.last)
+        #expect(restored.question == "Can I lend The Peregrine to Sam?")
+        #expect(relaunched.proposalPhase(for: restored) == .done("Marked The Peregrine as lent."))
+    }
+
     @Test func whatCameOfAProposalItsFilingRefusedStillReadsBackWithTheChat() async throws {
         // The perform returned after New Chat filed its chat, and the filing
         // wouldn't take what came of it. Opened as filed, the card would say

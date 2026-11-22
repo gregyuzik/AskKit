@@ -65,6 +65,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   chat is on screen, and stays up over one that didn't open, under an alert that says so, which
   VoiceOver reads; the pane beside iPhone Duo's fold shows the same alert. The line is new, in all 25
   languages.
+- **What came of a yes reaches a chat New Chat could only set aside or keep in the thread's place.**
+  When the archive refused the chat New Chat ended while a perform was still out, its outcome was
+  written into the filings and the chats waiting in memory to be filed, but not into the copy set aside
+  beside the thread for the next launch to file, nor into the thread where the chat had to stay. That
+  copy kept the yes as it was saved, so the chat read back on a later launch with what came of it
+  unknown, its card drawn with no action. It is written there too now, where that copy reads whole and
+  the disk takes the write.
 
 
 ## [0.7.2] - 2026-11-09

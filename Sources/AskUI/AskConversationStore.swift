@@ -1497,15 +1497,19 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Write what came of a proposal into the copies of its chat kept off
-    /// screen: its filing, and a chat waiting in memory to be filed
-    /// (`filingsOwed`). A chat New Chat could only set aside or hold in the
-    /// thread's place keeps the yes as it was written, and reads back on a
-    /// later launch with what came of it unknown. In the write queue.
+    /// screen: its filing, a chat waiting in memory to be filed
+    /// (`filingsOwed`), and a chat New Chat could only set aside beside the
+    /// thread or hold in its place (`HeldThread.unfiled`) when the archive
+    /// refused it, which a later launch reads back. In the write queue, so
+    /// what holds the thread's place is what it is when the write runs.
     private func writeLateOutcome(_ outcome: AskProposalOutcome, for diskTurn: DiskTurn) async {
         filingsOwed = filingsOwed.map { chat in
             AskThreadEntry.settlingProposal(asked: diskTurn.question, at: diskTurn.askedAt, with: outcome, in: chat) ?? chat
         }
         await archive.settleProposal(asked: diskTurn.question, at: diskTurn.askedAt, with: outcome)
+        await thread.settleProposal(
+            asked: diskTurn.question, at: diskTurn.askedAt, with: outcome, inTheThreadsPlace: heldThread == .unfiled
+        )
     }
 
     private func recordProposalOutcome(_ id: UUID, _ outcome: AskProposalOutcome) {
