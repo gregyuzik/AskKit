@@ -49,7 +49,7 @@ answers when it can, and the on-device model when it can't.
 - **Actions the reader confirms.** A tool can propose an action, such as adding a reminder, that runs
   only once the reader taps yes.
 - **The whole screen.** Streaming answers, tiles for the rows an answer names, follow-ups, chat
-  history, a Mac menu and a settings card, on iOS, macOS and visionOS, iPhone Duo included.
+  history, a Mac menu and a settings card, on iOS, iPadOS, macOS and visionOS, iPhone Duo included.
 - **Every reader.** 25 languages, VoiceOver, Dynamic Type and Reduce Motion.
 - **Private.** No dependencies, no analytics and no network requests of its own.
 
