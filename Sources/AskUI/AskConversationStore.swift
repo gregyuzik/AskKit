@@ -522,7 +522,13 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// (`stop(byReader:)`): the engine's `stop()` cancels whatever it is
     /// asking when it lands, so a question asked in the same tick has to
     /// reach the engine after it, as one asked after New Chat does.
-    @ObservationIgnored private var changingChat: Task<Void, Never>?
+    @ObservationIgnored private var changingChat: Task<Void, Never>? {
+        didSet { isChangingChat = changingChat != nil }
+    }
+    /// Whether a chat change is under way, Stop's word to the engine included
+    /// (`changingChat`): observed, where `changingChat` isn't, so Try Again
+    /// hides while `retry(_:)` refuses it.
+    private(set) var isChangingChat = false
     /// How many chat changes have been queued, so the last can tell it is the
     /// last and clear `changingChat`.
     @ObservationIgnored private var chatChangesQueued = 0
@@ -1011,13 +1017,25 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// the chat changing, Stop's word on its way to the engine): it is newer
     /// though it has no turn yet, and asking again would cancel it.
     ///
+    /// **Nor while the chat changes, with nothing waiting**: an earlier chat
+    /// opening, or Stop's word on its way to the engine (`isChangingChat`).
+    /// The question asked again would wait for the change, its turn already
+    /// off the thread: a thread of that one turn would leave for a first
+    /// screen, and a second Stop puts a waiting question back only into an
+    /// empty draft, so with one begun there the question would be in
+    /// neither. Try Again hides meanwhile
+    /// (`AskTurn.offersRetry(isNewest:whileThinking:whileTheChatChanges:)`),
+    /// so after a Stop it comes back once the engine has heard it.
+    ///
     /// Try Again, Ask again and Another pick carry the turn's photo and scope,
     /// and send the photo again while this process has its pixels. A turn
     /// read back from disk has neither its pixels nor its scope, so its
     /// question goes on the words alone, and the thread says so under it when
     /// a photo went with it.
     public func retry(_ turn: Turn) {
-        guard !questionWaits, let last = turns.last, last.id == turn.id, last.failure != nil else { return }
+        guard !questionWaits, !isChangingChat, let last = turns.last, last.id == turn.id, last.failure != nil else {
+            return
+        }
         if !last.hasContent { turns.removeLast() }
         start(turn.question, origin: turn.origin, photo: turn.photo, image: turn.photoImage, scope: turn.scope)
     }

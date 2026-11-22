@@ -50,7 +50,7 @@ struct AskThreadRow<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: View
     /// a moment ago, and only its failure offers Try Again and the coaching.
     let isLast: Bool
     /// Whether the turn's failure offers Try Again
-    /// (`AskTurn.offersRetry(isNewest:whileThinking:)`).
+    /// (`AskTurn.offersRetry(isNewest:whileThinking:whileTheChatChanges:)`).
     var offersRetry = false
     /// Whether the answer's follow-ups are showing under it: the stream has
     /// ended and there is something to offer.
@@ -507,7 +507,8 @@ extension AskTurn {
     }
 
     /// Whether this turn's failure offers Try Again: one that can be asked
-    /// again, on the newest turn, while the store isn't thinking.
+    /// again, on the newest turn, while the store isn't thinking and the chat
+    /// isn't changing (`AskConversationStore.isChangingChat`).
     ///
     /// **Not while a question waits to be asked**, for the saved thread to be
     /// read or for the chat to change. It has no turn yet, so the failed turn
@@ -516,8 +517,15 @@ extension AskTurn {
     /// the reader's tap and do nothing with it. A failure stops the store
     /// thinking in the update that writes it, so a turn that has just failed
     /// offers it at once.
-    nonisolated func offersRetry(isNewest: Bool, whileThinking isThinking: Bool) -> Bool {
-        failure?.isRetryable == true && isNewest && !isThinking
+    ///
+    /// **Nor while the chat changes**, Stop's word on its way to the engine
+    /// included, which `retry` refuses for the same reason. So a turn the
+    /// reader stopped before its first word offers it once the engine has
+    /// heard the Stop, a hop after the failure line.
+    nonisolated func offersRetry(
+        isNewest: Bool, whileThinking isThinking: Bool, whileTheChatChanges isChangingChat: Bool = false
+    ) -> Bool {
+        failure?.isRetryable == true && isNewest && !isThinking && !isChangingChat
     }
 }
 

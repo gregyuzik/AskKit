@@ -694,6 +694,63 @@ import Testing
         #expect(asker.questions.withLock { $0 }.map(\.0) == ["Which is the oldest?", "And the newest?"])
     }
 
+    @Test func tryAgainWhileStopsWordIsOnItsWayKeepsTheQuestion() async throws {
+        // Taken then, Try Again took the turn off the thread and left its
+        // question waiting for Stop: the thread's only turn gone, the stage
+        // left the thread, and a second Stop over a draft begun since put the
+        // question back nowhere.
+        let asker = ScriptedAsker()
+        asker.scripts([
+            .init(events: [.tier(.privateCloud)], hangs: true),
+            .init(events: [.tier(.privateCloud), .answer(.of("Let It Be."))])
+        ])
+        let store = makeStore(asker: asker)
+        store.ask("Which is the oldest?")
+        await yieldUntil { asker.questions.withLock { $0 }.count == 1 }
+        asker.parksStop.withLock { $0 = true }
+        store.stop(byReader: true)
+        await asker.stopIsParked()
+        let stopped = try #require(store.turns.last)
+        #expect(stopped.failure?.isRetryable == true)
+        #expect(store.isChangingChat)
+        #expect(!stopped.offersRetry(isNewest: true, whileThinking: store.isThinking, whileTheChatChanges: store.isChangingChat))
+
+        store.retry(stopped)
+        #expect(store.hasTurns)
+        #expect(store.turns.map(\.id) == [stopped.id], "Try Again took the turn off the thread")
+        store.draft = "And the newest?"
+        store.stop(byReader: true)
+        asker.releaseStop()
+        await eventually { asker.stops.withLock { $0 } == 2 }
+        await settle(store)
+        let kept = store.turns.map(\.question).contains("Which is the oldest?") || store.draft == "Which is the oldest?"
+        #expect(kept)
+        #expect(asker.questions.withLock { $0 }.map(\.0) == ["Which is the oldest?"])
+    }
+
+    @Test func tryAgainComesBackOnceStopsWordHasReachedTheEngine() async throws {
+        let asker = ScriptedAsker()
+        asker.scripts([
+            .init(events: [.tier(.privateCloud)], hangs: true),
+            .init(events: [.tier(.privateCloud), .answer(.of("Let It Be."))])
+        ])
+        let store = makeStore(asker: asker)
+        store.ask("Which is the oldest?")
+        await yieldUntil { asker.questions.withLock { $0 }.count == 1 }
+        asker.parksStop.withLock { $0 = true }
+        store.stop(byReader: true)
+        await asker.stopIsParked()
+        let stopped = try #require(store.turns.last)
+
+        asker.releaseStop()
+        await eventually { !store.isChangingChat }
+        #expect(stopped.offersRetry(isNewest: true, whileThinking: store.isThinking, whileTheChatChanges: store.isChangingChat))
+        store.retry(stopped)
+        await settle(store)
+        #expect(store.turns.map(\.question) == ["Which is the oldest?"])
+        #expect(store.turns.last?.answer?.text == "Let It Be.")
+    }
+
     @Test func newChatStopsTheEnginesTurnBeforeResettingIt() async {
         // A turn New Chat leaves running finishes unseen and spends its
         // request, so the engine hears Stop before it hears the reset.
@@ -4654,13 +4711,15 @@ import Testing
         #expect(store.turns.last?.answer?.text == "Answer.")
     }
 
-    @Test func aChatOpenedWithNothingOnScreenToFileLeavesTheTurnsKeptBesideTheThreadListed() async throws {
+    @Test func anEarlierChatOpenedOverTheTurnsKeptBesideTheThreadLeavesThemListed() async throws {
         // The thread that couldn't be read went meanwhile, its place now
-        // refusing writes, and the turn asked beside it failed. Asked again as
-        // the reader opens an earlier chat, it waits for that chat, so there
-        // is nothing on screen for the open to file. The turn's filing is an
-        // ordinary one from then on, and listed: still marked as kept beside
-        // the thread, the next New Chat would delete it.
+        // refusing writes, and the turn asked beside it failed. Try Again
+        // waits for no chat change (`retry`), so tapped as the reader opens an
+        // earlier chat it does nothing, and the open files the failed turn's
+        // chat over its filing beside the thread. That filing is an ordinary
+        // one from then on, and listed: still marked as kept beside the
+        // thread, the next New Chat would delete it. Asked again on the chat
+        // opened, the question is that chat's.
         let folder = try privateFolder()
         defer { makeWritable(folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
         let asker = ScriptedAsker()
@@ -4679,9 +4738,15 @@ import Testing
         #expect(failed.failure != nil)
 
         let opening = Task { await store.openThread(earlier) }
-        await Task.yield()
+        await yieldUntil { store.isChangingChat }
         store.retry(failed)
+        #expect(store.turns.map(\.id) == [failed.id], "Try Again took the turn off the thread as the chat changed")
         await opening.value
+        await store.flushPersistence()
+        #expect(store.turns.map(\.question) == ["Which are on vinyl?"])
+        #expect(store.history.map(\.title) == ["Anything from 1969?"])
+
+        store.ask("Anything from 1969?")
         await settle(store)
         await store.flushPersistence()
         #expect(store.turns.map(\.question) == ["Which are on vinyl?", "Anything from 1969?"])

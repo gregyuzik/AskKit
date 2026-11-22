@@ -82,7 +82,9 @@ struct AskThreadList<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: Vie
                 turn: pair.turn,
                 previous: pair.previous,
                 isLast: isLast,
-                offersRetry: pair.turn.offersRetry(isNewest: isLast, whileThinking: store.isThinking),
+                offersRetry: pair.turn.offersRetry(
+                    isNewest: isLast, whileThinking: store.isThinking, whileTheChatChanges: store.isChangingChat
+                ),
                 showsChips: isLast && !store.isThinking
                     && (!store.followUps.isEmpty || store.offersAnotherPick),
                 // Empty on every turn but the newest, so the follow-ups
@@ -279,7 +281,8 @@ struct AskWaitRowFocus: Equatable {
     /// with Try Again to wherever the system put it.
     ///
     /// **Every press asks**: Try Again shows only where `retry` asks, and not
-    /// while a question waits (`AskTurn.offersRetry(isNewest:whileThinking:)`).
+    /// while a question waits or the chat changes
+    /// (`AskTurn.offersRetry(isNewest:whileThinking:whileTheChatChanges:)`).
     /// A press that asked nothing would leave a request naming the kept turn,
     /// and the next question typed below it would take the focus from the
     /// field it was typed in.

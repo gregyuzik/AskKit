@@ -6,7 +6,8 @@ import Testing
 
 @testable import AskUI
 
-/// When a failure offers Try Again (`AskTurn.offersRetry(isNewest:whileThinking:)`).
+/// When a failure offers Try Again
+/// (`AskTurn.offersRetry(isNewest:whileThinking:whileTheChatChanges:)`).
 @Suite(.timeLimit(.minutes(1))) struct AskTryAgainOfferTests {
     private func failed(isRetryable: Bool = true) -> AskTurn<UIRow> {
         var turn = AskTurn<UIRow>(question: "What's the oldest?", origin: .typed)
@@ -25,6 +26,13 @@ import Testing
     /// asked: a Try Again shown then took the tap and did nothing with it.
     @Test func aQuestionWaitingToBeAskedTakesTryAgainAway() {
         #expect(!failed().offersRetry(isNewest: true, whileThinking: true))
+    }
+
+    /// **Nor while the chat changes**, Stop's word on its way to the engine
+    /// included: `retry` refuses it then, as it would leave the question
+    /// waiting with its turn gone from the thread.
+    @Test func aChatChangingTakesTryAgainAway() {
+        #expect(!failed().offersRetry(isNewest: true, whileThinking: false, whileTheChatChanges: true))
     }
 
     /// Only the newest turn, and only a failure that can be asked again.

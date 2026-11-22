@@ -23,6 +23,16 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   (`Tips.resetDatastore()`), and a reader who has already been to Ask starts from none: their next
   visit is the first. The other two tips are as they were.
 
+### Fixed
+
+- **Try Again waits for the chat to change, so the question it asks again stays on the thread.**
+  Tapped while Stop's word was still on its way to the engine, or while an earlier chat was being read
+  and filed, Try Again took the failed turn off the thread and left its question waiting. A thread of
+  that one turn went back to a first screen, and a second Stop with something typed in the composer
+  put the question back nowhere. `AskConversationStore.retry(_:)` now does nothing until the change is
+  done, and the thread hides Try Again meanwhile, so after a Stop before the first word it appears a
+  moment after the line that says the reader stopped the answer.
+
 ## [0.7.2] - 2026-11-09
 
 Eleven fixes, and no change to the API. A chat keeps saving when one of its rows won't encode, a yes

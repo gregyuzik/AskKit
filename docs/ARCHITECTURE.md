@@ -694,7 +694,10 @@ place, or a `.perLaunch` domain's next launch.
 alive over the same thread is logged as a fault. It turns engine events into `AskTurn`s, owns the draft,
 and persists, restores and archives the thread.
 - **Re-asking.** Try Again re-asks only the newest failed turn, leaving the draft alone, and isn't
-  offered while a question waits to be asked, which is newer though it has no turn yet. A turn that
+  offered while a question waits to be asked, which is newer though it has no turn yet, or while the
+  chat changes (the queue under Order, Stop's word to the engine included): asked again then, the
+  question would wait with its turn already off the thread, and a second Stop could leave it in neither
+  the thread nor the composer. So after a Stop, Try Again comes once the engine has heard it. A turn that
   failed before drawing anything gives its place to the re-ask; one that drew prose keeps it, with the
   re-ask below. Ask again asks the question as a new turn over the thread as it stands. Another pick
   rerolls a pick: its origin, `.reroll`, is asked as `AskTurnMode.reroll`, as is a host's
