@@ -85,6 +85,18 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   `<|end|>`), then at the first `]` or `}` that closes nothing the chip opened, trims the quote or
   separator the cut leaves, and drops a chip with nothing left. It reads the text's shape alone, so it
   holds in every script, and it cleans the follow-ups read back from disk as well.
+- **A row this build can't read is kept where a late outcome or a recovered chat would have dropped
+  it.** A row a newer build wrote, or one a host's row type has outgrown, reads back left out of its
+  answer. Writing what came of a yes into the chat's filing wrote the filing back without that row, and
+  putting a chat set aside back with the earlier chats removed the set-aside copy, the row's last one,
+  or joined it with a filing and wrote that without it. The filing is now left as it is, and the card
+  reads back with what came of the yes unknown, taking no tap; a chat set aside is filed beside such a
+  filing, and its file is kept as an original until a build reads it whole. The thread's own next save,
+  and a chat opened and filed again, still write the answer without the row, as the screen shows it.
+- **A chat deleted from History while it opens opens nothing.** The sheet stays up while a chat opens
+  (above), so its row could be swiped away meanwhile, and the open went on with what it had read: the
+  chat just deleted came back as the thread. The open now gives way to its chat's delete, and the chat
+  on screen stays as it was. A chat deleted beside it changes nothing.
 
 ## [0.7.2] - 2026-11-09
 

@@ -3880,6 +3880,53 @@ import Testing
         #expect(reports.outcomes == [.gaveWay])
     }
 
+    @Test(arguments: [true, false])
+    func aChatDeletedAsItOpensOpensNothing(deletesTheOneOpening: Bool) async throws {
+        // The sheet stays up while a chat opens, so its row can be swiped
+        // away meanwhile. The open went on with what it had read, and the
+        // chat just deleted came back as the thread. It gives way now, and
+        // leaves the chat on screen as it was and unfiled, as it was before
+        // the tap. A chat deleted beside it changes nothing.
+        let name = "askkit-open-deleted-\(deletesTheOneOpening)"
+        let threadURL = temporaryLocation(name).appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation(name)
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let opened = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        let beside = try #require(await archive.archive([earlierEntry("What have I lent out?", at: 2_000_000)]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+        await store.loadHistory()
+
+        let filing = Park()
+        filing.parks.withLock { $0 = true }
+        store.whileFilingTheChatOnScreen = { await filing.wait() }
+        let reports = OpenReports(store)
+        let opening = Task { await store.openThread(opened, reporting: reports.note) }
+        await filing.isParked()
+        await store.deleteThread(deletesTheOneOpening ? opened : beside)
+        filing.release()
+        await opening.value
+        await store.flushPersistence()
+        await store.loadHistory()
+
+        if deletesTheOneOpening {
+            #expect(reports.outcomes == [.gaveWay])
+            #expect(store.turns.map(\.question) == ["Anything from 1969?"])
+            #expect(await entriesOnDisk(threadURL) == ["Anything from 1969?"])
+            #expect(store.history.map(\.title) == ["What have I lent out?"])
+            #expect(await archive.summaries().map(\.title) == ["What have I lent out?"])
+        } else {
+            #expect(reports.outcomes == [.opened])
+            #expect(store.turns.map(\.question) == ["Which records do I own?"])
+            #expect(store.history.map(\.title) == ["Anything from 1969?"])
+        }
+    }
+
     @Test func aTurnStoppedByAnOpenThatCouldNotFileTheChatIsSaved() async throws {
         // The open stops the turn in flight and then finds the chat on screen
         // can't be filed, so the chat stays; its stopped turn is saved as

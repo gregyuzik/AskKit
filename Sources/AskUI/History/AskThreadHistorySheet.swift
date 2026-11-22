@@ -45,7 +45,8 @@ struct AskThreadHistorySheet: View {
                         // closes the sheet or says why not, or Delete All
                         // Chats, which closes it. New Chat from the menu, a
                         // host's own request or another window's leaves the
-                        // sheet up, listing the chats as they are now.
+                        // sheet up, listing the chats as they are now, as
+                        // does the row deleted as it opened, gone from them.
                         case .gaveWay: break
                         case .refused: refusal.show(for: summary)
                         }

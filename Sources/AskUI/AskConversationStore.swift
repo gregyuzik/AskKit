@@ -557,6 +557,12 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// when some of its turns didn't decode, since the filing is then their
     /// only copy (`open`).
     @ObservationIgnored private var openedChatID: UUID?
+    /// The chat the reader's last request to open one chose. Deleted from the
+    /// list while it opens, it is the request no longer, and the open gives
+    /// way (`deleteThread`): it would bring the chat just deleted back as the
+    /// thread. Only that chat's delete: another deleted beside it leaves the
+    /// open as it was.
+    @ObservationIgnored private var openingChatID: UUID?
     /// The filing that keeps the turns asked while the thread's place is held
     /// (`heldThread`), by a thread that couldn't be read or a chat New Chat
     /// couldn't file and that won't move aside, which the list leaves out
@@ -2651,6 +2657,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         }
         chatRequests &+= 1
         let request = chatRequests
+        openingChatID = summary.id
         // The composer as the tap left it, which the open empties only if
         // nothing has written to it by the time the chat lands.
         let composerAtTheTap = composerRevision
@@ -2683,15 +2690,18 @@ public final class AskConversationStore<Domain: AskDomain> {
         // queue, not this one, and may still be about to hold the place for a
         // chat they couldn't file or move (`endingWrites`).
         await persisting?.value
+        // Still the reader's last request: nothing asked for since, and the
+        // chat not deleted from the list meanwhile (`openingChatID`).
+        func isLive() -> Bool { request == chatRequests && openingChatID == summary.id }
         // Refused, unless the reader has asked for something else since,
         // which then says what came of it: two lines over one list, or one
         // over a sheet New Chat or another chat closed.
-        func refusal() -> AskChatOpenOutcome { request == chatRequests ? .refused : .gaveWay }
+        func refusal() -> AskChatOpenOutcome { isLive() ? .refused : .gaveWay }
         // Chosen again once it is on screen: a second tap on its row, landing
         // after the first opened it. Its filing goes once it is written as
         // the thread, so read now it would look gone.
         if summary.id == openedChatID {
-            report(request == chatRequests ? .opened : .gaveWay)
+            report(isLive() ? .opened : .gaveWay)
             return
         }
         guard heldThread == nil else {
@@ -2699,8 +2709,8 @@ public final class AskConversationStore<Domain: AskDomain> {
             return
         }
         let read = await archive.entries(for: summary.id)
-        // The reader asked for something else while it read.
-        guard request == chatRequests else {
+        // The reader asked for something else while it read, or deleted it.
+        guard isLive() else {
             report(.gaveWay)
             return
         }
@@ -2744,13 +2754,29 @@ public final class AskConversationStore<Domain: AskDomain> {
             var filing = outgoing
             var marked = turns.filter(\.isComplete).map(ReadersMarks.init)
             var filedOnce = false
+            let ends = threadEnds
+            // Given way, with the chat still on screen, as when its chat was
+            // deleted: the turn this stopped is saved, as Stop saves one,
+            // since its own task returned without a save.
+            func giveWay() {
+                if settled, threadEnds == ends { persist() }
+                report(.gaveWay)
+            }
             while true {
                 // Turns filed beside a thread that couldn't be read, and read
                 // since, are in this filing, which takes their filing's place.
-                let filed = await queueWrite { [archive, filing] store in
+                // Given way to before the write, it files nothing: what took
+                // its place files the chat itself, or, for its chat deleted,
+                // leaves the chat on screen as it was, kept nowhere else yet.
+                let filed: Bool? = await queueWrite { [archive, filing] store in
                     await store.whileFilingTheChatOnScreen?()
+                    guard request == store.chatRequests, store.openingChatID == summary.id else { return nil }
                     return await archive.fileTheChatOnScreen(filing, at: .now, sparing: summary.id) != nil
                 }.value
+                guard let filed else {
+                    giveWay()
+                    return
+                }
                 guard filed else {
                     // Refused again after a filing that took, the chat is in
                     // two places, on screen and in that filing, until it is
@@ -2768,9 +2794,11 @@ public final class AskConversationStore<Domain: AskDomain> {
                 filedOnce = true
                 // Filed, and still the reader's last request: anything asked
                 // for meanwhile files this chat again, which replaces this
-                // filing.
-                guard request == chatRequests else {
-                    report(.gaveWay)
+                // filing. Its chat deleted as the archive wrote, the filing
+                // stays, listed beside the chat on screen until New Chat
+                // files that chat over it.
+                guard isLive() else {
+                    giveWay()
                     return
                 }
                 let onScreen = turns.filter(\.isComplete)
@@ -2944,8 +2972,13 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Forget an earlier chat. Does nothing on a domain that keeps no chats.
+    ///
+    /// The chat the reader's last request opens, deleted while it opens, opens
+    /// nothing: the open gives way (`openingChatID`), and the chat on screen
+    /// stays as it was.
     public func deleteThread(_ summary: AskThreadSummary) async {
         guard offersHistory else { return }
+        if openingChatID == summary.id { openingChatID = nil }
         history.removeAll { $0.id == summary.id }
         await archive.remove(summary.id)
         await loadHistory()
@@ -3250,8 +3283,9 @@ nonisolated enum AskChatOpenOutcome: Equatable, Sendable {
     case opened
     /// A request made after it took its place: New Chat, Delete All Chats or
     /// another chat, from the same list, the menu, another window or the
-    /// host. The list says nothing of this one: a later request from it says
-    /// what came of that.
+    /// host, or the chat itself deleted from the list as it opened. The list
+    /// says nothing of this one: a later request from it says what came of
+    /// that, and a deleted chat's row is gone.
     case gaveWay
     /// Nothing opened, and nothing took its place: the chat won't read or
     /// has gone from disk, the chat on screen couldn't be filed first, or the
