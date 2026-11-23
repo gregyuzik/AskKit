@@ -916,21 +916,23 @@ import Testing
         #expect(follow.footRequests == landed)
     }
 
-    @Test func theSameStepAfterTheResizeIsTheReaders() {
-        // Only the resize's own steps are set aside. Past `resizeWindow` the
-        // traced step clears the flag as any drag does, and at 408pt from the
-        // last turn's end it is far enough to earn the pill.
+    @Test func theSameStepAfterTheResizeLandsIsTheReaders() {
+        // Only the resize's own steps are set aside. Once a sample has left
+        // the thread at rest at its foot and `resizeWindow` has passed, the
+        // traced step clears the flag as any drag does, and the thread is
+        // left where it went.
         let follow = AskScrollFollow()
         let now: TimeInterval = 100
         follow.geometryChanged(Self.upright, at: now)
         follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.01)
-        let asked = follow.footRequests
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 1174), at: now + 0.02)
+        let landed = follow.footRequests
 
-        let later = now + 0.01 + AskScrollFollow.resizeWindow + 0.1
-        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: later)
+        let later = now + 0.01 + Self.lateBy
+        #expect(!follow.keepsFootThroughResize(at: later))
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 1057), at: later)
         #expect(!follow.isAtFoot)
-        #expect(follow.showsJumpPill)
-        #expect(follow.footRequests == asked)
+        #expect(follow.footRequests == landed)
     }
 
     @Test func aHandOnTheThreadMidResizeIsTheReaders() {
@@ -1008,18 +1010,269 @@ import Testing
     @Test func aResizesRequestsLapseWithIt() {
         // `AskScreen` answers `footRequests` from a task that also runs each
         // time the thread appears, with whatever count the last resize left,
-        // so it asks this first: no once the window has passed, and no once a
-        // hand is on the thread.
+        // so it asks this first: no once the thread has come to rest at its
+        // foot, and no once a hand is on the thread or the thread's own jump
+        // is taking it there.
+        let now: TimeInterval = 100
+        let past = now + 0.01 + Self.lateBy
+        func turned() -> AskScrollFollow {
+            let follow = AskScrollFollow()
+            follow.geometryChanged(Self.upright, at: now)
+            follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.01)
+            #expect(follow.footRequests > 0)
+            #expect(follow.keepsFootThroughResize(at: now + 0.02))
+            return follow
+        }
+
+        let landed = turned()
+        landed.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 1174), at: now + 0.03)
+        #expect(!landed.keepsFootThroughResize(at: now + 0.04))
+        #expect(!landed.keepsFootThroughResize(at: past))
+
+        let held = turned()
+        held.scrollPhaseChanged(.interacting)
+        #expect(!held.keepsFootThroughResize(at: now + 0.02))
+        held.scrollPhaseChanged(.idle)
+        #expect(!held.keepsFootThroughResize(at: past))
+
+        let jumped = turned()
+        jumped.jumped(at: now + 0.02)
+        #expect(!jumped.keepsFootThroughResize(at: now + 0.03))
+    }
+
+    @Test func aPhoneTurnedUprightAgainKeepsTheReaderAtTheFoot() {
+        // **Traced on the demo's thread on an iPhone 18 Pro simulator**, turned
+        // upright from its side with the reader at the foot. The thread came
+        // to rest at its foot and then, after the screen's scroll for a
+        // request it had already answered, 52 pt above it with nothing else
+        // changed, before the bars' inset came back. Inside `resizeWindow`
+        // that step is still the resize's, and asked for again.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        let third: CGFloat = 1.0 / 3
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 943, offset: 614 + third, inset: 78), at: now
+        )
+
+        follow.geometryChanged(
+            Self.traced(width: 874, container: 232, content: 943, offset: 614 + third, inset: 78), at: now + 1.6
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 908, offset: 614 + third, inset: 78), at: now + 1.609
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 212 + third, inset: 78), at: now + 1.616
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 264 + third, inset: 78), at: now + 1.619
+        )
+        let beforeTheStep = follow.footRequests
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 212 + third, inset: 78), at: now + 1.624
+        )
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1013, offset: 174 + third), at: now + 1.625)
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests == beforeTheStep + 2)
+
+        let landed = follow.footRequests
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1013, offset: 226 + third), at: now + 1.63)
+        #expect(follow.footRequests == landed)
+        #expect(!follow.keepsFootThroughResize(at: now + 1.63 + Self.lateBy))
+    }
+
+    // MARK: - A resize on a loaded device
+
+    /// The traced turn's samples come in the same order on a loaded device,
+    /// further apart: a push gate's run of the demo's
+    /// testAThreadAtItsFootStaysThereOnItsSide, with a load average of about
+    /// 20 on 12 cores, left the newest answer under the composer on its side.
+    /// Nothing in these four has answered the resize yet, so each is still
+    /// its own, however late it comes.
+    private static let lateBy = AskScrollFollow.resizeWindow + 0.1
+
+    @Test func theScrollViewsStepAfterTheNewWidthIsTheResizesHoweverLate() {
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        let beforeTheStep = follow.footRequests
+
+        let late = now + 0.023 + Self.lateBy
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: late)
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests > beforeTheStep)
+        #expect(follow.keepsFootThroughResize(at: late))
+    }
+
+    @Test func rowsMeasuredAtTheNewWidthAreAskedForHoweverLate() {
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: now + 0.028)
+        let beforeTheRows = follow.footRequests
+
+        let late = now + 0.028 + Self.lateBy
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 1765, offset: 792, inset: 78), at: late
+        )
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 1771, offset: 792, inset: 78), at: late + 1
+        )
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests == beforeTheRows + 2)
+        #expect(follow.keepsFootThroughResize(at: late + 1))
+    }
+
+    @Test func aRequestTheScreenAnswersLateIsStillTheResizes() {
+        // `AskScreen` answers from a task, which asks again as it runs: on a
+        // loaded device that can be long after the sample that asked.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        #expect(follow.footRequests > 0)
+        #expect(follow.keepsFootThroughResize(at: now + 0.023 + Self.lateBy))
+    }
+
+    @Test func theTurnsSecondWidthIsTheSameResizeHoweverLate() {
+        // The rotation's own width first, the content's end 229pt above the
+        // bottom edge, then the rows at their estimates for it, the last
+        // turn's end 484pt below it. The first frame has the end in view and
+        // isn't at rest there, so it answers nothing; and decided again from
+        // the second when the phone's width on its side comes, the resize
+        // would let the reader go.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 340, container: 722, content: 1480, offset: 871), at: now + 0.001)
+
+        let late = now + 0.001 + Self.lateBy
+        let beforeTheRows = follow.footRequests
+        follow.geometryChanged(Self.traced(width: 340, container: 722, content: 2205, offset: 871), at: late)
+        #expect(follow.footRequests == beforeTheRows + 1)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: late + 0.007)
+        #expect(follow.isAtFoot)
+        #expect(follow.footRequests == beforeTheRows + 2)
+        #expect(follow.keepsFootThroughResize(at: late + 0.007))
+    }
+
+    @Test func whatTheReaderDoesAfterTheResizeLandsAsksForNothing() {
+        // Once the thread has come to rest at its foot and `resizeWindow` has
+        // passed, the resize is over: a card the reader opens in place in the
+        // settled last turn grows where it stands, and a keyboard rises over
+        // the thread, on their second samples as on their first.
+        let now: TimeInterval = 100
+        func landed() -> AskScrollFollow {
+            let follow = AskScrollFollow()
+            follow.geometryChanged(Self.upright, at: now)
+            follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.01)
+            follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 1174), at: now + 0.02)
+            return follow
+        }
+
+        let card = landed()
+        let beforeTheCard = card.footRequests
+        card.geometryChanged(Self.traced(width: 750, container: 250, content: 1740, offset: 1174), at: now + 60)
+        card.geometryChanged(Self.traced(width: 750, container: 250, content: 1940, offset: 1174), at: now + 60.02)
+        #expect(card.footRequests == beforeTheCard)
+        #expect(!card.keepsFootThroughResize(at: now + 60.02))
+
+        let keyboard = landed()
+        let beforeTheKeyboard = keyboard.footRequests
+        keyboard.geometryChanged(Self.traced(width: 750, container: 150, content: 1540, offset: 1174), at: now + 60)
+        keyboard.geometryChanged(Self.traced(width: 750, container: 60, content: 1540, offset: 1174), at: now + 60.02)
+        #expect(keyboard.footRequests == beforeTheKeyboard)
+    }
+
+    @Test func aStepBackAfterALateLandingIsTheReaders() {
+        // **What the window still decides**, and the cost of an event that
+        // can't. The upright turn's samples, with the thread first at rest at
+        // its foot past `resizeWindow`: a step back up after that comes after
+        // the resize is over. Nothing tells it from a reader's scroll that
+        // reports no phase, so it is read as one, inside the follow boundary,
+        // and the thread rests 41pt short of its foot. The traced step came
+        // from a scroll the screen no longer makes
+        // (`aRequestTheThreadHasAnsweredIsNotAnsweredAgain`).
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        let third: CGFloat = 1.0 / 3
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 943, offset: 614 + third, inset: 78), at: now
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 212 + third, inset: 78), at: now + 1
+        )
+        let late = now + 1 + Self.lateBy
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 264 + third, inset: 78), at: late
+        )
+        let landed = follow.footRequests
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 212 + third, inset: 78), at: late + 0.005
+        )
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1013, offset: 174 + third), at: late + 0.006)
+        #expect(follow.footRequests == landed)
+        #expect(follow.isAtFoot)
+    }
+
+    @Test func aRequestTheThreadHasAnsweredIsNotAnsweredAgain() {
+        // The upright turn again, as it went once the screen stopped
+        // answering such a request: at rest at the foot when the request's
+        // task asks, at rest there again in the next sample, and through the
+        // bars' new inset, with nothing asked for after the first rest.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        let third: CGFloat = 1.0 / 3
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 943, offset: 614 + third, inset: 78), at: now
+        )
+        follow.geometryChanged(
+            Self.traced(width: 874, container: 232, content: 943, offset: 614 + third, inset: 78), at: now + 1.6
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 888, offset: 614 + third, inset: 78), at: now + 1.608
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 212 + third, inset: 78), at: now + 1.615
+        )
+        #expect(follow.keepsFootThroughResize(at: now + 1.615))
+
+        let rested = follow.footRequests
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 264 + third, inset: 78), at: now + 1.617
+        )
+        #expect(!follow.keepsFootThroughResize(at: now + 1.617))
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 670, content: 1013, offset: 264 + third, inset: 78), at: now + 1.62
+        )
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1013, offset: 226 + third), at: now + 1.622)
+        #expect(follow.footRequests == rested)
+        #expect(!follow.keepsFootThroughResize(at: now + 1.622))
+        #expect(follow.isAtFoot)
+    }
+
+    @Test func aResizeThatNeverLandsKeepsTheFootUntilTheReaderTakesHold() {
+        // **The cost of no clock**: a request the screen never lands keeps the
+        // resize under way, so what grows the thread next, a minute on, is
+        // still taken to the foot. Only a hand on the thread lets it go, and
+        // off iOS no hand is read.
         let follow = AskScrollFollow()
         let now: TimeInterval = 100
         follow.geometryChanged(Self.upright, at: now)
         follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.01)
-        #expect(follow.footRequests > 0)
-        #expect(follow.keepsFootThroughResize(at: now + 0.02))
-        #expect(!follow.keepsFootThroughResize(at: now + 0.01 + AskScrollFollow.resizeWindow + 0.1))
+        #expect(follow.keepsFootThroughResize(at: now + 60))
+
+        let beforeTheCard = follow.footRequests
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1940, offset: 871), at: now + 60)
+        #expect(follow.footRequests == beforeTheCard + 1)
 
         follow.scrollPhaseChanged(.interacting)
-        #expect(!follow.keepsFootThroughResize(at: now + 0.02))
+        follow.scrollPhaseChanged(.idle)
+        #expect(!follow.keepsFootThroughResize(at: now + 60.1))
     }
 
     // MARK: - The navigation bar
