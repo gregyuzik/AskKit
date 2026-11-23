@@ -841,7 +841,12 @@ such as a photo still decoding, crosses its placeholder the same way (`AskPictur
 - **Resizes.** A resize (a turned phone, a dragged window, iPhone Duo moving between its displays) is
   never the reader's doing, so a reader at the foot when one starts is there when it ends. A turned
   phone can report an offset that reads as a drag; taken for one, it left a reader 645 pt above the
-  foot.
+  foot. A resize that keeps the reader at the foot lasts until a sample shows the thread at rest
+  there, and for at least half a second after the width last changed. A busy device keeps the order
+  of a turn's layout passes but not their pace, so it is that event, not the clock, that ends the
+  resize. The half-second covers a step back up just after the thread first reaches the foot, which no
+  sample can tell from the reader's scroll. A hand on the thread, or the thread's own jump, ends the
+  resize sooner.
 - **Coming back.** The thread coming back into view, from a pushed item or another tab, is no new
   question: a reader is where they left it, and only one the follow was taking down a streaming answer
   is taken to its end.
