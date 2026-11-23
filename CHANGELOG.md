@@ -23,6 +23,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   (`Tips.resetDatastore()`), and a reader who has already been to Ask starts from none: their next
   visit is the first. The other two tips are as they were.
 
+### Fixed
+
+- **Opening an earlier chat beside iPhone Duo's fold moves the mark and no row, all the way through.**
+  `AskConversationStore` filed the chat on screen, put the chosen one there, and listed the chat it had
+  filed only once the open's writes had landed and the list was read again. Until then the pane of
+  chats drew the chosen chat alone in its top row, then both chats back in their places, for as long as
+  those writes took. The list now changes with the screen, to what that read finds.
+
 ## [0.7.2] - 2026-11-09
 
 Eleven fixes, and no change to the API. A chat keeps saving when one of its rows won't encode, a yes
