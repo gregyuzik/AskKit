@@ -23,6 +23,15 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   (`Tips.resetDatastore()`), and a reader who has already been to Ask starts from none: their next
   visit is the first. The other two tips are as they were.
 
+### Fixed
+
+- **Leaving the app with follow-ups on screen no longer faults in SwiftUI.** The thread is
+  `.privacySensitive()`, and as the scene goes inactive SwiftUI builds a redacted copy of it beside
+  the original. The copy's chips claimed the same matched-geometry ids as the originals, so the first
+  Home press after launch logged "Multiple inserted views in matched geometry group" once for each
+  follow-up, and a question still in flight would have done the same. The copy now stays out of the
+  chip-to-question morph, which runs as before on the thread the reader sees.
+
 ## [0.7.2] - 2026-11-09
 
 Eleven fixes, and no change to the API. A chat keeps saving when one of its rows won't encode, a yes
