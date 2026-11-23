@@ -105,12 +105,13 @@ final class AskScrollFollow {
     /// the foot goes on past it until a sample leaves the thread at rest there
     /// (`resizeAnswered`), however late its samples come. The window covers the
     /// one step no sample can tell from the reader's: the offset alone moving
-    /// up from rest at the foot. Turned upright, an iPhone 18 Pro simulator
-    /// reported the thread at rest at its foot and then 52 pt above it, 5 ms
-    /// later, with nothing else changed and no scroll phase, before the bars'
-    /// new inset; on the Mac, where no scroll phase is read at all, the wheel
-    /// takes the same step. Inside the window it is the resize's, and after
-    /// it the reader's.
+    /// up from rest at the foot, with no scroll phase, which off iOS is also
+    /// the wheel. Inside the window it is the resize's, and asked for again;
+    /// after it, the reader's. Traced once, turned upright on an iPhone 18 Pro
+    /// simulator, after the screen's scroll for a request the thread had
+    /// already answered: 52 pt above the foot, before the bars' new inset. The
+    /// screen no longer makes that scroll (`keepsFootThroughResize(at:)`), and
+    /// the window is there for a step like it from anywhere else.
     static let resizeWindow: TimeInterval = 0.5
 
     /// Whether the last turn's end is close enough that following it is what
@@ -457,13 +458,26 @@ final class AskScrollFollow {
     /// (`keepsFootThroughResize(at:)`).
     var keepsFootThroughResize: Bool { keepsFootThroughResize(at: Date.timeIntervalSinceReferenceDate) }
 
-    /// Whether a resize under way at `now` is keeping the reader at the foot:
-    /// what every `footRequests` is issued on, and what `AskScreen` asks again
-    /// before it answers one, however long after the request its task runs.
-    /// Its task also runs each time the thread appears, with whatever count
-    /// the last resize left, and that is no resize at all unless one is still
-    /// waiting to be answered.
+    /// Whether a resize under way at `now` is keeping the reader at the foot,
+    /// and the last sample left them short of it: what `AskScreen` asks again
+    /// before it answers a `footRequests`, however long after the request its
+    /// task runs. Its task also runs each time the thread appears, with
+    /// whatever count the last resize left, and that is no resize at all
+    /// unless one is still waiting to be answered.
+    ///
+    /// **A request the thread has already answered is not answered again.**
+    /// Turned upright on an iPhone 18 Pro simulator, a request's task ran 3 ms
+    /// after the sample that showed the thread at rest at its foot, and the
+    /// sample after the screen's scroll had it 52 pt above the foot, to be
+    /// asked for again. With the task doing nothing there, the same turn went
+    /// from rest at the foot to rest at the foot through the bars' new inset.
     func keepsFootThroughResize(at now: TimeInterval) -> Bool {
+        holdsFoot(at: now) && !resizeAnswered
+    }
+
+    /// Whether a resize under way at `now` is keeping the reader at the foot:
+    /// what every `footRequests` is issued on (`geometryChanged(_:at:)`).
+    private func holdsFoot(at now: TimeInterval) -> Bool {
         resizeKeepsFoot && isResizing(at: now)
     }
 
@@ -590,7 +604,7 @@ final class AskScrollFollow {
         // Not through `jumped(at:)`, which would make the rewrapped turn's
         // growth the thread's own and send the animated follow after the same
         // foot: two motions for one resize.
-        if keepsFootThroughResize(at: now), atFoot, scrollable, distance > 0 {
+        if holdsFoot(at: now), atFoot, scrollable, distance > 0 {
             footRequests += 1
         }
         // Set last: the request above, and the step set aside before it, read
