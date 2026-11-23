@@ -17,7 +17,8 @@ public import SwiftUI
 ///
 /// Under Reduce Motion the blur and the stagger go and the fade stays: a fade is
 /// not motion, and holding text back until it is fully opaque would be slower
-/// than showing it.
+/// than showing it. Under a host's `askDrawsAtRest` the whole reveal goes, the
+/// caret with it, and the text is the plain `Text` a settled turn draws.
 struct AskStreamingText: View {
     private let attributed: AttributedString
     private let chunks: [AskRevealChunk]
@@ -25,6 +26,7 @@ struct AskStreamingText: View {
     private let caret: AskCaret
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.askDrawsAtRest) private var drawsAtRest
     /// Bumped once the last chunk has finished drawing in, so the body runs
     /// again and pauses the clock.
     @State private var settledTick = 0
@@ -53,11 +55,12 @@ struct AskStreamingText: View {
         // chasing the last glyph for the whole turn is motion by any reading,
         // and the reduced reveal is a fade and nothing else.
         let caret = showsCaret && !reduceMotion ? self.caret : nil
-        if chunks.isEmpty && caret == nil {
+        if drawsAtRest || (chunks.isEmpty && caret == nil) {
             // At rest: a plain `Text`, with no renderer and no clock. A
             // finished turn lands here once the store drops its chunks. A turn
             // in flight always has chunks, at least the merged stretch, so it
-            // keeps the clock, under Reduce Motion too.
+            // keeps the clock, under Reduce Motion too; under `askDrawsAtRest`
+            // it doesn't.
             Text(attributed)
         } else {
             // **The stamped text is built once, not once a frame.** It depends

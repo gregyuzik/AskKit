@@ -260,7 +260,13 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// A fold a host asked the screen to arrange itself around on a device
     /// with none (`askSimulatedFold(_:)`): read in place of the device's own.
     @Environment(\.askSimulatedFold) private var simulatedFold
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReducesMotion
+    /// A host's UI test drawing the screen at rest (`askDrawsAtRest(_:)`).
+    @Environment(\.askDrawsAtRest) private var drawsAtRest
+    /// Whether the screen moves nothing of its own: under Reduce Motion, where
+    /// it already moves nothing (its fades ride an animation of `.none`), and
+    /// under `askDrawsAtRest`, which takes that answer without the system's.
+    private var reduceMotion: Bool { systemReducesMotion || drawsAtRest }
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Whether the host rests the composer in its tab bar's slot
