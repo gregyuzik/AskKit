@@ -25,6 +25,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **A reader at the foot of a thread stays there as the phone turns, on a busy device too.** Keeping
+  them there rested on a half-second after the width changed. On a busy device, the turn's later
+  layout passes and the screen's own scroll to the foot can land after that half-second, and the
+  newest answer came to rest under the composer. A resize that keeps the reader at the foot now goes
+  on until the thread is seen at rest there, however late that comes, and for at least the
+  half-second. And the screen no longer scrolls again to a foot the thread has already reached:
+  turned upright, that scroll had put the thread 52 pt short of its foot for a moment.
 - **An earlier chat opened beside a fold no longer minimizes the navigation bar.** On a busy device,
   a phone turned on its side could report the bars' shorter inset seconds after it turned, and the
   screen took that for the bar minimizing. So it didn't hold the bar open for the scroll that takes a
