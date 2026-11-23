@@ -86,8 +86,12 @@ Deeper notes: `.claude/references/`.
   - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in the push gate when it has
     `PREPUSH_LIB` (the maintainers'), never in CI, whose virtual Mac draws views too slowly for the
     suites' deadlines. The gate builds their tests first (`build-ios-tests`, `build-ui-smoke`), then
-    holds an iPhone seat while they run, and runs `ui-smoke` (about 12 minutes) only when the push
-    changes a file under `Sources/AskUI/` or `Demo/`, a script that runs it, or the gate. Run alone,
+    holds an iPhone seat while they run, and runs `ui-smoke` (about 20 minutes on one seat) only when
+    the push changes a file under `Sources/AskUI/` or `Demo/`, a script that runs it, or the gate.
+    Before `ui-smoke` the gate tries for the other iPhone too (the lib's `gate_sim_extra`, which never
+    waits: one seat whenever a gate is queued or anyone else wants it); with it, `ui-smoke` splits the
+    suite in two halves by the last run's per-test times and runs them at once, one a seat
+    (`ASKKIT_SIM_2`). Never `-parallel-testing-worker-count`: it clones the simulator. Run alone,
     each builds its tests first. Without `PREPUSH_LIB`, CONTRIBUTING.md says when to run them yourself.
   - A test that passes only while work beats a deadline on the wall clock takes `.racesTheClock`
     (`AskEngineTests.swift`). It is skipped while the load average is past two a core, and
