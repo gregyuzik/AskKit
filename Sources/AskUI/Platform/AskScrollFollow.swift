@@ -95,13 +95,22 @@ final class AskScrollFollow {
     /// animated scroll on the screen takes.
     static let jumpGlideWindow: TimeInterval = 0.5
 
-    /// How long after the thread's width last changed its steps are still the
-    /// resize's own, and a reader who was at the foot is kept there
-    /// (`geometryChanged(_:at:)`). `jumpGlideWindow`'s half-second: a phone
-    /// turned on its side was traced reaching its final layout inside a quarter of one, and a
-    /// scroll that reports no hold goes unread for this long after the window
-    /// stops moving. On the Mac, where no scroll phase is read at all, that
-    /// includes the wheel.
+    /// The least time after the thread's width last changed that its steps are
+    /// still the resize's own, and a reader who was at the foot is kept there
+    /// (`isResizeUnderWay(at:)`). `jumpGlideWindow`'s half-second: a phone
+    /// turned either way was traced reaching its final layout inside a tenth
+    /// of one.
+    ///
+    /// **A floor, not the length of a resize.** One that holds the reader at
+    /// the foot goes on past it until a sample leaves the thread at rest there
+    /// (`resizeAnswered`), however late its samples come. The window covers the
+    /// one step no sample can tell from the reader's: the offset alone moving
+    /// up from rest at the foot. Turned upright, an iPhone 18 Pro simulator
+    /// reported the thread at rest at its foot and then 52 pt above it, 5 ms
+    /// later, with nothing else changed and no scroll phase, before the bars'
+    /// new inset; on the Mac, where no scroll phase is read at all, the wheel
+    /// takes the same step. Inside the window it is the resize's, and after
+    /// it the reader's.
     static let resizeWindow: TimeInterval = 0.5
 
     /// Whether the last turn's end is close enough that following it is what
@@ -228,8 +237,23 @@ final class AskScrollFollow {
     @ObservationIgnored private var resizedAt: TimeInterval?
 
     /// Whether the resize under way keeps the reader at the foot, which
-    /// `resized(to:at:)` decides once as it begins.
+    /// `resized(to:at:)` decides once as it begins. Let go by a hand on the
+    /// thread, by the thread's own jump, and once the resize is answered and
+    /// past `resizeWindow` (`geometryChanged(_:at:)`); never by the clock
+    /// alone.
     @ObservationIgnored private var resizeKeepsFoot = false
+
+    /// Whether the last sample left the thread at rest at its foot, or had no
+    /// foot to keep: the last turn's end in view and the content's end not
+    /// past the bottom edge, or a thread that fits. What answers a resize
+    /// that keeps the foot (`isResizeUnderWay(at:)`).
+    ///
+    /// **At rest, not only in view.** Turned on its side, the thread first
+    /// reported the rotation's own width with the content's end 229 pt above
+    /// the bottom edge, the rows still at their estimates, and then the last
+    /// turn's end 484 pt below it. The first frame has that end in view and
+    /// answers nothing.
+    @ObservationIgnored private var resizeAnswered = true
 
     /// The thread's top inset in the last sample, and the open bar's
     /// (`barLooksMinimized`). Ignored by observation for `lastGeometry`'s
@@ -339,15 +363,35 @@ final class AskScrollFollow {
     }
 
     /// Whether the thread is inside `resizeWindow` of its width changing
-    /// (`resized(to:at:)`).
+    /// (`resized(to:at:)`). The bar's inset reads this alone
+    /// (`insetTopChanged(_:at:)`).
     private func isWithinResizeWindow(at now: TimeInterval) -> Bool {
         resizedAt.map { now - $0 < Self.resizeWindow } ?? false
     }
 
-    /// Whether the thread is inside `resizeWindow` of its width changing, with
-    /// no hand on it (`geometryChanged(_:at:)`).
+    /// Whether a resize is under way at `now`: inside `resizeWindow` of the
+    /// thread's width changing, or, for one that keeps the reader at the
+    /// foot, until a sample has left the thread at rest there
+    /// (`resizeAnswered`). What sets the resize's steps aside, what its
+    /// requests are issued and answered on, and what groups its widths into
+    /// one decision (`resized(to:at:)`).
+    ///
+    /// **An event ends it, not the clock**, because a loaded device keeps the
+    /// order of a resize's samples and not their pace. A push gate's run of
+    /// the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load average
+    /// of about 20 on 12 cores, left the newest answer under the composer on
+    /// its side. The traced turn is over inside a tenth of a second; held to
+    /// the window alone, a turn's later samples found it closed, so the
+    /// scroll view's step read as the reader's, and a row measured at the
+    /// new width, or the screen's task asking again, went unanswered.
+    private func isResizeUnderWay(at now: TimeInterval) -> Bool {
+        isWithinResizeWindow(at: now) || (resizeKeepsFoot && !resizeAnswered)
+    }
+
+    /// Whether a resize is under way at `now` with no hand on the thread
+    /// (`geometryChanged(_:at:)`).
     private func isResizing(at now: TimeInterval) -> Bool {
-        !isReaderScrolling && isWithinResizeWindow(at: now)
+        !isReaderScrolling && isResizeUnderWay(at: now)
     }
 
     /// Whether the navigation bar looks minimized: the thread's top inset is
@@ -415,8 +459,10 @@ final class AskScrollFollow {
 
     /// Whether a resize under way at `now` is keeping the reader at the foot:
     /// what every `footRequests` is issued on, and what `AskScreen` asks again
-    /// before it answers one. Its task also runs each time the thread appears,
-    /// with whatever count the last resize left, and that is no resize at all.
+    /// before it answers one, however long after the request its task runs.
+    /// Its task also runs each time the thread appears, with whatever count
+    /// the last resize left, and that is no resize at all unless one is still
+    /// waiting to be answered.
     func keepsFootThroughResize(at now: TimeInterval) -> Bool {
         resizeKeepsFoot && isResizing(at: now)
     }
@@ -426,18 +472,19 @@ final class AskScrollFollow {
     /// sample is compared with the last one, which it reads.
     ///
     /// **Whether to keep the foot is decided once, as the resize begins**, from
-    /// the sample before it, and each width change after that only extends the
-    /// window. A phone turned on its side reports a width of its own on the
-    /// way (402 → 340 → 750 on an iPhone 18 Pro, 16 ms apart), with the rows
-    /// still at their estimates for it, and a decision read off that frame
-    /// would drop a reader who was at the foot or catch one who wasn't.
+    /// the sample before it, and each width change while it is under way only
+    /// extends it (`isResizeUnderWay(at:)`). A phone turned on its side reports
+    /// a width of its own on the way (402 → 340 → 750 on an iPhone 18 Pro, 16
+    /// ms apart), with the rows still at their estimates for it, and a
+    /// decision read off that frame would drop a reader who was at the foot or
+    /// catch one who wasn't.
     ///
     /// **From the distance, not `isAtFoot`**, which is latched. A reader who
     /// opened something in place in a settled last turn has the flag and not
     /// the foot, and a resize must not carry them away from what they opened.
     private func resized(to geometry: AskThreadGeometry, at now: TimeInterval) {
         guard let lastGeometry, geometry.containerWidth != lastGeometry.containerWidth else { return }
-        if !isWithinResizeWindow(at: now) {
+        if !isResizeUnderWay(at: now) {
             resizeKeepsFoot = lastGeometry.distanceFromContentFoot - Self.restingTrailingSpace <= Self.followWithin
         }
         resizedAt = now
@@ -484,6 +531,13 @@ final class AskScrollFollow {
         // `readerScrolledUp(from:)`, and a reader at the foot of a settled
         // thread came out of the turn 645 pt above it, behind the pill. A hand
         // on the thread is still the reader's, resize or not.
+        //
+        // **A resize answered and past its window lets the reader go first**,
+        // before this sample can be read as one of its steps or ask for the
+        // foot. Read after the request below, a card the reader opens in place
+        // a minute later would have its first sample answer nothing and its
+        // second ask for the foot.
+        if resizeKeepsFoot, resizeAnswered, !isWithinResizeWindow(at: now) { resizeKeepsFoot = false }
         resized(to: geometry, at: now)
         insetTopChanged(geometry, at: now)
         let scrolledUp = !isJumpGliding(at: now)
@@ -528,11 +582,10 @@ final class AskScrollFollow {
         if far != isFar { isFar = far }
         // **A reader at the foot as a resize begins is at the foot when it
         // ends.** The scroll view keeps an offset, not a foot, and the rows are
-        // measured at their new width over the next quarter-second: turned on
-        // its side, the content went 1540 → 1765 → 1771 pt after the width had
-        // changed. So every sample inside the window that leaves the last
-        // turn's end below the bottom edge asks again, and the last one asked
-        // lands.
+        // measured at their new width after the width has changed: turned on
+        // its side, the content went 1540 → 1765 → 1771 pt. So every sample of
+        // the resize that leaves the last turn's end below the bottom edge asks
+        // again, and the last one asked lands.
         //
         // Not through `jumped(at:)`, which would make the rewrapped turn's
         // growth the thread's own and send the animated follow after the same
@@ -540,6 +593,9 @@ final class AskScrollFollow {
         if keepsFootThroughResize(at: now), atFoot, scrollable, distance > 0 {
             footRequests += 1
         }
+        // Set last: the request above, and the step set aside before it, read
+        // whether the sample before this one answered the resize.
+        resizeAnswered = !scrollable || (distance <= 0 && geometry.distanceFromContentFoot >= -1)
         newestQuestionMoved()
     }
 
@@ -780,8 +836,11 @@ final class AskScrollFollow {
     /// Either way the thread is on its way to its foot, measuring the rows it
     /// builds on the way there, so their growth is its own for
     /// `ownGrowthWindow`, and the steps its glide takes are its own for
-    /// `jumpGlideWindow`.
+    /// `jumpGlideWindow`. A resize keeping the foot lets go: the glide is
+    /// taking the thread there, and the resize's instant scrolls would cut it
+    /// short.
     func jumped(at now: TimeInterval = Date.timeIntervalSinceReferenceDate) {
+        resizeKeepsFoot = false
         isAtFoot = true
         isFar = false
         hasUnseenGrowth = false
