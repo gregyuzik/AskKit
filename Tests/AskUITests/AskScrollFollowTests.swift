@@ -1024,9 +1024,83 @@ import Testing
 
     // MARK: - The navigation bar
 
-    @Test func theBarLooksOpenUntilTheInsetShrinks() {
+    @Test func theReadersScrollDownMinimizesTheBar() {
+        // Traced on the demo on an iPhone 18 Pro simulator: the reader's swipe
+        // down a thread in tabs. The phase came first, then the offset alone,
+        // then the navigation bar and the tab bar collapsing as the thread
+        // went on down, the bar taking 54 pt out of the inset.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -116), at: now)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -100), at: now + 0.017)
+        follow.geometryChanged(Self.traced(width: 402, container: 638.5, content: 1013, offset: -82.5), at: now + 0.035)
+        #expect(!follow.barLooksMinimized)
+
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 657, content: 1013, offset: -64, inset: 98.5), at: now + 0.052
+        )
+        #expect(follow.barLooksMinimized)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: -45, inset: 80), at: now + 0.206
+        )
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: 60, inset: 62), at: now + 0.227
+        )
+        follow.scrollPhaseChanged(.decelerating)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: 84.5, inset: 62), at: now + 0.35
+        )
+        follow.scrollPhaseChanged(.idle)
+        #expect(follow.barLooksMinimized)
+
+        // Up the thread again: the bar opens, and is open.
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 640, content: 1013, offset: 40, inset: 98), at: now + 3
+        )
+        #expect(follow.barLooksMinimized)
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: 0), at: now + 3.1)
+        #expect(!follow.barLooksMinimized)
+    }
+
+    @Test func aCollapseSampledAfterTheHandHasGoneIsStillTheReaders() {
+        // The scroll down sampled, the hand gone, and only then the bar's
+        // collapse, as a loaded simulator can deliver it.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -116), at: now)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -40), at: now + 0.05)
+        follow.scrollPhaseChanged(.idle)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: -40, inset: 62), at: now + 0.4
+        )
+        #expect(follow.barLooksMinimized)
+    }
+
+    @Test func aCollapseSplitAcrossTwoSamplesIsStillTheBars() {
+        // As traced on the turned phone: each step of the collapse came as the
+        // space between the bars growing, then, 3 ms later, the inset falling
+        // with nothing else changed. Here it comes after the hand has gone.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -116), at: now)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -40), at: now + 0.05)
+        follow.scrollPhaseChanged(.idle)
+        follow.geometryChanged(Self.traced(width: 402, container: 675, content: 1013, offset: -40), at: now + 0.4)
+        #expect(!follow.barLooksMinimized)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: -40, inset: 62), at: now + 0.403
+        )
+        #expect(follow.barLooksMinimized)
+    }
+
+    @Test func theBarLooksOpenUntilItGivesTheSpaceBetweenTheBarsItsHeight() {
         // Measured beside a fold on an iPhone 18 Pro simulator: the bar
-        // minimizing took 54 pt out of the inset.
+        // minimizing took 54 pt out of the inset, and the space between the
+        // bars grew by as much, in one sample with no scroll phase read.
         let follow = AskScrollFollow()
         let now: TimeInterval = 100
         follow.geometryChanged(Self.upright, at: now)
@@ -1057,6 +1131,75 @@ import Testing
             Self.traced(width: 750, container: 300, content: 1765, offset: 820, inset: 30), at: now + 5
         )
         #expect(follow.barLooksMinimized)
+    }
+
+    @Test func theBarsInsetOnItsSideSampledLongAfterTheTurnIsTheOpenBar() {
+        // **Seconds late, not milliseconds.** Traced in a failing run of the
+        // demo's testBesideAFoldTheChatsStayOnScreenWithTheOpenOneMarked on an
+        // iPhone 18 Pro simulator, with a load average of about 720 on 12
+        // cores: turned on its side, the thread reported every width at the
+        // upright bars' 116 pt, and their 78 pt on its side came only with the
+        // next sample, 9.8 s later, as an earlier chat opened from the pane.
+        // Read as the bar minimizing, it kept the screen from holding the bar
+        // open for the scroll that took the chat to its foot, and that scroll
+        // minimized it, moving the pane of chats up 54 pt.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 369, offset: -116), at: now)
+        follow.geometryChanged(Self.traced(width: 340, container: 414, content: 327, offset: -116), at: now + 0.029)
+        follow.geometryChanged(Self.traced(width: 340, container: 414, content: 389, offset: -116), at: now + 0.034)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 345, offset: -116), at: now + 0.04)
+        follow.geometryChanged(Self.traced(width: 374.5, container: 250, content: 345, offset: -116), at: now + 0.137)
+        // The screen's own scroll to the foot.
+        follow.geometryChanged(Self.traced(width: 374.5, container: 250, content: 369, offset: 252.5), at: now + 0.162)
+        follow.geometryChanged(Self.traced(width: 374.5, container: 250, content: 369, offset: 2.5), at: now + 0.169)
+        #expect(!follow.barLooksMinimized)
+
+        follow.geometryChanged(
+            Self.traced(width: 374.5, container: 250, content: 433, offset: 40.5, inset: 78), at: now + 9.98
+        )
+        #expect(!follow.barLooksMinimized)
+
+        // From there, the reader's scroll down minimizes it as it does upright.
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(
+            Self.traced(width: 374.5, container: 250, content: 433, offset: 60, inset: 78), at: now + 12
+        )
+        follow.geometryChanged(
+            Self.traced(width: 374.5, container: 304, content: 433, offset: 104.5, inset: 24), at: now + 12.2
+        )
+        #expect(follow.barLooksMinimized)
+    }
+
+    @Test func aFallInTheInsetDuringAScrollUpIsTheOpenBar() {
+        // The same late inset, had it come with the first sample of the
+        // reader's scroll up the thread: the safe area moves the offset with
+        // the inset, so the content shows from where it did, less the reader's
+        // own step up. Only a scroll down minimizes the bar.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 374.5, container: 250, content: 369, offset: 2.5), at: now)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(
+            Self.traced(width: 374.5, container: 250, content: 369, offset: 30.5, inset: 78), at: now + 5
+        )
+        #expect(!follow.barLooksMinimized)
+    }
+
+    @Test func aThreadsFirstSamplesLeaveTheBarOpen() {
+        // Traced on the demo as the first question of a new chat built its
+        // thread: one sample with no inset at all, and the bars' inset again
+        // 9 ms later. A question's scroll asked for in between would have
+        // left the bar to minimize under it.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 20, offset: -116), at: now)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 376, content: 161, offset: 0, inset: 0), at: now + 6
+        )
+        #expect(!follow.barLooksMinimized)
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 161, offset: -116), at: now + 6.009)
+        #expect(!follow.barLooksMinimized)
     }
 
     @Test func aThreadThatFitsEitherWayAsksForNothing() {

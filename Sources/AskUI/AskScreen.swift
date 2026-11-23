@@ -1485,6 +1485,9 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
     /// the thread, which `.onScrollDown` never answers by opening the bar, and
     /// `.never` would open it: measured on an iPhone 18 Pro simulator, a bar
     /// the reader's scroll had minimized opened as the pill's jump began.
+    /// Whether the reader's scroll minimized it is the follow's reading
+    /// (`AskScrollFollow.barLooksMinimized`); one wrong the other way leaves
+    /// the hold off, and the scroll minimizes the bar.
     private func scrollThreadItself(_ scroll: () -> Void) {
         if !follow.barLooksMinimized { threadScrollsItself = true }
         ownThreadScrolls += 1

@@ -25,6 +25,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **An earlier chat opened beside a fold no longer minimizes the navigation bar.** On a busy device,
+  a phone turned on its side could report the bars' shorter inset seconds after it turned, and the
+  screen took that for the bar minimizing. So it didn't hold the bar open for the scroll that takes a
+  chat to its end, and that scroll minimized it, moving the pane of chats up under the reader's finger.
+  The screen now takes a fall in the inset for the bar minimizing only after the reader's own scroll
+  down the thread, or when the space between the bars grows by as much. Any other fall is the open bar
+  at a new size.
 - **Opening an earlier chat beside iPhone Duo's fold moves the mark and no row, all the way through.**
   `AskConversationStore` filed the chat on screen, put the chosen one there, and listed the chat it had
   filed only once the open's writes had landed and the list was read again. Until then the rows the
