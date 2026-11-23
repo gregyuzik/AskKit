@@ -2893,6 +2893,88 @@ import Testing
         #expect(onDisk.map(\.question) == ["Which records do I own?"])
     }
 
+    /// **The mark moves, and no row, at every moment of an open.** The pane
+    /// beside the fold lists the chat on screen among the earlier ones
+    /// (`AskChatsPaneRows`), so the chat an open files has to be on the list
+    /// from the moment the chosen one is on screen. Read back only once the
+    /// open's writes had landed, it was missing until then: the pane's rows
+    /// were the chosen chat alone, in the top row, and then both in their
+    /// places.
+    @Test func openingAnEarlierChatMovesTheMarkAndNoRowWhileItOpens() async throws {
+        let threadURL = temporaryLocation("askkit-open-rows").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-rows")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let earlier = try #require(await archive.archive([earlierEntry("Which records do I own?")]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.loadHistory()
+        let rows = { AskChatsPaneRows.rows(current: store.currentSummary, history: store.history) }
+        let before = rows()
+        #expect(before.map(\.summary.title) == ["Anything from 1969?", "Which records do I own?"])
+        #expect(before.map(\.isOpen) == [true, false])
+
+        // Every list of rows the pane could draw while the chat opens.
+        let drawn = ObservationLog { rows().map(\.id) }
+        await store.openThread(earlier)
+        await store.flushPersistence()
+
+        let after = rows()
+        #expect(after.map(\.summary.title) == ["Anything from 1969?", "Which records do I own?"])
+        #expect(after.map(\.isOpen) == [false, true], "The mark moved to the chat opened.")
+        #expect(drawn.heard > 0)
+        for ids in drawn.values {
+            #expect(ids == before.map(\.id), "No row moved, nor left the list.")
+        }
+    }
+
+    /// **In its place by date, wherever that is.** With one earlier chat the
+    /// chat an open files is always the newest, so it goes back on top; with
+    /// three, opening the oldest and then the middle one files a chat below
+    /// the top, and the list the open puts up has to be the list the archive
+    /// reads back once the writes land.
+    @Test func openingAnEarlierChatKeepsEveryRowInItsPlaceAmongThree() async throws {
+        let threadURL = temporaryLocation("askkit-open-rows-three").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-open-rows-three")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let oldest = try #require(await archive.archive([earlierEntry("Which records do I own?", at: 1_000_000)]))
+        let middle = try #require(await archive.archive([earlierEntry("Anything by Fleetwood Mac?", at: 2_000_000)]))
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.loadHistory()
+        let rows = { AskChatsPaneRows.rows(current: store.currentSummary, history: store.history) }
+        let before = rows()
+        #expect(before.map(\.summary.title) == ["Anything from 1969?", "Anything by Fleetwood Mac?", "Which records do I own?"])
+        #expect(before.map(\.isOpen) == [true, false, false])
+
+        for (chosen, marked) in [(oldest, [false, false, true]), (middle, [false, true, false])] {
+            let drawn = ObservationLog { rows().map(\.id) }
+            await store.openThread(chosen)
+            await store.flushPersistence()
+
+            let after = rows()
+            #expect(after.map(\.id) == before.map(\.id), "Opening \(chosen.title) moved a row.")
+            #expect(after.map(\.isOpen) == marked, "The mark moved to \(chosen.title).")
+            #expect(drawn.heard > 0)
+            for ids in drawn.values {
+                #expect(ids == before.map(\.id), "No row moved, nor left the list, while \(chosen.title) opened.")
+            }
+            // The list the open put up is the list the archive reads back.
+            let shown = store.history.map(\.id)
+            await store.loadHistory()
+            #expect(store.history.map(\.id) == shown)
+        }
+    }
+
     @Test func openingAnEarlierChatTakesTheDraftsScopeWithIt() async throws {
         let threadURL = temporaryLocation("askkit-history-scope").appendingPathExtension("json")
         let archiveDirectory = temporaryLocation("askkit-history-scope")

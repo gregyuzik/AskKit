@@ -4,6 +4,7 @@ import AskCore
 import CoreGraphics
 import Foundation
 import FoundationModels
+import Observation
 import Synchronization
 import Testing
 
@@ -653,6 +654,40 @@ nonisolated func yieldUntil(within seconds: Double = storeWaitDeadline, _ condit
     let deadline = ContinuousClock().now + .seconds(seconds)
     while !condition(), !Task.isCancelled, ContinuousClock().now < deadline {
         await Task.yield()
+    }
+}
+
+// MARK: - Observation
+
+/// What `reads` returns each time what it reads is published, arming again
+/// after each.
+///
+/// **Read on the main actor's next turn, not in the write.** `onChange` runs
+/// as the write begins, before the value has changed, so each value is read
+/// once the code that wrote it has given the main actor up: what a frame drawn
+/// then would show. Writes in one stretch with no suspension between are
+/// heard once, as the screen draws them once.
+@MainActor
+final class ObservationLog<Value> {
+    private(set) var values: [Value] = []
+    private let reads: @MainActor () -> Value
+
+    init(_ reads: @escaping @MainActor () -> Value) {
+        self.reads = reads
+        arm()
+    }
+
+    /// How many times what `reads` reads was published.
+    var heard: Int { values.count }
+
+    private func arm() {
+        withObservationTracking { _ = reads() } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.values.append(self.reads())
+                self.arm()
+            }
+        }
     }
 }
 
