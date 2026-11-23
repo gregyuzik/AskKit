@@ -58,6 +58,14 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         guard case .available = SystemLanguageModel.default.availability else {
             throw XCTSkip("No on-device model on this simulator — nothing to drive.")
         }
+        return launch(with: arguments)
+    }
+
+    /// Launch on an empty thread with no tips, then `arguments`, and wait for
+    /// the screen: `launch(_:)` without its skip, for a screen that draws the
+    /// same with a model or without one.
+    @MainActor
+    private func launch(with arguments: [String]) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         // The thread is persisted, so without this the first assertion of the
@@ -87,12 +95,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// With no model needed, they run without Apple Intelligence too.
     @MainActor
     private func launchScripted(_ arguments: String...) -> XCUIApplication {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.scriptedAnswer] + arguments
-        app.launch()
-        XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
-        return app
+        launch(with: [DemoLaunchArgument.scriptedAnswer] + arguments)
     }
 
     @MainActor
@@ -580,7 +583,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             root(app).swipeDown()
             swipes += 1
         }
-        let frame = settledFrame(of: first)
+        // A place to come back to, so no place to wait for: once the swipes
+        // are over, agreement alone.
+        let frame = restingFrame(of: first, "The first question, where the swipes left it")
         XCTAssertTrue(first.isHittable, "The reader has scrolled up to the first question.")
         let newest = question("Question 5 about my things", in: app)
         XCTAssertFalse(newest.exists && newest.isHittable, "The newest question is out of view.")
@@ -595,7 +600,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     private func assertTheReaderIsAt(_ place: ThreadPlace, in app: XCUIApplication, _ when: String) {
         RunLoop.current.run(until: Date().addingTimeInterval(2))
         XCTAssertTrue(place.question.exists && place.question.isHittable, "\(when), the first question is still in reach,")
-        XCTAssertEqual(settledFrame(of: place.question).minY, place.frame.minY, accuracy: 4, "where it was,")
+        XCTAssertEqual(
+            restingFrame(of: place.question, "The first question").minY, place.frame.minY, accuracy: 4, "where it was,"
+        )
         XCTAssertFalse(place.newest.exists && place.newest.isHittable, "the newest question is still out of view,")
         XCTAssertTrue(element(Ids.jumpToLatest, in: app).exists, "and the pill still offers the way back.")
     }
@@ -639,23 +646,19 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(newChat.isHittable, "Done leaves the bar open.")
     }
 
-    /// Where the newest answer in the tree comes to rest, once two readings a
-    /// beat apart agree.
+    /// Where the newest answer in the tree comes to rest
+    /// (`restingReadings(_:reading:where:)`), taken once a wait for the event
+    /// its motion follows has ended.
     ///
     /// The last `ask.answer` rather than one at an index, because the thread
     /// is lazy: on its side it keeps two answers of five, so an index taken
     /// upright names nothing once the phone has turned.
     @MainActor
-    private func settledNewestAnswer(in app: XCUIApplication) -> CGRect {
+    private func settledNewestAnswer(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> CGRect {
         let answers = app.descendants(matching: .any).matching(identifier: Ids.answer)
-        var last = answers.allElementsBoundByIndex.last?.frame ?? .null
-        for _ in 0..<30 {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.15))
-            let now = answers.allElementsBoundByIndex.last?.frame ?? .null
-            if abs(now.minY - last.minY) < 0.5 { return now }
-            last = now
-        }
-        return last
+        return restingReadings(
+            "The newest answer", reading: { [answers.allElementsBoundByIndex.last?.frame ?? .null] }, file: file, line: line
+        )[0]
     }
 
     // MARK: The composer in a tab bar's slot
@@ -743,20 +746,19 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let ask = tab("Ask", in: app)
         let library = tab("Library", in: app)
         XCTAssertTrue(library.exists, "The bar is expanded.")
-        XCTAssertLessThanOrEqual(settledFrame(of: face).maxY, ask.frame.minY, "Expanded, the face sits above the bar.")
+        _ = restingFrames(of: [face, ask], "Expanded, the face sits above the bar") { $0[0].maxY <= $0[1].minY }
 
         // Up the thread and back down it, so the scroll down is the reader's.
         root(app).swipeDown()
         root(app).swipeUp()
         XCTAssertTrue(library.waitForNonExistence(timeout: uiTimeout), "The reader's scroll down minimizes the bar.")
-        let button = settledFrame(of: ask)
-        let minimized = settledFrame(of: face)
-        XCTAssertGreaterThan(minimized.minX, button.maxX, "With the bar minimized, the face is beside the Ask button,")
-        XCTAssertEqual(minimized.midY, button.midY, accuracy: 4, "on its row.")
+        _ = restingFrames(
+            of: [face, ask], "With the bar minimized, the face is beside the Ask button, on its row"
+        ) { $0[0].minX > $0[1].maxX && abs($0[0].midY - $0[1].midY) <= 4 }
 
         root(app).swipeDown()
         XCTAssertTrue(library.waitForExistence(timeout: uiTimeout), "The reader's scroll up expands the bar.")
-        XCTAssertLessThanOrEqual(settledFrame(of: face).maxY, ask.frame.minY, "The face goes back above it.")
+        _ = restingFrames(of: [face, ask], "The face goes back above it") { $0[0].maxY <= $0[1].minY }
     }
 
     /// The slot is the Ask tab's: another tab has no composer in it but the
@@ -863,13 +865,15 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let pending = element(Ids.pendingPhoto, in: app)
         XCTAssertTrue(pending.waitForExistence(timeout: uiTimeout), "The photo waits,")
         XCTAssertTrue(pending.isHittable)
-        XCTAssertLessThanOrEqual(settledFrame(of: pending).maxY, settledFrame(of: face).minY, "over the face.")
+        _ = restingFrames(of: [pending, face], "The photo waits over the face") { $0[0].maxY <= $0[1].minY }
 
         face.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: uiTimeout))
         let field = app.textFields[Ids.field]
         wait(field, hittable: true, "The tap raises the composer,")
-        XCTAssertLessThanOrEqual(settledFrame(of: pending).maxY, field.frame.minY, "and the photo waits over it.")
+        _ = restingFrames(
+            of: [pending, field], "The photo waits over the composer the face raised"
+        ) { $0[0].maxY <= $0[1].minY }
         field.typeText("What goes with this?")
         app.buttons[Ids.send].tap()
         XCTAssertTrue(element(Ids.answer, in: app).waitForExistence(timeout: turnTimeout))
@@ -893,19 +897,69 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertEqual(element.isHittable, hittable, message)
     }
 
-    /// Where an element comes to rest, once two readings a beat apart agree —
-    /// for a frame the system is still moving, like the slot's as the tab bar
-    /// minimizes.
+    /// Where `element` comes to rest (`restingReadings(_:reading:where:)`),
+    /// with `endsHere` saying where its motion ends.
     @MainActor
-    private func settledFrame(of element: XCUIElement) -> CGRect {
-        var last = element.frame
-        for _ in 0..<30 {
+    private func restingFrame(
+        of element: XCUIElement, _ what: String, where endsHere: (CGRect) -> Bool = { _ in true },
+        file: StaticString = #filePath, line: UInt = #line
+    ) -> CGRect {
+        restingFrames(of: [element], what, where: { endsHere($0[0]) }, file: file, line: line)[0]
+    }
+
+    /// Where `elements` come to rest together (`restingReadings(_:reading:where:)`),
+    /// with `endsHere` saying where their motion ends.
+    @MainActor
+    private func restingFrames(
+        of elements: [XCUIElement], _ what: String, where endsHere: ([CGRect]) -> Bool = { _ in true },
+        file: StaticString = #filePath, line: UInt = #line
+    ) -> [CGRect] {
+        restingReadings(what, reading: { elements.map(\.frame) }, where: endsHere, file: file, line: line)
+    }
+
+    /// Frames read a beat apart until they come to rest where the motion ends:
+    /// `endsHere` holds of a reading, and every frame in it is where it was a
+    /// beat before. For a frame the system is still moving, like the slot's
+    /// as the tab bar minimizes. `what` says what that rest is, and names the
+    /// failure when it doesn't come within `uiTimeout`, along with the last
+    /// reading.
+    ///
+    /// **Where the motion ends, not stillness alone.** Two readings that agree
+    /// are what a frame at rest gives, and also what an app too busy to draw
+    /// between them gives, mid-motion. So a caller that knows where its motion
+    /// ends says so, as the condition its assertion would check, and a reading
+    /// that agrees short of it is read again: the face beside the Ask button,
+    /// the first screen back at its place. A caller with no such place, one
+    /// taking a place to come back to or checking that something stayed, waits
+    /// first for the event the motion follows (the keyboard gone, the window
+    /// turned, the chosen chat on screen), and agreement is the rest of it.
+    ///
+    /// **A wait that never ends fails**, rather than handing back its last
+    /// reading as though it were the place.
+    @MainActor
+    private func restingReadings(
+        _ what: String, reading read: () -> [CGRect], where endsHere: ([CGRect]) -> Bool = { _ in true },
+        file: StaticString = #filePath, line: UInt = #line
+    ) -> [CGRect] {
+        let deadline = Date().addingTimeInterval(uiTimeout)
+        var last = read()
+        while Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))
-            let now = element.frame
-            if abs(now.minX - last.minX) < 0.5, abs(now.minY - last.minY) < 0.5 { return now }
+            let now = read()
+            if endsHere(now), Self.agree(now, last) { return now }
             last = now
         }
+        XCTFail("\(what): not at rest there within \(Int(uiTimeout)) s. Last read \(last).", file: file, line: line)
         return last
+    }
+
+    /// Whether two readings of the same frames agree, every edge within half
+    /// a point. A frame XCUI can't place (`.null`) agrees with nothing.
+    private static func agree(_ these: [CGRect], _ those: [CGRect]) -> Bool {
+        these.count == those.count && zip(these, those).allSatisfy { this, that in
+            abs(this.minX - that.minX) < 0.5 && abs(this.minY - that.minY) < 0.5
+                && abs(this.maxX - that.maxX) < 0.5 && abs(this.maxY - that.maxY) < 0.5
+        }
     }
 
     // MARK: The chrome
@@ -1064,8 +1118,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// test failed on its first assertion, the starters 82.7 pt above where
     /// they started.
     ///
-    /// Read off the starters' frame, polled until two readings agree: the
-    /// keyboard reported gone is not taken to mean its animation has finished.
+    /// Read off the starters' frame, polled until it is back at its place and
+    /// two readings agree (`restingReadings(_:reading:where:)`): the keyboard
+    /// reported gone is not taken to mean its animation has finished.
     ///
     /// Where the column ends, not how it gets there. The column can make its
     /// whole trip in a single frame on the way down and still end exactly at
@@ -1076,7 +1131,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let app = launchScripted()
         let starters = element(Ids.starters, in: app)
         XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
-        let rest = settledMinY(of: starters)
+        // The place to come back to, so no place to wait for: agreement alone,
+        // once the screen is up.
+        let rest = restingFrame(of: starters, "The first screen at launch").minY
         let field = app.textFields[Ids.field]
         let button = app.buttons[Ids.send]
         // The first screen lets its caveat go while it makes room, and only
@@ -1093,7 +1150,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         wait(button, label: "Dismiss keyboard")
         button.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: uiTimeout))
-        XCTAssertEqual(settledMinY(of: starters), rest, accuracy: 1, "The chevron leaves the first screen where it was.")
+        _ = restingFrame(of: starters, "The chevron leaves the first screen where it was") { abs($0.minY - rest) <= 1 }
         XCTAssertTrue(caveat.exists, "Its hide gives the room back.")
 
         field.tap()
@@ -1102,7 +1159,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(caveat.waitForNonExistence(timeout: uiTimeout), "The second show makes room too.")
         done.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: uiTimeout))
-        XCTAssertEqual(settledMinY(of: starters), rest, accuracy: 1, "Done leaves the first screen where it was.")
+        _ = restingFrame(of: starters, "Done leaves the first screen where it was") { abs($0.minY - rest) <= 1 }
         XCTAssertTrue(caveat.exists, "Its hide gives the room back.")
     }
 
@@ -1120,25 +1177,26 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let app = launchScripted()
         let starters = element(Ids.starters, in: app)
         XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
-        let rest = settledMinY(of: starters)
+        // As in `testTheFirstScreenComesBackToRestWhenTheKeyboardLeaves`.
+        let rest = restingFrame(of: starters, "The first screen at launch").minY
 
         // Upright again even when an assertion below stops the test: whatever
         // runs next on this simulator, in any repo, expects a phone upright.
         addTeardownBlock { @MainActor in XCUIDevice.shared.orientation = .portrait }
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForTurn(of: app, onItsSide: true)
-        _ = settledMinY(of: starters)
-        let bar = app.navigationBars.firstMatch.frame
-        let composer = app.buttons[Ids.send].frame
+        let bar = app.navigationBars.firstMatch
+        let composer = app.buttons[Ids.send]
         // The heading over the bank, not only the bank: it is the top of the
         // taller half, and the first thing the bar's edge would hide.
         let heading = element(Ids.tryAsking, in: app)
-        XCTAssertGreaterThanOrEqual(heading.frame.minY, bar.maxY, "Nothing of the bank is under the bar.")
-        XCTAssertLessThanOrEqual(starters.frame.maxY, composer.minY, "No starter is behind the composer.")
+        _ = restingFrames(
+            of: [heading, starters, bar, composer], "Nothing of the bank is under the bar, and no starter is behind the composer"
+        ) { $0[0].minY >= $0[2].maxY && $0[1].maxY <= $0[3].minY }
 
         XCUIDevice.shared.orientation = .portrait
         waitForTurn(of: app, onItsSide: false)
-        XCTAssertEqual(settledMinY(of: starters), rest, accuracy: 1, "Turned back, the first screen is where it was.")
+        _ = restingFrame(of: starters, "Turned back, the first screen is where it was") { abs($0.minY - rest) <= 1 }
     }
 
     /// The same in a tab over a host's slot, where the tab bar and the
@@ -1169,15 +1227,15 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let heading = element(Ids.tryAsking, in: app)
         let disclosure = app.staticTexts["Questions are answered on this device."]
         XCTAssertTrue(heading.exists && disclosure.exists, "The heading and the disclosure are the demo's.")
-        _ = settledFrame(of: heading)
-        _ = settledFrame(of: starters)
-        _ = settledFrame(of: disclosure)
-        let bar = app.navigationBars.firstMatch.frame
-        // The face rides above the tab bar or beside it: the foot is whichever is higher.
-        let foot = min(settledFrame(of: face).minY, app.tabBars.firstMatch.frame.minY)
-        XCTAssertGreaterThanOrEqual(heading.frame.minY, bar.maxY, "Nothing of the bank is under the bar.")
-        XCTAssertLessThanOrEqual(starters.frame.maxY, foot, "No starter is behind the face or the tab bar.")
-        XCTAssertLessThanOrEqual(disclosure.frame.maxY, foot, "Nor is the disclosure.")
+        let bar = app.navigationBars.firstMatch
+        let tabBar = app.tabBars.firstMatch
+        _ = restingFrames(
+            of: [heading, starters, disclosure, bar, face, tabBar], "Nothing of the bank is under the bar, and neither a starter nor the disclosure is behind the face or the tab bar"
+        ) { frames in
+            // The face rides above the tab bar or beside it: the foot is whichever is higher.
+            let foot = min(frames[4].minY, frames[5].minY)
+            return frames[0].minY >= frames[3].maxY && frames[1].maxY <= foot && frames[2].maxY <= foot
+        }
         XCTAssertEqual(starters.buttons.count, 2, "On its side over the slot, the bank offers two.")
 
         XCUIDevice.shared.orientation = .portrait
@@ -1209,19 +1267,6 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             window.frame.width > window.frame.height, onItsSide,
             onItsSide ? "The window turns onto its side." : "The window turns upright again."
         )
-    }
-
-    /// An element's top edge once two readings a beat apart agree.
-    @MainActor
-    private func settledMinY(of element: XCUIElement) -> CGFloat {
-        var last = element.frame.minY
-        for _ in 0..<30 {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.15))
-            let now = element.frame.minY
-            if abs(now - last) < 0.5 { return now }
-            last = now
-        }
-        return last
     }
 
     /// New Chat is dead until there is a chat to end.
@@ -1719,11 +1764,14 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         let headline = app.staticTexts["Ask about your things"]
         XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
         XCTAssertTrue(headline.waitForExistence(timeout: uiTimeout), "The headline is the demo's.")
-        let fold = settledFrame(of: root(app)).minX
-        let bank = settledFrame(of: starters)
-        XCTAssertLessThanOrEqual(headline.frame.maxX, fold, "What Ask is keeps to the leading side of the fold.")
-        XCTAssertGreaterThanOrEqual(bank.minX, fold, "What to ask keeps to the trailing side,")
-        XCTAssertGreaterThanOrEqual(app.buttons[Ids.send].frame.minX, fold, "and so does the composer.")
+        let screen = root(app)
+        let composer = app.buttons[Ids.send]
+        _ = restingFrames(
+            of: [screen, headline, starters, composer], "What Ask is keeps to the leading side of the fold, and what to ask and the composer to the trailing side"
+        ) { frames in
+            let fold = frames[0].minX
+            return frames[1].maxX <= fold && frames[2].minX >= fold && frames[3].minX >= fold
+        }
         XCTAssertFalse(element(Ids.historyPane, in: app).exists, "With no chats, the pane lists none.")
 
         starters.buttons.element(boundBy: 0).tap()
@@ -1785,16 +1833,21 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(open.isSelected, "marked as the open one.")
         let earlier = pane.buttons.matching(NSPredicate(format: "label CONTAINS %@", earlierQuestion)).firstMatch
         XCTAssertTrue(earlier.waitForExistence(timeout: uiTimeout), "The chat New Chat put away is listed,")
-        let place = settledFrame(of: earlier).minY
-        XCTAssertGreaterThan(place, open.frame.minY, "under the newer one.")
+        let place = restingFrames(
+            of: [earlier, open], "The chat New Chat put away is listed under the newer one"
+        ) { $0[0].minY > $0[1].minY }[0].minY
 
         earlier.tap()
         wait(open, labelContaining: earlierQuestion)
-        XCTAssertEqual(settledFrame(of: open).minY, place, accuracy: 1, "Opened, it is marked where it was.")
-        XCTAssertTrue(pane.exists, "The pane stays.")
         // The bubble's label says whose words they are; the words are its value.
         let shown = questions.matching(NSPredicate(format: "value CONTAINS %@", earlierQuestion)).firstMatch
-        XCTAssertTrue(shown.waitForExistence(timeout: uiTimeout), "And the chat is the thread beside it.")
+        XCTAssertTrue(shown.waitForExistence(timeout: uiTimeout), "The chat is the thread beside the list,")
+        // A check that the row stayed, so no place to wait for: read once the
+        // chosen chat is on screen, which any move of the row's would follow
+        // (the list filing the chat, the bar minimizing over the thread), and
+        // agreement is the rest.
+        XCTAssertEqual(restingFrame(of: open, "The opened chat's row").minY, place, accuracy: 1, "and, opened, it is marked where it was.")
+        XCTAssertTrue(pane.exists, "The pane stays.")
     }
 
     /// Around iPhone Duo's own fold, open on its side, by touch: a question
@@ -1828,15 +1881,19 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             pane.waitForExistence(timeout: uiTimeout),
             "No fold with room for two panes: this is for iPhone Duo open on its side."
         )
-        let fold = settledFrame(of: pane).maxX
         XCTAssertTrue(headline.waitForNonExistence(timeout: uiTimeout), "Asked a question, the leading pane is the chats'.")
         XCTAssertFalse(app.buttons[Ids.history].exists, "They are on screen, so the bar has no button for them.")
-        XCTAssertGreaterThanOrEqual(app.buttons[Ids.send].frame.minX, fold, "The composer keeps to the conversation's pane.")
+        let composer = app.buttons[Ids.send]
+        let fold = restingFrames(
+            of: [pane, composer], "The composer keeps to the conversation's pane"
+        ) { $0[1].minX >= $0[0].maxX }[0].maxX
 
         app.buttons[Ids.clear].tap()
         XCTAssertTrue(questions.firstMatch.waitForNonExistence(timeout: uiTimeout), "New Chat emptied the thread.")
         XCTAssertTrue(pane.exists, "The chats stay beside it,")
-        XCTAssertGreaterThanOrEqual(settledFrame(of: starters).minX, fold, "and the first screen is in the conversation's pane:")
+        _ = restingFrame(of: starters, "The chats stay beside the thread New Chat emptied, and the first screen is in the conversation's pane") {
+            $0.minX >= fold
+        }
         // New Chat takes the keyboard, and in a window as short as the inner
         // display on its side the first screen lets its headline go while the
         // keyboard is up. Done brings it back.
@@ -1860,13 +1917,15 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(open.label.contains(openQuestion), "The chat on screen is a row of the list.")
         let earlier = pane.buttons.matching(NSPredicate(format: "label CONTAINS %@", earlierQuestion)).firstMatch
         XCTAssertTrue(earlier.waitForExistence(timeout: uiTimeout), "The chat New Chat put away is listed,")
-        let place = settledFrame(of: earlier).minY
-        XCTAssertGreaterThan(place, open.frame.minY, "under the newer one.")
+        let place = restingFrames(
+            of: [earlier, open], "The chat New Chat put away is listed under the newer one"
+        ) { $0[0].minY > $0[1].minY }[0].minY
         earlier.tap()
         wait(open, labelContaining: earlierQuestion)
-        XCTAssertEqual(settledFrame(of: open).minY, place, accuracy: 1, "Opened, it is marked where it was.")
         let shown = questions.matching(NSPredicate(format: "value CONTAINS %@", earlierQuestion)).firstMatch
-        XCTAssertTrue(shown.waitForExistence(timeout: uiTimeout), "And the chat is the thread beside it.")
+        XCTAssertTrue(shown.waitForExistence(timeout: uiTimeout), "The chat is the thread beside the list,")
+        // As beside the stand-in fold: read once the chosen chat is on screen.
+        XCTAssertEqual(restingFrame(of: open, "The opened chat's row").minY, place, accuracy: 1, "and, opened, it is marked where it was.")
 
         app.buttons[Ids.historyDeleteAll].tap()
         // The dialog's own button, not the pane's that opened it, and the
@@ -1877,7 +1936,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(pane.waitForNonExistence(timeout: uiTimeout), "With nothing left to list, the pane goes,")
         XCTAssertTrue(headline.waitForExistence(timeout: uiTimeout))
         XCTAssertLessThanOrEqual(headline.frame.maxX, fold, "and the first screen takes both panes again.")
-        XCTAssertGreaterThanOrEqual(settledFrame(of: starters).minX, fold)
+        _ = restingFrame(of: starters, "What to ask keeps to the trailing side") { $0.minX >= fold }
     }
 
     /// Wait for an element's label to contain `text`.
@@ -2001,15 +2060,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// 76% (`askDeemphasizedText`), and in dark it passes `.secondary`.
     @MainActor
     private func auditTheFirstScreen(in appearance: DemoAppearance) throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = [
-            DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.appearance, appearance.rawValue
-        ]
-        app.launch()
-        // By identifier alone, for the reason `launch()` spells out: which XCUI
-        // type `ask.root` lands on moves with the layout.
-        XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout), "The screen came up.")
+        let app = launch(with: [DemoLaunchArgument.appearance, appearance.rawValue])
 
         // Chip rows, whose glass capsules the contrast audit misreads — see the
         // handler below. By identifier alone, the rule `launch()` spells out:
@@ -2111,11 +2162,10 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// first screen.
     @MainActor
     private func auditTheThread(_ state: AuditedThread, in appearance: DemoAppearance) throws {
-        continueAfterFailure = false
         let app: XCUIApplication
         switch state {
         case .answerWithTiles:
-            app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue)
+            app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue, DemoLaunchArgument.drawsAtRest)
             let starters = element(Ids.starters, in: app)
             XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
             starters.buttons.element(boundBy: 0).tap()
@@ -2123,13 +2173,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             XCTAssertTrue(element(Ids.results, in: app).waitForExistence(timeout: uiTimeout), "With its tiles.")
             XCTAssertTrue(element(Ids.evidence, in: app).waitForExistence(timeout: uiTimeout), "And its evidence line.")
         case .failureWithTryAgain:
-            app = XCUIApplication()
-            app.launchArguments = [
-                DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.holdTurn,
-                DemoLaunchArgument.appearance, appearance.rawValue
-            ]
-            app.launch()
-            XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
+            app = launch(with: [
+                DemoLaunchArgument.holdTurn, DemoLaunchArgument.appearance, appearance.rawValue, DemoLaunchArgument.drawsAtRest
+            ])
             let starters = element(Ids.starters, in: app)
             XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
             starters.buttons.element(boundBy: 0).tap()
@@ -2138,10 +2184,10 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             XCTAssertTrue(app.buttons[Ids.retry].waitForExistence(timeout: uiTimeout), "Try Again is offered.")
         }
         XCTAssertTrue(element(Ids.question, in: app).exists, "The question is on the thread.")
-        // What an answer brings arrives in waves within 600 ms (`askArrival`),
-        // and an audit of a piece still coming up out of its blur reads a
-        // contrast no reader is left with.
-        Thread.sleep(forTimeInterval: 1)
+        // Nothing to wait for: launched drawn at rest
+        // (`DemoLaunchArgument.drawsAtRest`), what the answer brings is at full
+        // from its first frame, so the audit reads the contrast a reader is
+        // left with, never a piece still coming up out of its blur.
 
         let answer = element(Ids.answer, in: app)
         let foot = answer.exists ? answer.frame.maxY : .infinity
@@ -2198,8 +2244,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// button and "Not now" are held to it as they are.
     @MainActor
     private func auditTheConfirmationCard(in appearance: DemoAppearance) throws {
-        continueAfterFailure = false
-        let app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue)
+        let app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue, DemoLaunchArgument.drawsAtRest)
         let field = app.textFields[Ids.field]
         XCTAssertTrue(field.waitForExistence(timeout: uiTimeout))
         field.tap()
@@ -2208,8 +2253,8 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         XCTAssertTrue(element(Ids.answer, in: app).waitForExistence(timeout: turnTimeout))
         XCTAssertTrue(app.buttons[Ids.proposalConfirm].waitForExistence(timeout: uiTimeout), "The answer offers to do it.")
         XCTAssertTrue(app.buttons[Ids.proposalDecline].exists, "And offers not to.")
-        // The card arrives last of the answer's waves (`auditTheThread`).
-        Thread.sleep(forTimeInterval: 1)
+        // At full already, though it is the last of the answer's waves: drawn
+        // at rest, as `auditTheThread`'s are.
 
         let foot = element(Ids.answer, in: app).frame.maxY
         try app.performAccessibilityAudit(for: Self.everyCheckButContrast) { issue in
@@ -2260,22 +2305,34 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         }
     }
 
-    /// The composer with nothing in it, by Apple's contrast audit alone: the
-    /// placeholder, the host's hint, drawn on the capsule's accent tint, and
-    /// the accessory button's glyph beside it.
+    /// The composer with nothing in it, by Apple's contrast audit alone, in
+    /// light.
+    @MainActor
+    func testTheEmptyComposerPassesTheContrastAudit() throws {
+        try auditTheEmptyComposer(in: .light)
+    }
+
+    /// The same, in dark.
+    @MainActor
+    func testTheEmptyComposerPassesTheContrastAuditInDark() throws {
+        try auditTheEmptyComposer(in: .dark)
+    }
+
+    /// The composer with nothing in it, in `appearance`: the placeholder, the
+    /// host's hint, drawn on the capsule's accent tint, and the accessory
+    /// button's glyph beside it. Launched scripted, which leaves the first
+    /// screen as it is wherever a model can serve (`DemoDomain.answersWithoutModel`)
+    /// and keeps the composer live where none can.
     ///
     /// **The one measurement of the glass AskUI can't make itself.** What the
     /// placeholder is drawn in is chosen from an estimate of the tinted glass
     /// as a flat blend (`AskGlassForeground`), and Liquid Glass isn't one.
     /// This reads the pixels. Scoped to issues on the composer's own elements,
-    /// so it says nothing new about the rest of the screen, which the audit
-    /// above covers.
+    /// so it says nothing new about the rest of the screen, which
+    /// `auditTheFirstScreen` covers.
     @MainActor
-    func testTheEmptyComposerPassesTheContrastAudit() throws {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread]
-        app.launch()
+    private func auditTheEmptyComposer(in appearance: DemoAppearance) throws {
+        let app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue)
         let field = app.textFields[Ids.field]
         // Empty at launch, since no draft outlives one, so the placeholder shows.
         XCTAssertTrue(field.waitForExistence(timeout: uiTimeout), "The composer came up.")
