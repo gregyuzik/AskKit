@@ -244,6 +244,24 @@ final class AskScrollFollow {
     /// alone.
     @ObservationIgnored private var resizeKeepsFoot = false
 
+    /// How far the content's foot was below the bottom edge where the reader
+    /// last left the thread, which a resize decides whether to keep the foot
+    /// from (`resized(to:at:)`): each sample's own distance, except that a
+    /// sample in which only the space between the bars changed height
+    /// carries over the one before it
+    /// (`AskThreadGeometry.onlyTheContainerHeightChanged(from:)`).
+    ///
+    /// **A bottom inset moves the foot without moving the reader.** A
+    /// keyboard rising over a settled thread leaves the offset where it was,
+    /// 294 pt of the thread under it (`aKeyboardIsNotAResize`), and so did
+    /// the composer raised a portrait keyboard's height, with no keyboard on
+    /// screen, as an iPhone 18 Pro simulator began to turn on its side in
+    /// two push gates' runs of the demo. Read off that sample, the reader at
+    /// the foot was 283 pt from the last turn's end, the resize kept nothing,
+    /// and on its side the newest answer was under the composer. Ignored by
+    /// observation for `lastGeometry`'s reason.
+    @ObservationIgnored private var footDistanceAsLeft: CGFloat = 0
+
     /// Whether the last sample left the thread at rest at its foot, or had no
     /// foot to keep: the last turn's end in view and the content's end not
     /// past the bottom edge, or a thread that fits. What answers a resize
@@ -496,10 +514,13 @@ final class AskScrollFollow {
     /// **From the distance, not `isAtFoot`**, which is latched. A reader who
     /// opened something in place in a settled last turn has the flag and not
     /// the foot, and a resize must not carry them away from what they opened.
+    /// The distance as the reader left it (`footDistanceAsLeft`), so a bottom
+    /// inset that rose under a thread at its foot, as the turn began or before
+    /// it, doesn't count as the reader having gone.
     private func resized(to geometry: AskThreadGeometry, at now: TimeInterval) {
         guard let lastGeometry, geometry.containerWidth != lastGeometry.containerWidth else { return }
         if !isResizeUnderWay(at: now) {
-            resizeKeepsFoot = lastGeometry.distanceFromContentFoot - Self.restingTrailingSpace <= Self.followWithin
+            resizeKeepsFoot = footDistanceAsLeft - Self.restingTrailingSpace <= Self.followWithin
         }
         resizedAt = now
     }
@@ -553,6 +574,9 @@ final class AskScrollFollow {
         // second ask for the foot.
         if resizeKeepsFoot, resizeAnswered, !isWithinResizeWindow(at: now) { resizeKeepsFoot = false }
         resized(to: geometry, at: now)
+        if !(lastGeometry.map(geometry.onlyTheContainerHeightChanged(from:)) ?? false) {
+            footDistanceAsLeft = geometry.distanceFromContentFoot
+        }
         insetTopChanged(geometry, at: now)
         let scrolledUp = !isJumpGliding(at: now)
             && !isResizing(at: now)
