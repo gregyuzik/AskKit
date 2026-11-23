@@ -1079,19 +1079,16 @@ import Testing
         #expect(follow.barLooksMinimized)
     }
 
-    @Test func theBarLooksOpenUntilTheReaderMinimizesIt() {
+    @Test func theBarLooksOpenUntilItGivesTheSpaceBetweenTheBarsItsHeight() {
         // Measured beside a fold on an iPhone 18 Pro simulator: the bar
-        // minimizing took 54 pt out of the inset, sampled in one step with
-        // the scroll down that minimized it, after the scroll's first.
+        // minimizing took 54 pt out of the inset, and the space between the
+        // bars grew by as much, in one sample with no scroll phase read.
         let follow = AskScrollFollow()
         let now: TimeInterval = 100
         follow.geometryChanged(Self.upright, at: now)
         #expect(!follow.barLooksMinimized)
 
-        follow.scrollPhaseChanged(.interacting)
-        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1657, offset: 880), at: now + 1)
-        follow.geometryChanged(Self.traced(width: 402, container: 724, content: 1657, offset: 900, inset: 62), at: now + 1.02)
-        follow.scrollPhaseChanged(.idle)
+        follow.geometryChanged(Self.traced(width: 402, container: 724, content: 1657, offset: 900, inset: 62), at: now + 1)
         #expect(follow.barLooksMinimized)
 
         follow.geometryChanged(Self.traced(width: 402, container: 670, content: 1657, offset: 700), at: now + 2)

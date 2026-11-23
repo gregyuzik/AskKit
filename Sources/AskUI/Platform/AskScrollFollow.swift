@@ -231,12 +231,17 @@ final class AskScrollFollow {
     /// `resized(to:at:)` decides once as it begins.
     @ObservationIgnored private var resizeKeepsFoot = false
 
-    /// The thread's top inset in the last sample, and the tallest it has been
-    /// since the thread last took a new width (`barLooksMinimized`). Ignored by
-    /// observation for `lastGeometry`'s reason: read when the screen scrolls,
-    /// never drawn from.
+    /// The thread's top inset in the last sample, and the open bar's
+    /// (`barLooksMinimized`). Ignored by observation for `lastGeometry`'s
+    /// reason: read when the screen scrolls, never drawn from.
     @ObservationIgnored private var insetTop: CGFloat = 0
-    @ObservationIgnored private var tallestInsetTop: CGFloat = 0
+    @ObservationIgnored private var openBarInsetTop: CGFloat = 0
+
+    /// Whether a fall in the inset from the open bar's is the bar minimizing
+    /// (`barLooksMinimized`): set by the reader's step down the thread with
+    /// the bar open, or by a fall the space between the bars takes up, and
+    /// cleared by any other sample of the open bar.
+    @ObservationIgnored private var fallIsTheBars = false
 
     /// The space the thread's content lays out in, which its question bubbles
     /// report where they are in (`questionPlaced(_:of:)`). The content's own,
@@ -328,14 +333,20 @@ final class AskScrollFollow {
         scrollPhase == .animating && jumpedAt.map { now - $0 < Self.jumpGlideWindow } ?? false
     }
 
+    /// Whether the thread is inside `resizeWindow` of its width changing
+    /// (`resized(to:at:)`).
+    private func isWithinResizeWindow(at now: TimeInterval) -> Bool {
+        resizedAt.map { now - $0 < Self.resizeWindow } ?? false
+    }
+
     /// Whether the thread is inside `resizeWindow` of its width changing, with
     /// no hand on it (`geometryChanged(_:at:)`).
     private func isResizing(at now: TimeInterval) -> Bool {
-        !isReaderScrolling && resizedAt.map { now - $0 < Self.resizeWindow } ?? false
+        !isReaderScrolling && isWithinResizeWindow(at: now)
     }
 
     /// Whether the navigation bar looks minimized: the thread's top inset is
-    /// shorter than the tallest it has been at this width.
+    /// shorter than the open bar's.
     ///
     /// **A minimizing bar takes its height out of the inset**, as SDK 27's
     /// automatic safe-area adjustment does: beside a fold on an iPhone 18 Pro
@@ -346,12 +357,49 @@ final class AskScrollFollow {
     /// scroll down under `.onScrollDown` can't open it and `.never` would
     /// (`AskNavigationBarMinimization`).
     ///
-    /// **The tallest is the inset as it is through a resize**, and the tallest
-    /// since outside one: a phone turned on its side reports the bars' new,
-    /// shorter inset a few milliseconds after its new width. Where the safe
-    /// area doesn't follow the bar, the inset never shrinks and the bar always
-    /// looks open.
-    var barLooksMinimized: Bool { insetTop < tallestInsetTop - 1 }
+    /// **The inset falls for the bar only after the reader's scroll down the
+    /// thread, or into the space between the bars.** The reader's is the one
+    /// scroll the screen doesn't hold the bar open through, and a collapsing
+    /// bar gives its height to that space, so a sample that carries a whole
+    /// step of the collapse shows the space growing by what the inset lost:
+    /// measured beside a fold, 54 pt each. Any other fall is the open bar at a
+    /// new size, and the inset it falls to is the open bar's from then on. A
+    /// resize starts the bar over at the inset it reports, and a rise is the
+    /// bar opening.
+    ///
+    /// **No clock says which inset belongs to a resize.** A phone turned on
+    /// its side reports the bars' shorter inset a few milliseconds after its
+    /// new width, or, on a loaded device, with whatever sample comes next.
+    /// Traced on an iPhone 18 Pro simulator at a load average of about 720 on
+    /// 12 cores, the 78 pt on its side came 9.8 s after the turn, as an
+    /// earlier chat opened from the pane beside a fold. Read against the
+    /// upright 116 pt, the tallest since the turn, the bar looked minimized,
+    /// the screen didn't hold it open for the scroll that took the chat to its
+    /// foot, and that scroll minimized it, moving the pane of chats up 54 pt.
+    /// A new thread's first sample, with no inset at all, is another fall
+    /// that isn't the bar's.
+    ///
+    /// **A scroll down is the top of the space between the bars moving down
+    /// the content** (`AskThreadGeometry.visibleTop`) while the reader scrolls,
+    /// a hand on the thread or its momentum, and not the offset alone: the
+    /// safe area moves the offset with the inset, so the content shows from
+    /// where it did, and the bar collapsing leaves the offset where it was.
+    ///
+    /// **The space alone can't carry it.** SwiftUI can report a step of the
+    /// collapse in two samples, about 3 ms apart: the space and the offset
+    /// first, then the inset with nothing else changed. Traced on the turned
+    /// phone, every step of the bar minimizing under the screen's own scroll
+    /// came that way, and the last step of the reader's swipe upright left the
+    /// space as it was.
+    ///
+    /// **What it can't tell.** A late inset that arrives with the reader's
+    /// scroll down, or with the space between the bars growing as much for
+    /// another reason, reads as the bar minimizing, though nothing minimized
+    /// it. And a collapse split that way under a scroll that isn't the
+    /// reader's reads as the open bar at each step, which the screen's next
+    /// scroll of its own opens. Off iOS the reading moves nothing: there is no
+    /// bar to hold open (`AskScreen.scrollThreadItself(_:)`).
+    var barLooksMinimized: Bool { insetTop < openBarInsetTop - 1 }
 
     /// Whether a resize under way is keeping the reader at the foot now
     /// (`keepsFootThroughResize(at:)`).
@@ -381,7 +429,7 @@ final class AskScrollFollow {
     /// the foot, and a resize must not carry them away from what they opened.
     private func resized(to geometry: AskThreadGeometry, at now: TimeInterval) {
         guard let lastGeometry, geometry.containerWidth != lastGeometry.containerWidth else { return }
-        if !(resizedAt.map { now - $0 < Self.resizeWindow } ?? false) {
+        if !isWithinResizeWindow(at: now) {
             resizeKeepsFoot = lastGeometry.distanceFromContentFoot - Self.restingTrailingSpace <= Self.followWithin
         }
         resizedAt = now
@@ -429,7 +477,7 @@ final class AskScrollFollow {
         // thread came out of the turn 645 pt above it, behind the pill. A hand
         // on the thread is still the reader's, resize or not.
         resized(to: geometry, at: now)
-        insetTopChanged(geometry.insetTop, at: now)
+        insetTopChanged(geometry, at: now)
         let scrolledUp = !isJumpGliding(at: now)
             && !isResizing(at: now)
             && (lastGeometry.map(geometry.readerScrolledUp(from:)) ?? false)
@@ -505,13 +553,29 @@ final class AskScrollFollow {
         if inView != questionInView { questionInView = inView }
     }
 
-    /// Keeps the top inset, and the tallest it has been, from every geometry
-    /// sample (`barLooksMinimized`). Called after `resized(to:at:)`, which
-    /// stamps the resize this reads.
-    private func insetTopChanged(_ inset: CGFloat, at now: TimeInterval) {
-        let resizing = resizedAt.map { now - $0 < Self.resizeWindow } ?? false
-        tallestInsetTop = resizing || lastGeometry == nil ? inset : max(tallestInsetTop, inset)
+    /// Keeps the top inset, and the open bar's, from every geometry sample
+    /// (`barLooksMinimized`). Called after `resized(to:at:)`, which stamps the
+    /// resize this reads, and before the sample becomes `lastGeometry`.
+    private func insetTopChanged(_ geometry: AskThreadGeometry, at now: TimeInterval) {
+        let inset = geometry.insetTop
         insetTop = inset
+        guard let lastGeometry, !isWithinResizeWindow(at: now) else {
+            openBarInsetTop = inset
+            fallIsTheBars = false
+            return
+        }
+        let scrolledDown = isReaderScrolling && geometry.visibleTop > lastGeometry.visibleTop
+        let fall = lastGeometry.insetTop - inset
+        let spaceTookFall = fall > 1 && geometry.containerHeight - lastGeometry.containerHeight >= fall - 1
+        if inset >= openBarInsetTop - 1 {
+            // Open, so only a scroll down from here minimizes it.
+            openBarInsetTop = max(openBarInsetTop, inset)
+            fallIsTheBars = scrolledDown
+        } else if scrolledDown || spaceTookFall || fallIsTheBars {
+            fallIsTheBars = true
+        } else {
+            openBarInsetTop = inset
+        }
     }
 
     /// How long the check after the follow waits before it looks: twice the

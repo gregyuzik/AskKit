@@ -25,6 +25,13 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **An earlier chat opened beside a fold no longer minimizes the navigation bar.** On a busy device,
+  a phone turned on its side could report the bars' shorter inset seconds after it turned, and the
+  screen took that for the bar minimizing. So it didn't hold the bar open for the scroll that takes a
+  chat to its end, and that scroll minimized it, moving the pane of chats up under the reader's finger.
+  The screen now takes a fall in the inset for the bar minimizing only after the reader's own scroll
+  down the thread, or when the space between the bars grows by as much. Any other fall is the open bar
+  at a new size.
 - **Leaving the app with follow-ups on screen no longer faults in SwiftUI.** The thread is
   `.privacySensitive()`, and as the scene goes inactive SwiftUI builds a redacted copy of it beside
   the original. The copy's chips claimed the same matched-geometry ids as the originals, so the first

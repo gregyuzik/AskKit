@@ -954,7 +954,10 @@ thread does the same, except on the Mac.
   shortens, History goes while the reader types (`AskHistoryItem`).
 - **The navigation bar** minimizes on iOS only as the reader scrolls down: never while Done shows or an
   item is pushed (`askItemIsPushed`), nor for a scroll the screen makes itself, whose offset can't say
-  whose scroll moved it (`AskNavigationBarMinimization`).
+  whose scroll moved it (`AskNavigationBarMinimization`). A bar the reader's scroll down minimized stays
+  so through the screen's own scroll; the screen reads it from a fall in the top inset after that scroll,
+  or one the space between the bars takes up, and no other, since a turned phone's inset can arrive
+  seconds late (`AskScrollFollow.barLooksMinimized`).
 - **The quota banner** over the thread says when Private Cloud Compute has spent its daily quota and when
   it resets, in the settings card's words: a reset later today as its time, one on a later day as its day
   and time, one already past not at all. "Show options" opens Apple's route to a higher limit, where
