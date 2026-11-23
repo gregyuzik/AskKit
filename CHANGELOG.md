@@ -43,6 +43,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   Home press after launch logged "Multiple inserted views in matched geometry group" once for each
   follow-up, and a question still in flight would have done the same. The copy now stays out of the
   chip-to-question morph, which runs as before on the thread the reader sees.
+- **New Chat lists the chat it ends in the same change that empties the screen.**
+  `AskConversationStore` listed the chat New Chat ended only once its filing had landed and the list
+  was read again. Until then the chat was on neither the screen nor the list, so beside iPhone Duo's
+  fold the pane of chats dropped its row and drew it again a moment later, moving every row below it.
+  The chat now goes on the list as it leaves the screen, in its place by date and under the id the
+  archive files it under, so a tap on its row opens it. It stays there whatever a read of the list
+  finds until the filing has an answer, and a chat that couldn't be filed leaves the list then. A
+  chat deleted before its filing lands is removed once it has, rather than coming back with it.
 
 ## [0.7.2] - 2026-11-09
 
