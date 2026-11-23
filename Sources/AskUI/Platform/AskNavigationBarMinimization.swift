@@ -46,8 +46,11 @@ extension EnvironmentValues {
 /// pane beside a fold minimized the bar every time, taking the gear item away
 /// and moving the pane of chats up 54 pt, and following three answers to the
 /// foot minimized it in one run of three. Only the reader's scroll minimizes
-/// it. A bar already minimized is left so (`AskScrollFollow.barLooksMinimized`):
-/// `.never` would open it.
+/// it. A bar the reader's scroll down minimized is left so
+/// (`AskScrollFollow.barLooksMinimized`): `.never` would open it. Taking a
+/// late inset on a turned phone for a minimized bar left the hold off, and
+/// the same chat opened beside a fold minimized the bar again on a loaded
+/// simulator, two runs in three.
 ///
 /// "Minimizes", the SDK's word, because AskKit keeps "fold" for iPhone Duo's
 /// hinge (ARCHITECTURE.md, Words kept to one meaning).

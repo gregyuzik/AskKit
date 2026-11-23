@@ -61,9 +61,16 @@ nonisolated struct AskThreadGeometry: Equatable {
     /// `containerHeight` tall. Content under a bar's glass is drawn but
     /// covered, and a tip pointing at it would point at the bar.
     func shows(top: CGFloat, bottom: CGFloat) -> Bool {
-        let visibleTop = offset + insetTop
-        return top >= visibleTop - 1 && bottom <= visibleTop + containerHeight + 1
+        top >= visibleTop - 1 && bottom <= visibleTop + containerHeight + 1
     }
+
+    /// Where in the content the space between the bars starts, just under the
+    /// navigation bar. A scroll down the thread moves it down the content. A
+    /// safe area that changes moves the offset with the inset and leaves it
+    /// where it was, and a bar collapsing over the thread leaves the offset
+    /// and moves it up by what the bar gave up
+    /// (`AskScrollFollow.barLooksMinimized`).
+    var visibleTop: CGFloat { offset + insetTop }
 
     /// Whether the reader moved the thread away from where it was, as opposed
     /// to the thread growing away from the reader.
