@@ -396,13 +396,17 @@ final class AskScrollFollow {
     /// one decision (`resized(to:at:)`).
     ///
     /// **An event ends it, not the clock**, because a loaded device keeps the
-    /// order of a resize's samples and not their pace. A push gate's run of
-    /// the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load average
-    /// of about 20 on 12 cores, left the newest answer under the composer on
-    /// its side. The traced turns are over inside a quarter of a second; held
-    /// to the window alone, a turn's later samples found it closed, so the
-    /// scroll view's step read as the reader's, and a row measured at the
-    /// new width, or the screen's task asking again, went unanswered.
+    /// order of a resize's samples and not their pace. The traced turns are
+    /// over inside a quarter of a second; held to the window alone, a turn's
+    /// later samples, come late, would find it closed, so the scroll view's
+    /// step would read as the reader's, and a row measured at the new width,
+    /// or the screen's task asking again, would go unanswered. A push gate's
+    /// run of the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load
+    /// average of about 20 on 12 cores, left the newest answer under the
+    /// composer on its side, and was put down to that. The same failure came
+    /// back with this in place, at the same spot in two gates' runs, from a
+    /// bottom inset that rose as the turn began (`footDistanceAsLeft`), so
+    /// which of the two that first run was isn't known.
     private func isResizeUnderWay(at now: TimeInterval) -> Bool {
         isWithinResizeWindow(at: now) || (resizeKeepsFoot && !resizeAnswered)
     }

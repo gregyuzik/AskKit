@@ -25,6 +25,14 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **A reader at the foot of a thread stays there as the phone turns, when the bottom inset rises
+  first.** Whether to keep the reader at the foot was decided from the last layout before the width
+  changed. On one simulator, as the phone began to turn with no keyboard on screen, the composer
+  rose a portrait keyboard's height over a thread that hadn't moved. That layout put the reader
+  about 300 pt from the foot, so the turn kept nothing, and on its side the newest answer was under
+  the composer. A change in the bottom inset alone no longer counts as the reader leaving the foot.
+  The same goes for a keyboard that's really up: a reader at the foot under it is still at the foot
+  when the phone turns.
 - **A reader at the foot of a thread stays there as the phone turns, on a busy device too.** Keeping
   them there rested on a half-second after the width changed. On a busy device, the turn's later
   layout passes and the screen's own scroll to the foot can land after that half-second, and the
