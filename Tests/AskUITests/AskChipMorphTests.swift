@@ -1,6 +1,7 @@
 #if os(iOS) || os(macOS) || os(visionOS)
 
 import Foundation
+import SwiftUI
 import Testing
 
 import AskCore
@@ -80,6 +81,20 @@ import AskCore
         // that turning it on is a decision someone makes rather than a line
         // someone adds.
         #expect(!AskChipMorph.matches(turn("What records do I own?", origin: .starter), isNewest: true))
+    }
+
+    @Test func thePrivacyCopyOfTheThreadLeavesTheMorph() {
+        // **SwiftUI draws the thread twice as the scene goes inactive**: the
+        // thread as it was, reading no reasons, and a copy redacted for
+        // `.privacySensitive()`, reading `.privacy`. The namespace comes down
+        // to both, so if the copy joined, every chip on screen would have two
+        // sources, which SwiftUI logs as a fault at the first Home press.
+        #expect(AskChipMorph.joinsTheMorph(under: []))
+        #expect(!AskChipMorph.joinsTheMorph(under: .privacy))
+        #expect(!AskChipMorph.joinsTheMorph(under: [.privacy, .placeholder]))
+        // Only the privacy copy is known to be a second instance; a host's own
+        // placeholder redaction of the whole screen draws one.
+        #expect(AskChipMorph.joinsTheMorph(under: .placeholder))
     }
 }
 

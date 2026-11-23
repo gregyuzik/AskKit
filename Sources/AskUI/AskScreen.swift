@@ -1679,6 +1679,15 @@ public struct AskScreen<Domain: AskDomain, Mark: View, Tiles: View, Disclosure: 
             // A hook a host can act on. Without it, a host that wants to redact
             // the thread (backgrounding, screen sharing, an app lock) has
             // nothing to reach for and has to blur the whole screen.
+            //
+            // **SwiftUI acts on it too, by drawing the thread twice.** As the
+            // scene goes inactive it keeps the thread as it was and builds a
+            // redacted copy beside it, with `.privacy` in the copy's
+            // `redactionReasons` (2026-11-23). Anything handed down by value
+            // from above this line is shared by both copies, which is how
+            // `chipMorph` came to have two sources for every chip
+            // (`AskChipMorph.joinsTheMorph(under:)`); state a view below makes
+            // for itself is the copy's own.
             .privacySensitive()
             .askDismissesKeyboardOnTap { putKeyboardAway() }
             // The content's own space, the one `onScrollGeometryChange`'s

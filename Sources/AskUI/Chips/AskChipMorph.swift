@@ -30,6 +30,17 @@ public import SwiftUI
 /// follow-ups, which come up once its answer lands, and a model can offer the
 /// very question it was asked. So the bubble lets the id go before they can
 /// claim it, and at most one pair is ever in flight.
+///
+/// **And SwiftUI can draw the whole thread twice.** The thread is
+/// `.privacySensitive()` (`AskScreen.threadScroll`), and as the scene goes
+/// inactive SwiftUI keeps the thread as it was and builds a redacted copy of
+/// it beside it, with `.privacy` in the copy's `redactionReasons`. The
+/// namespace is handed down from the screen, above the modifier, so the copy's
+/// chips claimed the same ids as the originals, and every follow-up on screen
+/// logged "Multiple inserted views in matched geometry group" at the first
+/// Home press after launch (AskKit demo and Klosyt, iPhone 18 Pro simulator,
+/// 2026-11-23). The copy leaves the namespace instead
+/// (`joinsTheMorph(under:)`).
 nonisolated enum AskChipMorph {
 
     /// The geometry id a chip and its question share.
@@ -65,6 +76,19 @@ nonisolated enum AskChipMorph {
     static func matches<Row: AskRow>(_ turn: AskTurn<Row>, isNewest: Bool) -> Bool {
         isNewest && !turn.isComplete && turn.origin == .followUp
     }
+
+    /// Whether a view redacted for `reasons` takes its part in the morph:
+    /// every view but the privacy copy SwiftUI builds of the thread.
+    ///
+    /// **The copy, not the original, is the one redacted.** As the scene goes
+    /// inactive, the thread the reader was looking at reads no reasons and the
+    /// copy reads `.privacy` (logged from both, 2026-11-23), so the morph
+    /// stays with the views that are on screen to run it. A host that redacts
+    /// the thread for privacy itself, with no copy, takes it out of the morph
+    /// too, which costs nothing: a redacted chip has no sentence to show.
+    static func joinsTheMorph(under reasons: RedactionReasons) -> Bool {
+        !reasons.contains(.privacy)
+    }
 }
 
 extension View {
@@ -92,15 +116,20 @@ extension View {
 /// not recorded on a device.
 ///
 /// Without a morph the effect runs in a namespace of its own, where the view is
-/// the only one with its id, so it has nothing to match and nothing moves.
+/// the only one with its id, so it has nothing to match and nothing moves. The
+/// privacy copy of the thread runs there too (`AskChipMorph.joinsTheMorph`):
+/// it is a second instance of this modifier, with an `alone` of its own, so
+/// it claims nothing the original holds.
 private struct AskChipMorphEffect: ViewModifier {
     let id: String
     let shared: Namespace.ID?
 
     @Namespace private var alone
+    @Environment(\.redactionReasons) private var redaction
 
     func body(content: Content) -> some View {
-        content.matchedGeometryEffect(id: id, in: shared ?? alone)
+        let namespace = AskChipMorph.joinsTheMorph(under: redaction) ? shared : nil
+        content.matchedGeometryEffect(id: id, in: namespace ?? alone)
     }
 }
 
