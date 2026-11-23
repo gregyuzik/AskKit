@@ -1007,6 +1007,70 @@ import Testing
         #expect(follow.footRequests == 0)
     }
 
+    @Test func aKeyboardsHeightAsThePhoneTurnsIsNoStepFromTheFoot() {
+        // **Recorded in two push gates' runs of the demo's
+        // testAThreadAtItsFootStaysThereOnItsSide on an iPhone 18 Pro
+        // simulator**, with no keyboard on screen: as the turn began, the
+        // composer rose about 295 pt, a portrait keyboard's height, over a
+        // thread that hadn't moved, and stayed up through the rotation.
+        // Decided from that sample, the reader was that far from the foot,
+        // nothing was asked for, and on its side the newest answer was under
+        // the composer.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 1657, offset: 871), at: now + 0.001)
+
+        follow.geometryChanged(Self.traced(width: 340, container: 428, content: 1480, offset: 871), at: now + 0.002)
+        follow.geometryChanged(Self.traced(width: 340, container: 428, content: 2205, offset: 871), at: now + 0.008)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        let beforeTheStep = follow.footRequests
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: now + 0.028)
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests > beforeTheStep)
+
+        let landed = follow.footRequests
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 1771, offset: 1443, inset: 78), at: now + 0.24
+        )
+        #expect(follow.footRequests == landed)
+        #expect(!follow.keepsFootThroughResize(at: now + 0.24 + Self.lateBy))
+    }
+
+    @Test func aReaderAtTheFootUnderAKeyboardIsAtTheFootOnItsSide() {
+        // A keyboard that is up takes the same 294 pt and moves nothing
+        // (`aKeyboardIsNotAResize`), so the reader at the foot as it rose is
+        // still there when the phone turns under it.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 1657, offset: 871), at: now + 1)
+
+        follow.geometryChanged(Self.traced(width: 750, container: 60, content: 1540, offset: 871), at: now + 10)
+        #expect(follow.isAtFoot)
+        #expect(follow.footRequests > 0)
+    }
+
+    @Test func aReaderWhoScrolledUpUnderAKeyboardIsLeftWhereTheyWere() {
+        // Only a change of the container's height alone carries the foot
+        // over: a reader who scrolls up the thread with the keyboard up has
+        // left it, and the turn leaves them where they went.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 1657, offset: 871), at: now + 1)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 1657, offset: 371), at: now + 2)
+        follow.scrollPhaseChanged(.idle)
+        #expect(!follow.isAtFoot)
+
+        follow.geometryChanged(Self.traced(width: 750, container: 60, content: 1540, offset: 371), at: now + 10)
+        follow.geometryChanged(Self.traced(width: 750, container: 60, content: 1540, offset: 254), at: now + 10.005)
+        #expect(!follow.isAtFoot)
+        #expect(follow.footRequests == 0)
+    }
+
     @Test func aResizesRequestsLapseWithIt() {
         // `AskScreen` answers `footRequests` from a task that also runs each
         // time the thread appears, with whatever count the last resize left,
