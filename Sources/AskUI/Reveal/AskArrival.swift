@@ -29,7 +29,8 @@ public import SwiftUI
 /// more than `liveWindow` after its answer ended.
 ///
 /// Reduce Motion keeps the fade, as the reveal does, and drops the blur, the
-/// scale and the stagger.
+/// scale and the stagger. A host's `askDrawsAtRest`, for a UI test that reads
+/// the pixels, draws every piece at rest.
 nonisolated public enum AskArrival {
     /// What a piece is, which decides how it comes up.
     public enum Kind: Sendable {
@@ -158,17 +159,19 @@ private struct AskArrivalModifier: ViewModifier {
     @Environment(\.askArrivalEnding) private var ending
     @Environment(\.askArrivalFirstStep) private var firstStep
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.askDrawsAtRest) private var drawsAtRest
 
     func body(content: Content) -> some View {
         // Read against the clock here, where the piece is first built: a piece
         // built too late to arrive has to be drawn at rest from its first
         // frame, or it is drawn hidden for that frame and then fades up anyway.
+        // A host's `askDrawsAtRest` draws every piece that way.
         AskArrivalBody(
             content: content,
             base: firstStep,
             step: step,
             kind: kind,
-            arrives: AskArrival.isLive(endedAt: ending, now: Date.timeIntervalSinceReferenceDate),
+            arrives: !drawsAtRest && AskArrival.isLive(endedAt: ending, now: Date.timeIntervalSinceReferenceDate),
             reduceMotion: reduceMotion
         )
     }

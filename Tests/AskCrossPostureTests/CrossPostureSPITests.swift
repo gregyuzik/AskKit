@@ -62,6 +62,14 @@ extension CrossPostureSPITests {
         _ = Color.clear.askSimulatedFold(.book())
         _ = Color.clear.askSimulatedFold(nil)
     }
+
+    /// What a host's UI-test launch sets to have its audits read the screen
+    /// at rest.
+    @MainActor
+    @Test func aHostDrawsItsScreenAtRestForAnAudit() {
+        _ = Color.clear.askDrawsAtRest(true)
+        _ = Color.clear.askDrawsAtRest(false)
+    }
 }
 #endif
 

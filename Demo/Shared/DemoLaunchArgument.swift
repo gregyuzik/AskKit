@@ -9,11 +9,11 @@ import Foundation
 /// else entirely. In the project, it's in the Compile Sources of the three app
 /// targets and the UI-test target.
 ///
-/// Each one but `holdTurn`, `assistant`, `hidesTips` and `appearance` is also
-/// in the Run arguments of the three app schemes (`AskKitDemo_iOS`, `_macOS`
-/// and `_visionOS`), off, so it can be ticked in Xcode's scheme editor; those
-/// four are passed at launch, or added to a scheme by hand. A new one goes
-/// into all three, added there in Xcode.
+/// Each one but `holdTurn`, `assistant`, `hidesTips`, `appearance` and
+/// `drawsAtRest` is also in the Run arguments of the three app schemes
+/// (`AskKitDemo_iOS`, `_macOS` and `_visionOS`), off, so it can be ticked in
+/// Xcode's scheme editor; those five are passed at launch, or added to a scheme
+/// by hand. A new one goes into all three, added there in Xcode.
 nonisolated enum DemoLaunchArgument {
     /// Start with an empty thread: `AskPersistence.perLaunch` instead of
     /// `.thread`, so nothing is restored and nothing is saved. In either
@@ -170,6 +170,19 @@ nonisolated enum DemoLaunchArgument {
     /// Not in the schemes' Run arguments: pass it at launch. At the simulator,
     /// the device's own appearance does the same.
     static let appearance = "-askAppearance"
+
+    /// Draw every answer at rest (`askDrawsAtRest(_:)`): what an answer brings
+    /// is at full from its first frame, its prose comes without the reveal,
+    /// and the screen moves nothing of its own.
+    ///
+    /// **For the UI tests' audits, which read the pixels.** An answer's pieces
+    /// arrive in waves for up to a second after it lands, on the wall clock,
+    /// and an audit that slept a second for them could read a piece still in
+    /// its blur on a Mac drawing late. At rest, the audit reads the screen a
+    /// reader is left with, with nothing to wait for.
+    ///
+    /// Not in the schemes' Run arguments: pass it at launch.
+    static let drawsAtRest = "-askDrawsAtRest"
 
     /// On the Mac, in a Debug build: write the window to a PNG at the path
     /// after this flag, then quit (`DemoWindowCapture`). How the README's Mac

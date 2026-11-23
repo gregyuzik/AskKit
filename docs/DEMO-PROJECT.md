@@ -24,8 +24,8 @@ Apple Intelligence, and `-askScriptedAnswer` needs no model. To run on a device,
 `DEVELOPMENT_TEAM = <your team ID>` in an untracked `Demo/Local.xcconfig`.
 
 Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`. All but `-askAssistant`,
-`-askHoldTurn`, `-askHidesTips` and `-askAppearance` are listed, off, in each app scheme's Run > Arguments:
-tick one to use it. Add those four to the scheme in Xcode, or pass one at launch, as
+`-askHoldTurn`, `-askHidesTips`, `-askAppearance` and `-askDrawsAtRest` are listed, off, in each app scheme's
+Run > Arguments: tick one to use it. Add those five to the scheme in Xcode, or pass one at launch, as
 `xcrun simctl launch <device> com.example.askkitdemo -askAssistant`. The three that image the Mac window
 are under [Imaging the Mac window](#imaging-the-mac-window).
 
@@ -45,6 +45,7 @@ are under [Imaging the Mac window](#imaging-the-mac-window).
 | `-askHoldTurn` | Every turn held in flight until Stop, answered as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. |
 | `-askHidesTips` | AskUI's tips hidden, as every UI test launches the demo. Without it the demo configures TipKit at launch and shows them; TipKit remembers a tip that has gone, so delete the app to see them again. The starter's tip waits for a second visit to Ask: another tab and back under `-askTabs`, or the next launch. |
 | `-askAppearance <light or dark>` | The demo launched in light or dark, whatever the device is set to, as the UI tests' accessibility audits launch it. Set on the device, the change is the system's to deliver: under load it hadn't reached the app seven seconds after the setter returned, and an audit "in dark" read a screen still drawn light. |
+| `-askDrawsAtRest` | Every answer drawn at rest, as the UI tests' accessibility audits launch the demo: what an answer brings is at full from its first frame, its prose comes without the reveal, and the screen moves nothing of its own (AskUI's SPI `askDrawsAtRest(_:)`). An answer's pieces arrive for up to a second after it lands, on the wall clock, which an audit can't see the end of. |
 | `-askAssistant` | Opens on the assistant, whatever was on screen last; the switch still goes back to the library. The assistant shows no tiles, and under each answer the line saying what it stood on: its own words where a tool grounded it, "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed in a Reminders section of the settings card. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing there. |
 
 `-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on
@@ -131,10 +132,11 @@ shared schemes (`xcshareddata/xcschemes/`), `project.xcworkspace/contents.xcwork
   The iPhone's list is left unset: the check is the iPad's.
 - **The launch arguments** are in each app scheme's Run arguments, off, so the scheme launches the demo
   plainly ([Running it](#running-it)). A flag for one platform alone, such as `-askTabs` or
-  `-askCaptureWindow`, is listed in every scheme all the same. Three aren't: `-askAssistant`, which
+  `-askCaptureWindow`, is listed in every scheme all the same. Five aren't: `-askAssistant`, which
   opens on the assistant rather than where the demo was left (the app's own switch moves between the
   domains and remembers which was on screen); `-askHoldTurn`, which holds every turn in flight; and
-  `-askHidesTips`, which hides AskUI's tips for the UI tests.
+  three for the UI tests, `-askHidesTips`, which hides AskUI's tips, and `-askAppearance` and
+  `-askDrawsAtRest`, which the audits launch in.
 - **`AskKitDemoUITests`** is iOS only. The smoke suite drives the screen on an iPhone 18 Pro simulator,
   and the Mac and visionOS apps are checked by hand, since a UI-test bundle per platform would be three
   flaky suites asserting one set of identifiers. It compiles `Shared/` too, so a launch argument isn't

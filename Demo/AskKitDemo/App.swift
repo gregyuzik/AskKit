@@ -3,8 +3,10 @@ import SwiftUI
 import TipKit
 
 import AskCore
-// SPI for `askSimulatedFold(_:)` alone: the stand-in fold `-askFold` and the
-// previews arrange the screen around. A host imports AskUI plainly.
+// SPI for `askSimulatedFold(_:)` and `askDrawsAtRest(_:)` alone: the stand-in
+// fold `-askFold` and the previews arrange the screen around, and the screen
+// drawn at rest for the UI tests' audits (`-askDrawsAtRest`). A host imports
+// AskUI plainly.
 @_spi(AskKitInternal) import AskUI
 
 /// A host for AskUI with no app's data and no Private Cloud Compute entitlement
@@ -66,6 +68,9 @@ struct AskKitDemoApp: App {
             // A fold the simulator doesn't have, when the launch asks for
             // one, so the screen's arrangement around it can be seen.
             .askSimulatedFold(simulatedFold)
+            // Every answer drawn at rest when the launch asks for it, for an
+            // audit that reads the pixels.
+            .askDrawsAtRest(CommandLine.arguments.contains(DemoLaunchArgument.drawsAtRest))
             // Light or dark when the launch asks for one, and the device's
             // appearance otherwise.
             .preferredColorScheme(launchColorScheme)
