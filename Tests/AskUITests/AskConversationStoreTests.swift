@@ -2897,8 +2897,9 @@ import Testing
     /// beside the fold lists the chat on screen among the earlier ones
     /// (`AskChatsPaneRows`), so the chat an open files has to be on the list
     /// from the moment the chosen one is on screen. Read back only once the
-    /// open's writes had landed, it was missing until then: the pane drew the
-    /// chosen chat alone, in the top row, and then both rows in their places.
+    /// open's writes had landed, it was missing until then: the pane's rows
+    /// were the chosen chat alone, in the top row, and then both in their
+    /// places.
     @Test func openingAnEarlierChatMovesTheMarkAndNoRowWhileItOpens() async throws {
         let threadURL = temporaryLocation("askkit-open-rows").appendingPathExtension("json")
         let archiveDirectory = temporaryLocation("askkit-open-rows")
