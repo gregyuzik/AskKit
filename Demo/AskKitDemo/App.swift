@@ -66,8 +66,8 @@ struct AskKitDemoApp: App {
             // A fold the simulator doesn't have, when the launch asks for
             // one, so the screen's arrangement around it can be seen.
             .askSimulatedFold(simulatedFold)
-            // Light or dark from the first frame when the launch asks, and
-            // the device's appearance otherwise.
+            // Light or dark when the launch asks for one, and the device's
+            // appearance otherwise.
             .preferredColorScheme(launchColorScheme)
             #if os(macOS)
             // An Ask link goes to a window already open: without this the

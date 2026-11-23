@@ -158,14 +158,14 @@ nonisolated enum DemoLaunchArgument {
     /// Draw the demo in light or dark, the argument after this flag
     /// (`DemoAppearance`), whatever the device is set to: the scene's root
     /// takes it as its preferred color scheme (`AskKitDemoApp`), so the app
-    /// is drawn in it from its first frame.
+    /// launches in it, with nothing waiting on the system.
     ///
     /// **For the UI tests' audits, which read the pixels.** Set on the device
-    /// instead (`XCUIDevice.appearance`), the change reached the app on the
-    /// system's clock, after the setter had returned: on an idle Mac the app
-    /// launched dark, and under load one launched and was audited "in dark"
-    /// while still drawn light. Passed at launch, there is nothing to wait
-    /// for.
+    /// instead (`XCUIDevice.appearance`), the change is the system's to
+    /// deliver, and under load it hadn't: the setter returned after two
+    /// seconds, and the app launched then was still drawn light when it was
+    /// audited "in dark" seven seconds later. Passed at launch, there is
+    /// nothing to wait for.
     ///
     /// Not in the schemes' Run arguments: pass it at launch. At the simulator,
     /// the device's own appearance does the same.

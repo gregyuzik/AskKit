@@ -1989,7 +1989,7 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         try auditTheFirstScreen(in: .dark)
     }
 
-    /// The audit, with the demo drawn in `appearance` from its first frame
+    /// The audit, with the demo launched in `appearance`
     /// (`DemoLaunchArgument.appearance` says why not the device's).
     ///
     /// **Contrast is a call of its own.** In one call with `.dynamicType` and

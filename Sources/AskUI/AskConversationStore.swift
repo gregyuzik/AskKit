@@ -2769,8 +2769,6 @@ public final class AskConversationStore<Domain: AskDomain> {
             restoreCoaching()
         }
         openedChatID = id
-        // Off the list as it joins the screen, as `takeIn`'s filing goes.
-        history.removeAll { $0.id == id }
         queueWrite { [archive] store in
             if await store.writeThread(merged), dropped == 0 {
                 await archive.remove(id)
