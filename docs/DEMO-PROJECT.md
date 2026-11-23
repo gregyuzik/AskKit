@@ -24,8 +24,8 @@ Apple Intelligence, and `-askScriptedAnswer` needs no model. To run on a device,
 `DEVELOPMENT_TEAM = <your team ID>` in an untracked `Demo/Local.xcconfig`.
 
 Every launch argument is declared in `Demo/Shared/DemoLaunchArgument.swift`. All but `-askAssistant`,
-`-askHoldTurn` and `-askHidesTips` are listed, off, in each app scheme's Run > Arguments: tick one to use
-it. Add those three to the scheme in Xcode, or pass one at launch, as
+`-askHoldTurn`, `-askHidesTips` and `-askAppearance` are listed, off, in each app scheme's Run > Arguments:
+tick one to use it. Add those four to the scheme in Xcode, or pass one at launch, as
 `xcrun simctl launch <device> com.example.askkitdemo -askAssistant`. The three that image the Mac window
 are under [Imaging the Mac window](#imaging-the-mac-window).
 
@@ -44,6 +44,7 @@ are under [Imaging the Mac window](#imaging-the-mac-window).
 | `-askEmptyLibrary` | An empty library, so the first screen is the nothing-to-ask one; `-askEmptyLibrary button` adds its button. |
 | `-askHoldTurn` | Every turn held in flight until Stop, answered as under `-askScriptedAnswer` with an answer that never comes: the wait row stays up, for screenshots and profiles of a turn in flight. |
 | `-askHidesTips` | AskUI's tips hidden, as every UI test launches the demo. Without it the demo configures TipKit at launch and shows them; TipKit remembers a tip that has gone, so delete the app to see them again. The starter's tip waits for a second visit to Ask: another tab and back under `-askTabs`, or the next launch. |
+| `-askAppearance <light or dark>` | The demo drawn in light or dark from its first frame, whatever the device is set to, as the UI tests' accessibility audits launch it: set on the device, the change reached the app after the test had gone on, and under load an audit read a screen still drawn in the other appearance. |
 | `-askAssistant` | Opens on the assistant, whatever was on screen last; the switch still goes back to the library. The assistant shows no tiles, and under each answer the line saying what it stood on: its own words where a tool grounded it, "Not from this app's data" where nothing did. A reminder waits for the reader's tap on its card and lasts for the launch, listed in a Reminders section of the settings card. With `-askScriptedAnswer`, a question with "remind" in it gets the card, one with "miles" a conversion, and anything else an answer nothing grounded. `-askResetThread`, `-askFreshHistory`, `-askPrefill` and `-askFold` work with it; the library's other arguments do nothing there. |
 
 `-AppleLanguages (he)` runs the demo in Hebrew, right to left; add `-askScriptedAnswer` where no model on

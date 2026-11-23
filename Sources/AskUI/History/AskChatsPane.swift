@@ -322,15 +322,16 @@ nonisolated enum AskChatsPaneRows {
     ///
     /// **In its place, not on top.** Opening an earlier chat files the one on
     /// screen and puts the earlier one there, and neither is asked anything
-    /// by that, so neither moves: the mark does. A chat goes to the top when
-    /// the reader asks it something, which is when it is the newest.
+    /// by that, so neither moves: the mark does, in the change that puts the
+    /// earlier chat on screen, since the store lists the chat it filed in the
+    /// same change (`AskConversationStore.openThread(_:)`). A chat goes to the
+    /// top when the reader asks it something, which is when it is the newest.
     ///
-    /// **One row a chat.** The list leaves out the earlier chat on screen,
-    /// but not at once: an open puts the chat on screen first and reads the
-    /// list again once it is written, and a filing an interrupted write left
-    /// behind stays listed until a read joins it. A filing of the chat on
-    /// screen, under its id or as the same first question asked at the same
-    /// moment, is left out, and the chat on screen is the one listed.
+    /// **One row a chat.** The list leaves out the earlier chat on screen as
+    /// it opens, but a filing an interrupted write left behind stays listed
+    /// until a read joins it. A filing of the chat on screen, under its id or
+    /// as the same first question asked at the same moment, is left out, and
+    /// the chat on screen is the one listed.
     static func ordered(current: AskThreadSummary?, history: [AskThreadSummary]) -> [AskThreadSummary] {
         guard let current else { return history }
         let earlier = history.filter { !isFiling($0, of: current) }

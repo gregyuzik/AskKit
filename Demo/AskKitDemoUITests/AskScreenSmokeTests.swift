@@ -1989,8 +1989,8 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         try auditTheFirstScreen(in: .dark)
     }
 
-    /// The audit, with the device in `appearance` for the run and back as it was
-    /// after, whether the audit passes or not.
+    /// The audit, with the demo drawn in `appearance` from its first frame
+    /// (`DemoLaunchArgument.appearance` says why not the device's).
     ///
     /// **Contrast is a call of its own.** In one call with `.dynamicType` and
     /// another check the audit fails the disclosure line in both appearances and "Try asking" in
@@ -2000,11 +2000,12 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// screen's grays at 50%, nearly passes them at 60% and 68% and passes
     /// 76% (`askDeemphasizedText`), and in dark it passes `.secondary`.
     @MainActor
-    private func auditTheFirstScreen(in appearance: XCUIDevice.Appearance) throws {
+    private func auditTheFirstScreen(in appearance: DemoAppearance) throws {
         continueAfterFailure = false
-        use(appearance)
         let app = XCUIApplication()
-        app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread]
+        app.launchArguments = [
+            DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.appearance, appearance.rawValue
+        ]
         app.launch()
         // By identifier alone, for the reason `launch()` spells out: which XCUI
         // type `ask.root` lands on moves with the layout.
@@ -2109,13 +2110,12 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// fills, not the glass capsules whose corners the audit misreads on the
     /// first screen.
     @MainActor
-    private func auditTheThread(_ state: AuditedThread, in appearance: XCUIDevice.Appearance) throws {
+    private func auditTheThread(_ state: AuditedThread, in appearance: DemoAppearance) throws {
         continueAfterFailure = false
-        use(appearance)
         let app: XCUIApplication
         switch state {
         case .answerWithTiles:
-            app = launchScripted()
+            app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue)
             let starters = element(Ids.starters, in: app)
             XCTAssertTrue(starters.waitForExistence(timeout: uiTimeout))
             starters.buttons.element(boundBy: 0).tap()
@@ -2124,7 +2124,10 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
             XCTAssertTrue(element(Ids.evidence, in: app).waitForExistence(timeout: uiTimeout), "And its evidence line.")
         case .failureWithTryAgain:
             app = XCUIApplication()
-            app.launchArguments = [DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.holdTurn]
+            app.launchArguments = [
+                DemoLaunchArgument.hidesTips, DemoLaunchArgument.resetThread, DemoLaunchArgument.holdTurn,
+                DemoLaunchArgument.appearance, appearance.rawValue
+            ]
             app.launch()
             XCTAssertTrue(root(app).waitForExistence(timeout: uiTimeout))
             let starters = element(Ids.starters, in: app)
@@ -2170,16 +2173,6 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
         return element.frame.minY >= foot
     }
 
-    /// The device in `appearance` for the rest of the test, and back as it was
-    /// after, whether the test passes or not.
-    @MainActor
-    private func use(_ appearance: XCUIDevice.Appearance) {
-        let device = XCUIDevice.shared
-        let before = device.appearance
-        device.appearance = appearance
-        addTeardownBlock { @MainActor in device.appearance = before }
-    }
-
     /// The confirmation card, by Apple's audit: every check but contrast, then
     /// contrast alone, in light.
     @MainActor
@@ -2204,10 +2197,9 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// appearances, so it lets nothing through on the card: the confirm
     /// button and "Not now" are held to it as they are.
     @MainActor
-    private func auditTheConfirmationCard(in appearance: XCUIDevice.Appearance) throws {
+    private func auditTheConfirmationCard(in appearance: DemoAppearance) throws {
         continueAfterFailure = false
-        use(appearance)
-        let app = launchScripted()
+        let app = launchScripted(DemoLaunchArgument.appearance, appearance.rawValue)
         let field = app.textFields[Ids.field]
         XCTAssertTrue(field.waitForExistence(timeout: uiTimeout))
         field.tap()
@@ -2259,9 +2251,8 @@ nonisolated final class AskScreenSmokeTests: XCTestCase {
     /// the glass's shaded fill and rim, not what a reader sees, and the light
     /// verdict on this one element is let through whatever it says.
     @MainActor
-    private func auditTheNothingToAskButton(in appearance: XCUIDevice.Appearance) throws {
-        use(appearance)
-        let app = try launch(DemoLaunchArgument.emptyLibrary, "button")
+    private func auditTheNothingToAskButton(in appearance: DemoAppearance) throws {
+        let app = try launch(DemoLaunchArgument.emptyLibrary, "button", DemoLaunchArgument.appearance, appearance.rawValue)
         XCTAssertTrue(app.buttons[Ids.nothingAction].waitForExistence(timeout: uiTimeout), "The screen offers its button.")
 
         try app.performAccessibilityAudit(for: .contrast) { issue in

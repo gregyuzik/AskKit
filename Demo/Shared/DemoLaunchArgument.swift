@@ -9,10 +9,10 @@ import Foundation
 /// else entirely. In the project, it's in the Compile Sources of the three app
 /// targets and the UI-test target.
 ///
-/// Each one but `holdTurn`, `assistant` and `hidesTips` is also in the Run
-/// arguments of the three app schemes (`AskKitDemo_iOS`, `_macOS` and
-/// `_visionOS`), off, so it can be ticked in Xcode's scheme editor; those
-/// three are passed at launch, or added to a scheme by hand. A new one goes
+/// Each one but `holdTurn`, `assistant`, `hidesTips` and `appearance` is also
+/// in the Run arguments of the three app schemes (`AskKitDemo_iOS`, `_macOS`
+/// and `_visionOS`), off, so it can be ticked in Xcode's scheme editor; those
+/// four are passed at launch, or added to a scheme by hand. A new one goes
 /// into all three, added there in Xcode.
 nonisolated enum DemoLaunchArgument {
     /// Start with an empty thread: `AskPersistence.perLaunch` instead of
@@ -155,6 +155,22 @@ nonisolated enum DemoLaunchArgument {
     /// Not in the schemes' Run arguments: pass it at launch.
     static let hidesTips = "-askHidesTips"
 
+    /// Draw the demo in light or dark, the argument after this flag
+    /// (`DemoAppearance`), whatever the device is set to: the scene's root
+    /// takes it as its preferred color scheme (`AskKitDemoApp`), so the app
+    /// is drawn in it from its first frame.
+    ///
+    /// **For the UI tests' audits, which read the pixels.** Set on the device
+    /// instead (`XCUIDevice.appearance`), the change reached the app on the
+    /// system's clock, after the setter had returned: on an idle Mac the app
+    /// launched dark, and under load one launched and was audited "in dark"
+    /// while still drawn light. Passed at launch, there is nothing to wait
+    /// for.
+    ///
+    /// Not in the schemes' Run arguments: pass it at launch. At the simulator,
+    /// the device's own appearance does the same.
+    static let appearance = "-askAppearance"
+
     /// On the Mac, in a Debug build: write the window to a PNG at the path
     /// after this flag, then quit (`DemoWindowCapture`). How the README's Mac
     /// images are made. A script launches the demo as its own child and hands
@@ -175,6 +191,13 @@ nonisolated enum DemoLaunchArgument {
         guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
         return arguments[index + 1]
     }
+}
+
+/// What `DemoLaunchArgument.appearance` takes, declared once for the reason
+/// `DemoLaunchArgument` is.
+nonisolated enum DemoAppearance: String, Sendable {
+    case light
+    case dark
 }
 
 /// The demo's URL scheme: `askkitdemo://ask?q=…` opens with the question in the
