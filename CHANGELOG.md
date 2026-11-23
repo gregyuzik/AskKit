@@ -25,6 +25,11 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ### Fixed
 
+- **Opening an earlier chat beside iPhone Duo's fold moves the mark and no row, all the way through.**
+  `AskConversationStore` filed the chat on screen, put the chosen one there, and listed the chat it had
+  filed only once the open's writes had landed and the list was read again. Until then the rows the
+  pane of chats was given held the chosen chat alone, in the top row, and then both chats in their
+  places again, for as long as those writes took. The list now changes with the screen, to what that read finds.
 - **Leaving the app with follow-ups on screen no longer faults in SwiftUI.** The thread is
   `.privacySensitive()`, and as the scene goes inactive SwiftUI builds a redacted copy of it beside
   the original. The copy's chips claimed the same matched-geometry ids as the originals, so the first
