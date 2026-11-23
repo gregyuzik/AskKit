@@ -66,6 +66,9 @@ struct AskKitDemoApp: App {
             // A fold the simulator doesn't have, when the launch asks for
             // one, so the screen's arrangement around it can be seen.
             .askSimulatedFold(simulatedFold)
+            // Light or dark when the launch asks for one, and the device's
+            // appearance otherwise.
+            .preferredColorScheme(launchColorScheme)
             #if os(macOS)
             // An Ask link goes to a window already open: without this the
             // Mac opens a new window for every link. Every window shows
@@ -97,6 +100,16 @@ struct AskKitDemoApp: App {
         case "upright": .upright()
         case "uprightBent": .upright(bend: 24)
         default: nil
+        }
+    }
+
+    /// `DemoLaunchArgument.appearance`: the color scheme to draw in, or nil
+    /// for the device's own.
+    private var launchColorScheme: ColorScheme? {
+        switch DemoLaunchArgument.value(after: DemoLaunchArgument.appearance).flatMap(DemoAppearance.init(rawValue:)) {
+        case .light: .light
+        case .dark: .dark
+        case nil: nil
         }
     }
 }

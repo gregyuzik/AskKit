@@ -283,16 +283,16 @@ project_files() {
 #
 # The tests the test targets' runs report, summed, must reach the floor. The
 # count is of tests run, a skipped one included, so it is the count of what
-# compiled in: 1,675 when the floor was set, on main as of #50 (AskCoreTests
-# 844, AskUITests 724, AskCrossPostureTests 104, AskReadmeApproachableTests 3).
+# compiled in: 1,790 when the floor was set, on main as of #118 (AskCoreTests
+# 915, AskUITests 768, AskCrossPostureTests 104, AskReadmeApproachableTests 3).
 # The 35 between them leave room for a deliberate deletion, and fail a run that
 # lost more: a big file's over-tight `#if` (AskConversationStoreTests holds
-# 236, AskEngineTests 228, AskPromptTests 63), all of AskCrossPostureTests
-# (1,571 would run), or the platform line every AskUI test file opens with,
+# 242, AskEngineTests 240, AskPromptTests 77), all of AskCrossPostureTests
+# (1,686 would run), or the platform line every AskUI test file opens with,
 # edited across them. A file of 35 tests or fewer can still go unnoticed, and
 # so can all of AskReadmeApproachableTests. Raise the floor as the suite grows,
 # or the widening gap lets more of the suite go missing unnoticed.
-SWIFT_TEST_FLOOR=1640
+SWIFT_TEST_FLOOR=1755
 step_test() {
   local scratch="$work/coldtest" log="$logs/swift-test.log" ran skipped floor host
   rm -rf "$scratch"
@@ -428,16 +428,17 @@ ios_sim() {
 # The floor is lower than `step_test`'s, and counts tests passed, read from the
 # result bundle, since `-quiet` keeps the per-test lines out of the log. The
 # simulator compiles fewer of AskUITests' tests than the Mac does, since some
-# compile for the Mac alone. A run on main as of #48 passed 1,619 where the
-# Mac ran 1,675, and #49 and #50 added no test. The twelve tests that race
-# the wall clock count as skipped, not passed, while the Mac is under load, so
-# 1,580 leaves 39 for a deliberate deletion, 27 with all twelve skipped, and
-# fails a run that lost AskConversationStoreTests (236 here too) or
-# AskEngineTests (228). Raise it with `step_test`'s.
+# compile for the Mac alone: on main as of #118, 1,744 ran where the Mac ran
+# 1,790. The eighteen tests that race the wall clock count as skipped, not
+# passed, while the Mac is under load, and that run, under load, skipped all
+# eighteen and passed 1,726. So 1,687 leaves 39 for a deliberate deletion with
+# all eighteen skipped, 57 with none, and fails a run that lost
+# AskConversationStoreTests (242 here too) or AskEngineTests (240). Raise it
+# with `step_test`'s.
 #
 # The bundle keeps each failure, so a failure collects no sysdiagnose: on a CI
 # runner that took ten minutes and timed out.
-IOS_TEST_FLOOR=1580
+IOS_TEST_FLOOR=1687
 step_build_ios_tests() { # simulator
   local log="$logs/build-ios-tests.log"
   say "AskKit-Package tests, built for iPhone 18 Pro ($1)"
