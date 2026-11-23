@@ -2,10 +2,32 @@
 
 import AskCore
 import Foundation
+import Observation
 import SwiftUI
 import Testing
 
 @testable import AskUI
+
+/// Counts how often what `reads` reads is published, arming again after each.
+@MainActor
+private final class ObservationTally {
+    private(set) var heard = 0
+    private let reads: @MainActor () -> Void
+
+    init(_ reads: @escaping @MainActor () -> Void) {
+        self.reads = reads
+        arm()
+    }
+
+    private func arm() {
+        withObservationTracking { reads() } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.heard += 1
+                self?.arm()
+            }
+        }
+    }
+}
 
 /// What the screen's chrome reads of the thread, and how often it hears it.
 @Suite(.timeLimit(.minutes(1))) @MainActor struct AskThreadShapeTests {
@@ -30,7 +52,7 @@ import Testing
         let asker = ScriptedAsker(.init(events: streamed(words: 30)))
         let store = makeStore(asker: asker)
         await store.restoreIfNeeded()
-        let tally = ObservationLog {
+        let tally = ObservationTally {
             _ = store.stage
             _ = store.captionTier
             _ = store.hasTurns
@@ -86,7 +108,7 @@ import Testing
                 _ = store.status.nextTier
             })
         ]
-        let tallies = reads.map { name, read in (name, ObservationLog(read)) }
+        let tallies = reads.map { name, read in (name, ObservationTally(read)) }
         store.ask("What do I own?")
         await settle(store)
         try? await Task.sleep(for: .milliseconds(50))
@@ -108,7 +130,7 @@ import Testing
         let store = makeStore(domain: domain, asker: asker, threadURL: url)
         await store.restoreIfNeeded()
         #expect(store.showsUnreadableThreadNotice)
-        let tally = ObservationLog { _ = store.showsUnreadableThreadNotice }
+        let tally = ObservationTally { _ = store.showsUnreadableThreadNotice }
 
         store.ask("What do I own?")
         await settle(store)

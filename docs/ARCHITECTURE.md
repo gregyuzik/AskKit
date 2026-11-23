@@ -595,7 +595,7 @@ thread, and the filing goes once that write took and every one of its turns deco
   blocks opening an earlier one, and the turns asked meanwhile go into a provisional filing, as beside a
   thread that couldn't be read. A chat it can write nowhere waits in memory to be filed.
 - Opening an earlier chat does nothing if filing the one on screen fails, and the opened chat comes off
-  the archive's list only once it is written as the thread and every one of its turns decoded.
+  the list only once it is written as the thread and every one of its turns decoded.
 - A save the disk refuses is tried again as protected data comes back and as the screen does.
 - Delete All Chats outranks that rule: what the reader deletes is deleted. What the disk won't delete
   is owed and tried again, and a New Chat deletes it too; a chat whose file won't go stays off the

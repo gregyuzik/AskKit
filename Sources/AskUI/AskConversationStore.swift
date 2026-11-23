@@ -2609,14 +2609,13 @@ public final class AskConversationStore<Domain: AskDomain> {
         // Filed before anything leaves the screen, and awaited: unfiled (a
         // locked device, a full disk), the chat on screen stays there, since
         // opening the other would write over its last copy.
-        var filing: AskThreadSummary?
         if !outgoing.isEmpty {
             // Turns filed beside a thread that couldn't be read, and read since,
             // are in this filing, which takes their filing's place.
-            filing = await queueWrite { [archive] _ in
-                await archive.fileTheChatOnScreen(outgoing, at: .now, sparing: summary.id)
+            let filed = await queueWrite { [archive] _ in
+                await archive.fileTheChatOnScreen(outgoing, at: .now, sparing: summary.id) != nil
             }.value
-            guard filing != nil else {
+            guard filed else {
                 Logger(subsystem: brand.logSubsystem, category: "ask")
                     .error("the chat on screen could not be filed, so an earlier chat did not open")
                 // The chat stays, with the turn this stopped: saved as Stop
@@ -2648,18 +2647,6 @@ public final class AskConversationStore<Domain: AskDomain> {
         lastTerminalTurnEndedAt = nil
         proposalOutcomeFocus = nil
         openedChatID = summary.id
-        // **The list changes with the screen**, to what `loadHistory()` reads
-        // once the writes below land: the chat opened off it, and the one it
-        // replaced on it, in its place by date, newest first as the archive
-        // lists them. Left to that read, the chat just filed would be on
-        // neither the screen nor the list until then, and the pane beside the
-        // fold would draw the chosen chat alone in its top row, then both
-        // chats in their places (`AskChatsPaneRows`).
-        var listed = history.filter { $0.id != summary.id && $0.id != filing?.id }
-        if let filing {
-            listed.insert(filing, at: listed.firstIndex { $0.updatedAt < filing.updatedAt } ?? listed.endIndex)
-        }
-        history = listed
         forgetFeedbackAttachments()
 
         // Written, then taken off the list: interrupted between, a chat is in
