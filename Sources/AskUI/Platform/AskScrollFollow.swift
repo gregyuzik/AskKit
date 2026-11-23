@@ -244,6 +244,31 @@ final class AskScrollFollow {
     /// alone.
     @ObservationIgnored private var resizeKeepsFoot = false
 
+    /// How far the content's foot was below the bottom edge where the reader
+    /// last left the thread, which a resize decides whether to keep the foot
+    /// from (`resized(to:at:)`): each sample's own distance, except that a
+    /// sample in which only the space between the bars changed height
+    /// (`AskThreadGeometry.onlyTheContainerHeightChanged(from:)`) can bring
+    /// it nearer the foot and never take it further away.
+    ///
+    /// **A bottom inset moves the foot without moving the reader.** A
+    /// keyboard rising over a settled thread leaves the offset where it was,
+    /// 294 pt of the thread under it (`aKeyboardIsNotAResize`), and so did
+    /// the composer raised a portrait keyboard's height, with no keyboard on
+    /// screen, as an iPhone 18 Pro simulator began to turn on its side in
+    /// two push gates' runs of the demo. Read off that sample, the reader at
+    /// the foot was 283 pt from the last turn's end, the resize kept nothing,
+    /// and on its side the newest answer was under the composer.
+    ///
+    /// **Nearer, though, because the inset going hands the space back.**
+    /// Traced on the demo, a keyboard leaving took the space between the bars
+    /// from 376 to 670 pt in one sample with the offset unchanged, and the
+    /// content's foot from 291 pt below the bottom edge to 3 pt above it.
+    /// Carried over, the 291 would have had a turn that began then leave the
+    /// reader where the scroll view put them. Ignored by observation for
+    /// `lastGeometry`'s reason.
+    @ObservationIgnored private var footDistanceAsLeft: CGFloat = 0
+
     /// Whether the last sample left the thread at rest at its foot, or had no
     /// foot to keep: the last turn's end in view and the content's end not
     /// past the bottom edge, or a thread that fits. What answers a resize
@@ -378,13 +403,17 @@ final class AskScrollFollow {
     /// one decision (`resized(to:at:)`).
     ///
     /// **An event ends it, not the clock**, because a loaded device keeps the
-    /// order of a resize's samples and not their pace. A push gate's run of
-    /// the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load average
-    /// of about 20 on 12 cores, left the newest answer under the composer on
-    /// its side. The traced turns are over inside a quarter of a second; held
-    /// to the window alone, a turn's later samples found it closed, so the
-    /// scroll view's step read as the reader's, and a row measured at the
-    /// new width, or the screen's task asking again, went unanswered.
+    /// order of a resize's samples and not their pace. The traced turns are
+    /// over inside a quarter of a second; held to the window alone, a turn's
+    /// later samples, come late, would find it closed, so the scroll view's
+    /// step would read as the reader's, and a row measured at the new width,
+    /// or the screen's task asking again, would go unanswered. A push gate's
+    /// run of the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load
+    /// average of about 20 on 12 cores, left the newest answer under the
+    /// composer on its side, and was put down to that. The same failure came
+    /// back with this in place, at the same spot in two gates' runs, from a
+    /// bottom inset that rose as the turn began (`footDistanceAsLeft`), so
+    /// which of the two that first run was isn't known.
     private func isResizeUnderWay(at now: TimeInterval) -> Bool {
         isWithinResizeWindow(at: now) || (resizeKeepsFoot && !resizeAnswered)
     }
@@ -496,10 +525,13 @@ final class AskScrollFollow {
     /// **From the distance, not `isAtFoot`**, which is latched. A reader who
     /// opened something in place in a settled last turn has the flag and not
     /// the foot, and a resize must not carry them away from what they opened.
+    /// The distance as the reader left it (`footDistanceAsLeft`), so a bottom
+    /// inset that rose under a thread at its foot, as the turn began or before
+    /// it, doesn't count as the reader having gone.
     private func resized(to geometry: AskThreadGeometry, at now: TimeInterval) {
         guard let lastGeometry, geometry.containerWidth != lastGeometry.containerWidth else { return }
         if !isResizeUnderWay(at: now) {
-            resizeKeepsFoot = lastGeometry.distanceFromContentFoot - Self.restingTrailingSpace <= Self.followWithin
+            resizeKeepsFoot = footDistanceAsLeft - Self.restingTrailingSpace <= Self.followWithin
         }
         resizedAt = now
     }
@@ -553,6 +585,9 @@ final class AskScrollFollow {
         // second ask for the foot.
         if resizeKeepsFoot, resizeAnswered, !isWithinResizeWindow(at: now) { resizeKeepsFoot = false }
         resized(to: geometry, at: now)
+        footDistanceAsLeft = lastGeometry.map(geometry.onlyTheContainerHeightChanged(from:)) == true
+            ? min(footDistanceAsLeft, geometry.distanceFromContentFoot)
+            : geometry.distanceFromContentFoot
         insetTopChanged(geometry, at: now)
         let scrolledUp = !isJumpGliding(at: now)
             && !isResizing(at: now)

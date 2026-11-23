@@ -110,6 +110,20 @@ nonisolated struct AskThreadGeometry: Equatable {
         else { return false }
         return offset < previous.offset
     }
+
+    /// Whether the space between the bars changed height and nothing else did:
+    /// a bottom inset rising or setting under a thread that stayed where it
+    /// was, such as a keyboard or the composer growing. The reader is where
+    /// they were, however far the foot went under the inset
+    /// (`AskScrollFollow.footDistanceAsLeft`). A rotation or a window resize
+    /// changes the width with it, and the safe area moving the offset with
+    /// the inset changes the offset.
+    func onlyTheContainerHeightChanged(from previous: AskThreadGeometry) -> Bool {
+        contentHeight == previous.contentHeight
+            && offset == previous.offset
+            && insetTop == previous.insetTop
+            && containerWidth == previous.containerWidth
+    }
 }
 
 #endif
