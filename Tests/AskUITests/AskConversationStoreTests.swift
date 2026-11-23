@@ -2793,6 +2793,179 @@ import Testing
         #expect(store.currentSummary == nil)
     }
 
+    /// **The chat New Chat ends is listed in the change that empties the
+    /// screen.** The pane beside the fold lists the chat on screen among the
+    /// earlier ones (`AskChatsPaneRows`), so the chat New Chat ends has to be
+    /// on the list from the moment it leaves the screen. Listed only once its
+    /// filing had landed and the list was read again, it was missing until
+    /// then: the pane's rows were the earlier chats alone, and then the ended
+    /// chat came back on top of them.
+    @Test func newChatListsTheChatItEndsInTheChangeThatEmptiesTheScreen() async throws {
+        let threadURL = temporaryLocation("askkit-new-chat-rows").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-new-chat-rows")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        try #require(await archive.archive([earlierEntry("Which records do I own?")]) != nil)
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.loadHistory()
+        await store.flushPersistence()
+        let rows = { AskChatsPaneRows.rows(current: store.currentSummary, history: store.history) }
+        let before = rows()
+        #expect(before.map(\.summary.title) == ["Anything from 1969?", "Which records do I own?"])
+        #expect(before.map(\.isOpen) == [true, false])
+
+        // Every list of rows the pane could draw while the chat ends.
+        let drawn = ObservationLog { rows().map(\.id) }
+        store.startOver()
+        // What the next frame draws: the screen empty, and every chat in its
+        // row, none of them marked.
+        #expect(store.turns.isEmpty)
+        #expect(rows().map(\.id) == before.map(\.id), "The chat ended is listed as the screen empties.")
+        #expect(rows().map(\.isOpen) == [false, false])
+        let listed = store.history
+        await store.flushPersistence()
+
+        #expect(drawn.heard > 0)
+        for ids in drawn.values {
+            #expect(ids == before.map(\.id), "No row moved, nor left the list.")
+        }
+        // The list New Chat put up is the list the archive reads back, the
+        // ended chat's id included, so a tap on its row opens it.
+        #expect(store.history == listed)
+        await store.loadHistory()
+        #expect(store.history == listed)
+    }
+
+    /// **In its place by date, wherever that is.** An earlier chat opened and
+    /// ended again without a question asked of it goes back where it was,
+    /// below the chats asked since.
+    @Test func newChatListsAnEarlierChatItEndsInItsPlace() async throws {
+        let threadURL = temporaryLocation("askkit-new-chat-rows-three").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-new-chat-rows-three")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        let oldest = try #require(await archive.archive([earlierEntry("Which records do I own?", at: 1_000_000)]))
+        try #require(await archive.archive([earlierEntry("Anything by Fleetwood Mac?", at: 2_000_000)]) != nil)
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.openThread(oldest)
+        await store.flushPersistence()
+        let rows = { AskChatsPaneRows.rows(current: store.currentSummary, history: store.history) }
+        let before = rows()
+        #expect(before.map(\.summary.title) == ["Anything from 1969?", "Anything by Fleetwood Mac?", "Which records do I own?"])
+        #expect(before.map(\.isOpen) == [false, false, true])
+
+        let drawn = ObservationLog { rows().map(\.id) }
+        store.startOver()
+        #expect(rows().map(\.id) == before.map(\.id), "The chat ended is listed in its place as the screen empties.")
+        #expect(rows().map(\.isOpen) == [false, false, false])
+        let listed = store.history
+        await store.flushPersistence()
+
+        #expect(drawn.heard > 0)
+        for ids in drawn.values {
+            #expect(ids == before.map(\.id), "No row moved, nor left the list.")
+        }
+        await store.loadHistory()
+        #expect(store.history == listed)
+    }
+
+    /// **A read of the list before the filing lands keeps the chat on it.**
+    /// The pane's own read, or the history button's, can land between the
+    /// tap and the filing, reading an archive the chat isn't in yet.
+    @Test func aReadOfTheListBeforeNewChatHasFiledTheChatKeepsItListed() async throws {
+        let threadURL = temporaryLocation("askkit-new-chat-read").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-new-chat-read")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        try #require(await archive.archive([earlierEntry("Which records do I own?")]) != nil)
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.loadHistory()
+        await store.flushPersistence()
+        let rows = { AskChatsPaneRows.rows(current: store.currentSummary, history: store.history) }
+        let before = rows()
+
+        let drawn = ObservationLog { rows().map(\.id) }
+        store.startOver()
+        // Read before the filing: the write is queued behind this read's.
+        await store.loadHistory()
+        #expect(rows().map(\.id) == before.map(\.id), "A read before the filing kept the chat ended listed.")
+        await store.flushPersistence()
+
+        #expect(drawn.heard > 0)
+        for ids in drawn.values {
+            #expect(ids == before.map(\.id), "No row moved, nor left the list.")
+        }
+    }
+
+    /// **A chat deleted before its filing lands stays deleted.** Listed as
+    /// New Chat ends it, the chat can be deleted from the list before the
+    /// archive has it. Removed ahead of the filing, it would come back with
+    /// it.
+    @Test func aChatDeletedBeforeNewChatHasFiledItStaysDeleted() async throws {
+        let threadURL = temporaryLocation("askkit-new-chat-delete").appendingPathExtension("json")
+        let archiveDirectory = temporaryLocation("askkit-new-chat-delete")
+        defer {
+            try? FileManager.default.removeItem(at: threadURL)
+            try? FileManager.default.removeItem(at: archiveDirectory)
+        }
+        let asker = ScriptedAsker(.init(events: [.tier(.privateCloud), .answer(.of("Abbey Road.", tiles: [UIRow("Abbey Road")]))]))
+        let (store, archive) = keepingStore(asker: asker, threadURL: threadURL, archiveDirectory: archiveDirectory)
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+
+        store.startOver()
+        let ended = try #require(store.history.first)
+        let listed = ObservationLog { store.history.map(\.id) }
+        await store.deleteThread(ended)
+        await store.flushPersistence()
+
+        #expect(store.history.isEmpty)
+        #expect(await archive.summaries().isEmpty)
+        for ids in listed.values {
+            #expect(ids.isEmpty, "The chat deleted never came back on the list.")
+        }
+    }
+
+    /// **Not filed, the chat leaves the list with the filing's failure.**
+    /// Listed as New Chat ends it, a chat the archive can't take (a locked
+    /// device, a full disk) is set aside for the next launch to file, and
+    /// there is nothing on the list to open until then.
+    @Test func aChatNewChatCouldNotFileLeavesTheListOnceTheFilingFails() async throws {
+        let folder = try privateFolder()
+        defer { makeWritable(folder.archive, folder.folder); try? FileManager.default.removeItem(at: folder.folder) }
+        try FileManager.default.createDirectory(at: folder.archive, withIntermediateDirectories: true)
+        let (store, archive) = keepingStore(asker: answeringAsker(), threadURL: folder.thread, archiveDirectory: folder.archive)
+        await store.restoreIfNeeded()
+        store.ask("Anything from 1969?")
+        await settle(store)
+        await store.flushPersistence()
+        try setMode(0o500, folder.archive)
+
+        store.startOver()
+        #expect(store.history.map(\.title) == ["Anything from 1969?"])
+        await store.flushPersistence()
+
+        #expect(store.history.isEmpty, "A chat that wasn't filed isn't listed.")
+        #expect(await archive.summaries().isEmpty)
+        #expect(setAsideFiles(in: folder.folder).count == 1)
+    }
+
     @Test func aChatTheDomainDoesNotKeepIsNeverFiled() async {
         let archiveDirectory = temporaryLocation("askkit-history")
         defer { try? FileManager.default.removeItem(at: archiveDirectory) }
@@ -4146,8 +4319,12 @@ import Testing
         await relaunched.restoreIfNeeded()
 
         relaunched.startOver()
+        // Listed once as it ends, under the id its filing takes.
+        let listed = relaunched.history
+        #expect(listed.map(\.title) == ["Which records do I own?"])
         await relaunched.flushPersistence()
         #expect(await filedChats(in: archive) == [["Which records do I own?", "Anything from 1969?"]])
+        #expect(relaunched.history == listed)
     }
 
     @Test func openingAnotherChatAfterARelaunchOverAThreadAndItsFilingFilesTheWholeChat() async throws {
@@ -4313,8 +4490,12 @@ import Testing
         await store.flushPersistence()
 
         store.startOver()
+        // Listed once as it ends, under the id of the turns' filing, which
+        // the chat is filed over.
+        let listed = store.history
+        #expect(listed.map(\.title) == ["Anything from 1969?"])
         await store.flushPersistence()
-        #expect(store.history.map(\.title) == ["Anything from 1969?"])
+        #expect(store.history == listed)
         #expect(await archive.summaries().map(\.turnCount) == [2])
     }
 

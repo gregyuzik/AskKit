@@ -413,6 +413,22 @@ import Testing
         #expect(onScreen.id == held)
     }
 
+    @Test func theChatOnScreenFiledAnewTakesTheIDItWasListedUnder() async throws {
+        // New Chat lists the chat it ends before the write, under an id it
+        // hands the archive, so a tap on its row opens it: a chat anew is
+        // filed under that id, and a chat filed already keeps its filing's.
+        let (archive, directory) = makeArchive()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let listed = UUID()
+        let anew = try #require(await archive.fileTheChatOnScreen(chat(["anew"]), at: .now, sparing: nil, anew: listed))
+        #expect(anew.id == listed)
+        #expect(await archive.summaries().map(\.id) == [listed])
+
+        let again = try #require(await archive.fileTheChatOnScreen(chat(["anew", "and more"]), at: .now, sparing: nil, anew: UUID()))
+        #expect(again.id == listed)
+        #expect(await archive.summaries().map(\.turnCount) == [2])
+    }
+
     @Test func aChatFileTheIndexDoesNotNameIsListed() async throws {
         // A filing interrupted after its chat was written and before the index
         // was: the chat files are the record, and the list reads them.

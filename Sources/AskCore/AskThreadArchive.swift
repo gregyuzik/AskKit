@@ -342,6 +342,18 @@ public actor AskThreadArchive<Row: AskRow> {
     /// cap counts. Not filed, the provisional filing stays as it was.
     @discardableResult
     package func fileTheChatOnScreen(_ entries: [AskThreadEntry<Row>], at now: Date, sparing spared: UUID?) -> AskThreadSummary? {
+        fileTheChatOnScreen(entries, at: now, sparing: spared, anew: UUID())
+    }
+
+    /// File the chat on screen as `fileTheChatOnScreen(_:at:sparing:)` does,
+    /// under `anew` where it takes no filing's place: the id a caller listed
+    /// the chat under before the write, as New Chat lists the chat it ends
+    /// (`AskConversationStore.endThread(filing:)`). Never an id filed already:
+    /// a filing of the chat that doesn't read whole would be written over.
+    @discardableResult
+    package func fileTheChatOnScreen(
+        _ entries: [AskThreadEntry<Row>], at now: Date, sparing spared: UUID?, anew: UUID
+    ) -> AskThreadSummary? {
         guard !entries.isEmpty else { return nil }
         let index = readIndex()
         let held = provisional
@@ -351,7 +363,7 @@ public actor AskThreadArchive<Row: AskRow> {
         // Neither is replaced unless this build reads it whole, as in
         // `archive(_:at:sparing:)`.
         let wholeHeld = held.flatMap { readsWhole($0) ? $0 : nil }
-        let id = earlier.flatMap { readsWhole($0) ? $0 : nil } ?? wholeHeld ?? UUID()
+        let id = earlier.flatMap { readsWhole($0) ? $0 : nil } ?? wholeHeld ?? anew
         provisional = nil
         guard let summary = file(entries, as: id, in: index, at: now, sparing: spared, absorbing: wholeHeld == id ? nil : wholeHeld) else {
             provisional = held
