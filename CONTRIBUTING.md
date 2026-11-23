@@ -36,7 +36,7 @@ steps:
 | `scripts/ci.sh demo` | The demo's three apps and its UI-test bundle. |
 | `scripts/ci.sh all` | `checks`, `test`, `api`, `builds` and `demo`: the default, what CI runs, and what the push gate runs without `PREPUSH_LIB`. With it, the gate adds the iOS steps below. |
 | `scripts/ci.sh test-ios` | The package's tests on an iPhone 18 Pro simulator, failing under 1,580 passes: lower than `test`'s floor, since some of AskUI's tests compile for the Mac alone and a skipped test doesn't count here. It builds them first, as `scripts/ci.sh build-ios-tests` does alone. Not in CI; the maintainers' push gate runs it. |
-| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. It builds them first, as `scripts/ci.sh build-ui-smoke` does alone. Not in CI; the maintainers' push gate runs it when a push changes `Sources/AskUI/` or `Demo/`. |
+| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. It builds them first, as `scripts/ci.sh build-ui-smoke` does alone. Not in CI; the maintainers' push gate runs it when a push changes `Sources/AskUI/`, `Demo/` or the scripts that run it. |
 
 While you work, `swift test` and `swiftlint lint` are the quick ones. No test asks a real model: the
 engine and the store run against scripted sessions. Any warning that names a file under `Sources/`,

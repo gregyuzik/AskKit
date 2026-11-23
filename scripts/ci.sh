@@ -149,8 +149,8 @@ logged() { # log command...
 # counts these steps' output for warnings too, and a run that printed one
 # leaves that DerivedData marked: the next run starts it empty, and the warning
 # shows again until it is fixed. A warning only this matcher sees (the
-# manifest's, by package identity) still fails the step, and SwiftPM prints
-# those on every build.
+# manifest's, by package identity) still fails the step, but leaves the
+# DerivedData unmarked.
 package_identity=$(basename "$(pwd -P)" | tr '[:upper:]' '[:lower:]')
 warnings_in() { # log
   { grep -E 'warning: ' "$1" || true; } | awk -v package="warning: '$package_identity': " '
@@ -472,12 +472,13 @@ step_test_ios() {
 
 # The demo's UI smoke suite on the iOS simulator, which scripts/ui-smoke.sh
 # runs. CI builds the bundle and doesn't run it, and the push gate runs it only
-# for a push that changes the screen (Sources/AskUI/ or Demo/): a simulator UI
-# test, about 12 minutes, would be the flakiest part of a gate every change
-# passes. `-project` is spelled out because from the repo root xcodebuild
-# otherwise resolves against `Package.swift`, which has no such scheme. Its
-# DerivedData and settings are `demo_build`'s, so it starts from what `demo`
-# built rather than from a cold DerivedData of Xcode's own.
+# for a push that changes the screen (Sources/AskUI/ or Demo/) or the scripts
+# that run it: a simulator UI test, about 12 minutes, would be the flakiest
+# part of a gate every change passes. `-project` is spelled out because from
+# the repo root xcodebuild otherwise resolves against `Package.swift`, which
+# has no such scheme. Its DerivedData and settings are `demo_build`'s, so it
+# starts from what `demo` built rather than from a cold DerivedData of Xcode's
+# own.
 #
 # build-ui-smoke and ui-smoke split it as build-ios-tests and test-ios split
 # the package's tests: the build, for the simulator, with its warnings scanned,
