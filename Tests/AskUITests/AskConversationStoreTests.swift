@@ -4319,8 +4319,12 @@ import Testing
         await relaunched.restoreIfNeeded()
 
         relaunched.startOver()
+        // Listed once as it ends, under the id its filing takes.
+        let listed = relaunched.history
+        #expect(listed.map(\.title) == ["Which records do I own?"])
         await relaunched.flushPersistence()
         #expect(await filedChats(in: archive) == [["Which records do I own?", "Anything from 1969?"]])
+        #expect(relaunched.history == listed)
     }
 
     @Test func openingAnotherChatAfterARelaunchOverAThreadAndItsFilingFilesTheWholeChat() async throws {
@@ -4486,8 +4490,12 @@ import Testing
         await store.flushPersistence()
 
         store.startOver()
+        // Listed once as it ends, under the id of the turns' filing, which
+        // the chat is filed over.
+        let listed = store.history
+        #expect(listed.map(\.title) == ["Anything from 1969?"])
         await store.flushPersistence()
-        #expect(store.history.map(\.title) == ["Anything from 1969?"])
+        #expect(store.history == listed)
         #expect(await archive.summaries().map(\.turnCount) == [2])
     }
 
