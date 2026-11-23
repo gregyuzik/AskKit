@@ -63,9 +63,11 @@ Deeper notes: `.claude/references/`.
   and fails at setup with none, or on a runner that isn't GitHub-hosted. On a runner whose macOS is under the package's floor, `ci.sh test` builds the
   tests without running them, with a warning. It runs `scripts/ci.sh`'s steps one job each, and `scripts/git-hooks/pre-push`
   runs them in order, with `gate_catalogs` (Strings, above) after `checks`; both scripts stay mode
-  `100755`, since a hook dispatcher skips a non-executable hook silently. The push gate refuses an
-  untracked file under `Sources/`, `Tests/` or `Demo/` or at `Package.swift`, which SwiftPM would
-  compile into the tree it proves.
+  `100755`, since a hook dispatcher skips a non-executable hook silently. With `PREPUSH_LIB` a plain
+  push is light (`checks` and `gate_catalogs` only, refusing nothing), and a full one (the
+  maintainers' merge) refuses an uncommitted or untracked file a step reads, and an ignored one
+  under `Sources/`, `Tests/`, a folder of `Demo/` or at `Package.swift`, which SwiftPM or Xcode would
+  compile into the tree it proves. Without it the gate runs `ci.sh all` on the checkout as it is.
   - `scripts/ci.sh checks` runs the cheap ones by hand: shellcheck, actionlint and zizmor (offline,
     over `.github/`; ignore a finding inline with its reason, as the setup action does), `swiftlint
     lint --strict` (`trailing_comma` is on, `Package.swift` included), `scripts/check-strings.py`, the
@@ -83,9 +85,10 @@ Deeper notes: `.claude/references/`.
     allowlist as part of the tree.
   - `scripts/ci.sh test-ios` and `scripts/ci.sh ui-smoke [TEST]` run in the push gate when it has
     `PREPUSH_LIB` (the maintainers'), never in CI, whose virtual Mac draws views too slowly for the
-    suites' deadlines. The gate holds an iPhone seat for them and runs `ui-smoke` (about 12 minutes)
-    only when the push changes a file under `Sources/AskUI/` or `Demo/`. Without `PREPUSH_LIB`,
-    CONTRIBUTING.md says when to run them yourself.
+    suites' deadlines. The gate builds their tests first (`build-ios-tests`, `build-ui-smoke`), then
+    holds an iPhone seat while they run, and runs `ui-smoke` (about 12 minutes) only when the push
+    changes a file under `Sources/AskUI/` or `Demo/`, a script that runs it, or the gate. Run alone,
+    each builds its tests first. Without `PREPUSH_LIB`, CONTRIBUTING.md says when to run them yourself.
   - A test that passes only while work beats a deadline on the wall clock takes `.racesTheClock`
     (`AskEngineTests.swift`). It is skipped while the load average is past two a core, and
     `ci.sh test` says how many were.

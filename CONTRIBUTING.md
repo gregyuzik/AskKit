@@ -34,9 +34,9 @@ steps:
 | `scripts/ci.sh api` | `swift package diagnose-api-breaking-changes` against the newest `v*` tag in the branch's history, over the macOS build's public and `package` API, in about 30 seconds. It fails on anything removed, renamed or changed, a new enum case included, unless `.github/api-breakage-allowlist.txt` lists it (below). It can't see a public declaration made `package`, or a change of isolation alone. |
 | `scripts/ci.sh builds` | The `AskKit-Package` scheme for eight generic destinations: iOS, macOS, visionOS, tvOS and watchOS on the simulator or the Mac, then the iOS, visionOS and watchOS devices. `scripts/ci.sh build DESTINATION` builds one, and `scripts/ci.sh destinations` lists them for CI's matrix. |
 | `scripts/ci.sh demo` | The demo's three apps and its UI-test bundle. |
-| `scripts/ci.sh all` | `checks`, `test`, `api`, `builds` and `demo`: the default, what CI runs, and what the push gate runs without `PREPUSH_LIB`. With it, the gate adds `test-ios` and `ui-smoke`. |
-| `scripts/ci.sh test-ios` | The package's tests on an iPhone 18 Pro simulator, failing under 1,580 passes: lower than `test`'s floor, since some of AskUI's tests compile for the Mac alone and a skipped test doesn't count here. Not in CI; the maintainers' push gate runs it. |
-| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. Not in CI; the maintainers' push gate runs it when a push changes `Sources/AskUI/` or `Demo/`. |
+| `scripts/ci.sh all` | `checks`, `test`, `api`, `builds` and `demo`: the default, what CI runs, and what the push gate runs without `PREPUSH_LIB`. With it, the gate adds the iOS steps below. |
+| `scripts/ci.sh test-ios` | The package's tests on an iPhone 18 Pro simulator, failing under 1,580 passes: lower than `test`'s floor, since some of AskUI's tests compile for the Mac alone and a skipped test doesn't count here. It builds them first, as `scripts/ci.sh build-ios-tests` does alone. Not in CI; the maintainers' push gate runs it. |
+| `scripts/ci.sh ui-smoke [TEST]` | The demo's UI tests on that simulator, or only `TEST`, such as `AskScreenSmokeTests/<test>`; `scripts/ui-smoke.sh` runs the same. It builds them first, as `scripts/ci.sh build-ui-smoke` does alone. Not in CI; the maintainers' push gate runs it when a push changes `Sources/AskUI/` or `Demo/`. |
 
 While you work, `swift test` and `swiftlint lint` are the quick ones. No test asks a real model: the
 engine and the store run against scripted sessions. Any warning that names a file under `Sources/`,
@@ -62,11 +62,10 @@ skips the jobs, and `CI passed`, the check `main` requires, still reports. `main
 over the workflows and the Python scripts, to report no new high-severity alert.
 
 The push gate is optional: `git config core.hooksPath scripts/git-hooks` makes
-`scripts/git-hooks/pre-push` run `scripts/ci.sh all` before every push. It refuses while a file a step
-reads has uncommitted changes, or while an untracked file sits where SwiftPM or the demo would compile
-it, ignored or not (hidden files, `xcuserdata/` and `Demo/Local.xcconfig` excepted). It proves the
-checkout, so push a branch from a checkout of it. Keep the hook at mode 100755: git ignores one that
-isn't executable.
+`scripts/git-hooks/pre-push` run `scripts/ci.sh all` before every push. It proves the checkout as it
+stands, uncommitted changes and untracked files included, so commit what you mean to push, and push a
+branch from a checkout of it; CI checks out the commits themselves. Keep the hook at mode 100755: git
+ignores one that isn't executable.
 
 ## Strings
 

@@ -1,4 +1,9 @@
 #!/bin/sh
+# shellcheck disable=SC2034,SC2154
+#   GATE_NAME and GATE_OWN_PROJECTS are read by the step helpers PREPUSH_LIB
+#   sources, and gate_arm_ui and gate_locked_udid are set by them: a library
+#   the linter can't follow.
+#
 # The push gate: what has to hold before a push leaves the machine. Its checks,
 # tests and builds are scripts/ci.sh's, the steps CI runs, so the two gates
 # can't drift apart. One check is the gate's alone: the String Catalogs graded
@@ -9,60 +14,61 @@
 # scripts/ci.sh lists, and it runs `ci.sh all` on every push. Git ignores a
 # hook that isn't executable, so this file stays mode 100755.
 #
-# It proves the working tree, which the dirty-tree check below makes HEAD's
-# tree. It never reads the refs git hands it, so `git push origin other-branch`
-# run from here proves HEAD, not other-branch: push a branch from a checkout of
-# it.
+# It proves the working tree. It never reads the refs git hands it, so `git
+# push origin other-branch` run from here proves HEAD, not other-branch: push a
+# branch from a checkout of it.
 #
-# PREPUSH_LIB, when set, names a shell file this hook sources for a cache of
-# trees that have passed. It defines `gate_proven`, which succeeds when the
-# tests and builds can be skipped for this tree, and `gate_record`, which notes
-# that it passed them, and it reads `gate_irrelevant` below to leave docs out
-# of the tree's key. It also defines `gate_catalogs`, which grades every
-# tracked String Catalog with the checker the maintainers' apps share: each key
-# in the 24 locales beside English, every unit translated and not blank, each
-# argument's specifier, the CLDR plural categories, no stray locale, the demo
-# project's and Info.plist's locale lists, and the bytes Xcode writes. Nothing
-# in this repository provides one; without it the gate runs `ci.sh all`, the
-# steps CI runs, scripts/check-strings.py among them, and nothing grades the
-# catalogs' translations or runs the iOS steps, which need its seat lock.
+# PREPUSH_LIB, when set, names the shell library the maintainers' gates share,
+# with step helpers beside it; nothing in this repository provides one.
+# Without it the gate runs `ci.sh all`, the steps CI runs,
+# scripts/check-strings.py among them, and nothing grades the catalogs'
+# translations or runs the iOS steps, which need its seat lock. With it a push
+# is light or full. A light one, a backup of work in progress, runs the checks
+# and the catalogs and stops. A full one first refuses a working tree that
+# isn't what the push sends: an uncommitted change to a path a step reads, an
+# untracked file there, or an ignored file where a build reads
+# (gate_build_roots), since an ignore rule hides a file from git, not from
+# SwiftPM or Xcode. Then it runs every step, unless this exact tree passed
+# before or the change reaches no compiler (gate_proven), and records the pass
+# (gate_finish). Each step is marked for the gate's timings (gate_step). The
+# helpers are documented where the library defines them.
 #
 # Order is cheapest-first, so a logic break surfaces in seconds rather than
-# after twelve xcodebuilds:
-#   1. the dirty-tree check  (what a step reads must be committed, and no
-#                             untracked file may sit where a build reads)
-#   2. ci.sh checks          (shellcheck, actionlint and zizmor, swiftlint, the
+# after a dozen xcodebuilds:
+#   1. ci.sh checks          (shellcheck, actionlint and zizmor, swiftlint, the
 #                             strings' lookups and count keys, the README
 #                             sample's, the project file's)
-#   3. gate_catalogs         (the String Catalogs against the shared standard,
-#                             with PREPUSH_LIB only)
-#   4. ci.sh test            (`swift test`, cold, with a minimum pass count)
-#   5. ci.sh api             (the public API against the newest release tag)
-#   6. ci.sh builds          (the package for eight destinations)
-#   7. ci.sh demo            (the demo's three apps and its UI tests, built)
-#   8. ci.sh test-ios        (the package's tests on an iPhone seat, with
-#                             PREPUSH_LIB only: its gate_lock_sim holds the
-#                             seat)
-#   9. ci.sh ui-smoke        (the demo's UI tests on that seat, when the push
-#                             changes Sources/AskUI/ or Demo/; PREPUSH_LIB only)
-# A cache may skip 4 to 9, never the checks. A change to THIS file reaches no
-# compiler, but it decides what passing means, so a cache has to count it as a
-# change to the tree. The release tag `api` compares with is no part of the
-# tree, so a tree that passed stays passed when a new tag is cut; CI, which has
-# no cache, still compares it with the new one.
+#   2. gate_catalogs         (the String Catalogs against the shared standard)
+#   3. ci.sh test            (`swift test`, cold, with a minimum count)
+#   4. ci.sh api             (the public API against the newest release tag)
+#   5. ci.sh builds          (the package for eight destinations)
+#   6. ci.sh demo            (the demo's three apps and its UI tests, built)
+#   7. ci.sh build-ios-tests (the package's tests, built for an iPhone seat)
+#      ci.sh build-ui-smoke  (the demo's UI tests, built for it, when 9 runs)
+#   8. ci.sh test-ios        (those tests on the seat, which the gate holds
+#                             from here)
+#   9. ci.sh ui-smoke        (the demo's UI tests on it, when the push changes
+#                             Sources/AskUI/ or Demo/)
+# Steps 2 to 9 need PREPUSH_LIB. A cache may skip 3 to 9, never the checks. A
+# change to THIS file reaches no compiler, but it decides what passing means,
+# so a cache has to count it as a change to the tree. The release tag `api`
+# compares with is no part of the tree, so a tree that passed stays passed
+# when a new tag is cut; CI, which has no cache, still compares it with the
+# new one.
 #
 # Bypass with `git push --no-verify` (sparingly — fix the underlying issue).
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 # Docs-only: paths that can't reach a compiler. Without this a one-line
-# AGENTS.md edit costs twelve xcodebuilds, which is slow enough to train people
-# into `--no-verify`, and a push gate that gets routinely bypassed stops gating
-# anything. Anything UNKNOWN still falls through to a full run.
+# AGENTS.md edit costs a dozen xcodebuilds, which is slow enough to train
+# people into `--no-verify`, and a push gate that gets routinely bypassed stops
+# gating anything. Anything UNKNOWN still falls through to a full run.
 #
-# A function because a cache (PREPUSH_LIB) reads it too, to key a tree by what
-# a compiler can reach. The dirty-tree check below asks a wider question, and
-# answers it with `gate_reads`.
+# A function because the library reads it, to key a tree by what a compiler
+# can reach and to tell which steps a branch's diff needs (gate_arms, below).
+# The refusal of uncommitted changes asks a wider question, and answers it
+# with `gate_reads`.
 #
 # No file under a SwiftPM target or one of the demo's folders is docs,
 # whatever its extension: SwiftPM takes every file in a target's directory, as
@@ -98,7 +104,9 @@ gate_irrelevant() {
 # - the workflows, the setup action, Dependabot's config and the two linters'
 #   configs, which actionlint and zizmor read.
 # Not by widening `gate_irrelevant`: it keys the cache too, and every README
-# edit would then cost the full build.
+# edit would then cost the full build. An uncommitted `.gitignore` is no change
+# this counts: what it hides is still on disk, and the ignored files there are
+# gate_build_roots' to refuse.
 gate_reads() {
   case "$1" in
     README.md|*.sh) return 0 ;;
@@ -110,155 +118,111 @@ gate_reads() {
   ! gate_irrelevant "$1"
 }
 
-# Whether a build leaves an untracked path out, whatever ignores it: a hidden
-# name (.DS_Store, an editor's swap file), which SwiftPM and Xcode's folders
-# skip; xcuserdata/, Xcode's own per-user state; and Demo/Local.xcconfig, the
-# signing settings Demo/Signing.xcconfig includes only where one exists.
-build_skips() {
-  case "$1" in
-    */.*|*/xcuserdata/*|Demo/Local.xcconfig) return 0 ;;
-  esac
-  return 1
-}
-
-# Whether an untracked path, which the listings below look for only under
-# Sources/, Tests/, Demo/ and at Package.swift, is one a build reads: not one
-# the build leaves out, and not docs at Demo/'s own top level, which is no
-# source folder.
-untracked_builds() {
-  ! build_skips "$1" && ! gate_irrelevant "$1"
-}
-
-# The newline-separated paths in $2 that the predicate $1 keeps, indented.
-keep() {
-  printf '%s\n' "$2" | while IFS= read -r f; do
-    [ -z "$f" ] || ! "$1" "$f" || printf '  %s\n' "$f"
-  done
-}
-
-# A tree with uncommitted changes a step reads fails CLOSED, before anything is
-# built.
-#
-# The gate checks and compiles the WORKING TREE, and a cache hashes `HEAD`.
-# With uncommitted changes those are different trees, so a dirty push could
-# prove a fix that isn't being pushed: a README whose Adopt code matches the
-# sample only in the working tree, or a hook fixed there and pushed broken.
-# Worse, a cache could record a passing key under the broken commit's hash,
-# after which any later push of that exact tree skips the builds entirely, and
-# every host that pins this package takes a broken `main` at its next bump.
-#
-# An untracked file is a change too, where a build reads it: SwiftPM compiles
-# every `.swift` in a target's directory, tracked or not, so a commit calling a
-# function that lives in an untracked file would pass here and push a tree
-# that doesn't compile. Untracked files are looked for only under Sources/,
-# Tests/, Demo/ and at Package.swift, so tmp/ and other scratch stay free. An
-# ignored file there counts as well: `.git/info/exclude`, a global excludes
-# file and an uncommitted `.gitignore` hide a file from git, and none of them
-# travels with the push, but SwiftPM and Xcode build what's on disk. So the
-# check reads no ignore rule to decide, only `build_skips`, which this file
-# carries, and a stray project.pbxproj beside the demo's project.xcproj stops
-# the push here, ignored or not. That is also why an uncommitted `.gitignore`
-# is no change `gate_reads` counts.
-#
-# The tracked changes are the working tree against HEAD, staged or not, since
-# that difference is the one that matters. `--no-renames` lists a rename as
-# its two ends, so a file moved out of Sources/ into docs/ still counts by the
-# end the build loses.
-#
-# Each listing is checked: under /bin/sh a failing git piped into anything
-# reads as an empty list, which is a clean tree. `core.quotePath=false` keeps a
-# non-ASCII name as it is; a name git still quotes, one with a newline, a tab,
-# a quote or a backslash in it, starts with a quote, matches no docs pattern
-# and counts, which fails closed.
-if ! changed=$(git -c core.quotePath=false diff --name-only --no-renames HEAD --) ||
-  ! untracked=$(git -c core.quotePath=false ls-files --others --exclude-standard \
-    -- Sources Tests Demo Package.swift) ||
-  ! ignored=$(git -c core.quotePath=false ls-files --others --ignored --exclude-standard \
-    --directory -- Sources Tests Demo Package.swift); then
-  echo "pre-push: git failed to list the tree's changes, so the gate can't tell what it would prove" >&2
-  exit 1
-fi
-dirty_relevant=$(keep gate_reads "$changed")
-untracked_relevant=$(keep untracked_builds "$untracked")
-ignored_relevant=$(keep untracked_builds "$ignored")
-if [ -n "$dirty_relevant" ]; then
-  echo "pre-push: changes the gate reads are uncommitted — it would prove a tree you are not pushing:" >&2
-  printf '%s\n' "$dirty_relevant" >&2
-fi
-if [ -n "$untracked_relevant" ]; then
-  echo "pre-push: untracked files sit where the build reads them — the gate would build them, and the push would leave them out:" >&2
-  printf '%s\n' "$untracked_relevant" >&2
-fi
-if [ -n "$ignored_relevant" ]; then
-  echo "pre-push: ignored files sit where the build reads them — an ignore rule hides them from git, not from SwiftPM or Xcode, so the gate would build them and the push would leave them out:" >&2
-  printf '%s\n' "$ignored_relevant" >&2
-fi
-if [ -n "$dirty_relevant$untracked_relevant$ignored_relevant" ]; then
-  echo "pre-push: commit, stash or remove them, then push (git stash -u takes untracked files too, and git stash -a ignored ones)" >&2
-  exit 1
-fi
-
+# CI checks out a clean tree and has no cache to record a pass in, so without
+# the library nothing is refused: the steps run on the working tree as it is.
 if [ -z "${PREPUSH_LIB:-}" ]; then
   echo "pre-push: running scripts/ci.sh all, the steps CI runs; with no PREPUSH_LIB there is no cache, so all of them run, with no shared String Catalog checker and no iOS tests, which need its seat lock" >&2
   exec ./scripts/ci.sh all
 fi
 
+# The cache prefix the step helpers name their logs by, and the projects whose
+# target-level warnings ("(in target 'X' from project 'P')") are AskKit's, as
+# ci.sh's own matcher has them.
+GATE_NAME=askkit
+GATE_OWN_PROJECTS='AskKit|AskKitDemo'
+
 # shellcheck source=/dev/null
 . "$PREPUSH_LIB"
+
+# The folders a build reads whole: the package's targets, every folder of the
+# demo's (`Demo/*/*`: its top level holds the untracked Demo/Local.xcconfig a
+# developer keeps their signing team in, and reads nothing else), and the
+# manifest. A file an ignore rule hides there (`.git/info/exclude`, a global
+# excludes file, an uncommitted `.gitignore`) would be built and left out of
+# the push, a stray project.pbxproj beside the demo's project.xcproj among
+# them. Hidden names and xcuserdata/ don't count.
+gate_build_roots Sources Tests 'Demo/*/*' Package.swift || exit 1
 
 # A caller that can run two pushes in this repo at once sets PREPUSH_SLOT_SUFFIX:
 # empty for the first, which keeps the warm caches, and "-2" for one that starts
 # while the first runs. Each gets a scratch, logs and DerivedData of its own, so
 # neither clobbers the other's.
-ASKKIT_CI_WORK="${TMPDIR%/}/askkit-gate${PREPUSH_SLOT_SUFFIX:-}"
+tmp=$(gate_tmp) || exit 1
+ASKKIT_CI_WORK="${tmp}askkit-gate${PREPUSH_SLOT_SUFFIX:-}"
 export ASKKIT_CI_WORK
+derived="$ASKKIT_CI_WORK/derived"
 
+gate_step "ci.sh checks"
 ./scripts/ci.sh checks || exit 1
 gate_catalogs || exit 1
 
 # Only the steps whose inputs are in the key are skipped. The checks above have
 # already run, and they are the half `--no-verify` throws away.
-if gate_proven; then
-  echo "pre-push: ok" >&2
-  exit 0
-fi
+if gate_proven; then exit 0; fi
 
-./scripts/ci.sh test || exit 1
-./scripts/ci.sh api || exit 1
-./scripts/ci.sh builds || exit 1
-./scripts/ci.sh demo || exit 1
+# From here a failure ends the gate through gate_finish, which lets go of the
+# DerivedData the builds claimed.
+gate_step "ci.sh test"
+./scripts/ci.sh test || gate_finish --failed
+gate_step "ci.sh api"
+./scripts/ci.sh api || gate_finish --failed
 
-# The iOS steps CI can't run, since its virtual Mac draws views too slowly for
-# the suites' deadlines, so this gate is where they run. Both test on an iPhone
-# seat, held from here until the gate exits (gate_lock_sim): a simulator runs
-# one test session at a time, and the lock is shared with every repo's gate and
-# with hold-sim.sh.
-sim=$(gate_sim "iPhone 18 Pro") || exit 1
-gate_lock_sim "$sim"
-
-# The seat goes back as the lock found it when the gate exits: gate_lock_sim's
-# trap shuts it down again if simctl listed it Shutdown when the lock was
-# taken and no test run is live on it, and only then lets the lock go.
-# INT and TERM exit into the trap.
-
-ASKKIT_SIM=$sim ./scripts/ci.sh test-ios || exit 1
+# The builds share one DerivedData, kept warm between pushes, where a warning
+# in a file nothing recompiles would stay hidden. So each build's output is
+# counted for AskKit's warnings too, and a run that printed one leaves the
+# DerivedData marked: the next run starts it empty.
+gate_logged --warnings "$derived" "ci.sh builds" ./scripts/ci.sh builds || gate_finish --failed
+gate_logged --warnings "$derived" "ci.sh demo" ./scripts/ci.sh demo || gate_finish --failed
 
 # The UI smoke suite (about 12 minutes, and the flakiest step there is) only
-# when the push changes the screen: a file under Sources/AskUI/ or Demo/ that
-# differs from where the branch left origin/main. With no origin/main to
-# compare against, it runs.
+# when the push changes the screen, a file under Sources/AskUI/ or Demo/ (its
+# docs aside) that differs from where the branch left main, or the script that
+# runs the suite. With no merge base, or a change to this gate, it runs.
 #
 # A tree that passes with the suite skipped is still recorded, so a later push
-# of the same tree skips the suite too, even where origin/main has moved and
-# its screen now differs (a revert of a screen change, say). Such a tree's
-# screen is one origin/main shipped, and recording only the runs that ran the
-# suite would rebuild every logic-only tree at every landing.
-base=$(git merge-base HEAD origin/main 2>/dev/null) || base=
-if [ -z "$base" ] || ! git diff --quiet "$base" HEAD -- Sources/AskUI Demo; then
-  ASKKIT_SIM=$sim ./scripts/ci.sh ui-smoke || exit 1
-else
-  echo "pre-push: ui-smoke skipped: nothing under Sources/AskUI/ or Demo/ changed since origin/main" >&2
+# of the same tree skips the suite too, even where main has moved and its
+# screen now differs (a revert of a screen change, say). Such a tree's screen
+# is one main shipped, and recording only the runs that ran the suite would
+# rebuild every logic-only tree at every landing.
+gate_map() {
+  case "$1" in
+    Sources/AskUI/*|Demo/*|scripts/ci.sh|scripts/ui-smoke.sh) echo ui ;;
+  esac
+}
+gate_arms gate_map ui || gate_finish --failed
+
+# The iOS steps CI can't run, since its virtual Mac draws views too slowly for
+# the suites' deadlines, so this gate is where they run. Their tests are built
+# for the iPhone seat it picks before it locks one, so the seat (a simulator
+# runs one test session at a time, and the lock is shared with every repo's
+# gate and with hand-held seats) is held only while they run.
+sim=$(gate_sim "iPhone 18 Pro") || gate_finish --failed
+ASKKIT_SIM=$sim
+export ASKKIT_SIM
+gate_logged --warnings "$derived" "ci.sh build-ios-tests" ./scripts/ci.sh build-ios-tests || gate_finish --failed
+if [ "$gate_arm_ui" = 1 ]; then
+  gate_logged --warnings "$derived" "ci.sh build-ui-smoke" ./scripts/ci.sh build-ui-smoke || gate_finish --failed
 fi
 
-gate_record
+# The lock may move the gate to the other iPhone, when the one it picked is
+# held by hand; the tests run on the one it holds. The seat goes back as the
+# lock found it when the gate lets it go or exits: shut down again if it was
+# down and no test run is live on it.
+gate_step "simulator lock"
+gate_lock_sim "$sim" --either
+ASKKIT_SIM=${gate_locked_udid:-$sim}
+ASKKIT_TESTS_BUILT=1
+export ASKKIT_SIM ASKKIT_TESTS_BUILT
+
+gate_step "ci.sh test-ios"
+./scripts/ci.sh test-ios || gate_finish --failed
+if [ "$gate_arm_ui" = 1 ]; then
+  gate_step "ci.sh ui-smoke"
+  ./scripts/ci.sh ui-smoke || gate_finish --failed
+else
+  echo "pre-push: ui-smoke skipped: nothing under Sources/AskUI/ or Demo/, and no script that runs it, changed since main" >&2
+fi
+gate_release_sim
+
+gate_finish
 echo "pre-push: ok" >&2
