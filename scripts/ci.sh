@@ -5,24 +5,27 @@
 # gates can't drift apart.
 #
 # usage: scripts/ci.sh [step]
-#   checks        shellcheck, actionlint and zizmor, swiftlint, the strings'
-#                 lookups and count keys, README's samples against
-#                 ReadmeDomain.swift and ReadmeAssistantDomain.swift, and the
-#                 project file's
-#   test          `swift test`, cold, with a minimum pass count and a warning check
-#   api           the public API against the newest release tag, less the
-#                 breaks .github/api-breakage-allowlist.txt lists
-#   test-ios      the package's tests on an iPhone 18 Pro simulator
-#   ui-smoke [T]  the demo's UI tests on an iPhone 18 Pro simulator, or only
-#                 test T, such as AskScreenSmokeTests/<test>
-#   build DEST    the package for one xcodebuild destination
-#   builds        the package for all eight destinations
-#   destinations  those eight, one per line: CI's build matrix and
-#                 scripts/soft-deprecation-check.sh read them
-#   demo          the demo's three apps and its UI-test bundle
-#   all           checks, test, api, builds and demo: the default, what CI runs
-#                 (one job each), and what the push gate runs with no
-#                 PREPUSH_LIB. With one it adds test-ios and ui-smoke.
+#   checks           shellcheck, actionlint and zizmor, swiftlint, the
+#                    strings' lookups and count keys, README's samples against
+#                    ReadmeDomain.swift and ReadmeAssistantDomain.swift, and
+#                    the project file's
+#   test             `swift test`, cold, with a minimum pass count and a
+#                    warning check
+#   api              the public API against the newest release tag, less the
+#                    breaks .github/api-breakage-allowlist.txt lists
+#   build-ios-tests  the package's tests, built for an iPhone 18 Pro simulator
+#   test-ios         those tests, run on it
+#   build-ui-smoke   the demo's UI tests, built for an iPhone 18 Pro simulator
+#   ui-smoke [T]     those tests, run on it, or only test T, such as
+#                    AskScreenSmokeTests/<test>
+#   build DEST       the package for one xcodebuild destination
+#   builds           the package for all eight destinations
+#   destinations     those eight, one per line: CI's build matrix and
+#                    scripts/soft-deprecation-check.sh read them
+#   demo             the demo's three apps and its UI-test bundle
+#   all              checks, test, api, builds and demo: the default, what CI
+#                    runs (one job each), and what the push gate runs with no
+#                    PREPUSH_LIB. With one it adds the iOS steps above.
 #
 # Needs Xcode 27.2 or later and Python 3, plus
 # `brew install swiftlint shellcheck actionlint zizmor`.
@@ -31,8 +34,12 @@
 # default $RUNNER_TEMP/askkit-ci on CI and ${TMPDIR}askkit-ci elsewhere. A step
 # that fails names the log to read.
 #
-# test-ios and ui-smoke test on the simulator whose UDID is in $ASKKIT_SIM, the
-# seat the push gate holds for them, or else on one named iPhone 18 Pro.
+# The iOS steps build and test for the simulator whose UDID is in $ASKKIT_SIM,
+# the seat the push gate holds for them, or else for one named iPhone 18 Pro.
+# test-ios and ui-smoke run their build step first, so a run by hand never
+# tests what an earlier build left, unless ASKKIT_TESTS_BUILT=1 says it just
+# ran: the push gate runs the build steps before it locks the seat, so nothing
+# compiles while it holds one.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -138,9 +145,12 @@ logged() { # log command...
 #
 # The compiler reports a warning only for a file it compiles, so an incremental
 # build shows the warnings of the files that changed, not of the tree. CI's
-# builds are cold. The push gate's keep their DerivedData between pushes, so
-# there a warning in an untouched file stays hidden until something recompiles
-# it.
+# builds are cold. The push gate's keep their DerivedData between pushes, so it
+# counts these steps' output for warnings too, and a run that printed one
+# leaves that DerivedData marked: the next run starts it empty, and the warning
+# shows again until it is fixed. A warning only this matcher sees (the
+# manifest's, by package identity) still fails the step, but leaves the
+# DerivedData unmarked.
 package_identity=$(basename "$(pwd -P)" | tr '[:upper:]' '[:lower:]')
 warnings_in() { # log
   { grep -E 'warning: ' "$1" || true; } | awk -v package="warning: '$package_identity': " '
@@ -270,6 +280,19 @@ project_files() {
 # macOS under the floor, the tests are built and their warnings scanned but not
 # run, and the job says so in a warning. The push gate runs them. Anywhere else
 # an old macOS fails as it always did.
+#
+# The tests the test targets' runs report, summed, must reach the floor. The
+# count is of tests run, a skipped one included, so it is the count of what
+# compiled in: 1,675 when the floor was set, on main as of #50 (AskCoreTests
+# 844, AskUITests 724, AskCrossPostureTests 104, AskReadmeApproachableTests 3).
+# The 35 between them leave room for a deliberate deletion, and fail a run that
+# lost more: a big file's over-tight `#if` (AskConversationStoreTests holds
+# 236, AskEngineTests 228, AskPromptTests 63), all of AskCrossPostureTests
+# (1,571 would run), or the platform line every AskUI test file opens with,
+# edited across them. A file of 35 tests or fewer can still go unnoticed, and
+# so can all of AskReadmeApproachableTests. Raise the floor as the suite grows,
+# or the widening gap lets more of the suite go missing unnoticed.
+SWIFT_TEST_FLOOR=1640
 step_test() {
   local scratch="$work/coldtest" log="$logs/swift-test.log" ran skipped floor host
   rm -rf "$scratch"
@@ -293,21 +316,9 @@ step_test() {
     { grep -E 'recorded an issue|error:' "$log" || true; } | head -20 >&2
     exit 1
   fi
-  # The tests the test targets' runs report, summed, must reach 1,640. The
-  # count is of tests run, a skipped one included, so it is the count of what
-  # compiled in: 1,675 when the minimum was set, on main as of #50
-  # (AskCoreTests 844, AskUITests 724, AskCrossPostureTests 104,
-  # AskReadmeApproachableTests 3). The 35 between them leave room for a
-  # deliberate deletion, and fail a run that lost more: a big file's
-  # over-tight `#if` (AskConversationStoreTests holds 236, AskEngineTests
-  # 228, AskPromptTests 63), all of AskCrossPostureTests (1,571 would run),
-  # or the platform line every AskUI test file opens with, edited across
-  # them. A file of 35 tests or fewer can still go unnoticed, and so can all
-  # of AskReadmeApproachableTests. Raise the minimum as the suite grows, or
-  # the widening gap lets more of the suite go missing unnoticed.
   ran=$(sed -nE 's/.*Test run with ([0-9]+) tests.*/\1/p' "$log" | awk '{ s += $1 } END { print s + 0 }')
-  if [ "$ran" -lt 1640 ]; then
-    say "only $ran tests ran (minimum 1,640), so part of the suite likely didn't compile in — $log"
+  if [ "$ran" -lt "$SWIFT_TEST_FLOOR" ]; then
+    say "only $ran tests ran (floor $SWIFT_TEST_FLOOR), so part of the suite likely didn't compile in — $log"
     exit 1
   fi
   # The tests that race the wall clock stand down while the Mac is under load
@@ -393,12 +404,28 @@ passes_in() { # result-bundle
     python3 -I -c 'import json, sys; print(int(json.load(sys.stdin).get("passedTests", 0)))' 2>/dev/null
 }
 
+# The simulator the iOS steps build and test for: the one in $ASKKIT_SIM, or
+# else one named iPhone 18 Pro.
+ios_sim() {
+  if [ -n "${ASKKIT_SIM:-}" ]; then
+    printf '%s\n' "$ASKKIT_SIM"
+  else
+    simulator "iPhone 18 Pro"
+  fi
+}
+
 # The package's tests on the iOS simulator, where every `os(iOS)` leg that
-# `swift test` on the Mac never compiles runs. The push gate runs it on the
+# `swift test` on the Mac never compiles runs. The push gate runs them on the
 # seat it holds (a simulator holds one test run at a time); CI doesn't, since
 # its virtual Mac draws views too slowly for the suite's deadlines.
 #
-# The minimum is lower than `step_test`'s, and counts tests passed, read from the
+# build-ios-tests builds them (build-for-testing) for that simulator and scans
+# the build for warnings, and test-ios runs what it built
+# (test-without-building), so the push gate builds them before it takes the
+# seat and holds the seat only while they run. Run alone, test-ios builds them
+# first (ASKKIT_TESTS_BUILT, in the header).
+#
+# The floor is lower than `step_test`'s, and counts tests passed, read from the
 # result bundle, since `-quiet` keeps the per-test lines out of the log. The
 # simulator compiles fewer of AskUITests' tests than the Mac does, since some
 # compile for the Mac alone. A run on main as of #48 passed 1,619 where the
@@ -410,35 +437,54 @@ passes_in() { # result-bundle
 #
 # The bundle keeps each failure, so a failure collects no sysdiagnose: on a CI
 # runner that took ten minutes and timed out.
+IOS_TEST_FLOOR=1580
+step_build_ios_tests() { # simulator
+  local log="$logs/build-ios-tests.log"
+  say "AskKit-Package tests, built for iPhone 18 Pro ($1)"
+  if ! logged "$log" xcodebuild build-for-testing -scheme AskKit-Package -destination "id=$1" \
+      -derivedDataPath "$derived" -quiet EXCLUDED_ARCHS=x86_64; then
+    say "the iOS tests didn't build — $log"
+    { grep -E 'error:' "$log" || true; } | head -20 >&2
+    exit 1
+  fi
+  no_warnings "$log" "building the iOS tests" || exit 1
+}
+
 step_test_ios() {
   local sim log="$logs/test-ios.log" results="$work/test-ios.xcresult" passes
-  sim=${ASKKIT_SIM:-$(simulator "iPhone 18 Pro")}
+  sim=$(ios_sim)
+  [ "${ASKKIT_TESTS_BUILT:-}" = 1 ] || step_build_ios_tests "$sim"
   rm -rf "$results"
   say "AskKit-Package tests on iPhone 18 Pro ($sim)"
-  if ! logged "$log" xcodebuild test -scheme AskKit-Package -destination "id=$sim" \
-      -derivedDataPath "$derived" -resultBundlePath "$results" -collect-test-diagnostics never \
-      -quiet EXCLUDED_ARCHS=x86_64; then
+  if ! logged "$log" xcodebuild test-without-building -scheme AskKit-Package -destination "id=$sim" \
+      -derivedDataPath "$derived" -resultBundlePath "$results" -collect-test-diagnostics never -quiet; then
     say "the iOS tests failed — $log"
     { grep -E 'recorded an issue|error:' "$log" || true; } | head -20 >&2
     exit 1
   fi
   passes=$(passes_in "$results") || fail "couldn't count the tests that passed in $results"
-  if [ "$passes" -lt 1580 ]; then
-    say "only $passes tests passed on iOS (minimum 1,580), so part of the suite likely didn't compile in — $results"
+  if [ "$passes" -lt "$IOS_TEST_FLOOR" ]; then
+    say "only $passes tests passed on iOS (floor $IOS_TEST_FLOOR), so part of the suite likely didn't compile in — $results"
     exit 1
   fi
   say "$passes tests passed on iOS"
-  no_warnings "$log" "testing on iOS" || exit 1
 }
 
 # The demo's UI smoke suite on the iOS simulator, which scripts/ui-smoke.sh
 # runs. CI builds the bundle and doesn't run it, and the push gate runs it only
-# for a push that changes the screen (Sources/AskUI/ or Demo/): a simulator UI
-# test, about 12 minutes, would be the flakiest part of a gate every change
-# passes. `-project` is spelled out because from the repo root xcodebuild
-# otherwise resolves against `Package.swift`, which has no such scheme. Its
-# DerivedData and settings are `demo_build`'s, so it starts from what `demo`
-# built rather than from a cold DerivedData of Xcode's own.
+# for a push that changes the screen (Sources/AskUI/ or Demo/) or the scripts
+# that run it: a simulator UI test, about 12 minutes, would be the flakiest
+# part of a gate every change passes. `-project` is spelled out because from
+# the repo root xcodebuild otherwise resolves against `Package.swift`, which
+# has no such scheme. Its DerivedData and settings are `demo_build`'s, so it
+# starts from what `demo` built rather than from a cold DerivedData of Xcode's
+# own.
+#
+# build-ui-smoke and ui-smoke split it as build-ios-tests and test-ios split
+# the package's tests: the build, for the simulator, with its warnings scanned,
+# then the run, which builds nothing and collects no test diagnostics (a
+# failure otherwise spends up to ten minutes collecting the simulator's, with
+# the seat held). Run alone, ui-smoke builds first.
 #
 # An argument names one test, `AskScreenSmokeTests/<test>`.
 #
@@ -447,17 +493,31 @@ step_test_ios() {
 # So the run counts only with a test passed, read from the result bundle as
 # `test-ios` reads its count. Under `-only-testing` nothing outside TEST runs,
 # so with TEST that pass is TEST's.
+step_build_ui_smoke() { # simulator
+  local log="$logs/build-ui-smoke.log"
+  say "AskKitDemoUITests, built for iPhone 18 Pro ($1)"
+  if ! logged "$log" xcodebuild build-for-testing -project Demo/AskKitDemo.xcodeproj -scheme AskKitDemoUITests \
+      -destination "platform=iOS Simulator,id=$1" -derivedDataPath "$derived" -quiet \
+      CODE_SIGNING_ALLOWED=NO EXCLUDED_ARCHS=x86_64; then
+    say "the UI smoke suite didn't build — $log"
+    { grep -E 'error:' "$log" || true; } | head -20 >&2
+    exit 1
+  fi
+  no_warnings "$log" "building the UI smoke suite" || exit 1
+}
+
 step_ui_smoke() { # [test]
   local sim log="$logs/ui-smoke.log" results="$work/ui-smoke.xcresult" only=() passes
-  sim=${ASKKIT_SIM:-$(simulator "iPhone 18 Pro")}
+  sim=$(ios_sim)
+  [ "${ASKKIT_TESTS_BUILT:-}" = 1 ] || step_build_ui_smoke "$sim"
   [ -z "${1:-}" ] || only=("-only-testing:AskKitDemoUITests/$1")
   # xcodebuild refuses a result bundle path that already exists.
   rm -rf "$results"
   say "AskKitDemoUITests on iPhone 18 Pro ($sim) — $log"
-  if ! logged "$log" xcodebuild test -project Demo/AskKitDemo.xcodeproj -scheme AskKitDemoUITests \
-      -destination "platform=iOS Simulator,id=$sim" -derivedDataPath "$derived" \
-      -resultBundlePath "$results" ${only[@]+"${only[@]}"} \
-      CODE_SIGNING_ALLOWED=NO EXCLUDED_ARCHS=x86_64; then
+  if ! logged "$log" xcodebuild test-without-building -project Demo/AskKitDemo.xcodeproj \
+      -scheme AskKitDemoUITests -destination "platform=iOS Simulator,id=$sim" \
+      -derivedDataPath "$derived" -resultBundlePath "$results" -collect-test-diagnostics never \
+      ${only[@]+"${only[@]}"}; then
     say "the UI smoke suite failed — $log"
     { grep -E 'error:|Test Case .* failed|XCTAssert' "$log" || true; } | head -20 >&2
     exit 1
@@ -533,7 +593,7 @@ demo_build() { # scheme destination
 # `scripts/ci.sh test ios` fails instead of running the Mac's tests.
 step=${1:-all}
 case "$step" in
-  checks|test|api|test-ios|builds|demo|all)
+  checks|test|api|build-ios-tests|test-ios|build-ui-smoke|builds|demo|all)
     [ "$#" -le 1 ] || fail "usage: scripts/ci.sh $step" ;;
   ui-smoke)
     [ "$#" -le 2 ] || fail "usage: scripts/ci.sh ui-smoke [TEST]" ;;
@@ -544,7 +604,9 @@ case "$step" in
   checks) step_checks ;;
   test) step_test ;;
   api) step_api ;;
+  build-ios-tests) sim=$(ios_sim); step_build_ios_tests "$sim" ;;
   test-ios) step_test_ios ;;
+  build-ui-smoke) sim=$(ios_sim); step_build_ui_smoke "$sim" ;;
   ui-smoke) step_ui_smoke "${2:-}" ;;
   build) step_build "$2" || exit 1 ;;
   builds) step_builds ;;
