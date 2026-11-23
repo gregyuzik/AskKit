@@ -1052,6 +1052,22 @@ import Testing
         #expect(follow.footRequests > 0)
     }
 
+    @Test func aKeyboardLeavingBringsTheFootBackIntoView() {
+        // Traced on the demo as a question was sent: the thread 291 pt short
+        // of its foot under the keyboard, then the keyboard gone in one
+        // sample, the offset unchanged and the content's end 3 pt above the
+        // bottom edge. The inset going brings the reader to the foot, so a
+        // turn that begins there keeps them at it.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 376, content: 805, offset: 22), at: now)
+        follow.geometryChanged(Self.traced(width: 402, container: 670, content: 805, offset: 22), at: now + 0.02)
+
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 940, offset: 22), at: now + 0.03)
+        #expect(follow.isAtFoot)
+        #expect(follow.footRequests > 0)
+    }
+
     @Test func aReaderWhoScrolledUpUnderAKeyboardIsLeftWhereTheyWere() {
         // Only a change of the container's height alone carries the foot
         // over: a reader who scrolls up the thread with the keyboard up has

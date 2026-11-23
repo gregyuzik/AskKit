@@ -248,8 +248,8 @@ final class AskScrollFollow {
     /// last left the thread, which a resize decides whether to keep the foot
     /// from (`resized(to:at:)`): each sample's own distance, except that a
     /// sample in which only the space between the bars changed height
-    /// carries over the one before it
-    /// (`AskThreadGeometry.onlyTheContainerHeightChanged(from:)`).
+    /// (`AskThreadGeometry.onlyTheContainerHeightChanged(from:)`) can bring
+    /// it nearer the foot and never take it further away.
     ///
     /// **A bottom inset moves the foot without moving the reader.** A
     /// keyboard rising over a settled thread leaves the offset where it was,
@@ -258,8 +258,15 @@ final class AskScrollFollow {
     /// screen, as an iPhone 18 Pro simulator began to turn on its side in
     /// two push gates' runs of the demo. Read off that sample, the reader at
     /// the foot was 283 pt from the last turn's end, the resize kept nothing,
-    /// and on its side the newest answer was under the composer. Ignored by
-    /// observation for `lastGeometry`'s reason.
+    /// and on its side the newest answer was under the composer.
+    ///
+    /// **Nearer, though, because the inset going hands the space back.**
+    /// Traced on the demo, a keyboard leaving took the space between the bars
+    /// from 376 to 670 pt in one sample with the offset unchanged, and the
+    /// content's foot from 291 pt below the bottom edge to 3 pt above it.
+    /// Carried over, the 291 would have had a turn that began then leave the
+    /// reader where the scroll view put them. Ignored by observation for
+    /// `lastGeometry`'s reason.
     @ObservationIgnored private var footDistanceAsLeft: CGFloat = 0
 
     /// Whether the last sample left the thread at rest at its foot, or had no
@@ -578,9 +585,9 @@ final class AskScrollFollow {
         // second ask for the foot.
         if resizeKeepsFoot, resizeAnswered, !isWithinResizeWindow(at: now) { resizeKeepsFoot = false }
         resized(to: geometry, at: now)
-        if !(lastGeometry.map(geometry.onlyTheContainerHeightChanged(from:)) ?? false) {
-            footDistanceAsLeft = geometry.distanceFromContentFoot
-        }
+        footDistanceAsLeft = lastGeometry.map(geometry.onlyTheContainerHeightChanged(from:)) == true
+            ? min(footDistanceAsLeft, geometry.distanceFromContentFoot)
+            : geometry.distanceFromContentFoot
         insetTopChanged(geometry, at: now)
         let scrolledUp = !isJumpGliding(at: now)
             && !isResizing(at: now)
