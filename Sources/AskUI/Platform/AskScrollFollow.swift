@@ -243,6 +243,11 @@ final class AskScrollFollow {
     /// cleared by any other sample of the open bar.
     @ObservationIgnored private var fallIsTheBars = false
 
+    /// How much the space between the bars grew in the last sample, if it left
+    /// the inset as it was: a step of the collapse can bring the inset's fall
+    /// in the next one (`barLooksMinimized`).
+    @ObservationIgnored private var spaceGrowthBeforeFall: CGFloat = 0
+
     /// The space the thread's content lays out in, which its question bubbles
     /// report where they are in (`questionPlaced(_:of:)`). The content's own,
     /// and not the scroll view's, so a scroll moves nothing in it: a bubble
@@ -385,20 +390,23 @@ final class AskScrollFollow {
     /// safe area moves the offset with the inset, so the content shows from
     /// where it did, and the bar collapsing leaves the offset where it was.
     ///
-    /// **The space alone can't carry it.** SwiftUI can report a step of the
-    /// collapse in two samples, about 3 ms apart: the space and the offset
-    /// first, then the inset with nothing else changed. Traced on the turned
-    /// phone, every step of the bar minimizing under the screen's own scroll
-    /// came that way, and the last step of the reader's swipe upright left the
-    /// space as it was.
+    /// **A step of the collapse can come in two samples**, about 3 ms apart:
+    /// the space first, then the inset with nothing else changed. Traced on
+    /// the turned phone, every step of the bar minimizing under the screen's
+    /// own scroll came that way. So a fall with nothing else changed counts
+    /// the space's growth in the sample before, if that one left the inset as
+    /// it was; a late inset moves the offset with it, and never counts so. The
+    /// last step of the reader's swipe upright left the space as it was, and
+    /// the reader's scroll down reads that one.
     ///
     /// **What it can't tell.** A late inset that arrives with the reader's
     /// scroll down, or with the space between the bars growing as much for
     /// another reason, reads as the bar minimizing, though nothing minimized
-    /// it. And a collapse split that way under a scroll that isn't the
-    /// reader's reads as the open bar at each step, which the screen's next
-    /// scroll of its own opens. Off iOS the reading moves nothing: there is no
-    /// bar to hold open (`AskScreen.scrollThreadItself(_:)`).
+    /// it. And a collapse whose first step leaves the space as it was, under a
+    /// scroll that isn't the reader's, reads as the open bar at a new size,
+    /// which the screen's next scroll of its own opens. Off iOS the reading
+    /// moves nothing: there is no bar to hold open
+    /// (`AskScreen.scrollThreadItself(_:)`).
     var barLooksMinimized: Bool { insetTop < openBarInsetTop - 1 }
 
     /// Whether a resize under way is keeping the reader at the foot now
@@ -562,11 +570,15 @@ final class AskScrollFollow {
         guard let lastGeometry, !isWithinResizeWindow(at: now) else {
             openBarInsetTop = inset
             fallIsTheBars = false
+            spaceGrowthBeforeFall = 0
             return
         }
         let scrolledDown = isReaderScrolling && geometry.visibleTop > lastGeometry.visibleTop
         let fall = lastGeometry.insetTop - inset
-        let spaceTookFall = fall > 1 && geometry.containerHeight - lastGeometry.containerHeight >= fall - 1
+        let growth = geometry.containerHeight - lastGeometry.containerHeight
+        let insetAlone = abs(growth) <= 1 && geometry.offset == lastGeometry.offset
+        let spaceTookFall = fall > 1 && growth + (insetAlone ? spaceGrowthBeforeFall : 0) >= fall - 1
+        spaceGrowthBeforeFall = abs(fall) <= 1 ? growth : 0
         if inset >= openBarInsetTop - 1 {
             // Open: a fall next is the bar's after a step down, or into the space.
             openBarInsetTop = max(openBarInsetTop, inset)

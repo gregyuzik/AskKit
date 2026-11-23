@@ -1079,6 +1079,24 @@ import Testing
         #expect(follow.barLooksMinimized)
     }
 
+    @Test func aCollapseSplitAcrossTwoSamplesIsStillTheBars() {
+        // As traced on the turned phone: each step of the collapse came as the
+        // space between the bars growing, then, 3 ms later, the inset falling
+        // with nothing else changed. Here it comes after the hand has gone.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -116), at: now)
+        follow.scrollPhaseChanged(.interacting)
+        follow.geometryChanged(Self.traced(width: 402, container: 621, content: 1013, offset: -40), at: now + 0.05)
+        follow.scrollPhaseChanged(.idle)
+        follow.geometryChanged(Self.traced(width: 402, container: 675, content: 1013, offset: -40), at: now + 0.4)
+        #expect(!follow.barLooksMinimized)
+        follow.geometryChanged(
+            Self.traced(width: 402, container: 675, content: 1013, offset: -40, inset: 62), at: now + 0.403
+        )
+        #expect(follow.barLooksMinimized)
+    }
+
     @Test func theBarLooksOpenUntilItGivesTheSpaceBetweenTheBarsItsHeight() {
         // Measured beside a fold on an iPhone 18 Pro simulator: the bar
         // minimizing took 54 pt out of the inset, and the space between the
@@ -1096,9 +1114,9 @@ import Testing
     }
 
     @Test func aPhoneTurnedOnItsSideStartsTheBarOverAtItsNewInset() {
-        // The bars' shorter inset on its side, sampled a few milliseconds
-        // after the width, inside the resize: that is the open bar there, not
-        // a minimized one.
+        // The bars' shorter inset on its side arrives a few milliseconds after
+        // the width, inside the resize: that is the open bar there, not a
+        // minimized one.
         let follow = AskScrollFollow()
         let now: TimeInterval = 100
         follow.geometryChanged(Self.upright, at: now)
@@ -1108,13 +1126,9 @@ import Testing
         )
         #expect(!follow.barLooksMinimized)
 
-        // Minimized on its side by the reader, well after the turn.
-        follow.scrollPhaseChanged(.interacting)
+        // Minimized on its side, well after the turn.
         follow.geometryChanged(
-            Self.traced(width: 750, container: 250, content: 1765, offset: 800, inset: 78), at: now + 5
-        )
-        follow.geometryChanged(
-            Self.traced(width: 750, container: 300, content: 1765, offset: 820, inset: 30), at: now + 5.02
+            Self.traced(width: 750, container: 300, content: 1765, offset: 820, inset: 30), at: now + 5
         )
         #expect(follow.barLooksMinimized)
     }
