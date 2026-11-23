@@ -568,7 +568,7 @@ final class AskScrollFollow {
         let fall = lastGeometry.insetTop - inset
         let spaceTookFall = fall > 1 && geometry.containerHeight - lastGeometry.containerHeight >= fall - 1
         if inset >= openBarInsetTop - 1 {
-            // Open, so only a scroll down from here minimizes it.
+            // Open: a fall next is the bar's after a step down, or into the space.
             openBarInsetTop = max(openBarInsetTop, inset)
             fallIsTheBars = scrolledDown
         } else if scrolledDown || spaceTookFall || fallIsTheBars {
