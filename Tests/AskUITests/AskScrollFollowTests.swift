@@ -1022,6 +1022,81 @@ import Testing
         #expect(!follow.keepsFootThroughResize(at: now + 0.02))
     }
 
+    // MARK: - A resize on a loaded device
+
+    /// The traced turn's samples come in the same order on a loaded device,
+    /// further apart: a push gate's run of the demo's
+    /// testAThreadAtItsFootStaysThereOnItsSide, with a load average of about
+    /// 20 on 12 cores, left the newest answer under the composer on its side.
+    /// Nothing in these four has answered the resize yet, so each is still
+    /// its own, however late it comes.
+    private static let lateBy = AskScrollFollow.resizeWindow + 0.1
+
+    @Test func theScrollViewsStepAfterTheNewWidthIsTheResizesHoweverLate() {
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        let beforeTheStep = follow.footRequests
+
+        let late = now + 0.023 + Self.lateBy
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: late)
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests > beforeTheStep)
+        #expect(follow.keepsFootThroughResize(at: late))
+    }
+
+    @Test func rowsMeasuredAtTheNewWidthAreAskedForHoweverLate() {
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 754), at: now + 0.028)
+        let beforeTheRows = follow.footRequests
+
+        let late = now + 0.028 + Self.lateBy
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 1765, offset: 792, inset: 78), at: late
+        )
+        follow.geometryChanged(
+            Self.traced(width: 750, container: 250, content: 1771, offset: 792, inset: 78), at: late + 1
+        )
+        #expect(follow.isAtFoot)
+        #expect(!follow.showsJumpPill)
+        #expect(follow.footRequests == beforeTheRows + 2)
+        #expect(follow.keepsFootThroughResize(at: late + 1))
+    }
+
+    @Test func aRequestTheScreenAnswersLateIsStillTheResizes() {
+        // `AskScreen` answers from a task, which asks again as it runs: on a
+        // loaded device that can be long after the sample that asked.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: now + 0.023)
+        #expect(follow.footRequests > 0)
+        #expect(follow.keepsFootThroughResize(at: now + 0.023 + Self.lateBy))
+    }
+
+    @Test func theTurnsSecondWidthIsTheSameResizeHoweverLate() {
+        // The rotation's own width first, then the rows at their estimates for
+        // it, 484pt short of the foot. Decided again from that frame when the
+        // phone's width on its side comes, the resize would let the reader go.
+        let follow = AskScrollFollow()
+        let now: TimeInterval = 100
+        follow.geometryChanged(Self.upright, at: now)
+        follow.geometryChanged(Self.traced(width: 340, container: 722, content: 1480, offset: 871), at: now + 0.001)
+        follow.geometryChanged(Self.traced(width: 340, container: 722, content: 2205, offset: 871), at: now + 0.008)
+        let beforeTheWidth = follow.footRequests
+
+        let late = now + 0.008 + Self.lateBy
+        follow.geometryChanged(Self.traced(width: 750, container: 250, content: 1540, offset: 871), at: late)
+        #expect(follow.isAtFoot)
+        #expect(follow.footRequests > beforeTheWidth)
+        #expect(follow.keepsFootThroughResize(at: late))
+    }
+
     // MARK: - The navigation bar
 
     @Test func theReadersScrollDownMinimizesTheBar() {
