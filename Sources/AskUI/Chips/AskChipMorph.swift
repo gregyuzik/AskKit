@@ -83,9 +83,10 @@ nonisolated enum AskChipMorph {
     /// **The copy, not the original, is the one redacted.** As the scene goes
     /// inactive, the thread the reader was looking at reads no reasons and the
     /// copy reads `.privacy` (logged from both, 2026-11-23), so the morph
-    /// stays with the views that are on screen to run it. A host that redacts
-    /// the thread for privacy itself, with no copy, takes it out of the morph
-    /// too, which costs nothing: a redacted chip has no sentence to show.
+    /// stays with the views that are on screen to run it. A host's own
+    /// `.privacy` redaction over the thread would take it out of the morph
+    /// too: worked out from this rule, not run, and a redacted chip has no
+    /// sentence to show anyway.
     static func joinsTheMorph(under reasons: RedactionReasons) -> Bool {
         !reasons.contains(.privacy)
     }

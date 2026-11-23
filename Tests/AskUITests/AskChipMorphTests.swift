@@ -92,8 +92,8 @@ import AskCore
         #expect(AskChipMorph.joinsTheMorph(under: []))
         #expect(!AskChipMorph.joinsTheMorph(under: .privacy))
         #expect(!AskChipMorph.joinsTheMorph(under: [.privacy, .placeholder]))
-        // Only the privacy copy is known to be a second instance; a host's own
-        // placeholder redaction of the whole screen draws one.
+        // Only the privacy copy has been seen drawing a second instance, so the
+        // rule names `.privacy` alone and a placeholder keeps the morph.
         #expect(AskChipMorph.joinsTheMorph(under: .placeholder))
     }
 }
