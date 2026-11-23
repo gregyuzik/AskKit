@@ -30,6 +30,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
   filed only once the open's writes had landed and the list was read again. Until then the rows the
   pane of chats was given held the chosen chat alone, in the top row, and then both chats in their
   places again, for as long as those writes took. The list now changes with the screen, to what that read finds.
+- **Leaving the app with follow-ups on screen no longer faults in SwiftUI.** The thread is
+  `.privacySensitive()`, and as the scene goes inactive SwiftUI builds a redacted copy of it beside
+  the original. The copy's chips claimed the same matched-geometry ids as the originals, so the first
+  Home press after launch logged "Multiple inserted views in matched geometry group" once for each
+  follow-up, and a question still in flight would have done the same. The copy now stays out of the
+  chip-to-question morph, which runs as before on the thread the reader sees.
 
 ## [0.7.2] - 2026-11-09
 
