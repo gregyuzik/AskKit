@@ -552,6 +552,14 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// the filing is awaited and cleared as the chat ends, never set after
     /// an await (`fileBesideTheHeldThread`).
     @ObservationIgnored private var heldTurnsFiling: UUID?
+    /// The chats New Chat has ended whose filing hasn't landed, each listed
+    /// as the archive will list it once filed: on the list from the tap
+    /// (`endThread(filing:)`) whatever a read finds, until `endingWrites`
+    /// has the archive's answer, filed or not.
+    @ObservationIgnored private var filingsUnderWay: [FilingUnderWay] = []
+    /// The earlier chats deleted whose removal waits behind the writes
+    /// before it, which the list leaves out until it lands (`deleteThread`).
+    @ObservationIgnored private var removalsUnderWay: Set<UUID> = []
     /// The question waiting to be asked (`start`), if any. An earlier chat
     /// opening opens with it still waiting, to be asked there, rather than
     /// settling it as a turn of the chat it replaces. Stop, or a newer
@@ -1670,9 +1678,10 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// End the thread on screen, once it has been read: its turns go, filed
-    /// first with the earlier chats when `filing`, or deleted with them when
-    /// not, which is Delete All Chats. The feedback attachments it produced
-    /// go too. The writes are queued after every write before them.
+    /// first with the earlier chats when `filing`, and listed with them in
+    /// the same change (`listTheChatEnded`), or deleted with them when not,
+    /// which is Delete All Chats. The feedback attachments it produced go
+    /// too. The writes are queued after every write before them.
     ///
     /// Whatever holds the thread's place (`heldThread`) is set aside by New
     /// Chat, never deleted, since it is nowhere else, and deleted by Delete
@@ -1682,6 +1691,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         // before they are cleared. That includes what was asked after the
         // saved thread couldn't be read: it is the reader's, and it read fine.
         let outgoing = filing && offersHistory ? turns.filter(\.isComplete).map(\.entry) : []
+        let filedBeside = heldTurnsFiling
         turns = []
         threadEnds &+= 1
         readFailed = false
@@ -1692,11 +1702,65 @@ public final class AskConversationStore<Domain: AskDomain> {
         forgetFeedbackAttachments()
         guard keepsThread else { return }
         if filing {
-            queueWrite { await $0.endingWrites(filing: outgoing, held: held) }
+            let anew = UUID()
+            let listed = listTheChatEnded(outgoing, filedBeside: filedBeside, anew: anew)
+            queueWrite { await $0.endingWrites(filing: outgoing, anew: anew, listed: listed, held: held) }
         } else {
             history = []
+            filingsUnderWay = []
             queueWrite { await $0.deletingWrites() }
         }
+    }
+
+    /// **The list changes with the screen.** The chat New Chat ends goes on
+    /// the list in the change that takes it off the screen, as the archive
+    /// will list it once filed: in its place by date, under the id the
+    /// archive will file it under, in place of a filing of it the list
+    /// holds. Left to the read after its writes, it would be on neither the
+    /// screen nor the list until then, and the pane beside the fold would
+    /// draw the earlier chats alone, then the ended one among them
+    /// (`AskChatsPaneRows`). Says the id it is listed under, or nil with
+    /// nothing to file.
+    ///
+    /// Listed until its filing has an answer (`filingsUnderWay`), so a read
+    /// that lands first, the pane's or the history button's, keeps it.
+    private func listTheChatEnded(_ outgoing: [AskThreadEntry<Row>], filedBeside: UUID?, anew: UUID) -> UUID? {
+        // The id the archive files it under (`fileTheChatOnScreen`): a
+        // filing of the chat, then the turns filed beside a held thread,
+        // then the one it is given.
+        let id = history.first { $0.isSameChat(as: outgoing) }?.id ?? filedBeside ?? anew
+        let kept = Array(outgoing.suffix(AskThreadStore<Row>.maxPersistedTurns))
+        guard let summary = AskThreadSummary.of(kept, id: id, fallbackDate: .now) else { return nil }
+        filingsUnderWay.removeAll { $0.summary.id == id }
+        filingsUnderWay.append(FilingUnderWay(summary: summary, entries: outgoing))
+        history = withFilingsUnderWay(history)
+        return id
+    }
+
+    /// A chat New Chat is filing, as the list shows it, with the turns that
+    /// tell a filing of it apart (`AskThreadSummary.isSameChat(as:)`).
+    private struct FilingUnderWay {
+        let summary: AskThreadSummary
+        let entries: [AskThreadEntry<Row>]
+    }
+
+    /// `listed` with each chat New Chat is still filing in its place, in
+    /// place of what the archive lists of it: its filing, landed already, or
+    /// one that filing will take the place of.
+    private func withFilingsUnderWay(_ listed: [AskThreadSummary]) -> [AskThreadSummary] {
+        filingsUnderWay.reduce(listed) { list, underWay in
+            Self.inserting(underWay.summary, into: list.filter {
+                $0.id != underWay.summary.id && !$0.isSameChat(as: underWay.entries)
+            })
+        }
+    }
+
+    /// `list` with `summary` in its place by date, newest first, as the
+    /// archive lists them.
+    private static func inserting(_ summary: AskThreadSummary, into list: [AskThreadSummary]) -> [AskThreadSummary] {
+        var list = list
+        list.insert(summary, at: list.firstIndex { $0.updatedAt < summary.updatedAt } ?? list.endIndex)
+        return list
     }
 
     /// The engine's side of a chat ending: its turn stopped, then the chat
@@ -1727,12 +1791,16 @@ public final class AskConversationStore<Domain: AskDomain> {
     /// holds it won't move. What held the place before New Chat is set aside
     /// first, the same way, and never deleted, unless it is what is owed a
     /// delete (`deletionOwed`): that is deleted.
-    private func endingWrites(filing outgoing: [AskThreadEntry<Row>], held tapped: HeldThread?) async {
+    private func endingWrites(filing outgoing: [AskThreadEntry<Row>], anew: UUID, listed: UUID?, held tapped: HeldThread?) async {
+        // Every way out reads the list again, and the chat comes off the
+        // filings under way in the change that puts that read up, filed or
+        // not: listed once filed, and off the list when it isn't.
+        let settle = { self.filingsUnderWay.removeAll { $0.summary.id == listed } }
         // What holds the place now, not only at the tap: a New Chat before
         // this one may have found its own held thread wouldn't move, and held
         // it again.
         var held = tapped ?? heldThread
-        let filed = outgoing.isEmpty ? true : await archive.fileTheChatOnScreen(outgoing, at: .now, sparing: nil) != nil
+        let filed = outgoing.isEmpty ? true : await archive.fileTheChatOnScreen(outgoing, at: .now, sparing: nil, anew: anew) != nil
         // The turns filed beside a thread that couldn't be read are in this
         // filing now, which took their filing's place in the same write.
         // Where it failed, theirs stays, an ordinary filing from here on, so
@@ -1761,7 +1829,7 @@ public final class AskConversationStore<Domain: AskDomain> {
                 oweFiling(outgoing)
             }
             watchForProtectedData()
-            await loadHistory()
+            await loadHistory(settling: settle)
             return
         }
         // Moved aside, so the place is free, whoever held it.
@@ -1772,14 +1840,14 @@ public final class AskConversationStore<Domain: AskDomain> {
                 deletionOwed.thread = true
                 watchForProtectedData()
             }
-            await loadHistory()
+            await loadHistory(settling: settle)
             return
         }
         if await thread.save(outgoing) {
             // Written over whatever was owed a delete.
             deletionOwed.thread = false
             if await thread.setAside() {
-                await loadHistory()
+                await loadHistory(settling: settle)
                 return
             }
             Logger(subsystem: brand.logSubsystem, category: "ask")
@@ -1794,7 +1862,7 @@ public final class AskConversationStore<Domain: AskDomain> {
             // Holding the place would keep what is owed a delete in it, for a
             // later write to set aside.
             if placeHoldsDeleted {
-                await loadHistory()
+                await loadHistory(settling: settle)
                 return
             }
         }
@@ -1802,7 +1870,7 @@ public final class AskConversationStore<Domain: AskDomain> {
         // its copy or an older save of it, until that is set aside.
         heldThread = .unfiled
         watchForProtectedData()
-        await loadHistory()
+        await loadHistory(settling: settle)
     }
 
     /// Keep a chat that is on disk nowhere until the archive takes it
@@ -2533,12 +2601,26 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Read the list of earlier chats again. The earlier chat on screen is
-    /// left out of it while it is there.
+    /// left out of it while it is there, and so is a chat deleted whose
+    /// removal hasn't landed; a chat New Chat ended whose filing hasn't is on
+    /// it.
     public func loadHistory() async {
-        guard offersHistory else { return }
+        await loadHistory(settling: {})
+    }
+
+    /// Read the list again, and `settle` in the change that puts up what was
+    /// read: what kept the list from waiting on a write, a filing New Chat
+    /// listed ahead or a deletion, once that write has landed. Settled before
+    /// the read, it would leave a read already under way, of the disk before
+    /// the write, to put up a list without it.
+    private func loadHistory(settling settle: () -> Void) async {
+        guard offersHistory else { return settle() }
         // The earlier chat on screen is `openedChatID`.
         let summaries = await archive.summaries()
-        history = summaries.filter { $0.id != openedChatID && $0.id != heldTurnsFiling }
+        settle()
+        history = withFilingsUnderWay(summaries.filter {
+            $0.id != openedChatID && $0.id != heldTurnsFiling && !removalsUnderWay.contains($0.id)
+        })
     }
 
     /// Go back to an earlier chat from the history list.
@@ -2654,12 +2736,10 @@ public final class AskConversationStore<Domain: AskDomain> {
         // lists them. Left to that read, the chat just filed would be on
         // neither the screen nor the list until then, and the pane beside the
         // fold would draw the chosen chat alone in its top row, then both
-        // chats in their places (`AskChatsPaneRows`).
-        var listed = history.filter { $0.id != summary.id && $0.id != filing?.id }
-        if let filing {
-            listed.insert(filing, at: listed.firstIndex { $0.updatedAt < filing.updatedAt } ?? listed.endIndex)
-        }
-        history = listed
+        // chats in their places (`AskChatsPaneRows`). New Chat lists the chat
+        // it ends the same way (`listTheChatEnded`).
+        let listed = history.filter { $0.id != summary.id && $0.id != filing?.id }
+        history = filing.map { Self.inserting($0, into: listed) } ?? listed
         forgetFeedbackAttachments()
 
         // Written, then taken off the list: interrupted between, a chat is in
@@ -2778,11 +2858,20 @@ public final class AskConversationStore<Domain: AskDomain> {
     }
 
     /// Forget an earlier chat. Does nothing on a domain that keeps no chats.
+    ///
+    /// Removed after every write queued before it, and off the list until
+    /// then, whatever a read finds: the chat may be one New Chat listed as it
+    /// ended (`listTheChatEnded`), and removed ahead of its filing, it would
+    /// come back with it.
     public func deleteThread(_ summary: AskThreadSummary) async {
         guard offersHistory else { return }
         history.removeAll { $0.id == summary.id }
-        await archive.remove(summary.id)
-        await loadHistory()
+        filingsUnderWay.removeAll { $0.summary.id == summary.id }
+        removalsUnderWay.insert(summary.id)
+        await queueWrite { [archive] store in
+            await archive.remove(summary.id)
+            await store.loadHistory { _ = store.removalsUnderWay.remove(summary.id) }
+        }.value
     }
 
     // MARK: - What the view reads
