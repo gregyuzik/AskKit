@@ -98,8 +98,8 @@ final class AskScrollFollow {
     /// The least time after the thread's width last changed that its steps are
     /// still the resize's own, and a reader who was at the foot is kept there
     /// (`isResizeUnderWay(at:)`). `jumpGlideWindow`'s half-second: a phone
-    /// turned either way was traced reaching its final layout inside a tenth
-    /// of one.
+    /// turned on its side was traced reaching its final layout inside a
+    /// quarter of one.
     ///
     /// **A floor, not the length of a resize.** One that holds the reader at
     /// the foot goes on past it until a sample leaves the thread at rest there
@@ -381,8 +381,8 @@ final class AskScrollFollow {
     /// order of a resize's samples and not their pace. A push gate's run of
     /// the demo's testAThreadAtItsFootStaysThereOnItsSide, at a load average
     /// of about 20 on 12 cores, left the newest answer under the composer on
-    /// its side. The traced turn is over inside a tenth of a second; held to
-    /// the window alone, a turn's later samples found it closed, so the
+    /// its side. The traced turns are over inside a quarter of a second; held
+    /// to the window alone, a turn's later samples found it closed, so the
     /// scroll view's step read as the reader's, and a row measured at the
     /// new width, or the screen's task asking again, went unanswered.
     private func isResizeUnderWay(at now: TimeInterval) -> Bool {
@@ -466,10 +466,10 @@ final class AskScrollFollow {
     /// unless one is still waiting to be answered.
     ///
     /// **A request the thread has already answered is not answered again.**
-    /// Turned upright on an iPhone 18 Pro simulator, a request's task ran 3 ms
+    /// Turned upright on an iPhone 18 Pro simulator, a request's task ran just
     /// after the sample that showed the thread at rest at its foot, and the
-    /// sample after the screen's scroll had it 52 pt above the foot, to be
-    /// asked for again. With the task doing nothing there, the same turn went
+    /// sample after the screen's scroll, 6 ms later, had it 52 pt above the
+    /// foot, to be asked for again. With the task doing nothing there, the same turn went
     /// from rest at the foot to rest at the foot through the bars' new inset.
     func keepsFootThroughResize(at now: TimeInterval) -> Bool {
         holdsFoot(at: now) && !resizeAnswered
