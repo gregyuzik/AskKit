@@ -12,6 +12,12 @@ both kinds) is a breaking change, allowed in a 0.x minor version, because it sto
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-23
+
+Six fixes and one change, and no change to the API. A reader at the foot of a thread stays there as
+the phone turns, chats opened or ended beside iPhone Duo's fold move no row, leaving the app with
+follow-ups on screen no longer faults, and the "Hide a Suggestion" tip waits for a second visit.
+
 ### Changed
 
 - **The "Hide a Suggestion" tip waits for the reader's second visit to Ask.** It came up over the
@@ -914,7 +920,8 @@ device, and Private Cloud Compute, which is optional, needs Apple's managed enti
   reminders. A launch argument sets up each state of the screen, and `-askScriptedAnswer` answers
   without a model.
 
-[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/gregyuzik/AskKit/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/gregyuzik/AskKit/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/gregyuzik/AskKit/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/gregyuzik/AskKit/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/gregyuzik/AskKit/compare/v0.6.0...v0.7.0
