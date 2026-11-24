@@ -1,8 +1,8 @@
 #!/bin/sh
 # shellcheck disable=SC2034,SC2154
 #   GATE_NAME and GATE_OWN_PROJECTS are read by the step helpers PREPUSH_LIB
-#   sources, and gate_arm_ui and gate_locked_udid are set by them: a library
-#   the linter can't follow.
+#   sources, and gate_arm_ui, gate_locked_udid and gate_extra_udid are set by
+#   them: a library the linter can't follow.
 #
 # The push gate: what has to hold before a push leaves the machine. Its checks,
 # tests and builds are scripts/ci.sh's, the steps CI runs, so the two gates
@@ -48,7 +48,8 @@
 #   8. ci.sh test-ios        (those tests on the seat, which the gate holds
 #                             from here)
 #   9. ci.sh ui-smoke        (the demo's UI tests on it, when the push changes
-#                             Sources/AskUI/ or Demo/)
+#                             Sources/AskUI/ or Demo/: split over both iPhones
+#                             when the lib's try gets the other one too)
 # Steps 2 to 9 need PREPUSH_LIB. A cache may skip 3 to 9, never the checks. A
 # change to THIS file reaches no compiler, but it decides what passing means,
 # so a cache has to count it as a change to the tree. The release tag `api`
@@ -174,10 +175,11 @@ gate_step "ci.sh api"
 gate_logged --warnings "$derived" "ci.sh builds" ./scripts/ci.sh builds || gate_finish --failed
 gate_logged --warnings "$derived" "ci.sh demo" ./scripts/ci.sh demo || gate_finish --failed
 
-# The UI smoke suite (about 12 minutes, and the flakiest step there is) only
-# when the push changes the screen, a file under Sources/AskUI/ or Demo/ (its
-# docs aside) that differs from where the branch left main, or the script that
-# runs the suite. With no merge base, or a change to this gate, it runs.
+# The UI smoke suite (about 20 minutes on one seat, and the flakiest step
+# there is) only when the push changes the screen, a file under Sources/AskUI/
+# or Demo/ (its docs aside) that differs from where the branch left main, or
+# the script that runs the suite. With no merge base, or a change to this
+# gate, it runs.
 #
 # A tree that passes with the suite skipped is still recorded, so a later push
 # of the same tree skips the suite too, even where main has moved and its
@@ -217,6 +219,18 @@ export ASKKIT_SIM ASKKIT_TESTS_BUILT
 gate_step "ci.sh test-ios"
 ./scripts/ci.sh test-ios || gate_finish --failed
 if [ "$gate_arm_ui" = 1 ]; then
+  # The other iPhone too, when the lib's try gets it (gate_sim_extra: its
+  # lock free, a simulator slot for it, no gate queued and no hold waiting
+  # for it, and never a wait, so it is one seat whenever anyone else wants
+  # the second): ci.sh then splits the UI tests over the two. An installed
+  # lib without the try is one seat. gate_release_sim lets both go.
+  ASKKIT_SIM_2=
+  if command -v gate_sim_extra >/dev/null 2>&1; then
+    gate_step "simulator extra"
+    gate_sim_extra
+    ASKKIT_SIM_2=${gate_extra_udid:-}
+  fi
+  export ASKKIT_SIM_2
   gate_step "ci.sh ui-smoke"
   ./scripts/ci.sh ui-smoke || gate_finish --failed
 else

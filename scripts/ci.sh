@@ -16,7 +16,8 @@
 #   build-ios-tests  the package's tests, built for an iPhone 18 Pro simulator
 #   test-ios         those tests, run on it
 #   build-ui-smoke   the demo's UI tests, built for an iPhone 18 Pro simulator
-#   ui-smoke [T]     those tests, run on it, or only test T, such as
+#   ui-smoke [T]     those tests, run on it (split over it and $ASKKIT_SIM_2
+#                    when that is set), or only test T, such as
 #                    AskScreenSmokeTests/<test>
 #   build DEST       the package for one xcodebuild destination
 #   builds           the package for all eight destinations
@@ -36,6 +37,8 @@
 #
 # The iOS steps build and test for the simulator whose UDID is in $ASKKIT_SIM,
 # the seat the push gate holds for them, or else for one named iPhone 18 Pro.
+# With a second iPhone's UDID in $ASKKIT_SIM_2 (the gate's, when the lib's try
+# for the other iPhone got it), ui-smoke splits the whole suite over the two.
 # test-ios and ui-smoke run their build step first, so a run by hand never
 # tests what an earlier build left, unless ASKKIT_TESTS_BUILT=1 says it just
 # ran: the push gate runs the build steps before it locks the seat, so nothing
@@ -474,8 +477,8 @@ step_test_ios() {
 # The demo's UI smoke suite on the iOS simulator, which scripts/ui-smoke.sh
 # runs. CI builds the bundle and doesn't run it, and the push gate runs it only
 # for a push that changes the screen (Sources/AskUI/ or Demo/) or the scripts
-# that run it: a simulator UI test, about 12 minutes, would be the flakiest
-# part of a gate every change passes. `-project` is spelled out because from
+# that run it: a simulator UI test, about 20 minutes on one seat, would be the
+# flakiest part of a gate every change passes. `-project` is spelled out because from
 # the repo root xcodebuild otherwise resolves against `Package.swift`, which
 # has no such scheme. Its DerivedData and settings are `demo_build`'s, so it
 # starts from what `demo` built rather than from a cold DerivedData of Xcode's
@@ -511,6 +514,13 @@ step_ui_smoke() { # [test]
   local sim log="$logs/ui-smoke.log" results="$work/ui-smoke.xcresult" only=() passes
   sim=$(ios_sim)
   [ "${ASKKIT_TESTS_BUILT:-}" = 1 ] || step_build_ui_smoke "$sim"
+  if [ -z "${1:-}" ] && [ -n "${ASKKIT_SIM_2:-}" ] && [ "$ASKKIT_SIM_2" != "$sim" ]; then
+    if ui_smoke_plan; then
+      ui_smoke_two "$sim" "$ASKKIT_SIM_2"
+      return 0
+    fi
+    say "the UI smoke suite runs on one seat, $sim"
+  fi
   [ -z "${1:-}" ] || only=("-only-testing:AskKitDemoUITests/$1")
   # xcodebuild refuses a result bundle path that already exists.
   rm -rf "$results"
@@ -530,6 +540,161 @@ step_ui_smoke() { # [test]
   fi
   [ "$passes" -gt 0 ] || fail "no UI test passed: every one skipped, or none ran — $results"
   say "UI tests passed: $passes"
+}
+
+# ui-smoke on two seats: the push gate's iPhone and, in $ASKKIT_SIM_2, the
+# other iPhone, when the lib's try got it (prepush-lib.sh's gate_sim_extra;
+# a simulator is never cloned, so `-parallel-testing-worker-count` is out).
+# The suite splits into two halves of about the same time, by each test's
+# duration in the last run's result bundles (ui-smoke.xcresult, or the two
+# halves', the newest bundle's time counting), a test with no time taking the
+# mean, and by count with no bundle to read. Half one is the tests the source
+# names (Demo/AskKitDemoUITests/*.swift, `func test…()` in an XCTestCase
+# class) that the split gave it, `-only-testing`; half two is the whole suite
+# less those, `-skip-testing`, so whatever the source parse misses still
+# runs, on seat two. Both run at once, test-without-building against the
+# .xctestrun build-ui-smoke wrote, so neither reads the project or writes the
+# DerivedData the other uses; each has its own log and result bundle. The run
+# counts as ui-smoke does: no test failed in either half, and a test passed.
+# A TERM or INT stops both runs before it exits, so the gate never lets a seat
+# go under a live run.
+#
+# ui_smoke_plan finds the .xctestrun (the one for this SDK; none, or more
+# than one, is one seat) and the split, in ui_xctestrun and ui_half_one;
+# without either it says why and fails, and ui-smoke runs on one seat.
+ui_smoke_plan() {
+  local sdk found
+  ui_xctestrun=
+  ui_half_one=
+  if ! sdk=$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null) || [ -z "$sdk" ]; then
+    say "can't read the simulator SDK's version, so can't find the UI tests' .xctestrun"
+    return 1
+  fi
+  found=$(find "$derived/Build/Products" -maxdepth 1 -name "AskKitDemoUITests_*iphonesimulator${sdk}*.xctestrun" 2>/dev/null) || found=
+  if [ -z "$found" ] || [ "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" != 1 ]; then
+    say "no single .xctestrun for the UI tests on iphonesimulator$sdk in $derived/Build/Products: ${found:-none}"
+    return 1
+  fi
+  ui_xctestrun=$found
+  if ! ui_half_one=$(ui_smoke_split Demo/AskKitDemoUITests "$work/ui-smoke.xcresult" "$work/ui-smoke-1.xcresult" "$work/ui-smoke-2.xcresult") \
+      || [ -z "$ui_half_one" ]; then
+    say "couldn't split the UI tests in two"
+    return 1
+  fi
+}
+
+# Prints half one's tests, `Class/test` a line, from the sources in $1 and
+# the result bundles after it (those that read), and says on stderr how the
+# halves came out.
+ui_smoke_split() { # sources bundle...
+  python3 -I - "$@" <<'PY'
+import glob, json, os, re, subprocess, sys
+src, bundles = sys.argv[1], sys.argv[2:]
+tests = []
+for path in sorted(glob.glob(os.path.join(src, "*.swift"))):
+    cls = None
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"\s*(?:@\w+\s+)*(?:[a-z]+\s+)*class\s+(\w+)\s*:\s*XCTestCase\b", line)
+            if m:
+                cls = m.group(1)
+                continue
+            m = re.match(r"\s*(?:@\w+\s+)*(?:[a-z]+\s+)*func\s+(test\w*)\s*\(\s*\)", line)
+            if m and cls:
+                tests.append(cls + "/" + m.group(1))
+tests = sorted(set(tests))
+if len(tests) < 2:
+    sys.exit(1)
+times = {}
+def walk(node):
+    if node.get("nodeType") == "Test Case":
+        ident = re.sub(r"\(\)$", "", node.get("nodeIdentifier") or "")
+        secs = node.get("durationInSeconds")
+        if ident and isinstance(secs, (int, float)) and secs > 0:
+            times[ident] = float(secs)
+    for child in node.get("children") or []:
+        walk(child)
+for bundle in sorted((b for b in bundles if os.path.isdir(b)), key=os.path.getmtime):
+    try:
+        out = subprocess.run(["xcrun", "xcresulttool", "get", "test-results", "tests", "--path", bundle, "--compact"],
+                             capture_output=True, text=True, timeout=120)
+        if out.returncode == 0:
+            for node in json.loads(out.stdout).get("testNodes") or []:
+                walk(node)
+    except (OSError, ValueError, AttributeError, subprocess.TimeoutExpired):
+        pass
+known = [times[t] for t in tests if t in times]
+mean = sum(known) / len(known) if known else 1.0
+weight = {t: times.get(t, mean) for t in tests}
+halves = ([], [])
+load = [0.0, 0.0]
+for t in sorted(tests, key=lambda t: (-weight[t], t)):
+    i = 0 if load[0] <= load[1] else 1
+    halves[i].append(t)
+    load[i] += weight[t]
+if known:
+    how = "by the last run's times (%d of %d tests timed)" % (len(known), len(tests))
+    print("ci: the UI smoke suite in two halves %s: %d tests, about %d s, on seat one; %d, about %d s, and any the source parse missed, on seat two"
+          % (how, len(halves[0]), load[0], len(halves[1]), load[1]), file=sys.stderr)
+else:
+    print("ci: the UI smoke suite in two halves by count, with no result bundle to time them: %d tests on seat one; %d, and any the source parse missed, on seat two"
+          % (len(halves[0]), len(halves[1])), file=sys.stderr)
+print("\n".join(sorted(halves[0])))
+PY
+}
+
+# Runs the two halves, one a seat, and waits for both.
+ui_smoke_two() { # seat-one seat-two
+  local n p t rc1=0 rc2=0 passes=0
+  local -a one=() skip=()
+  while IFS= read -r t; do
+    one+=("-only-testing:AskKitDemoUITests/$t")
+    skip+=("-skip-testing:AskKitDemoUITests/$t")
+  done <<< "$ui_half_one"
+  # xcodebuild refuses a result bundle path that already exists.
+  rm -rf "$work/ui-smoke-1.xcresult" "$work/ui-smoke-2.xcresult"
+  say "AskKitDemoUITests on two iPhone 18 Pro seats, $1 and $2 — $logs/ui-smoke-1.log, $logs/ui-smoke-2.log"
+  ui_runs=()
+  trap 'ui_smoke_stop; exit 143' TERM
+  trap 'ui_smoke_stop; exit 130' INT
+  xcodebuild test-without-building -xctestrun "$ui_xctestrun" -destination "platform=iOS Simulator,id=$1" \
+    -resultBundlePath "$work/ui-smoke-1.xcresult" -collect-test-diagnostics never \
+    "${one[@]}" >"$logs/ui-smoke-1.log" 2>&1 &
+  ui_runs+=("$!")
+  xcodebuild test-without-building -xctestrun "$ui_xctestrun" -destination "platform=iOS Simulator,id=$2" \
+    -resultBundlePath "$work/ui-smoke-2.xcresult" -collect-test-diagnostics never \
+    "${skip[@]}" >"$logs/ui-smoke-2.log" 2>&1 &
+  ui_runs+=("$!")
+  wait "${ui_runs[0]}" || rc1=$?
+  wait "${ui_runs[1]}" || rc2=$?
+  ui_runs=()
+  trap - TERM INT
+  for n in 1 2; do grep -E 'Test Case .* (passed|failed)' "$logs/ui-smoke-$n.log" || true; done
+  if [ "$rc1" != 0 ] || [ "$rc2" != 0 ]; then
+    [ "$rc1" = 0 ] || ui_smoke_failed 1 "$rc1"
+    [ "$rc2" = 0 ] || ui_smoke_failed 2 "$rc2"
+    exit 1
+  fi
+  for n in 1 2; do
+    p=$(passes_in "$work/ui-smoke-$n.xcresult") || fail "couldn't count the tests that passed in $work/ui-smoke-$n.xcresult"
+    passes=$((passes + p))
+  done
+  [ "$passes" -gt 0 ] || fail "no UI test passed: every one skipped, or none ran — $work/ui-smoke-1.xcresult, $work/ui-smoke-2.xcresult"
+  say "UI tests passed: $passes, over two seats"
+}
+
+ui_smoke_failed() { # seat exit
+  say "the UI smoke suite failed on seat $1 (exit $2) — $logs/ui-smoke-$1.log"
+  { grep -E 'error:|Test Case .* failed|XCTAssert' "$logs/ui-smoke-$1.log" || true; } | head -20 >&2
+}
+
+# Stops the runs ui_smoke_two started that are still going, and waits for
+# them, so no test run outlives this script on a seat the gate lets go.
+ui_smoke_stop() {
+  local p
+  for p in "${ui_runs[@]+"${ui_runs[@]}"}"; do kill -TERM "$p" 2>/dev/null || true; done
+  for p in "${ui_runs[@]+"${ui_runs[@]}"}"; do wait "$p" 2>/dev/null || true; done
+  ui_runs=()
 }
 
 # EXCLUDED_ARCHS on the command line, because `AskKit-Package` is SwiftPM's
